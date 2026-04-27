@@ -4,16 +4,9 @@ import { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import RecentProjectCard from './RecentProjectCard';
+import type { ProjectSummary } from './types';
 
-interface ProjectSummary {
-    id: number;
-    name: string;
-    projectKey?: string;
-    isFavorite?: boolean;
-    type: 'AGILE' | 'KANBAN' | string;
-    lastAccessedAt?: string;
-}
-
+// Props for the carousel (data and loading state)
 interface RecentSpacesCarouselProps {
     projects: ProjectSummary[];
     loading: boolean;
@@ -21,10 +14,11 @@ interface RecentSpacesCarouselProps {
 }
 
 export default function RecentSpacesCarousel({ projects, loading, searchQuery }: RecentSpacesCarouselProps) {
-    const scrollRef = useRef<HTMLDivElement>(null);
-    const [showLeftArrow, setShowLeftArrow] = useState(false);
-    const [showRightArrow, setShowRightArrow] = useState(true);
+    const scrollRef = useRef<HTMLDivElement>(null); // Ref for the scrollable container
+    const [showLeftArrow, setShowLeftArrow] = useState(false); // State for left navigation arrow
+    const [showRightArrow, setShowRightArrow] = useState(true); // State for right navigation arrow
 
+    // Check scroll position to hide/show navigation arrows
     const handleScroll = () => {
         if (scrollRef.current) {
             const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
@@ -33,13 +27,12 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
         }
     };
 
+    // Initialize scroll listener and initial check
     useEffect(() => {
         const current = scrollRef.current;
         if (current) {
             current.addEventListener('scroll', handleScroll);
-            // Initial check
             handleScroll();
-            // Also check on resize
             window.addEventListener('resize', handleScroll);
         }
         return () => {
@@ -50,6 +43,7 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
         };
     }, [projects]);
 
+    // Manual scroll using arrow buttons
     const scroll = (direction: 'left' | 'right') => {
         if (scrollRef.current) {
             const { clientWidth } = scrollRef.current;
@@ -58,15 +52,15 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
         }
     };
 
+    // Show skeletons while data is being fetched
     if (loading) {
         return (
             <div className="flex gap-4 overflow-hidden py-1 w-full hide-scrollbar">
                 {Array.from({ length: 4 }).map((_, i) => (
-                    <div 
-                        key={i} 
+                    <div
+                        key={i}
                         className="flex flex-col p-5 h-[160px] min-w-[240px] rounded-2xl border border-[#E5E7EB] bg-white shadow-sm shrink-0"
                     >
-                        {/* Skeleton Header: Icon + Type + Star */}
                         <div className="flex justify-between items-start mb-3">
                             <div className="flex gap-3 items-center">
                                 <div className="w-8 h-8 rounded-[4px] bg-gray-200 animate-pulse" />
@@ -74,11 +68,7 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
                             </div>
                             <div className="w-4 h-4 bg-gray-200 rounded animate-pulse" />
                         </div>
-                        
-                        {/* Skeleton Body: Title */}
                         <div className="w-2/3 h-5 bg-gray-200 rounded animate-pulse mt-2 mb-auto" />
-                        
-                        {/* Skeleton Footer: Key + Boards */}
                         <div className="flex justify-between items-center mt-3 pt-3 border-t border-[#F3F4F6]">
                             <div className="w-12 h-3 bg-gray-200 rounded animate-pulse" />
                             <div className="w-16 h-3 bg-gray-200 rounded animate-pulse" />
@@ -89,6 +79,7 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
         );
     }
 
+    // Show empty state if no projects match filters/search
     if (projects.length === 0) {
         return (
             <div className="w-full py-8 text-center bg-gray-50 rounded border border-dashed border-gray-300">
@@ -101,7 +92,7 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
 
     return (
         <div className="relative group/carousel w-full mt-1">
-            {/* Left Navigation Arrow */}
+            {/* Left arrow button */}
             {showLeftArrow && (
                 <button
                     onClick={() => scroll('left')}
@@ -112,20 +103,20 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
                 </button>
             )}
 
-            {/* Carousel Container */}
+            {/* Scrollable card container */}
             <div
                 ref={scrollRef}
                 onScroll={handleScroll}
                 className="flex gap-4 overflow-x-auto pb-4 pt-2 px-1 md:px-0 hide-scrollbar scroll-smooth"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', contentVisibility: 'auto', containIntrinsicSize: '0 160px' } as React.CSSProperties}
             >
-                {/* Custom CSS for hiding scrollbar inline as fallback */}
                 <style jsx>{`
                     .hide-scrollbar::-webkit-scrollbar {
                         display: none;
                     }
                 `}</style>
 
+                {/* Render up to 5 project cards */}
                 {projects.slice(0, 5).map((project) => (
                     <RecentProjectCard
                         key={project.id}
@@ -138,7 +129,7 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
                     />
                 ))}
 
-                {/* Always show "View all" card if we have projects, as per user request */}
+                {/* Final "View All" card */}
                 <Link
                     href="/spaces"
                     className="group flex flex-col justify-center items-center min-w-[200px] h-[160px] bg-gray-50/50 hover:bg-white rounded-2xl border border-dashed border-gray-300 hover:border-[#0052CC]/30 hover:shadow-[0_8px_24px_rgba(0,82,204,0.08)] cursor-pointer transition-all duration-300 hover:-translate-y-[2px] shrink-0"
@@ -153,7 +144,7 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
                 </Link>
             </div>
 
-            {/* Right Navigation Arrow */}
+            {/* Right arrow button */}
             {showRightArrow && (
                 <button
                     onClick={() => scroll('right')}
@@ -166,3 +157,5 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
         </div>
     );
 }
+
+

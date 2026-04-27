@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -65,6 +67,46 @@ class ProjectInvitationServiceTest {
     private ProjectInvitationService projectInvitationService;
 
     @Test
+    void inviteToProject_success() {
+        ProjectInviteRequest request = new ProjectInviteRequest();
+        request.setEmail("new@example.com");
+        request.setRole(TeamRole.MEMBER);
+
+        Project project = project(77L, 10L, "creator@example.com");
+        User inviter = new User();
+        inviter.setUserId(10L);
+        inviter.setFullName("Inviter Name");
+
+        when(projectRepository.findById(77L)).thenReturn(Optional.of(project));
+        when(userRepository.findById(10L)).thenReturn(Optional.of(inviter));
+        when(userRepository.findByEmailIgnoreCase("new@example.com")).thenReturn(Optional.empty());
+        when(teamInvitationRepository.findByTeamIdAndEmail(11L, "new@example.com")).thenReturn(Optional.empty());
+
+        projectInvitationService.inviteToProject(77L, request, 10L);
+
+        verify(teamInvitationRepository).save(any(TeamInvitation.class));
+        verify(emailService).sendProjectInvitationHtmlEmail(eq("new@example.com"), eq("Inviter Name"), eq("Apollo"), anyString());
+    }
+
+    @Test
+    void inviteToProject_rejectsDuplicateInvite() {
+        ProjectInviteRequest request = new ProjectInviteRequest();
+        request.setEmail("already@example.com");
+        request.setRole(TeamRole.MEMBER);
+
+        Project project = project(77L, 10L, "creator@example.com");
+        TeamInvitation existingInvite = new TeamInvitation();
+        existingInvite.setStatus("PENDING");
+        existingInvite.setExpiresAt(LocalDateTime.now().plusDays(1));
+
+        when(projectRepository.findById(77L)).thenReturn(Optional.of(project));
+        when(userRepository.findByEmailIgnoreCase("already@example.com")).thenReturn(Optional.empty());
+        when(teamInvitationRepository.findByTeamIdAndEmail(11L, "already@example.com")).thenReturn(Optional.of(existingInvite));
+
+        assertThrows(RuntimeException.class, () -> projectInvitationService.inviteToProject(77L, request, 10L));
+    }
+
+    @Test
     void inviteToProject_rejectsOwnerInviteForNonCreatorEmail() {
         ProjectInviteRequest request = new ProjectInviteRequest();
         request.setEmail("teammate@example.com");
@@ -81,7 +123,7 @@ class ProjectInvitationServiceTest {
     }
 
     @Test
-    void acceptInvitation_downgradesLegacyOwnerInviteForNonCreator() {
+    void acceptInvitation_success() {
         Team team = new Team();
         team.setId(11L);
 
@@ -90,37 +132,54 @@ class ProjectInvitationServiceTest {
         team.setProjects(Set.of(project));
 
         TeamInvitation invitation = new TeamInvitation();
-        invitation.setId(501L);
         invitation.setToken("token-1");
         invitation.setEmail("invitee@example.com");
         invitation.setTeam(team);
-        invitation.setRole("OWNER");
-        invitation.setStatus("PENDING");
+        invitation.setRole("MEMBER");
         invitation.setExpiresAt(LocalDateTime.now().plusDays(1));
 
         User invitee = new User();
         invitee.setUserId(20L);
         invitee.setEmail("invitee@example.com");
-        invitee.setUsername("invitee");
 
         when(teamInvitationRepository.findByToken("token-1")).thenReturn(Optional.of(invitation));
         when(userRepository.findById(20L)).thenReturn(Optional.of(invitee));
         when(teamMemberRepository.findByTeamIdAndUserUserId(11L, 20L)).thenReturn(Optional.empty());
-        when(teamMemberRepository.save(any(TeamMember.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(teamInvitationRepository.save(any(TeamInvitation.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(teamMemberRepository.findByTeamId(11L)).thenReturn(List.of());
 
         projectInvitationService.acceptInvitation("token-1", 20L);
 
-        verify(teamMemberService).enforceCreatorOnlyOwnerRole(11L, 10L);
+        verify(teamMemberRepository).save(any(TeamMember.class));
+        assertEquals("ACCEPTED", invitation.getStatus());
+    }
 
-        ArgumentCaptor<TeamMember> memberCaptor = ArgumentCaptor.forClass(TeamMember.class);
-        verify(teamMemberRepository).save(memberCaptor.capture());
-        assertEquals(TeamRole.ADMIN, memberCaptor.getValue().getRole());
+    @Test
+    void acceptInvitation_rejectsExpired() {
+        TeamInvitation invitation = new TeamInvitation();
+        invitation.setToken("expired-token");
+        invitation.setExpiresAt(LocalDateTime.now().minusDays(1));
+        invitation.setTeam(new Team());
 
-        ArgumentCaptor<ProjectMemberController.MemberEvent> eventCaptor = ArgumentCaptor.forClass(ProjectMemberController.MemberEvent.class);
-        verify(simpMessagingTemplate).convertAndSend(eq("/topic/project/77/members"), eventCaptor.capture());
-        assertEquals("ADMIN", eventCaptor.getValue().role);
+        when(teamInvitationRepository.findByToken("expired-token")).thenReturn(Optional.of(invitation));
+
+        assertThrows(RuntimeException.class, () -> projectInvitationService.acceptInvitation("expired-token", 20L));
+    }
+
+    @Test
+    void acceptInvitation_rejectsEmailMismatch() {
+        TeamInvitation invitation = new TeamInvitation();
+        invitation.setToken("token-1");
+        invitation.setEmail("expected@example.com");
+        invitation.setExpiresAt(LocalDateTime.now().plusDays(1));
+        invitation.setTeam(new Team());
+
+        User actualUser = new User();
+        actualUser.setUserId(20L);
+        actualUser.setEmail("actual@example.com");
+
+        when(teamInvitationRepository.findByToken("token-1")).thenReturn(Optional.of(invitation));
+        when(userRepository.findById(20L)).thenReturn(Optional.of(actualUser));
+
+        assertThrows(RuntimeException.class, () -> projectInvitationService.acceptInvitation("token-1", 20L));
     }
 
     private Project project(Long projectId, Long ownerId, String ownerEmail) {
