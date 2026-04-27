@@ -52,7 +52,7 @@ export function useDashboardProjects(): UseDashboardProjectsReturn {
       const cacheKey = buildSessionCacheKey('dashboard_projects', [currentUser.userId]);
 
       // Try to load data from local session cache first for instant UI response
-      if (checkCache) {
+      if (checkCache && cacheKey) {
         const cached = getSessionCache<{ recent: ProjectSummary[]; favorites: ProjectSummary[] }>(cacheKey, { allowStale: true });
         if (cached.data) {
           setProjects(cached.data);
