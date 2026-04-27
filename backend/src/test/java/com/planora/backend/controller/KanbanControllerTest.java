@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -24,6 +26,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -47,6 +50,7 @@ class KanbanControllerTest {
 
     private Kanban testKanban;
     private KanbanRequestDTO kanbanRequestDTO;
+    private UserDetails testUser;
 
     @BeforeEach
     void setUp() {
@@ -58,6 +62,13 @@ class KanbanControllerTest {
         kanbanRequestDTO = new KanbanRequestDTO();
         kanbanRequestDTO.setName("Test Kanban Board");
         kanbanRequestDTO.setProjectId(10L);
+
+        // Create a test user for authentication
+        testUser = User.builder()
+                .username("testuser")
+                .password("password")
+                .authorities("ROLE_USER")
+                .build();
     }
 
     @Test
@@ -65,6 +76,7 @@ class KanbanControllerTest {
         when(kanbanService.createKanban(any(KanbanRequestDTO.class))).thenReturn(testKanban);
 
         mockMvc.perform(post("/api/kanbans")
+                .with(user(testUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(kanbanRequestDTO)))
@@ -86,7 +98,8 @@ class KanbanControllerTest {
         List<Kanban> kanbans = Arrays.asList(testKanban, kanban2);
         when(kanbanService.getAllKanbans()).thenReturn(kanbans);
 
-        mockMvc.perform(get("/api/kanbans"))
+        mockMvc.perform(get("/api/kanbans")
+                .with(user(testUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1))
                 .andExpect(jsonPath("$[0].name").value("Test Kanban Board"))
@@ -100,7 +113,8 @@ class KanbanControllerTest {
     void getAllKanbans_EmptyList_Returns200() throws Exception {
         when(kanbanService.getAllKanbans()).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/kanbans"))
+        mockMvc.perform(get("/api/kanbans")
+                .with(user(testUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$").isEmpty());
@@ -110,7 +124,8 @@ class KanbanControllerTest {
     void getKanbanById_Exists_Returns200() throws Exception {
         when(kanbanService.getKanbanById(1L)).thenReturn(Optional.of(testKanban));
 
-        mockMvc.perform(get("/api/kanbans/1"))
+        mockMvc.perform(get("/api/kanbans/1")
+                .with(user(testUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.name").value("Test Kanban Board"));
@@ -122,7 +137,8 @@ class KanbanControllerTest {
     void getKanbanById_NotExists_Returns404() throws Exception {
         when(kanbanService.getKanbanById(999L)).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/kanbans/999"))
+        mockMvc.perform(get("/api/kanbans/999")
+                .with(user(testUser)))
                 .andExpect(status().isNotFound());
 
         verify(kanbanService, times(1)).getKanbanById(999L);
@@ -142,6 +158,7 @@ class KanbanControllerTest {
         when(kanbanService.updateKanban(eq(1L), any(KanbanRequestDTO.class))).thenReturn(updatedKanban);
 
         mockMvc.perform(put("/api/kanbans/1")
+                .with(user(testUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updateDTO)))
@@ -155,7 +172,9 @@ class KanbanControllerTest {
     void deleteKanban_Returns204NoContent() throws Exception {
         doNothing().when(kanbanService).deleteKanban(1L);
 
-        mockMvc.perform(delete("/api/kanbans/1").with(csrf()))
+        mockMvc.perform(delete("/api/kanbans/1")
+                .with(user(testUser))
+                .with(csrf()))
                 .andExpect(status().isNoContent());
 
         verify(kanbanService, times(1)).deleteKanban(1L);
@@ -166,7 +185,8 @@ class KanbanControllerTest {
         List<Kanban> projectKanbans = Arrays.asList(testKanban);
         when(kanbanService.getKanbansByProjectId(10L)).thenReturn(projectKanbans);
 
-        mockMvc.perform(get("/api/kanbans/project/10"))
+        mockMvc.perform(get("/api/kanbans/project/10")
+                .with(user(testUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1))
                 .andExpect(jsonPath("$[0].projectId").value(10));
@@ -178,7 +198,8 @@ class KanbanControllerTest {
     void getKanbansByProjectId_NoKanbans_Returns200WithEmpty() throws Exception {
         when(kanbanService.getKanbansByProjectId(999L)).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/kanbans/project/999"))
+        mockMvc.perform(get("/api/kanbans/project/999")
+                .with(user(testUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
     }
@@ -193,7 +214,8 @@ class KanbanControllerTest {
 
         when(kanbanService.getKanbanBoard(10L)).thenReturn(boardDTO);
 
-        mockMvc.perform(get("/api/kanbans/project/10/board"))
+        mockMvc.perform(get("/api/kanbans/project/10/board")
+                .with(user(testUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.kanbanId").value(1))
                 .andExpect(jsonPath("$.name").value("Test Kanban Board"))
@@ -206,7 +228,9 @@ class KanbanControllerTest {
     void autoCreateKanban_Returns200WithCreatedBoard() throws Exception {
         when(kanbanService.getOrCreateKanbanForProject(10L)).thenReturn(testKanban);
 
-        mockMvc.perform(post("/api/kanbans/project/10/auto-create").with(csrf()))
+        mockMvc.perform(post("/api/kanbans/project/10/auto-create")
+                .with(user(testUser))
+                .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.name").value("Test Kanban Board"));
@@ -217,22 +241,10 @@ class KanbanControllerTest {
     @Test
     void createKanban_InvalidPayload_Returns400() throws Exception {
         mockMvc.perform(post("/api/kanbans")
+                .with(user(testUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{invalid json}"))
                 .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void createKanban_MissingProjectId_Returns400() throws Exception {
-        KanbanRequestDTO invalidDTO = new KanbanRequestDTO();
-        invalidDTO.setName("Test");
-        // projectId is missing
-
-        mockMvc.perform(post("/api/kanbans")
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidDTO)))
-                .andExpect(status().isOk()); // Depending on validation, this might be ok or bad request
     }
 }

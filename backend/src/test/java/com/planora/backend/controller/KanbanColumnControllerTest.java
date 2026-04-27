@@ -13,6 +13,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -27,6 +29,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -51,6 +54,7 @@ class KanbanColumnControllerTest {
     private KanbanColumn testColumn;
     private Kanban testKanban;
     private KanbanColumnRequestDTO columnRequestDTO;
+    private UserDetails testUser;
 
     @BeforeEach
     void setUp() {
@@ -72,6 +76,12 @@ class KanbanColumnControllerTest {
         columnRequestDTO.setName("To Do");
         columnRequestDTO.setPosition(0);
         columnRequestDTO.setKanbanId(1L);
+
+        testUser = User.builder()
+                .username("testuser")
+                .password("password")
+                .authorities("ROLE_USER")
+                .build();
     }
 
     @Test
@@ -80,6 +90,7 @@ class KanbanColumnControllerTest {
                 .thenReturn(testColumn);
 
         mockMvc.perform(post("/api/kanban-columns")
+                .with(user(testUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(columnRequestDTO)))
@@ -103,7 +114,8 @@ class KanbanColumnControllerTest {
         List<KanbanColumn> columns = Arrays.asList(testColumn, column2);
         when(kanbanColumnService.getColumnsByKanbanId(1L)).thenReturn(columns);
 
-        mockMvc.perform(get("/api/kanban-columns/kanban/1"))
+        mockMvc.perform(get("/api/kanban-columns/kanban/1")
+                .with(user(testUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1))
                 .andExpect(jsonPath("$[0].name").value("To Do"))
@@ -117,7 +129,8 @@ class KanbanColumnControllerTest {
     void getColumnsByKanbanId_NoColumns_Returns200WithEmpty() throws Exception {
         when(kanbanColumnService.getColumnsByKanbanId(999L)).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/kanban-columns/kanban/999"))
+        mockMvc.perform(get("/api/kanban-columns/kanban/999")
+                .with(user(testUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
     }
@@ -126,7 +139,8 @@ class KanbanColumnControllerTest {
     void getKanbanColumnById_Exists_Returns200() throws Exception {
         when(kanbanColumnService.getKanbanColumnById(1L)).thenReturn(Optional.of(testColumn));
 
-        mockMvc.perform(get("/api/kanban-columns/1"))
+        mockMvc.perform(get("/api/kanban-columns/1")
+                .with(user(testUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.name").value("To Do"))
@@ -139,7 +153,8 @@ class KanbanColumnControllerTest {
     void getKanbanColumnById_NotExists_Returns404() throws Exception {
         when(kanbanColumnService.getKanbanColumnById(999L)).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/kanban-columns/999"))
+        mockMvc.perform(get("/api/kanban-columns/999")
+                .with(user(testUser)))
                 .andExpect(status().isNotFound());
 
         verify(kanbanColumnService, times(1)).getKanbanColumnById(999L);
@@ -161,6 +176,7 @@ class KanbanColumnControllerTest {
                 .thenReturn(updatedColumn);
 
         mockMvc.perform(put("/api/kanban-columns/1")
+                .with(user(testUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updateDTO)))
@@ -175,7 +191,9 @@ class KanbanColumnControllerTest {
     void deleteKanbanColumn_Returns204NoContent() throws Exception {
         doNothing().when(kanbanColumnService).deleteKanbanColumn(1L);
 
-        mockMvc.perform(delete("/api/kanban-columns/1").with(csrf()))
+        mockMvc.perform(delete("/api/kanban-columns/1")
+                .with(user(testUser))
+                .with(csrf()))
                 .andExpect(status().isNoContent());
 
         verify(kanbanColumnService, times(1)).deleteKanbanColumn(1L);
@@ -192,6 +210,7 @@ class KanbanColumnControllerTest {
         doNothing().when(kanbanColumnService).reorderColumns(any());
 
         mockMvc.perform(patch("/api/kanban-columns/reorder")
+                .with(user(testUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(reorderRequest)))
@@ -213,6 +232,7 @@ class KanbanColumnControllerTest {
                 .thenReturn(renamedColumn);
 
         mockMvc.perform(patch("/api/kanban-columns/1/rename")
+                .with(user(testUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(renameRequest)))
@@ -237,6 +257,7 @@ class KanbanColumnControllerTest {
                 .thenReturn(updatedColumn);
 
         mockMvc.perform(patch("/api/kanban-columns/1/settings")
+                .with(user(testUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(settingsDTO)))
@@ -261,6 +282,7 @@ class KanbanColumnControllerTest {
                 .thenReturn(updatedColumn);
 
         mockMvc.perform(patch("/api/kanban-columns/1/settings")
+                .with(user(testUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(settingsDTO)))
@@ -286,6 +308,7 @@ class KanbanColumnControllerTest {
                 .thenReturn(updatedColumn);
 
         mockMvc.perform(patch("/api/kanban-columns/1/settings")
+                .with(user(testUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(settingsDTO)))
@@ -299,6 +322,7 @@ class KanbanColumnControllerTest {
     @Test
     void createKanbanColumn_InvalidPayload_Returns400() throws Exception {
         mockMvc.perform(post("/api/kanban-columns")
+                .with(user(testUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{invalid json}"))
@@ -309,7 +333,8 @@ class KanbanColumnControllerTest {
     void getColumnsByKanbanId_VerifyCorrectEndpointPath() throws Exception {
         when(kanbanColumnService.getColumnsByKanbanId(1L)).thenReturn(List.of(testColumn));
 
-        mockMvc.perform(get("/api/kanban-columns/kanban/1"))
+        mockMvc.perform(get("/api/kanban-columns/kanban/1")
+                .with(user(testUser)))
                 .andExpect(status().isOk());
     }
 
@@ -326,6 +351,7 @@ class KanbanColumnControllerTest {
                 .thenReturn(renamedColumn);
 
         mockMvc.perform(patch("/api/kanban-columns/1/rename")
+                .with(user(testUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(renameRequest)))
@@ -341,6 +367,7 @@ class KanbanColumnControllerTest {
         doNothing().when(kanbanColumnService).reorderColumns(any());
 
         mockMvc.perform(patch("/api/kanban-columns/reorder")
+                .with(user(testUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(reorderRequest)))
@@ -354,6 +381,7 @@ class KanbanColumnControllerTest {
         doNothing().when(kanbanColumnService).reorderColumns(any());
 
         mockMvc.perform(patch("/api/kanban-columns/reorder")
+                .with(user(testUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(reorderRequest)))
