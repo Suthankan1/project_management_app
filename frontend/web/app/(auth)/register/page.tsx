@@ -5,7 +5,7 @@ import InputField from '../components/UI/InputField';
 import Button from '../components/UI/Button';
 import BrandLogo from '../components/UI/BrandLogo';
 import AuthCard from '../components/UI/AuthCard';
-import { useRegisterForm, STRENGTH_LABELS, STRENGTH_COLOURS } from './useRegisterForm';
+import { useRegisterForm, STRENGTH_LABELS, STRENGTH_COLOURS, PASSWORD_REQUIREMENTS } from './useRegisterForm';
 
 export default function RegisterPage() {
   // All form state and API logic lives in the hook, keeping this file purely about rendering.
@@ -101,9 +101,7 @@ export default function RegisterPage() {
               // new-password prevents the browser from autofilling with an existing saved password
               autoComplete="new-password"
             />
-            {/* Only show the meter once the user starts typing — avoids "Weak" showing on an empty field */}
             {password.length > 0 && (
-              // aria-label exposes the textual strength level to screen readers since the colour bar isn't accessible
               <div id="pw-strength" className="mt-2" aria-label={`Password strength: ${STRENGTH_LABELS[strength]}`}>
                 <div className="flex gap-1 mb-1">
                   {[1, 2, 3, 4].map((seg) => (
@@ -113,7 +111,18 @@ export default function RegisterPage() {
                     />
                   ))}
                 </div>
-                <p className="text-xs text-gray-500">{STRENGTH_LABELS[strength]}</p>
+                <p className="text-xs text-gray-500 mb-2">{STRENGTH_LABELS[strength]}</p>
+                <ul className="space-y-0.5">
+                  {PASSWORD_REQUIREMENTS.map((req) => {
+                    const met = req.test(password);
+                    return (
+                      <li key={req.id} className={`flex items-center gap-1.5 text-xs ${met ? 'text-emerald-600' : 'text-gray-400'}`}>
+                        <span className="shrink-0">{met ? '✓' : '○'}</span>
+                        {req.label}
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             )}
           </div>

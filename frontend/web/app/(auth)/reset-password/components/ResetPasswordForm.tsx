@@ -1,47 +1,57 @@
 'use client';
 
+import { PASSWORD_REQUIREMENTS } from '@/lib/passwordValidation';
+import OtpInput from './OtpInput';
 import PasswordInput from './PasswordInput';
 
 interface ResetPasswordFormProps {
+  otp: string;
   newPassword: string;
   confirmPassword: string;
   error: string;
   isLoading: boolean;
+  onOtpChange: (value: string) => void;
   onPasswordChange: (password: string) => void;
   onConfirmPasswordChange: (password: string) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
 }
 
 export default function ResetPasswordForm({
+  otp,
   newPassword,
   confirmPassword,
   error,
   isLoading,
+  onOtpChange,
   onPasswordChange,
   onConfirmPasswordChange,
   onSubmit
 }: ResetPasswordFormProps) {
   return (
     <form className='space-y-5' onSubmit={onSubmit}>
-      {/* role="alert" makes screen readers announce the error immediately when it appears */}
       {error && (
         <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
           {error}
         </div>
       )}
 
-      {/* Shown upfront, not only on failure, so users know the rule before committing to a password */}
+      <OtpInput value={otp} onChange={onOtpChange} disabled={isLoading} />
+
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
         <p className="text-xs font-semibold text-blue-900 mb-2">Password Requirements:</p>
-        <ul className="text-xs text-blue-800 space-y-1">
-          <li className="flex items-center">
-            <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-2"></span>
-            At least 8 characters
-          </li>
+        <ul className="space-y-1">
+          {PASSWORD_REQUIREMENTS.map((req) => {
+            const met = req.test(newPassword);
+            return (
+              <li key={req.id} className={`flex items-center gap-1.5 text-xs ${met ? 'text-emerald-600' : 'text-blue-800'}`}>
+                <span className="shrink-0">{met ? '✓' : '○'}</span>
+                {req.label}
+              </li>
+            );
+          })}
         </ul>
       </div>
 
-      {/* New Password */}
       <PasswordInput
         label="New Password"
         value={newPassword}
@@ -50,7 +60,6 @@ export default function ResetPasswordForm({
         disabled={isLoading}
       />
 
-      {/* Confirm Password */}
       <PasswordInput
         label="Confirm Password"
         value={confirmPassword}
@@ -59,7 +68,6 @@ export default function ResetPasswordForm({
         disabled={isLoading}
       />
 
-      {/* Submit Button */}
       <button
         type="submit"
         disabled={isLoading}

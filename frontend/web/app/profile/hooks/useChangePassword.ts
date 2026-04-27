@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AxiosError } from 'axios';
 import api from '@/lib/axios';
+import { validatePassword } from '@/lib/passwordValidation';
 
 type PwStep = 'idle' | 'sent' | 'done';
 
@@ -44,6 +45,11 @@ export function useChangePassword({ email }: { email: string }) {
     };
 
     const handleResetPassword = async () => {
+        const { valid, message } = validatePassword(newPassword);
+        if (!valid) {
+            setError(message);
+            return;
+        }
         if (newPassword !== confirmPassword) {
             setError('Passwords do not match.');
             return;
@@ -52,7 +58,7 @@ export function useChangePassword({ email }: { email: string }) {
         setSuccess('');
         try {
             setIsResettingPw(true);
-            await api.post('/api/auth/reset', { token: otp, password: newPassword });
+            await api.post('/api/auth/reset', { token: otp, newPassword });
             setSuccess('Password updated successfully.');
             setPwStep('done');
             setOtp('');

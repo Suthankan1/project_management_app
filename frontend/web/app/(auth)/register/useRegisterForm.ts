@@ -4,16 +4,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/axios';
 import { getValidToken } from '@/lib/auth';
+import { validatePassword, PASSWORD_REQUIREMENTS } from '@/lib/passwordValidation';
+
+export { PASSWORD_REQUIREMENTS };
 
 // Exported so the view component can read human-friendly labels and Tailwind colour classes
 // without duplicating the mapping or adding a prop-drilling chain.
 export const STRENGTH_LABELS = ['', 'Weak', 'Fair', 'Good', 'Strong'] as const;
 export const STRENGTH_COLOURS = ['bg-gray-200', 'bg-red-400', 'bg-amber-400', 'bg-emerald-400', 'bg-emerald-600'] as const;
 
+// Scores each of the 4 complexity criteria (uppercase, lowercase, digit, special).
+// Length is validated separately — a short password always fails validatePassword().
 function getPasswordStrength(pw: string): 0 | 1 | 2 | 3 | 4 {
   let score = 0;
-  if (pw.length >= 8) score++;
   if (/[A-Z]/.test(pw)) score++;
+  if (/[a-z]/.test(pw)) score++;
   if (/[0-9]/.test(pw)) score++;
   if (/[^A-Za-z0-9]/.test(pw)) score++;
   return score as 0 | 1 | 2 | 3 | 4;
@@ -46,19 +51,17 @@ export function useRegisterForm() {
     setIsLoading(true);
     setError('');
 
-    // Client-side mismatch check before hitting the API — saves a network round-trip for the most common mistake.
     if (password !== confirmPassword) {
       setError('Passwords do not match!');
       setIsLoading(false);
       return;
     }
 
-    // Enforce a minimum strength requirement to encourage better password hygiene. 
-    // The API will still enforce its own rules and return an error if not met, but this gives users faster feedback.
-    if (strength < 4) {
-    setError('You must choose a Strong password.');
-    setIsLoading(false);
-    return;
+    const { valid, message } = validatePassword(password);
+    if (!valid) {
+      setError(message);
+      setIsLoading(false);
+      return;
     }
 
     // This regex is a basic check for the presence of "@" and "." in the right order, 

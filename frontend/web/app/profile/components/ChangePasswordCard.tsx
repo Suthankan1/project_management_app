@@ -2,6 +2,7 @@
 
 import { Dispatch, FormEvent, SetStateAction } from 'react';
 import { Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react';
+import { PASSWORD_REQUIREMENTS } from '@/lib/passwordValidation';
 import { inputCls, labelCls } from '../lib/profile-utils';
 
 type PwStep = 'idle' | 'sent' | 'done';
@@ -109,7 +110,7 @@ export default function ChangePasswordCard({
                                 type={showNewPw ? 'text' : 'password'}
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
-                                placeholder="At least 6 characters"
+                                placeholder="Min 8 chars, upper, lower, digit, symbol"
                                 className={inputCls + ' pr-11'}
                             />
                             <button
@@ -122,6 +123,19 @@ export default function ChangePasswordCard({
                                 {showNewPw ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
                         </div>
+                        {newPassword.length > 0 && (
+                            <ul className="mt-1.5 space-y-0.5">
+                                {PASSWORD_REQUIREMENTS.map((req) => {
+                                    const met = req.test(newPassword);
+                                    return (
+                                        <li key={req.id} className={`flex items-center gap-1.5 text-xs ${met ? 'text-emerald-600' : 'text-[#9CA3AF]'}`}>
+                                            <span className="shrink-0">{met ? '✓' : '○'}</span>
+                                            {req.label}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
                     </div>
                     <div>
                         <label className={labelCls}>Confirm Password</label>
