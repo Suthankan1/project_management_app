@@ -13,7 +13,7 @@ import { WorkloadPieChart } from './WorkloadPieChart';
 import { WorkloadMembersList } from './WorkloadMembersList';
 
 const COLORS = ['#0052CC', '#00875A', '#FF8B00', '#DE350B', '#FFC400', '#6554C0', '#36B37E', '#FF5630', '#2684FF', '#FF991F'];
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
 interface UserProfileItem {
   userId: number;
@@ -45,8 +45,8 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
       if (u.profilePicUrl) {
         const fullUrl = u.profilePicUrl.startsWith('http') ? u.profilePicUrl : `${API_BASE_URL}${u.profilePicUrl.startsWith('/') ? '' : '/'}${u.profilePicUrl}`;
         profilesMap[`id:${u.userId}`] = fullUrl;
-        profilesMap[`email:${u.email}`] = fullUrl;
-        profilesMap[`username:${u.username}`] = fullUrl;
+        if (u.email) profilesMap[`email:${u.email}`] = fullUrl;
+        if (u.username) profilesMap[`username:${u.username}`] = fullUrl;
       }
     });
     return profilesMap;
@@ -58,7 +58,7 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
     members.forEach(m => {
       let pathName = m.user.profilePicUrl;
       if (!pathName) {
-        pathName = userProfiles[`id:${m.user.userId}`] || userProfiles[`email:${m.user.username}`] || userProfiles[`username:${m.user.username}`] || null;
+        pathName = userProfiles[`id:${m.user.userId}`] || userProfiles[`email:${m.user.email}`] || userProfiles[`username:${m.user.username}`] || null;
       } else if (!pathName.startsWith('http')) {
         pathName = `${API_BASE_URL}${pathName.startsWith('/') ? '' : '/'}${pathName}`;
       }

@@ -40,6 +40,7 @@ export interface TeamMemberInfo {
     userId: number;
     fullName: string;
     username: string;
+    email?: string;
     profilePicUrl?: string | null;
   };
   role?: string;
