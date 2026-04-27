@@ -49,7 +49,7 @@ export function ProjectNote({ projectId, defaultNote = '' }: { projectId: number
       mutate(`/api/projects/${projectId}`);
       setIsEditing(false);
       toast('Project note updated', 'success');
-    } catch (err) {
+    } catch {
       toast('Failed to update project note', 'error');
       setNote(parsedDefault.text);
     } finally {

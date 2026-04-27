@@ -69,9 +69,9 @@ export default function BentoDashboard({
 
   // Filter grid items
   const filteredLayouts = useMemo<Layouts>(() => {
-    const filtered: any = {};
+    const filtered: Layouts = {};
     Object.entries(layouts || {}).forEach(([bp, items]) => {
-      filtered[bp] = (items as any[]).filter(item => activeIds.has(item.i));
+      filtered[bp] = (items as WidgetLayout[]).filter(item => activeIds.has(item.i));
     });
     return filtered;
   }, [layouts, activeIds]);

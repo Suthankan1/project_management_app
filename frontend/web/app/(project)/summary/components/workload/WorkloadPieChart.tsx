@@ -143,7 +143,7 @@ export function WorkloadPieChart({
               <PieChart onMouseLeave={() => setActiveIndex(-1)}>
                 <Pie
                   shape={renderPieShape}
-                  data={activeWorkloadData as any[]}
+                  data={activeWorkloadData}
                   cx="50%"
                   cy="50%"
                   innerRadius={70}

@@ -5,6 +5,8 @@ import { Send, MessageSquare } from 'lucide-react';
 import { useChat } from '@/hooks/chat/useChat';
 import { motion } from 'framer-motion';
 
+import { ChatMessage } from '@/app/(project)/project/[id]/chat/components/chat';
+
 /**
  * A real-time chat widget for project team members.
  * Fetches recent messages and allows sending new ones directly from the summary.
@@ -32,7 +34,7 @@ export function ProjectChat({ projectId }: { projectId: number | string }) {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full min-h-[340px]">
       {/* Messages area */}
       <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#F8FAFC]" ref={scrollContainerRef}>
-         {messages && messages.length > 0 ? messages.slice(-50).map((msg: any, i: number) => {
+         {messages && messages.length > 0 ? messages.slice(-50).map((msg: ChatMessage, i: number) => {
            const isMe = msg.sender === currentUser;
            return (
              <div key={msg.id || i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>

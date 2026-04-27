@@ -50,7 +50,7 @@ export function RecentlyCompleted({ tasks = [] }: { tasks?: Task[] }) {
       ) : (
         <div className="flex flex-col gap-2.5 relative z-10">
           {completedTasks.map((task, i) => {
-            const photoUrlRaw = (task as any).assigneePhotoUrl || (task as any).assignee?.avatar || (task as any).assignee?.profilePicUrl;
+            const photoUrlRaw = task.assigneePhotoUrl || task.assignee?.avatar || task.assignee?.profilePicUrl;
             const photoUrl = photoUrlRaw && !photoUrlRaw.startsWith('http') 
               ? `${API_BASE_URL}${photoUrlRaw.startsWith('/') ? '' : '/'}${photoUrlRaw}` 
               : photoUrlRaw;

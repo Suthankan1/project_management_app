@@ -15,9 +15,9 @@ function getStorageKey(projectId: number) {
 /**
  * Validates if the saved data matches the expected Layouts structure.
  */
-function isValidLayouts(data: any): data is Layouts {
+function isValidLayouts(data: unknown): data is Layouts {
   if (!data || typeof data !== 'object') return false;
-  return Object.values(data).some((v) => Array.isArray(v));
+  return Object.values(data as object).some((v) => Array.isArray(v));
 }
 
 /**
@@ -62,10 +62,10 @@ export function useBentoLayout(projectId: number, defaultLayouts: Layouts) {
 
   const saveTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const onLayoutChange = useCallback((_layout: any, allLayouts: Layouts) => {
+  const onLayoutChange = useCallback((_layout: unknown, allLayouts: Layouts) => {
     const adjusted = { ...allLayouts };
     if (adjusted.lg) {
-      adjusted.lg = fillRowGaps(adjusted.lg as WidgetLayout[], 24) as any;
+      adjusted.lg = fillRowGaps(adjusted.lg as WidgetLayout[], 24);
     }
     setLayouts(adjusted);
 
