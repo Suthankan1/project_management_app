@@ -10,7 +10,6 @@ interface DmsDocumentsTableProps {
     favoriteIds: number[];
     isTrashMode: boolean;
     mode: ViewMode;
-    projectNameMap: Record<number, string>;
     onToggleFavorite: (documentId: number) => void;
     onView: (documentId: number) => void;
     onDownload: (documentId: number) => void;
@@ -27,7 +26,6 @@ export default function DmsDocumentsTable({
     favoriteIds,
     isTrashMode,
     mode,
-    projectNameMap,
     onToggleFavorite,
     onView,
     onDownload,
@@ -59,7 +57,6 @@ export default function DmsDocumentsTable({
 
                     {filteredDocuments.map((doc) => {
                         const isFavorite = favoriteIds.includes(doc.id);
-                        const projectName = projectNameMap[doc.projectId];
 
                         return (
                             <tr key={doc.id} className="border-b border-[#F2F4F7] hover:bg-[#FAFBFC] align-top">
@@ -78,10 +75,6 @@ export default function DmsDocumentsTable({
                                                 </button>
                                             </div>
                                             <p className="text-xs text-[#667085] mt-1">{doc.contentType} • v{doc.latestVersionNumber}</p>
-                                            {/* FEATURE-3: project name in shared mode */}
-                                            {mode === 'shared' && projectName && (
-                                                <p className="text-xs text-[#98A2B3] mt-0.5">{projectName}</p>
-                                            )}
                                         </div>
                                     </div>
                                 </td>

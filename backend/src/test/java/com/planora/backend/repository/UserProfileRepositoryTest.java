@@ -39,7 +39,7 @@ class UserProfileRepositoryTest {
         alice = new User();
         alice.setEmail("alice@example.com");
         alice.setUsername("alice");
-        alice.setPassword("hashed_password");
+        alice.setPassword("HashedPassword123!");
         alice.setVerified(true);
         // Profile fields
         alice.setFullName("Alice Smith");
@@ -160,7 +160,7 @@ class UserProfileRepositoryTest {
         User bob = new User();
         bob.setEmail("bob@example.com");
         bob.setUsername("bob");
-        bob.setPassword("hashed_password_2");
+        bob.setPassword("HashedPassword123!");
         bob.setVerified(true);
         bob.setFullName("Bob Jones");
         bob.setJobTitle("QA Engineer");
