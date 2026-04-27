@@ -2,16 +2,19 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, MessageSquare } from 'lucide-react';
-import MotionWrapper from './MotionWrapper';
 import { useChat } from '@/hooks/chat/useChat';
-import { ChatMessage } from '@/app/(project)/project/[id]/chat/components/chat';
+import { motion } from 'framer-motion';
 
-export function ProjectChatWidget({ projectId }: { projectId: number | string }) {
+/**
+ * A real-time chat widget for project team members.
+ * Fetches recent messages and allows sending new ones directly from the summary.
+ */
+export function ProjectChat({ projectId }: { projectId: number | string }) {
   const { messages, sendMessage, currentUser } = useChat(projectId.toString());
   const [inputValue, setInputValue] = useState('');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom of chat without scrolling the whole page
+  // Auto-scroll the chat container whenever new messages arrive
   useEffect(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
@@ -26,45 +29,42 @@ export function ProjectChatWidget({ projectId }: { projectId: number | string })
   };
 
   return (
-    <MotionWrapper className="flex flex-col h-full min-h-[340px]">
-
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full min-h-[340px]">
+      {/* Messages area */}
       <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#F8FAFC]" ref={scrollContainerRef}>
-         {messages && messages.length > 0 ? messages.slice(-50).map((msg: ChatMessage, i: number) => {
+         {messages && messages.length > 0 ? messages.slice(-50).map((msg: any, i: number) => {
            const isMe = msg.sender === currentUser;
            return (
              <div key={msg.id || i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                {!isMe && <span className="text-[10px] font-semibold text-gray-500 mb-1 ml-1">{msg.sender}</span>}
-               <div className={`px-3 py-2 text-[13px] font-arimo break-words ${isMe ? 'bg-[#0052CC] text-white rounded-2xl rounded-tr-sm' : 'bg-white border border-gray-200 text-gray-800 rounded-2xl rounded-tl-sm shadow-sm'}`} style={{ maxWidth: '85%' }}>
+               <div className={`px-3 py-2 text-[13px] break-words ${isMe ? 'bg-[#0052CC] text-white rounded-2xl rounded-tr-sm' : 'bg-white border border-gray-200 text-gray-800 rounded-2xl rounded-tl-sm shadow-sm'}`} style={{ maxWidth: '85%' }}>
                  {msg.content}
                </div>
              </div>
            )
          }) : (
-           <div className="h-full flex flex-col items-center justify-center text-gray-400 text-sm">
-             <MessageSquare size={24} className="mb-2 opacity-30 text-gray-400" />
-             <p className="font-arimo text-[13px]">No team messages yet</p>
+           <div className="h-full flex flex-col items-center justify-center text-gray-400">
+             <MessageSquare size={24} className="mb-2 opacity-30" />
+             <p className="text-[13px]">No team messages yet</p>
            </div>
          )}
       </div>
 
-      <div className="p-3 border-t border-gray-100 bg-white rounded-b-xl shrink-0">
+      {/* Input area */}
+      <div className="p-3 border-t border-gray-100 bg-white shrink-0">
         <form onSubmit={handleSend} className="flex items-center gap-2 relative">
            <input 
              type="text" 
              value={inputValue}
              onChange={e => setInputValue(e.target.value)}
              placeholder="Type a message to team..."
-             className="w-full text-[13px] font-arimo rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 pr-10 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all"
+             className="w-full text-[13px] rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 pr-10 focus:outline-none focus:border-blue-400 focus:ring-1 transition-all"
            />
-           <button 
-             type="submit" 
-             disabled={!inputValue.trim()}
-             className="absolute right-1 p-1.5 rounded-md text-[#0052CC] hover:bg-blue-50 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
-           >
+           <button type="submit" disabled={!inputValue.trim()} className="absolute right-1 p-1.5 rounded-md text-[#0052CC] hover:bg-blue-50 disabled:opacity-40 transition-colors">
              <Send size={15} />
            </button>
         </form>
       </div>
-    </MotionWrapper>
+    </motion.div>
   )
 }
