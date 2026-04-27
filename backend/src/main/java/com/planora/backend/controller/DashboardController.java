@@ -13,12 +13,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * Single controller for the entire dashboard page.
- * All endpoints here are only for the dashboard — no mixing with other features.
- *
+/*
  * API Endpoints:
- *   GET /api/dashboard/recent          -> Recent Spaces section
+ *   GET /api/dashboard/recent          -> Recent Spaces section 
  *   GET /api/dashboard/favorites       -> Favorite Spaces section
  *   GET /api/dashboard/table/worked-on -> Table: Worked On tab
  *   GET /api/dashboard/table/viewed    -> Table: Viewed tab

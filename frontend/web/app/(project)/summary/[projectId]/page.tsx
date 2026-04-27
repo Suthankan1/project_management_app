@@ -8,41 +8,32 @@ import { isAgileProjectType } from '@/components/shared/ProjectTypeIcon';
 import SummaryPageSkeleton from "../components/SummarySkeleton";
 import dynamic from 'next/dynamic';
 
-// Lazy load the interactive Bento grid and its contents
+// Dynamically load the heavy BentoDashboard component for better initial performance
 const BentoDashboard = dynamic(() => import('../components/BentoDashboard'), {
     ssr: false,
     loading: () => <SummaryPageSkeleton />
 });
 
-
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
+/**
+ * Main Summary Page component for a specific project.
+ * Handles primary data fetching and passes it down to the dashboard grid.
+ */
 export default function SummaryPage() {
     const params = useParams();
     const projectId = Number(params.projectId);
 
-    // Fetch primary data points using SWR for caching and non-blocking background updates
-    const { data: tasks, isLoading: tasksLoading } = useSWR<Task[]>(
-        projectId ? `/api/tasks/project/${projectId}` : null, 
-        fetcher
-    );
-    const { data: sprints, isLoading: sprintsLoading } = useSWR<Sprint[]>(
-        projectId ? `/api/sprints/project/${projectId}` : null, 
-        fetcher
-    );
-    const { data: metrics, isLoading: metricsLoading } = useSWR<ProjectMetrics>(
-        projectId ? `/api/projects/${projectId}/metrics` : null,
-        fetcher
-    );
-    const { data: projectDetails, isLoading: projectLoading } = useSWR<{ type?: string, description?: string }>(
-        projectId ? `/api/projects/${projectId}` : null,
-        fetcher
-    );
+    // Fetch primary data points using SWR for caching and performance
+    const { data: tasks, isLoading: tasksLoading } = useSWR<Task[]>(projectId ? `/api/tasks/project/${projectId}` : null, fetcher);
+    const { data: sprints, isLoading: sprintsLoading } = useSWR<Sprint[]>(projectId ? `/api/sprints/project/${projectId}` : null, fetcher);
+    const { data: metrics, isLoading: metricsLoading } = useSWR<ProjectMetrics>(projectId ? `/api/projects/${projectId}/metrics` : null, fetcher);
+    const { data: projectDetails, isLoading: projectLoading } = useSWR<{ type?: string, description?: string }>(projectId ? `/api/projects/${projectId}` : null, fetcher);
 
+    // Determine project style based on its type metadata
     const isAgileProject = isAgileProjectType(projectDetails?.type);
 
-    // Show full-page skeleton only for critical primary data (sprints/tasks/metrics)
-    // SWR will skip this if data is cached!
+    // Show skeleton loader while critical initial data is being fetched
     if (tasksLoading || sprintsLoading || metricsLoading || projectLoading || !tasks || !sprints || !metrics || !projectDetails) {
         return <SummaryPageSkeleton />;
     }
