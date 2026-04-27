@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { ProjectTypeIcon, isAgileProjectType } from '@/components/shared/ProjectTypeIcon';
 
+// Props for the individual project card
 interface RecentProjectCardProps {
     id: string;
     name: string;
@@ -27,28 +28,31 @@ export default function RecentProjectCard({
     isFavorite: initialIsFavorite = false,
     onFavoriteToggle
 }: RecentProjectCardProps) {
-    const router = useRouter();
-    const [isFavorite, setIsFavorite] = useState(initialIsFavorite);
-    const isAgileProject = isAgileProjectType(type);
+    const router = useRouter(); // Helper to change pages
+    const [isFavorite, setIsFavorite] = useState(initialIsFavorite); // Local favorite state
+    const isAgileProject = isAgileProjectType(type); // Check if project is Agile or Kanban
 
+    // Sync local state when initial prop changes
     useEffect(() => {
         setIsFavorite(initialIsFavorite);
     }, [initialIsFavorite]);
 
+    // Save or remove project from favorites
     const handleFavoriteClick = async (e: React.MouseEvent) => {
-        e.stopPropagation();
+        e.stopPropagation(); // Prevent card click when clicking the star
         const nextState = !isFavorite;
         setIsFavorite(nextState);
         try {
-            await api.post(`/api/projects/${id}/favorite`);
-            window.dispatchEvent(new CustomEvent('planora:favorite-toggled'));
+            await api.post(`/api/projects/${id}/favorite`); // Update database
+            window.dispatchEvent(new CustomEvent('planora:favorite-toggled')); // Notify other components
             if (onFavoriteToggle) onFavoriteToggle(nextState);
         } catch (error) {
             console.error("Failed to toggle favorite:", error);
-            setIsFavorite(!nextState); // Revert on failure
+            setIsFavorite(!nextState); // Rollback on error
         }
     };
 
+    // Log the time when project is opened
     const recordProjectAccess = async () => {
         try {
             await api.post(`/api/projects/${id}/access`);
@@ -57,6 +61,7 @@ export default function RecentProjectCard({
         }
     };
 
+    // Go to project summary page
     const handleCardClick = async () => {
         await recordProjectAccess();
         window.dispatchEvent(new CustomEvent('planora:project-accessed'));
@@ -64,12 +69,13 @@ export default function RecentProjectCard({
         router.push(`/summary/${id}`);
     };
 
+    // Go directly to Sprint or Kanban board
     const handleBoardClick = async (e: React.MouseEvent) => {
         e.stopPropagation();
         await recordProjectAccess();
         window.dispatchEvent(new CustomEvent('planora:project-accessed'));
         localStorage.setItem('currentProjectName', name);
-        
+
         if (isAgileProject) {
             router.push(`/sprint-board?projectId=${id}`);
         } else {
@@ -77,7 +83,7 @@ export default function RecentProjectCard({
         }
     };
 
-    // Subtext like "SINTHU • V1.0"
+    // Subtext showing Key and Type (e.g., PLAN • AGILE)
     const displaySubtext = `${projectKey ? projectKey : name.substring(0, 4)} • ${isAgileProject ? 'Agile' : 'Kanban'}`.toUpperCase();
 
     const boardButtonTitle = isAgileProject ? 'View Sprint Board' : 'View Kanban Board';
@@ -85,6 +91,7 @@ export default function RecentProjectCard({
         ? 'w-[32px] h-[32px] flex items-center justify-center bg-indigo-50/50 text-indigo-500 rounded-lg border border-indigo-100/50 shadow-sm transition-all duration-300 hover:bg-indigo-500 hover:text-white hover:scale-110 hover:shadow-indigo-200/50'
         : 'w-[32px] h-[32px] flex items-center justify-center bg-emerald-50/50 text-emerald-500 rounded-lg border border-emerald-100/50 shadow-sm transition-all duration-300 hover:bg-emerald-500 hover:text-white hover:scale-110 hover:shadow-emerald-200/50';
 
+    // Go to project members page
     const handleMembersClick = async (e: React.MouseEvent) => {
         e.stopPropagation();
         await recordProjectAccess();
@@ -93,7 +100,7 @@ export default function RecentProjectCard({
         router.push(`/members/${id}`);
     };
 
-    // Helper function to generate a consistent soft color stripe based on project name
+    // Generate a colorful side stripe based on project name
     const getColorStripe = (str: string) => {
         const colors = [
             'bg-[#E6FCFF] dark:bg-cyan-950/30',
@@ -113,19 +120,19 @@ export default function RecentProjectCard({
     const stripeColor = getColorStripe(name || id);
 
     return (
-        <div 
+        <div
             onClick={handleCardClick}
             className={`group flex flex-row ${width ? width : 'min-w-[260px] max-w-[260px] shrink-0'} h-[160px] bg-white rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/80 cursor-pointer overflow-hidden transition-all duration-300 hover:shadow-[0_12px_24px_rgba(21,93,252,0.08)] hover:border-blue-200 hover:-translate-y-[3px] active:scale-[0.98] relative`}
         >
-            {/* Glossy Backdrop Effect */}
+            {/* Soft background glow on hover */}
             <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-blue-50/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
-            {/* Colored Left Stripe */}
+            {/* Vertical color stripe for visual identity */}
             <div className={`w-[8px] h-full shrink-0 ${stripeColor} transition-all duration-300 group-hover:w-[12px] opacity-80`} />
 
-            {/* Main Content Area */}
+            {/* Content Container */}
             <div className="flex flex-col flex-1 py-4 pr-5 pl-4 relative h-full">
-                {/* Top Bar: Subtext and Star */}
+                {/* Header: Key and Favorite Star */}
                 <div className="flex justify-between items-start w-full">
                     <span className="font-arimo text-[11px] font-bold text-[#94a3b8] tracking-[0.05em] uppercase group-hover:text-blue-500 transition-colors duration-300">
                         {displaySubtext}
@@ -146,17 +153,17 @@ export default function RecentProjectCard({
                     </button>
                 </div>
 
-                {/* Title */}
+                {/* Project Title */}
                 <h3 className="font-arimo text-[15px] leading-[22px] text-[#0f172a] font-bold mt-2 line-clamp-2 group-hover:text-blue-600 transition-colors duration-300 tracking-tight">
                     {name}
                 </h3>
 
-                {/* Bottom Section (Divider + Icons) */}
+                {/* Footer: Quick Action Buttons */}
                 <div className="mt-auto">
                     <div className="flex items-center justify-between">
-                        {/* Icons */}
                         <div className="flex items-center gap-2.5">
-                            <button 
+                            {/* Open Board Button */}
+                            <button
                                 onClick={handleBoardClick}
                                 title={boardButtonTitle}
                                 className={boardButtonClassName}
@@ -164,8 +171,8 @@ export default function RecentProjectCard({
                                 <ProjectTypeIcon projectType={type} size={14} />
                             </button>
 
-                            {/* Users icon - Navigates to Members */}
-                            <button 
+                            {/* Members Button */}
+                            <button
                                 onClick={handleMembersClick}
                                 title="Project Members"
                                 className="w-[32px] h-[32px] flex items-center justify-center bg-slate-50/80 text-slate-400 rounded-lg border border-slate-100 transition-all duration-300 hover:bg-blue-500 hover:text-white hover:border-transparent hover:scale-110 hover:shadow-blue-200/50"
@@ -179,7 +186,7 @@ export default function RecentProjectCard({
                             </button>
                         </div>
 
-                        {/* Open Label */}
+                        {/* Visual indicator to open the project */}
                         <div className="flex items-center px-2.5 py-1 rounded-md bg-slate-50 border border-slate-100 group-hover:bg-blue-600 group-hover:text-white group-hover:border-transparent transition-all duration-300 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                             <span className="font-arimo text-[10px] font-bold tracking-[0.1em] uppercase">
                                 OPEN
@@ -191,3 +198,5 @@ export default function RecentProjectCard({
         </div>
     );
 }
+
+
