@@ -63,6 +63,9 @@ class ProjectInvitationServiceTest {
     @Mock
     private SimpMessagingTemplate simpMessagingTemplate;
 
+    @Mock
+    private UserService userService;
+
     @InjectMocks
     private ProjectInvitationService projectInvitationService;
 
