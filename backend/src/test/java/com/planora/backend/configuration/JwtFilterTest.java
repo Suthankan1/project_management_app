@@ -68,7 +68,7 @@ class JwtFilterTest {
         FilterChain chain = mock(FilterChain.class);
 
         UserDetails userDetails = User.withUsername("alice@example.com")
-                .password("pass").authorities(Collections.emptyList()).build();
+                .password("ValidPassword123!").authorities(Collections.emptyList()).build();
 
         when(jwtService.extractEmail("valid-token")).thenReturn("alice@example.com");
         when(userDetailsService.loadUserByUsername("alice@example.com")).thenReturn(userDetails);

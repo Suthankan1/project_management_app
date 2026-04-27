@@ -39,7 +39,7 @@ class MilestoneRepositoryTest {
         User owner = new User();
         owner.setEmail("owner@test.com");
         owner.setUsername("owner");
-        owner.setPassword("valid_password");
+        owner.setPassword("ValidPassword123!");
         owner.setVerified(true);
         entityManager.persist(owner);
 

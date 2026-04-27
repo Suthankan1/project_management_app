@@ -36,7 +36,7 @@ class DocumentFolderRepositoryTest {
         User owner = new User();
         owner.setEmail("owner@test.com");
         owner.setUsername("owner");
-        owner.setPassword("valid_password");
+        owner.setPassword("ValidPassword123!");
         owner.setVerified(true);
         entityManager.persist(owner);
 
@@ -51,7 +51,7 @@ class DocumentFolderRepositoryTest {
         creator = new User();
         creator.setEmail("bob@example.com");
         creator.setUsername("bob");
-        creator.setPassword("valid_password");
+        creator.setPassword("ValidPassword123!");
         creator.setVerified(true);
         entityManager.persist(creator);
 

@@ -79,7 +79,7 @@ class KanbanColumnControllerTest {
 
         testUser = User.builder()
                 .username("testuser")
-                .password("password")
+                .password("ValidPassword123!")
                 .authorities("ROLE_USER")
                 .build();
     }

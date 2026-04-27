@@ -66,7 +66,7 @@ class KanbanControllerTest {
         // Create a test user for authentication
         testUser = User.builder()
                 .username("testuser")
-                .password("password")
+                .password("ValidPassword123!")
                 .authorities("ROLE_USER")
                 .build();
     }

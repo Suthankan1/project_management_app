@@ -37,7 +37,7 @@ class DocumentRepositoryTest {
         User owner = new User();
         owner.setEmail("owner@test.com");
         owner.setUsername("owner");
-        owner.setPassword("valid_password");
+        owner.setPassword("ValidPassword123!");
         owner.setVerified(true);
         entityManager.persist(owner);
 
@@ -52,7 +52,7 @@ class DocumentRepositoryTest {
         uploader = new User();
         uploader.setEmail("alice@example.com");
         uploader.setUsername("alice");
-        uploader.setPassword("valid_password");
+        uploader.setPassword("ValidPassword123!");
         uploader.setVerified(true);
         entityManager.persist(uploader);
 

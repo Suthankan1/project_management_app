@@ -11,5 +11,5 @@ public @interface WithMockUserPrincipal {
     long userId() default 1L;
     String username() default "user";
     String email() default "user@example.com";
-    String password() default "password";
+    String password() default "ValidPassword123!";
 }

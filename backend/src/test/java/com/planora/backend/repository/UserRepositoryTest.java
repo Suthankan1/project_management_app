@@ -32,14 +32,14 @@ class UserRepositoryTest {
         alice = new User();
         alice.setEmail("alice@example.com");
         alice.setUsername("alice");
-        alice.setPassword("hashedPass1");
+        alice.setPassword("HashedPass1!");
         alice.setVerified(true);
         entityManager.persist(alice);
 
         bob = new User();
         bob.setEmail("Bob@Example.COM");  // Mixed case to test case-insensitive
         bob.setUsername("BobUser");
-        bob.setPassword("hashedPass2");
+        bob.setPassword("HashedPass2!");
         bob.setVerified(true);
         entityManager.persist(bob);
 
@@ -171,7 +171,7 @@ class UserRepositoryTest {
         User charlie = new User();
         charlie.setEmail("charlie@example.com");
         charlie.setUsername("charlie");
-        charlie.setPassword("hashedPass3");
+        charlie.setPassword("HashedPass3!");
         charlie.setVerified(false);
 
         User saved = userRepository.save(charlie);

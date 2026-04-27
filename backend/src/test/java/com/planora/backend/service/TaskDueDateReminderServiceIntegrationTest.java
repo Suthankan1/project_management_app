@@ -105,7 +105,7 @@ class TaskDueDateReminderServiceIntegrationTest {
         User user = new User();
         user.setUsername(username);
         user.setEmail(email);
-        user.setPassword("password123");
+        user.setPassword("ValidPassword123!");
         user.setNotifyDueDateReminders(remindersEnabled);
         return userRepository.save(user);
     }
