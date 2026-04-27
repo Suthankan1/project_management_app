@@ -62,7 +62,7 @@ public class UserServiceTest {
     void setUp() {
         testUser = new User();
         testUser.setEmail("test@example.com");
-        testUser.setPassword("password123");
+        testUser.setPassword("Test@1234");
         testUser.setUsername("testuser");
     }
 
@@ -232,7 +232,7 @@ public class UserServiceTest {
 
         when(tokenRepository.findByToken("999999")).thenReturn(token);
 
-        boolean result = userService.resetPassword("999999", "newPassword123");
+        boolean result = userService.resetPassword("999999", "NewPassword1!");
 
         assertFalse(result);
     }
@@ -371,7 +371,7 @@ public class UserServiceTest {
 
         when(tokenRepository.findByToken("valid-otp")).thenReturn(token);
 
-        boolean result = userService.resetPassword("valid-otp", "newSecurePassword");
+        boolean result = userService.resetPassword("valid-otp", "NewSecure@1");
 
         assertTrue(result);
         assertTrue(token.isUsed());
@@ -389,7 +389,7 @@ public class UserServiceTest {
 
         when(tokenRepository.findByToken("expired-otp")).thenReturn(token);
 
-        boolean result = userService.resetPassword("expired-otp", "newPassword");
+        boolean result = userService.resetPassword("expired-otp", "NewPassword1!");
 
         assertFalse(result);
         verify(userRepository, never()).save(any());
@@ -405,7 +405,7 @@ public class UserServiceTest {
 
         when(tokenRepository.findByToken("used-otp")).thenReturn(token);
 
-        boolean result = userService.resetPassword("used-otp", "newPassword");
+        boolean result = userService.resetPassword("used-otp", "NewPassword1!");
 
         assertFalse(result);
         verify(userRepository, never()).save(any());

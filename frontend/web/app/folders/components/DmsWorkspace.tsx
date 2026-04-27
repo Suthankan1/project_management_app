@@ -14,17 +14,18 @@ interface DmsWorkspaceProps {
 
 export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
     const {
-        loading, error, projectId, isTrashMode, title, busy,
+        loading, error, projectId, currentProjectName, isTrashMode, title, busy,
         folders, selectedFolderId, setSelectedFolderId,
         newFolderName, setNewFolderName, folderCount,
-        filteredDocuments, favoriteIds, projectNameMap,
+        filteredDocuments, favoriteIds,
         searchQuery, setSearchQuery, isDragOver, setIsDragOver,
-        sharedProjectsNote, selectedVersionsDocId, setSelectedVersionsDocId,
+        selectedVersionsDocId, setSelectedVersionsDocId,
         selectedVersionsDoc, selectedInfoDoc, setSelectedInfoDoc,
+        renameDoc, renameName, setRenameName,
         versions, isUploading, uploadProgress,
         withProjectId, getFolderName,
         onCreateFolder, onDeleteFolder, onUpload, onDrop,
-        onToggleFavorite, onView, onDownload, onRename,
+        onToggleFavorite, onView, onDownload, onRename, onConfirmRename, onCancelRename,
         onSoftDelete, onToggleVersions, onOpenInfo, onRestore, onPermanentDelete,
     } = useDmsWorkspace(mode);
 
@@ -36,8 +37,15 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
         );
     }
 
-    if (error && !projectId) {
-        return <div className="p-6 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg">{error}</div>;
+    if (!projectId) {
+        return (
+            <div className="flex flex-col items-center justify-center h-[60vh] gap-3 text-center">
+                <p className="text-sm font-medium text-[#344054]">No project selected</p>
+                <p className="text-xs text-[#667085] max-w-xs">
+                    Open a project first, then navigate to Documents. Folders and files always belong to a specific project.
+                </p>
+            </div>
+        );
     }
 
     return (
@@ -60,6 +68,7 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
                 <div className="grid grid-cols-12 min-h-[70vh]">
                     <DmsSidebar
                         mode={mode} isTrashMode={isTrashMode} projectId={projectId}
+                        projectName={currentProjectName}
                         folders={folders} selectedFolderId={selectedFolderId}
                         setSelectedFolderId={setSelectedFolderId}
                         onDeleteFolder={onDeleteFolder} newFolderName={newFolderName}
@@ -98,13 +107,9 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
                         {error && (
                             <div className="mx-5 mt-4 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md">{error}</div>
                         )}
-                        {mode === 'shared' && sharedProjectsNote && (
-                            <div className="mx-5 mt-3 p-2 text-xs text-[#667085] bg-[#F9FAFB] border border-[#E6E8EC] rounded-md">{sharedProjectsNote}</div>
-                        )}
-
                         <DmsDocumentsTable
                             filteredDocuments={filteredDocuments} favoriteIds={favoriteIds}
-                            isTrashMode={isTrashMode} mode={mode} projectNameMap={projectNameMap}
+                            isTrashMode={isTrashMode} mode={mode}
                             onToggleFavorite={onToggleFavorite} onView={onView} onDownload={onDownload}
                             onRename={onRename} onSoftDelete={onSoftDelete}
                             onToggleVersions={onToggleVersions} onOpenInfo={onOpenInfo}
@@ -119,6 +124,8 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
                 versions={versions} setSelectedVersionsDocId={setSelectedVersionsDocId}
                 selectedInfoDoc={selectedInfoDoc} setSelectedInfoDoc={setSelectedInfoDoc}
                 getFolderName={getFolderName} isUploading={isUploading} uploadProgress={uploadProgress}
+                renameDoc={renameDoc} renameName={renameName} setRenameName={setRenameName}
+                onConfirmRename={onConfirmRename} onCancelRename={onCancelRename} busy={busy}
             />
         </>
     );

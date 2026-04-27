@@ -54,7 +54,7 @@ public class UserControllerTest {
     void setUp() {
         testUser = new User();
         testUser.setEmail("test@example.com");
-        testUser.setPassword("password123");
+        testUser.setPassword("Test@1234");
         testUser.setUsername("testuser");
     }
 
@@ -178,7 +178,7 @@ public class UserControllerTest {
     void testResetPassword_InvalidToken_Returns401() throws Exception {
         ResetPasswordRequest request = new ResetPasswordRequest();
         request.setToken("999999");
-        request.setNewPassword("newPassword123");
+        request.setNewPassword("NewPassword1!");
         when(userService.resetPassword(anyString(), anyString())).thenReturn(false);
 
         mockMvc.perform(post("/api/auth/reset")
@@ -186,6 +186,37 @@ public class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // Password complexity: register with a password missing uppercase and special char returns 400
+    @Test
+    @WithMockUserPrincipal
+    void testRegister_WeakPassword_Returns400() throws Exception {
+        User weakUser = new User();
+        weakUser.setEmail("weak@example.com");
+        weakUser.setUsername("weakuser");
+        weakUser.setPassword("password123");
+
+        mockMvc.perform(post("/api/auth/register")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(weakUser)))
+                .andExpect(status().isBadRequest());
+    }
+
+    // Password complexity: resetPassword with a weak newPassword returns 400 before reaching service
+    @Test
+    @WithMockUserPrincipal
+    void testResetPassword_WeakNewPassword_Returns400() throws Exception {
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setToken("123456");
+        request.setNewPassword("weakpass");
+
+        mockMvc.perform(post("/api/auth/reset")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
     }
 
     // Refresh token endpoint returns new tokens on valid refresh token

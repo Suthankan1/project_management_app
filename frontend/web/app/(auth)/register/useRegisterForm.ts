@@ -6,22 +6,17 @@ import api from '@/lib/axios';
 import { getValidToken } from '@/lib/auth';
 import { validatePassword, PASSWORD_REQUIREMENTS } from '@/lib/passwordValidation';
 
-export { PASSWORD_REQUIREMENTS };
-
 // Exported so the view component can read human-friendly labels and Tailwind colour classes
 // without duplicating the mapping or adding a prop-drilling chain.
 export const STRENGTH_LABELS = ['', 'Weak', 'Fair', 'Good', 'Strong'] as const;
 export const STRENGTH_COLOURS = ['bg-gray-200', 'bg-red-400', 'bg-amber-400', 'bg-emerald-400', 'bg-emerald-600'] as const;
 
-// Scores each of the 4 complexity criteria (uppercase, lowercase, digit, special).
-// Length is validated separately — a short password always fails validatePassword().
+// Only returns 4 (Strong) when every requirement passes — including length —
+// so the bar never shows "Strong" for a short complex password like "Ab1!".
 function getPasswordStrength(pw: string): 0 | 1 | 2 | 3 | 4 {
-  let score = 0;
-  if (/[A-Z]/.test(pw)) score++;
-  if (/[a-z]/.test(pw)) score++;
-  if (/[0-9]/.test(pw)) score++;
-  if (/[^A-Za-z0-9]/.test(pw)) score++;
-  return score as 0 | 1 | 2 | 3 | 4;
+  const met = PASSWORD_REQUIREMENTS.filter(req => req.test(pw)).length;
+  if (met === PASSWORD_REQUIREMENTS.length) return 4;
+  return Math.min(3, met) as 0 | 1 | 2 | 3;
 }
 
 export function useRegisterForm() {

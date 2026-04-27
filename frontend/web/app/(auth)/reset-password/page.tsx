@@ -10,8 +10,7 @@ import SuccessMessage from './components/SuccessMessage';
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
-  const urlToken = searchParams.get('token') || '';
-  const [otp, setOtp] = useState(urlToken);
+  const [otp, setOtp] = useState(() => searchParams.get('token') ?? '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);

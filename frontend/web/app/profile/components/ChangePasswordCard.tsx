@@ -2,7 +2,7 @@
 
 import { Dispatch, FormEvent, SetStateAction } from 'react';
 import { Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react';
-import { PASSWORD_REQUIREMENTS } from '@/lib/passwordValidation';
+import PasswordChecklist from '@/app/(auth)/components/UI/PasswordChecklist';
 import { inputCls, labelCls } from '../lib/profile-utils';
 
 type PwStep = 'idle' | 'sent' | 'done';
@@ -124,17 +124,9 @@ export default function ChangePasswordCard({
                             </button>
                         </div>
                         {newPassword.length > 0 && (
-                            <ul className="mt-1.5 space-y-0.5">
-                                {PASSWORD_REQUIREMENTS.map((req) => {
-                                    const met = req.test(newPassword);
-                                    return (
-                                        <li key={req.id} className={`flex items-center gap-1.5 text-xs ${met ? 'text-emerald-600' : 'text-[#9CA3AF]'}`}>
-                                            <span className="shrink-0">{met ? '✓' : '○'}</span>
-                                            {req.label}
-                                        </li>
-                                    );
-                                })}
-                            </ul>
+                            <div className="mt-1.5">
+                                <PasswordChecklist password={newPassword} unmetClassName="text-[#9CA3AF]" />
+                            </div>
                         )}
                     </div>
                     <div>

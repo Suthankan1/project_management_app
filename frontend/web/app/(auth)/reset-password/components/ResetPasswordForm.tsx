@@ -1,6 +1,6 @@
 'use client';
 
-import { PASSWORD_REQUIREMENTS } from '@/lib/passwordValidation';
+import PasswordChecklist from '@/app/(auth)/components/UI/PasswordChecklist';
 import OtpInput from './OtpInput';
 import PasswordInput from './PasswordInput';
 
@@ -39,17 +39,7 @@ export default function ResetPasswordForm({
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
         <p className="text-xs font-semibold text-blue-900 mb-2">Password Requirements:</p>
-        <ul className="space-y-1">
-          {PASSWORD_REQUIREMENTS.map((req) => {
-            const met = req.test(newPassword);
-            return (
-              <li key={req.id} className={`flex items-center gap-1.5 text-xs ${met ? 'text-emerald-600' : 'text-blue-800'}`}>
-                <span className="shrink-0">{met ? '✓' : '○'}</span>
-                {req.label}
-              </li>
-            );
-          })}
-        </ul>
+        <PasswordChecklist password={newPassword} unmetClassName="text-blue-800" />
       </div>
 
       <PasswordInput
