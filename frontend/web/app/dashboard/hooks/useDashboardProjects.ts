@@ -49,7 +49,7 @@ export function useDashboardProjects(): UseDashboardProjectsReturn {
 
     // Main function to fetch projects from API
     const fetchProjects = async (checkCache = false) => {
-      const cacheKey = buildSessionCacheKey('dashboard_projects', currentUser.id);
+      const cacheKey = buildSessionCacheKey('dashboard_projects', currentUser.userId);
 
       // Try to load data from local session cache first for instant UI response
       if (checkCache) {
