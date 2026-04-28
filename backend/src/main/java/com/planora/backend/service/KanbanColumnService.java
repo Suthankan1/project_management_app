@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+//Manages column lifecycle, automatic status generation, and reordering integrity
 @Service
 public class KanbanColumnService {
 
@@ -24,6 +25,7 @@ public class KanbanColumnService {
     @Autowired
     private KanbanRepository kanbanRepository;
 
+    //Creates a new column and automatically generates a logic-friendly 'status' key.
     public KanbanColumn createKanbanColumn(KanbanColumnRequestDTO dto) {
         Optional<Kanban> optionalKanban = kanbanRepository.findById(dto.getKanbanId());
         if (optionalKanban.isPresent()) {

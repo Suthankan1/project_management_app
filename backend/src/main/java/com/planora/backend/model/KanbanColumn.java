@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/*Represents an individual column within a Kanban board.
+ Tracks workflow stages, display ordering, and WIP constraints.*/
 @Entity
 @Getter
 @Setter
