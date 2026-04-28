@@ -76,9 +76,7 @@ export function useProjectContext() {
     if (projectId && storedId !== projectId) {
       setScopedProjectValue('currentProjectId', projectId);
       removeScopedProjectValue('currentProjectType');
-      setProjectType(null);
-    } else if (storedProjectType) {
-      setProjectType(storedProjectType);
+      // Do not call setProjectType synchronously here to avoid cascading renders.
     }
 
     let cancelled = false;

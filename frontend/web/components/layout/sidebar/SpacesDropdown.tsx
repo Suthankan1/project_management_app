@@ -83,11 +83,7 @@ export function SpacesDropdown({
 }) {
   const router = useRouter();
   const visible = items.slice(0, 4);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // Removed mounted state and effect as it is unnecessary and causes lint error.
 
   const dropdownContent = (
     <div
