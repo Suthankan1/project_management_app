@@ -47,9 +47,7 @@ const DateSection: React.FC<DateSectionProps> = ({ dates, onUpdateDueDate, onUpd
   };
 
   return (
-    <div className="border rounded-md border-gray-200 bg-white shadow-sm">
-      <div className="px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">Dates</div>
-      <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4">
         {dates.dueDate !== undefined && (
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-500 font-medium">Due date</span>
@@ -134,7 +132,6 @@ const DateSection: React.FC<DateSectionProps> = ({ dates, onUpdateDueDate, onUpd
             <span className="text-xs text-gray-600">{new Date(dates.updated).toLocaleString()}</span>
           </div>
         )}
-      </div>
     </div>
   );
 };

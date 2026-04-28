@@ -22,6 +22,7 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -79,6 +80,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleRuntime(RuntimeException ex) {
         log.error("Internal Server Error (RuntimeException): ", ex);
         return buildError(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), null);
+    }
+
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleBrokenPipe(AsyncRequestNotUsableException ex) {
+        // Client closed the connection before the response was fully written — nothing to do.
     }
 
     @ExceptionHandler(Exception.class)

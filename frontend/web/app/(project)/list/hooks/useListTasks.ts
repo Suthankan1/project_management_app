@@ -8,7 +8,6 @@ import { getMilestones, assignTaskToMilestone } from '@/services/milestone-servi
 import { useTaskWebSocket } from '@/hooks/useTaskWebSocket';
 import type { CreateTaskData } from '@/components/shared/CreateTaskModal';
 import type { Label, MilestoneResponse, Task } from '@/types';
-import { STATUS_ORDER } from '../lib/list-config';
 
 const MEMBERS_CACHE_TTL_MS = 1000 * 60 * 30;
 
@@ -45,6 +44,23 @@ const sanitizeTaskPhoto = (task: Task): Task => ({
   ...task,
   assigneePhotoUrl: isHttpUrl(task.assigneePhotoUrl) ? task.assigneePhotoUrl : undefined,
 });
+
+// The backend AssigneeDTO sends `userId` (not `id`). Normalise so that
+// Assignee.id is always the userId, matching the member list used in TaskRow.
+const normalizeAssignees = (task: Task): Task => {
+  if (!task.assignees?.length) return task;
+  return {
+    ...task,
+    assignees: task.assignees.map((a) => {
+      const raw = a as unknown as { userId?: number; photoUrl?: string };
+      return {
+        id: raw.userId ?? a.id,
+        name: a.name,
+        avatar: isHttpUrl(raw.photoUrl) ? raw.photoUrl : isHttpUrl(a.avatar) ? a.avatar : undefined,
+      };
+    }),
+  };
+};
 
 const normalizeTaskPatch = (patch: TaskEventPatch): Partial<Task> => ({
   id: patch.id,
@@ -125,7 +141,7 @@ export function useListTasks() {
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       try {
-        setTasks((JSON.parse(cached) as Task[]).map(sanitizeTaskPhoto));
+        setTasks((JSON.parse(cached) as Task[]).map(sanitizeTaskPhoto).map(normalizeAssignees));
         setLoading(false);
       } catch { /* ignore corrupt cache */ }
     }
@@ -139,7 +155,7 @@ export function useListTasks() {
         t.assigneeId && membersMap[t.assigneeId]
           ? { ...t, assigneePhotoUrl: membersMap[t.assigneeId] ?? undefined }
           : t
-      ).map(sanitizeTaskPhoto);
+      ).map(sanitizeTaskPhoto).map(normalizeAssignees);
       setTasks(enriched);
       localStorage.setItem(cacheKey, JSON.stringify(enriched));
     } catch {
@@ -217,7 +233,7 @@ export function useListTasks() {
       void api.get(`/api/tasks/${event.task.id}`).then((res) => {
         setTasks((prev) => {
           if (prev.some((t) => t.id === event.task!.id)) return prev;
-          const next = [...prev, sanitizeTaskPhoto(res.data as Task)];
+          const next = [...prev, normalizeAssignees(sanitizeTaskPhoto(res.data as Task))];
           if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
           return next;
         });
@@ -415,7 +431,7 @@ export function useListTasks() {
   }, [projectId, cacheKey]);
 
   const sortedTasks = useMemo(() => (
-    [...tasks].sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status))
+    [...tasks].sort((a, b) => a.id - b.id)
   ), [tasks]);
 
   return {

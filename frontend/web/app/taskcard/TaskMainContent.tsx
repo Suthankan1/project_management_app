@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { Paperclip, CheckSquare, Link, AlertCircle, Loader2 } from 'lucide-react';
+import { Paperclip, CheckSquare, Link2, Loader2, X } from 'lucide-react';
 import SubtaskList from './SubtaskList';
 import CommentSection from './CommentSection';
 import DescriptionEditor from './main/DescriptionEditor';
@@ -119,7 +119,7 @@ const TaskMainContent: React.FC<TaskMainContentProps> = ({
           label="Add subtask"
           onClick={() => !readOnly && setSubtaskAddTrigger(n => n + 1)}
         />
-        <TaskActionButton icon={<Link size={14} />} label="Link issue" onClick={() => !readOnly && setShowDependencyPicker(true)} />
+        <TaskActionButton icon={<Link2 size={14} />} label="Link issue" onClick={() => !readOnly && setShowDependencyPicker(true)} />
       </div>
       {attachError && (
         <p className="text-xs text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded mb-4">{attachError}</p>
@@ -138,50 +138,66 @@ const TaskMainContent: React.FC<TaskMainContentProps> = ({
       />
 
       {/* Linked Issues (Dependencies) */}
-      {(dependencies && dependencies.length > 0 || showDependencyPicker) && (
+      {(dependencies.length > 0 || showDependencyPicker) && (
         <div className="mb-8">
-          <h3 className="text-sm font-bold text-gray-800 mb-3">Linked Issues</h3>
-          {dependencies.map((dep) => (
-            <div key={dep.id} className="flex items-center gap-3 p-2 border border-gray-100 rounded mb-2 hover:bg-gray-50 transition-colors group">
-              <span className="text-xs font-semibold bg-red-100 text-red-700 px-2 py-1 rounded">
-                {dep.relation}
-              </span>
-              <div className="flex items-center gap-2 flex-1">
-                <AlertCircle size={16} className="text-red-500" />
-                <button
-                  className="text-sm text-blue-600 hover:underline font-medium"
-                  onClick={() => {
-                    // Manually fire a popstate event after pushState so React Router / the
-                    // modal layer picks up the new taskId without a full page navigation.
-                    const url = new URL(window.location.href);
-                    url.searchParams.set('taskId', String(dep.id));
-                    window.history.pushState({}, '', url.toString());
-                    window.dispatchEvent(new PopStateEvent('popstate'));
-                  }}
-                >
-                  TASK-{dep.id}
-                </button>
-                <span className="text-sm text-gray-600">{dep.title}</span>
-              </div>
-              <button
-                onClick={async () => {
-                  if (readOnly) return;
-                  if (!taskId) return;
-                  try {
-                    await api.delete(`/api/tasks/${taskId}/dependencies/${dep.id}`);
-                    onDependencyChanged?.();
-                  } catch {
-                    // silently fail; parent will keep current deps
-                  }
-                }}
-                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
-                title="Remove dependency"
-                disabled={readOnly}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-[#344054]">Linked Issues</h3>
+            {dependencies.length > 0 && (
+              <span className="text-xs text-[#667085]">{dependencies.length} link{dependencies.length !== 1 ? 's' : ''}</span>
+            )}
+          </div>
+          {dependencies.length > 0 && (
+            <div className="rounded-xl border border-[#EAECF0] bg-white overflow-hidden divide-y divide-[#F2F4F7] mb-3">
+              {dependencies.map((dep) => {
+                const relationColors: Record<string, string> = {
+                  BLOCKS:     'bg-red-100 text-red-700',
+                  BLOCKED_BY: 'bg-orange-100 text-orange-700',
+                  DUPLICATES: 'bg-purple-100 text-purple-700',
+                  RELATES_TO: 'bg-blue-100 text-blue-700',
+                };
+                const badgeClass = relationColors[dep.relation] ?? 'bg-[#F2F4F7] text-[#344054]';
+                return (
+                  <div key={dep.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-[#F8FAFF] transition-colors group">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${badgeClass}`}>
+                      {dep.relation.replace(/_/g, ' ')}
+                    </span>
+                    <Link2 size={13} className="text-[#98A2B3] flex-shrink-0" />
+                    <button
+                      className="text-xs font-semibold text-[#155DFC] hover:underline flex-shrink-0"
+                      onClick={() => {
+                        // Manually fire a popstate event after pushState so React Router / the
+                        // modal layer picks up the new taskId without a full page navigation.
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('taskId', String(dep.id));
+                        window.history.pushState({}, '', url.toString());
+                        window.dispatchEvent(new PopStateEvent('popstate'));
+                      }}
+                    >
+                      TASK-{dep.id}
+                    </button>
+                    <span className="text-sm text-[#667085] flex-1 min-w-0 truncate">{dep.title}</span>
+                    <button
+                      onClick={async () => {
+                        if (readOnly) return;
+                        if (!taskId) return;
+                        try {
+                          await api.delete(`/api/tasks/${taskId}/dependencies/${dep.id}`);
+                          onDependencyChanged?.();
+                        } catch {
+                          // silently fail; parent will keep current deps
+                        }
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-[#98A2B3] hover:text-red-500 transition-all"
+                      title="Remove link"
+                      disabled={readOnly}
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          )}
           {showDependencyPicker && taskId && projectId && (
             <DependencyPicker
               taskId={taskId}
@@ -191,18 +207,6 @@ const TaskMainContent: React.FC<TaskMainContentProps> = ({
               onCancel={() => setShowDependencyPicker(false)}
             />
           )}
-        </div>
-      )}
-      {showDependencyPicker && (!dependencies || dependencies.length === 0) && taskId && projectId && (
-        <div className="mb-8">
-          <h3 className="text-sm font-bold text-gray-800 mb-3">Linked Issues</h3>
-          <DependencyPicker
-            taskId={taskId}
-            projectId={projectId}
-            existingDependencyIds={[]}
-            onLinked={() => { onDependencyChanged?.(); setShowDependencyPicker(false); }}
-            onCancel={() => setShowDependencyPicker(false)}
-          />
         </div>
       )}
 
