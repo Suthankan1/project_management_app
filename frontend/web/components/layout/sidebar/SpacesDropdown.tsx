@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SearchIcon } from './SidebarIcons';
@@ -60,8 +61,8 @@ function DropdownItem({
   );
 }
 
-/* ── Project Dropdown ── */
-export function ProjectDropdown({
+/* ── Spaces Dropdown ── */
+export function SpacesDropdown({
   fixedTop, fixedLeft,
   items, loading, search, onSearch, emptyMsg, placeholder,
   viewAllHref, viewAllLabel, onProjectClick, onToggleFav, togglingId,
@@ -82,8 +83,13 @@ export function ProjectDropdown({
 }) {
   const router = useRouter();
   const visible = items.slice(0, 4);
+  const [mounted, setMounted] = useState(false);
 
-  return (
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const dropdownContent = (
     <div
       data-sidebar-dropdown
       className="bg-white rounded-xl border border-cu-border shadow-2xl shadow-black/10 overflow-hidden"
@@ -149,4 +155,7 @@ export function ProjectDropdown({
       </div>
     </div>
   );
+
+  if (!mounted) return null;
+  return createPortal(dropdownContent, document.body);
 }

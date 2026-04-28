@@ -1,5 +1,6 @@
 'use client';
 
+// Component for global site-wide search across projects, tasks, documents, and members.
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';

@@ -1,5 +1,6 @@
 'use client';
 
+// Main wrapper layout that orchestrates the Sidebar and TopBar alongside the main page content area.
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import { Suspense, useEffect, useRef } from 'react';
@@ -7,12 +8,12 @@ import { usePathname } from 'next/navigation';
 import CommandPalette from '@/components/ui/CommandPalette';
 import { useNavigation } from '@/lib/navigation-context';
 
-interface SidebarLayoutProps {
+interface FullLayoutProps {
     children: React.ReactNode;
     showTopBar?: boolean;
 }
 
-export default function SidebarLayout({ children, showTopBar = true }: SidebarLayoutProps) {
+export default function FullLayout({ children, showTopBar = true }: FullLayoutProps) {
     const pathname = usePathname();
     const { isSidebarOpen } = useNavigation();
     const isChatRoute = pathname?.includes('/chat');

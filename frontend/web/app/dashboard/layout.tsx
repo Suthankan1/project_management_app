@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import SidebarLayout from '@/navBar/SidebarLayout';
+import FullLayout from '@/components/layout/FullLayout';
 import { AUTH_TOKEN_CHANGED_EVENT, getValidToken } from '@/lib/auth';
 
 export default function DashboardLayout({
@@ -35,10 +35,10 @@ export default function DashboardLayout({
     }, [router]);
 
     return (
-        <SidebarLayout>
+        <FullLayout>
             <main className="flex-1 flex flex-col min-h-full bg-white px-4 md:px-8 pt-4 pb-0 md:pb-8">
                 {children}
             </main>
-        </SidebarLayout>
+        </FullLayout>
     );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+// Reusable sliding/popover panel component used within the Sidebar for displaying extended content.
 import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';

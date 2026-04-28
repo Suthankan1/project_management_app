@@ -19,6 +19,7 @@ export interface Assignee {
   name: string;
   email?: string;
   avatar?: string;
+  profilePicUrl?: string;
 }
 
 export interface Label {

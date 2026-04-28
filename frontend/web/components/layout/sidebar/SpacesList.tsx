@@ -1,8 +1,9 @@
+// Renders the list of favorite and recent projects within the Sidebar.
 import React from 'react';
-import { NavRow } from '@/navBar/sidebar/NavRows';
-import { ClockIcon, StarIcon } from '@/navBar/sidebar/SidebarIcons';
+import { NavRow } from '@/components/layout/sidebar/SidebarRows';
+import { ClockIcon, StarIcon } from '@/components/layout/sidebar/SidebarIcons';
 
-interface ProjectListProps {
+interface SpacesListProps {
   collapsed: boolean;
   favOpen: boolean;
   recentOpen: boolean;
@@ -16,7 +17,7 @@ interface ProjectListProps {
   isMobile?: boolean;
 }
 
-export default function ProjectList({
+export default function SpacesList({
   collapsed,
   favOpen,
   recentOpen,
@@ -28,7 +29,7 @@ export default function ProjectList({
   onOpenFav,
   onOpenRecent,
   isMobile = false,
-}: ProjectListProps) {
+}: SpacesListProps) {
   return (
     <>
       <div ref={favRef} className="relative">

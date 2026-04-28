@@ -1,5 +1,6 @@
 'use client';
 
+// Displays real-time user notifications and handles dropdown interactions for reading/deleting them.
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import Link from 'next/link';
 import { Bell, Trash2 } from 'lucide-react';

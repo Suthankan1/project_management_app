@@ -207,6 +207,7 @@ export function TabBar({
           key={tab.id}
           href={getTabHref(tab.id)}
           onClick={() => setMoreOpen(false)}
+          prefetch={true}
           className={`block px-4 py-2.5 text-[13px] transition-all duration-200 font-outfit font-bold ${
             effectiveActiveTab === tab.id ? 'text-blue-600 bg-blue-50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
           }`}
@@ -222,6 +223,7 @@ export function TabBar({
         href={getTabHref(tab.id)}
         onMouseEnter={() => setHoveredTab(tab.id)}
         onMouseLeave={() => setHoveredTab(null)}
+        prefetch={true}
         className="relative h-full flex items-center px-5 shrink-0 group transition-all duration-300"
       >
         {effectiveActiveTab === tab.id && (

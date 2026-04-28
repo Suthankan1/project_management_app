@@ -14,7 +14,7 @@ import 'react-resizable/css/styles.css';
 // Core UI and Configurations
 import { BentoCard } from './BentoCard';
 import { SummaryIcons as Icons } from './SummaryIcons';
-import { buildDefaultLayouts, Layouts } from './layoutConfig';
+import { buildDefaultLayouts, Layouts, WidgetLayout } from './layoutConfig';
 import { useBentoLayout } from '../hooks/useBentoLayout';
 
 // Grouped Widget Imports
