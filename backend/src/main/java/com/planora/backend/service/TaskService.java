@@ -266,8 +266,9 @@ public class TaskService {
             }
         }
 
-        //update reporter
+        //update reporter — restricted to ADMIN and OWNER
         if(request.getReporterId() != null){
+            requireMinimumRole(teamId, currentUserId, TeamRole.ADMIN);
             TeamMember newReporter= validateTeamMember(teamId, request.getReporterId());
             task.setReporter(newReporter);
         }
@@ -987,7 +988,7 @@ public class TaskService {
         }
 
         if(task.getReporter() != null && task.getReporter().getUser() != null){
-            dto.setReporterId(task.getReporter().getId());
+            dto.setReporterId(task.getReporter().getUser().getUserId());
             dto.setReporterName(task.getReporter().getUser().getUsername());
         }
 

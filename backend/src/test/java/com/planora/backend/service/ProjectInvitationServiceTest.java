@@ -82,7 +82,7 @@ class ProjectInvitationServiceTest {
 
         when(projectRepository.findById(77L)).thenReturn(Optional.of(project));
         when(userRepository.findById(10L)).thenReturn(Optional.of(inviter));
-        when(userRepository.findByEmailIgnoreCase("new@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findFirstByEmailIgnoreCase("new@example.com")).thenReturn(Optional.empty());
         when(teamInvitationRepository.findByTeamIdAndEmail(11L, "new@example.com")).thenReturn(List.of());
 
         projectInvitationService.inviteToProject(77L, request, 10L);
@@ -103,7 +103,7 @@ class ProjectInvitationServiceTest {
         existingInvite.setExpiresAt(LocalDateTime.now().plusDays(1));
 
         when(projectRepository.findById(77L)).thenReturn(Optional.of(project));
-        when(userRepository.findByEmailIgnoreCase("already@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findFirstByEmailIgnoreCase("already@example.com")).thenReturn(Optional.empty());
         when(teamInvitationRepository.findByTeamIdAndEmail(11L, "already@example.com")).thenReturn(List.of(existingInvite));
 
         assertThrows(RuntimeException.class, () -> projectInvitationService.inviteToProject(77L, request, 10L));

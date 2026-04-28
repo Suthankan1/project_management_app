@@ -30,7 +30,7 @@ const StatusSection: React.FC<StatusSectionProps> = ({ status, onUpdateStatus })
   }, [isOpen]);
 
   return (
-    <div className="mb-6">
+    <div>
       <label className="text-xs font-semibold text-gray-500 uppercase mb-2 block tracking-wide">Status</label>
       <div className="relative">
         <button

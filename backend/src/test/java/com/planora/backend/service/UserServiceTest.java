@@ -68,7 +68,7 @@ public class UserServiceTest {
 
     @Test
     void testRegister_NewUser() {
-        when(userRepository.findByEmailIgnoreCase(any())).thenReturn(Optional.empty());
+        when(userRepository.findFirstByEmailIgnoreCase(any())).thenReturn(Optional.empty());
 
         String result = userService.register(testUser);
 
@@ -81,7 +81,7 @@ public class UserServiceTest {
     @Test
     void testRegister_ExistingUnverifiedUser() {
         testUser.setVerified(false);
-        when(userRepository.findByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
+        when(userRepository.findFirstByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
 
         String result = userService.register(testUser);
 
@@ -95,7 +95,7 @@ public class UserServiceTest {
     @Test
     void testRegister_ExistingVerifiedUser_ReturnsAlreadyVerifiedMessage() {
         testUser.setVerified(true);
-        when(userRepository.findByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
+        when(userRepository.findFirstByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
 
         String result = userService.register(testUser);
 
@@ -113,7 +113,7 @@ public class UserServiceTest {
         token.setUsed(false);
         token.setTokenType(VerificationToken.TokenType.VERIFICATION);
 
-        when(userRepository.findByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
+        when(userRepository.findFirstByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
         when(tokenRepository.findByUserAndTokenType(any(), eq(VerificationToken.TokenType.VERIFICATION))).thenReturn(token);
 
         boolean result = userService.verifyToken("test@example.com", otp);
@@ -135,7 +135,7 @@ public class UserServiceTest {
         token.setAttempts(0);
         token.setTokenType(VerificationToken.TokenType.VERIFICATION);
 
-        when(userRepository.findByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
+        when(userRepository.findFirstByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
         when(tokenRepository.findByUserAndTokenType(any(), eq(VerificationToken.TokenType.VERIFICATION))).thenReturn(token);
 
         boolean result = userService.verifyToken("test@example.com", wrongOtp);
@@ -154,7 +154,7 @@ public class UserServiceTest {
         token.setUsed(false);
         token.setTokenType(VerificationToken.TokenType.VERIFICATION);
 
-        when(userRepository.findByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
+        when(userRepository.findFirstByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
         when(tokenRepository.findByUserAndTokenType(any(), eq(VerificationToken.TokenType.VERIFICATION))).thenReturn(token);
 
         boolean result = userService.verifyToken("test@example.com", "123456");
@@ -172,7 +172,7 @@ public class UserServiceTest {
         token.setUsed(false);
         token.setTokenType(VerificationToken.TokenType.VERIFICATION);
 
-        when(userRepository.findByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
+        when(userRepository.findFirstByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
         when(tokenRepository.findByUserAndTokenType(any(), eq(VerificationToken.TokenType.VERIFICATION))).thenReturn(token);
 
         boolean result = userService.verifyToken("test@example.com", "123456");
@@ -186,7 +186,7 @@ public class UserServiceTest {
         Authentication authentication = mock(Authentication.class);
         when(authentication.isAuthenticated()).thenReturn(true);
         when(authenticationManager.authenticate(any())).thenReturn(authentication);
-        when(userRepository.findByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
+        when(userRepository.findFirstByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
         when(jwtService.generateToken(anyString(), anyString())).thenReturn("mock-access-token");
         when(jwtService.generateRefreshToken(anyString())).thenReturn("mock-refresh-token");
 
@@ -279,7 +279,7 @@ public class UserServiceTest {
         UpdateProfileRequest request = new UpdateProfileRequest();
         request.setNotifyDueDateReminders(false);
 
-        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
         when(userRepository.save(testUser)).thenReturn(testUser);
 
         User updated = userService.updateUserProfile("test@example.com", request);
@@ -422,7 +422,7 @@ public class UserServiceTest {
         storedToken.setTokenType(VerificationToken.TokenType.REFRESH_TOKEN);
 
         when(jwtService.validateRefreshToken("old-refresh")).thenReturn("test@example.com");
-        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
         when(jwtService.extractJti("old-refresh")).thenReturn("old-jti");
         when(jwtService.extractJti("new-refresh")).thenReturn("new-jti");
         when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.REFRESH_TOKEN)).thenReturn(storedToken);
@@ -457,7 +457,7 @@ public class UserServiceTest {
         storedToken.setTokenType(VerificationToken.TokenType.REFRESH_TOKEN);
 
         when(jwtService.validateRefreshToken("tampered-token")).thenReturn("test@example.com");
-        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
         when(jwtService.extractJti("tampered-token")).thenReturn("attacker-jti");
         when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.REFRESH_TOKEN)).thenReturn(storedToken);
 
@@ -478,7 +478,7 @@ public class UserServiceTest {
         storedToken.setTokenType(VerificationToken.TokenType.REFRESH_TOKEN);
 
         when(jwtService.validateRefreshToken("used-token")).thenReturn("test@example.com");
-        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
         when(jwtService.extractJti("used-token")).thenReturn("jti-123");
         when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.REFRESH_TOKEN)).thenReturn(storedToken);
 
@@ -489,7 +489,7 @@ public class UserServiceTest {
 
     @Test
     void testGetUserByEmail_ValidEmail_ReturnsUser() {
-        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
 
         User result = userService.getUserByEmail("test@example.com");
 
@@ -504,14 +504,14 @@ public class UserServiceTest {
 
     @Test
     void testGetUserByEmail_NotFound_ThrowsException() {
-        when(userRepository.findByEmailIgnoreCase(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findFirstByEmailIgnoreCase(anyString())).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class, () -> userService.getUserByEmail("missing@example.com"));
     }
 
     @Test
     void testUpdateUserDetails_ValidName_UpdatesFullName() {
-        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
         when(userRepository.save(testUser)).thenReturn(testUser);
 
         userService.updateUserDetails("test@example.com", "New Full Name");
@@ -522,7 +522,7 @@ public class UserServiceTest {
 
     @Test
     void testUpdateUserDetails_EmptyName_ThrowsIllegalArgumentException() {
-        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
 
         assertThrows(IllegalArgumentException.class,
                 () -> userService.updateUserDetails("test@example.com", ""));

@@ -69,7 +69,7 @@ public class ProjectInvitationService {
 
 
         // Block if user is already a member
-        userRepository.findByEmailIgnoreCase(inviteeEmail).ifPresent(existingUser -> {
+        userRepository.findFirstByEmailIgnoreCase(inviteeEmail).ifPresent(existingUser -> {
             teamMemberRepository.findByTeamIdAndUserUserId(teamId, existingUser.getUserId())
                 .ifPresent(member -> {
                     throw new RuntimeException("This user is already a member of the project.");

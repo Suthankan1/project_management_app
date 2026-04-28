@@ -41,7 +41,7 @@ class JpaUserDetailedServiceTest {
 
     @Test
     void loadUserByUsername_returnsUserPrincipal_whenUserExistsAndVerified() {
-        when(repository.findByEmailIgnoreCase("alice@example.com")).thenReturn(Optional.of(verifiedUser));
+        when(repository.findFirstByEmailIgnoreCase("alice@example.com")).thenReturn(Optional.of(verifiedUser));
 
         UserDetails result = jpaUserDetailedService.loadUserByUsername("alice@example.com");
 
@@ -51,7 +51,7 @@ class JpaUserDetailedServiceTest {
 
     @Test
     void loadUserByUsername_throwsUsernameNotFoundException_whenUserNotFound() {
-        when(repository.findByEmailIgnoreCase("nobody@example.com")).thenReturn(Optional.empty());
+        when(repository.findFirstByEmailIgnoreCase("nobody@example.com")).thenReturn(Optional.empty());
 
         assertThrows(UsernameNotFoundException.class,
                 () -> jpaUserDetailedService.loadUserByUsername("nobody@example.com"));
@@ -60,7 +60,7 @@ class JpaUserDetailedServiceTest {
     @Test
     void loadUserByUsername_throwsDisabledException_whenUserNotVerified() {
         verifiedUser.setVerified(false);
-        when(repository.findByEmailIgnoreCase("alice@example.com")).thenReturn(Optional.of(verifiedUser));
+        when(repository.findFirstByEmailIgnoreCase("alice@example.com")).thenReturn(Optional.of(verifiedUser));
 
         assertThrows(DisabledException.class,
                 () -> jpaUserDetailedService.loadUserByUsername("alice@example.com"));
@@ -68,7 +68,7 @@ class JpaUserDetailedServiceTest {
 
     @Test
     void loadUserByUsername_isCaseInsensitive() {
-        when(repository.findByEmailIgnoreCase("ALICE@EXAMPLE.COM")).thenReturn(Optional.of(verifiedUser));
+        when(repository.findFirstByEmailIgnoreCase("ALICE@EXAMPLE.COM")).thenReturn(Optional.of(verifiedUser));
 
         UserDetails result = jpaUserDetailedService.loadUserByUsername("ALICE@EXAMPLE.COM");
 

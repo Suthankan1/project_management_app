@@ -216,7 +216,7 @@ const TaskRow = React.memo(function TaskRow({
       </div>
 
       {/* Title */}
-      <p className={`flex-1 min-w-0 text-[13px] font-medium truncate ${task.status?.toUpperCase() === 'DONE' ? 'line-through text-[#98A2B3]' : 'text-[#101828]'}`}>
+      <p className="flex-1 min-w-0 text-[13px] font-medium truncate text-[#101828]">
         {task.title}
       </p>
 
@@ -354,6 +354,7 @@ const TaskRow = React.memo(function TaskRow({
                   const has = existingIds.includes(member.id);
                   const nextIds = has ? existingIds.filter((id) => id !== member.id) : [...existingIds, member.id];
                   onAssigneesChange(task.id, nextIds);
+                  setAssigneeOpen(false);
                 }}
                 className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F9FAFB] text-[#374151] flex items-center justify-between"
               >
