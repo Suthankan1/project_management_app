@@ -113,7 +113,7 @@ export function NotificationsList({
 
                       {relatedProject && (
                         <Link
-                          href={`/summary/${relatedProject.projectId}`}
+                          href={`/project/${relatedProject.projectId}/summary`}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition-all active:scale-95 font-outfit"
                         >
                           {relatedProject.projectName}
