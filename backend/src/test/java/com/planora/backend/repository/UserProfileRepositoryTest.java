@@ -144,9 +144,9 @@ class UserProfileRepositoryTest {
     // ── findByEmail ───────────────────────────────────────────────────────────
 
     @Test
-    void findByEmailIgnoreCase_returnsUserWithProfileFields() {
+    void findFirstByEmailIgnoreCase_returnsUserWithProfileFields() {
         entityManager.clear();
-        Optional<User> result = userRepository.findByEmailIgnoreCase("ALICE@EXAMPLE.COM");
+        Optional<User> result = userRepository.findFirstByEmailIgnoreCase("ALICE@EXAMPLE.COM");
 
         assertTrue(result.isPresent());
         assertEquals("Alice Smith", result.get().getFullName());

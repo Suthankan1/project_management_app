@@ -36,7 +36,7 @@ public class JpaUserDetailedService implements UserDetailsService {
         // Step 1. Fetch the user.
         // Note: Spring Security uses the parameter name "username" universally to mean "primary identity".
         // In our specific system architecture, the primary identity for login is actually the email.
-        User user = repository.findByEmailIgnoreCase(username).orElse(null);
+        User user = repository.findFirstByEmailIgnoreCase(username).orElse(null);
 
         // Step 2. Fail fast if the user doesn't exist in our database.
         if(user == null){

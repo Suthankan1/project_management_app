@@ -151,7 +151,6 @@ class ChatRestControllerTest {
 
         when(userCacheService.resolveUserByEmailOrUsername("bob")).thenReturn(bob);
         when(userCacheService.resolveUserByEmailOrUsername("bob@example.com")).thenReturn(bob);
-        when(teamMemberRepository.findByTeamIdAndUserUserId(7L, 11L)).thenReturn(Optional.of(new TeamMember()));
 
 		ChatMessageDTO dm = new ChatMessageDTO();
 		dm.setId(30L);
@@ -167,6 +166,31 @@ class ChatRestControllerTest {
                 .andExpect(jsonPath("$[0].recipient").value("bob"));
 
         verify(chatService).markPrivateConversationAsRead(5L, "alice", "bob");
+    }
+
+    @Test
+    @WithMockUserPrincipal(email = "alice")
+    void getPrivateMessages_succeedsEvenIfWithUserNotTeamMember() throws Exception {
+        // withUser team membership is no longer validated — conversation history
+        // must remain accessible even after the other party leaves the project.
+        User former = new User();
+        former.setUserId(99L);
+        former.setUsername("former");
+
+        when(userCacheService.resolveUserByEmailOrUsername("former")).thenReturn(former);
+
+        ChatMessageDTO dm = new ChatMessageDTO();
+        dm.setId(55L);
+        dm.setSender("former");
+        dm.setRecipient("alice");
+
+        when(chatService.getPrivateConversation(5L, "alice", "former")).thenReturn(List.of(dm));
+
+        mockMvc.perform(get("/api/projects/5/chat/messages")
+                        .param("recipient", "alice")
+                        .param("with", "former"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(55L));
     }
 
     @Test

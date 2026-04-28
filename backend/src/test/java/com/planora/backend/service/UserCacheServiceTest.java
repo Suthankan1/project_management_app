@@ -47,7 +47,7 @@ class UserCacheServiceTest {
     @Test
     void resolveUserByEmailOrUsername_findsUserByEmail() {
         User user = buildUser(1L, "alice@example.com", "alice");
-        when(userRepository.findByEmailIgnoreCase("alice@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findFirstByEmailIgnoreCase("alice@example.com")).thenReturn(Optional.of(user));
 
         User result = userCacheService.resolveUserByEmailOrUsername("alice@example.com");
 
@@ -58,8 +58,8 @@ class UserCacheServiceTest {
     @Test
     void resolveUserByEmailOrUsername_fallsBackToUsername_whenEmailNotFound() {
         User user = buildUser(1L, "alice@example.com", "alice");
-        when(userRepository.findByEmailIgnoreCase("alice@example.com")).thenReturn(Optional.empty());
-        when(userRepository.findByUsernameIgnoreCase("alice@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findFirstByEmailIgnoreCase("alice@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findFirstByUsernameIgnoreCase("alice@example.com")).thenReturn(Optional.of(user));
 
         User result = userCacheService.resolveUserByEmailOrUsername("alice@example.com");
 
@@ -69,7 +69,7 @@ class UserCacheServiceTest {
     @Test
     void resolveUserByEmailOrUsername_findsUserByUsername() {
         User user = buildUser(1L, "alice@example.com", "alice");
-        when(userRepository.findByUsernameIgnoreCase("alice")).thenReturn(Optional.of(user));
+        when(userRepository.findFirstByUsernameIgnoreCase("alice")).thenReturn(Optional.of(user));
 
         User result = userCacheService.resolveUserByEmailOrUsername("alice");
 
@@ -80,8 +80,8 @@ class UserCacheServiceTest {
     @Test
     void resolveUserByEmailOrUsername_fallsBackToEmail_whenUsernameNotFound() {
         User user = buildUser(1L, "alice@example.com", "alice");
-        when(userRepository.findByUsernameIgnoreCase("aliasname")).thenReturn(Optional.empty());
-        when(userRepository.findByEmailIgnoreCase("aliasname")).thenReturn(Optional.of(user));
+        when(userRepository.findFirstByUsernameIgnoreCase("aliasname")).thenReturn(Optional.empty());
+        when(userRepository.findFirstByEmailIgnoreCase("aliasname")).thenReturn(Optional.of(user));
 
         User result = userCacheService.resolveUserByEmailOrUsername("aliasname");
 
@@ -90,8 +90,8 @@ class UserCacheServiceTest {
 
     @Test
     void resolveUserByEmailOrUsername_returnsNull_whenNeitherEmailNorUsernameFound() {
-        when(userRepository.findByUsernameIgnoreCase("ghost")).thenReturn(Optional.empty());
-        when(userRepository.findByEmailIgnoreCase("ghost")).thenReturn(Optional.empty());
+        when(userRepository.findFirstByUsernameIgnoreCase("ghost")).thenReturn(Optional.empty());
+        when(userRepository.findFirstByEmailIgnoreCase("ghost")).thenReturn(Optional.empty());
 
         User result = userCacheService.resolveUserByEmailOrUsername("ghost");
 

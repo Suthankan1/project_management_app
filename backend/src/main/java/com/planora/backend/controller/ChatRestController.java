@@ -237,8 +237,6 @@ public class ChatRestController {
             return new ResponseEntity<>(chatService.getGroupMessages(projectId), HttpStatus.OK);
         }
 
-        // Private conversation should always be resolved for the authenticated user.
-        validateTeamMembership(teamId, withUser);
         var privateConversation = chatService.getPrivateConversation(projectId, username, withUser);
         chatService.markPrivateConversationAsRead(projectId, username, withUser);
         return new ResponseEntity<>(privateConversation, HttpStatus.OK);
@@ -575,8 +573,7 @@ public class ChatRestController {
                                                      @RequestParam("with") String withUser,
                                                      Authentication authentication) {
         String username = authentication.getName();
-        Long teamId = resolveValidatedTeamId(projectId, username);
-        validateTeamMembership(teamId, withUser);
+        resolveValidatedTeamId(projectId, username);
         chatService.markPrivateConversationAsRead(projectId, username, withUser);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
