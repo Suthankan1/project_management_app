@@ -38,7 +38,7 @@ const stompClient = {
 };
 
 const ClientMock = function (options: { onConnect?: () => void }) {
-  stompClientOnConnect = options.onConnect;
+  stompClientOnConnect = options.onConnect ?? null;
   return stompClient;
 };
 

@@ -94,7 +94,7 @@ describe('NotificationsPage', () => {
     expect(screen.getByRole('link', { name: 'Open details' })).toHaveAttribute('href', '/taskcard?taskId=12');
 
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Atlas' })).toHaveAttribute('href', '/summary/77');
+      expect(screen.getByRole('link', { name: 'Atlas' })).toHaveAttribute('href', '/project/77/summary');
     });
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Read' })[1]);

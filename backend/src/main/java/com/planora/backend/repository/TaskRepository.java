@@ -31,7 +31,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            "t.id")
     List<Task> findByProjectIdWithScalars(@Param("projectId") Long projectId);
 
-    @EntityGraph(attributePaths = {"labels", "assignees", "assignees.user", "subTasks", "attachments"})
+    @EntityGraph(attributePaths = {"labels", "assignees", "assignees.user", "assignee", "assignee.user", "reporter", "reporter.user", "subTasks", "attachments"})
     @Query("SELECT DISTINCT t FROM Task t WHERE t.id IN :ids")
     List<Task> findByIdInWithCollections(@Param("ids") List<Long> ids);
 

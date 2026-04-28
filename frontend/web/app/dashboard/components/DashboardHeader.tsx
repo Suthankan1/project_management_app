@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import type { User } from '@/lib/auth';
 import WelcomeGreeting from '@/components/ui/WelcomeGreeting';
-import { NotificationBell } from '@/navBar/topbar/NotificationBell';
+import { NotificationBell } from '@/components/layout/topbar/NotificationBell';
 
 // Props for the header (current user data and profile picture URL)
 interface DashboardHeaderProps {

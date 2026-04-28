@@ -30,6 +30,7 @@ const nextConfig = {
       proxy('pages'),
       proxy('scheduled-reports'),
       proxy('reports'),
+      proxy('search'),
     ];
   },
   images: {
