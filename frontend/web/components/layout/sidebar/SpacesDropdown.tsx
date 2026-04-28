@@ -83,7 +83,12 @@ export function SpacesDropdown({
 }) {
   const router = useRouter();
   const visible = items.slice(0, 4);
-  // Removed mounted state and effect as it is unnecessary and causes lint error.
+
+  // Fix: Add mounted state to ensure portal only renders on client
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const dropdownContent = (
     <div
