@@ -39,22 +39,9 @@ const STATUS_LABEL: Record<Sprint['status'], string> = {
   COMPLETED:   'Completed',
 };
 
-function getSprintStatus(sprint: Sprint): Sprint['status'] {
-  if (!sprint.startDate || !sprint.endDate) return 'NOT_STARTED';
-
-  const start = new Date(sprint.startDate + 'T00:00:00');
-  const end = new Date(sprint.endDate + 'T00:00:00');
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-
-  if (start > now) return 'NOT_STARTED';
-  if (end < now) return 'COMPLETED';
-  return 'ACTIVE';
-}
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export { getSprintStatus, STATUS_STYLE, STATUS_LABEL };
+export { STATUS_STYLE, STATUS_LABEL };
 export type { Sprint as BurndownSprint };
 
 export default function SprintSelector({
@@ -82,8 +69,8 @@ export default function SprintSelector({
             {selectedSprint ? selectedSprint.name : 'Select Sprint'}
           </span>
           {selectedSprint && (
-            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[getSprintStatus(selectedSprint)]}`}>
-              {STATUS_LABEL[getSprintStatus(selectedSprint)]}
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[selectedSprint.status]}`}>
+              {STATUS_LABEL[selectedSprint.status]}
             </span>
           )}
           <ChevronDown size={16} className="text-[#98A2B3]" />
@@ -98,8 +85,8 @@ export default function SprintSelector({
                 className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[13px] hover:bg-[#F9FAFB] transition-colors ${s.id === selectedSprintId ? 'bg-[#EFF8FF] font-semibold text-[#175CD3]' : 'text-[#344054]'}`}
               >
                 <span>{s.name}</span>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[getSprintStatus(s)]}`}>
-                  {STATUS_LABEL[getSprintStatus(s)]}
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[s.status]}`}>
+                  {STATUS_LABEL[s.status]}
                 </span>
               </button>
             ))}
@@ -112,6 +99,7 @@ export default function SprintSelector({
         <input
           type="date"
           value={filterFrom}
+          max={filterTo || undefined}
           onChange={(e) => onFilterFromChange(e.target.value)}
           className="border-none bg-transparent text-[13px] text-[#344054] outline-none"
         />
@@ -119,6 +107,7 @@ export default function SprintSelector({
         <input
           type="date"
           value={filterTo}
+          min={filterFrom || undefined}
           onChange={(e) => onFilterToChange(e.target.value)}
           className="border-none bg-transparent text-[13px] text-[#344054] outline-none"
         />
