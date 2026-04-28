@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/*Controller managing the lifecycle of Kanban boards.
+  Each board serves as a container for columns and tasks within a specific project context.*/
 @RestController
 @RequestMapping("/api/kanbans")
 public class KanbanController {
@@ -27,6 +29,7 @@ public class KanbanController {
         return ResponseEntity.ok(kanbanService.getAllKanbans());
     }
 
+    //Standard CRUD: Fetches a single Kanban entity by its unique database ID.
     @GetMapping("/{id}")
     public ResponseEntity<Kanban> getKanbanById(@PathVariable Long id) {
         return kanbanService.getKanbanById(id)
