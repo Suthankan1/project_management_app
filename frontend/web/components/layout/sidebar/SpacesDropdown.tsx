@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -84,11 +84,7 @@ export function SpacesDropdown({
   const router = useRouter();
   const visible = items.slice(0, 4);
 
-  // Fix: Add mounted state to ensure portal only renders on client
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+
 
   const dropdownContent = (
     <div
@@ -157,6 +153,6 @@ export function SpacesDropdown({
     </div>
   );
 
-  if (!mounted) return null;
+  if (typeof window === 'undefined') return null;
   return createPortal(dropdownContent, document.body);
 }
