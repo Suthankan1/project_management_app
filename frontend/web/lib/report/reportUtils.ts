@@ -46,7 +46,7 @@ export function humanStatus(s: string): string {
   const map: Record<string, string> = {
     TODO: 'To Do', IN_PROGRESS: 'In Progress', IN_REVIEW: 'In Review', DONE: 'Done',
     ACTIVE: 'Active', COMPLETED: 'Completed', NOT_STARTED: 'Not Started',
-    OPEN: 'Open', ARCHIVED: 'Archived',
+    OPEN: 'Open', IN_PROGRESS: 'In Progress', COMPLETED: 'Completed', CANCELLED: 'Cancelled',
   };
   return map[s?.toUpperCase()] ?? s;
 }

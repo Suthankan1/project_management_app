@@ -262,7 +262,7 @@ function milestoneTimeline(doc: Doc, y: number, data: ReportData): number {
   sorted.forEach((m, i) => {
     const t   = m.dueDate ? new Date(m.dueDate).getTime() : now;
     const px  = mx0 + mw * (t - minT) / tRange;
-    const col: RGB = m.status === 'COMPLETED' ? C.green : m.status === 'ARCHIVED' ? C.grey : t < now ? C.red : C.orange;
+    const col: RGB = m.status === 'COMPLETED' ? C.green : m.status === 'CANCELLED' ? C.grey : t < now && (m.status === 'OPEN' || m.status === 'IN_PROGRESS') ? C.red : C.orange;
     rgb(doc, col); doc.circle(px, cy, 2.5, 'F');
     rgb(doc, C.white); doc.circle(px, cy, 1.2, 'F');
     const label = clip(m.name, 14);
