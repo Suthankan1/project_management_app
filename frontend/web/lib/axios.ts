@@ -1,5 +1,5 @@
 import axios from "axios";
-import { clearTokens, getRefreshToken, getValidToken, refreshAccessToken, saveRefreshToken, saveToken } from "@/lib/auth";
+import { clearTokens, getRefreshToken, getValidToken, getUserFromToken, refreshAccessToken, saveRefreshToken, saveToken } from "@/lib/auth";
 
 const api = axios.create({
     // Changed fallback from 'http://localhost:8080' to ''
@@ -34,17 +34,14 @@ api.interceptors.request.use(async (config) => {
     const authEndpoints = ['/api/auth/login', '/api/auth/register', '/api/auth/forgot', '/api/auth/reset', '/api/auth/reg/verify', '/api/auth/resend', '/api/auth/refresh'];
     const isAuthEndpoint = authEndpoints.some(endpoint => config.url?.includes(endpoint));
     if (!isAuthEndpoint && typeof window !== 'undefined') {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        if (token) {
-            try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                if (payload.exp - Date.now() / 1000 < 60) {
-                    const newToken = await refreshAccessToken();
-                    config.headers['Authorization'] = `Bearer ${newToken}`;
-                    return config;
-                }
-            } catch { /* malformed token — let the 401 handler deal with it */ }
-        }
+        try {
+            const user = getUserFromToken();
+            if (user?.exp && (user.exp - Date.now() / 1000) < 60) {
+                const newToken = await refreshAccessToken();
+                config.headers['Authorization'] = `Bearer ${newToken}`;
+                return config;
+            }
+        } catch { /* token expired or invalid — let the 401 handler deal with it */ }
     }
     return config;
 });
@@ -92,7 +89,10 @@ api.interceptors.response.use(
             if (!refreshToken) {
                 isRefreshing = false;
                 clearTokens();
-                if (typeof window !== 'undefined') window.location.href = '/login';
+                if (typeof window !== 'undefined') {
+                    // 500ms delay lets toast notifications render before reload
+                    setTimeout(() => { window.location.href = '/login'; }, 500);
+                }
                 return Promise.reject(error);
             }
 
@@ -107,7 +107,10 @@ api.interceptors.response.use(
             } catch (refreshError) {
                 processQueue(refreshError, null);
                 clearTokens();
-                if (typeof window !== 'undefined') window.location.href = '/login';
+                if (typeof window !== 'undefined') {
+                    // 500ms delay lets toast notifications render before reload
+                    setTimeout(() => { window.location.href = '/login'; }, 500);
+                }
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;

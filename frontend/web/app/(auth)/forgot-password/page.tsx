@@ -11,6 +11,7 @@ export default function ForgotPasswordPage() {
     submitted, setSubmitted,
     error,
     success,
+    cooldown,
     handleSubmit,
   } = useForgotPasswordForm();
 
@@ -54,16 +55,25 @@ export default function ForgotPasswordPage() {
               </svg>
             </div>
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Check your email</h2>
-            <p className="text-gray-500 text-sm mb-6">
+            <p className="text-gray-500 text-sm mb-4">
               We&apos;ve sent a password reset code to <br />
               <span className="font-semibold text-gray-900">{email}</span>
             </p>
             <p className="text-xs text-gray-400 mb-6">
               Go to the reset password page and enter the 6-digit code you received. The code will expire in 10 minutes.
             </p>
+            {cooldown > 0 ? (
+              <p className="text-sm text-gray-500 mb-4">
+                Check your inbox. You can request another reset in{' '}
+                <span className="font-semibold text-blue-600">{cooldown}s</span>.
+              </p>
+            ) : null}
             <button
               onClick={() => setSubmitted(false)}
-              className='w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition-colors mb-2'
+              disabled={cooldown > 0}
+              className={`w-full font-semibold py-2.5 rounded-xl transition-colors mb-2 text-white ${
+                cooldown > 0 ? 'bg-blue-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+              }`}
             >
               Send code to another email
             </button>

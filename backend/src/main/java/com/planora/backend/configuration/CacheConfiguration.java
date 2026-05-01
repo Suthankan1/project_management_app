@@ -21,7 +21,8 @@ public class CacheConfiguration {
                 "project-membership",
                 "user-details",
                 "team-member",
-                "project-team-id");
+                "project-team-id",
+                "userProfile");
         manager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(Duration.ofSeconds(60))
                 .maximumSize(500));
