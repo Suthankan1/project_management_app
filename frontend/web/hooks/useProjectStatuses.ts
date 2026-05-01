@@ -30,7 +30,7 @@ export function useProjectStatuses(projectId?: number) {
         const columns = response.data.columns || [];
         
         if (columns.length > 0) {
-          const dynamicStatuses = columns.map((col: any) => ({
+          const dynamicStatuses = columns.map((col: { name: string; status: string; color?: string }) => ({
             name: col.name,
             status: col.status,
             color: getStatusStyles(col.status, col.color),

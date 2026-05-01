@@ -6,7 +6,6 @@ import TaskMainContent from './TaskMainContent';
 import TaskSidebar from './TaskSidebar';
 import api from '@/lib/axios';
 import { toast } from '@/components/ui';
-import { Skeleton } from '@/components/ui/Skeleton';
 import { motion } from 'framer-motion';
 import { useStomp } from '@/ws/stomp-provider';
 
