@@ -218,9 +218,7 @@ export const ChatMessages = ({
     isAtBottomRef.current = true;
     const virtualizer = virtualizerRef.current;
     if (!virtualizer || visibleMessages.length === 0) return;
-    requestAnimationFrame(() => {
-      virtualizer.scrollToIndex(visibleMessages.length - 1, { align: 'end' });
-    });
+    virtualizer.scrollToIndex(visibleMessages.length - 1, { align: 'end' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRoomId, isPrivateChat]);
 
@@ -230,9 +228,7 @@ export const ChatMessages = ({
     const virtualizer = virtualizerRef.current;
     if (!virtualizer || visibleMessages.length === 0) return;
     if (!isAtBottomRef.current) return;
-    requestAnimationFrame(() => {
-      virtualizer.scrollToIndex(visibleMessages.length - 1, { align: 'end' });
-    });
+    virtualizer.scrollToIndex(visibleMessages.length - 1, { align: 'end' });
   }, [visibleMessages.length]);
 
   const handleDocumentClick = async (
@@ -298,13 +294,7 @@ export const ChatMessages = ({
               <div
                 key={msg.id ?? `local-msg-${idx}`}
                 data-index={idx}
-                ref={(el) => {
-                  if (el) {
-                    requestAnimationFrame(() => {
-                      rowVirtualizer.measureElement(el);
-                    });
-                  }
-                }}
+                ref={rowVirtualizer.measureElement}
                 style={{
                   position: 'absolute',
                   top: 0,
