@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PanelLeft } from 'lucide-react';
 import DocumentSidebar from './components/DocumentSidebar';
@@ -19,12 +19,16 @@ export default function PagesPage() {
   const {
     filteredPages,
     error,
-    searchQuery,
     setSearchQuery,
   } = usePages(projectId);
 
-  // Local state (not URL) because sidebar visibility is transient UI — shouldn't survive navigation or page share
+  const [searchInput, setSearchInput] = useState('');
   const [showDocSidebar, setShowDocSidebar] = useState(false);
+
+  useEffect(() => {
+    const id = setTimeout(() => setSearchQuery(searchInput), 300);
+    return () => clearTimeout(id);
+  }, [searchInput, setSearchQuery]);
 
   const handleTemplateSelect = (template: Template) => {
     try {
@@ -62,10 +66,10 @@ export default function PagesPage() {
         <div className={showDocSidebar ? 'flex' : 'hidden lg:flex'}>
           <DocumentSidebar
             pages={filteredPages}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
+            searchQuery={searchInput}
+            onSearchChange={setSearchInput}
             projectId={projectId}
-            selectedPageId={null} // Root path has no selected page
+            selectedPageId={null}
             onCreateClick={() => {
               // Already showing template selector here in root, but just in case
             }}

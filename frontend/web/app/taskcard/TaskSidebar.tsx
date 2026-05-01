@@ -131,7 +131,7 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
         </div>
       )}
       <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
-        <StatusSection status={status} onUpdateStatus={canEdit ? onUpdateStatus : undefined} />
+        <StatusSection projectId={projectId} status={status} onUpdateStatus={canEdit ? onUpdateStatus : undefined} />
         <PrioritySection priority={priority} onUpdatePriority={canEdit ? onUpdatePriority : undefined} />
       </div>
       <div className="border border-[#E5E7EB] rounded-xl bg-white shadow-sm overflow-hidden">

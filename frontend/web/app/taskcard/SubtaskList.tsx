@@ -7,6 +7,21 @@ interface Subtask {
   id: number;
   title: string;
   status: string;
+  priority?: string;
+  dueDate?: string | null;
+}
+
+const PRIORITY_DOT: Record<string, string> = {
+  URGENT: 'bg-red-500',
+  HIGH:   'bg-orange-400',
+  MEDIUM: 'bg-yellow-400',
+  NORMAL: 'bg-blue-400',
+  LOW:    'bg-gray-300',
+};
+
+function fmtDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 interface SubtaskListProps {
@@ -120,6 +135,15 @@ const SubtaskList: React.FC<SubtaskListProps> = ({ subtasks: initialSubtasks, ta
               <span className={`text-sm flex-1 min-w-0 ${isDone ? 'text-[#98A2B3] line-through' : 'text-[#101828]'}`}>
                 {st.title}
               </span>
+              {st.priority && (
+                <span
+                  className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[st.priority] ?? 'bg-gray-300'}`}
+                  title={st.priority}
+                />
+              )}
+              {st.dueDate && (
+                <span className="text-xs text-[#667085] flex-shrink-0">{fmtDate(st.dueDate)}</span>
+              )}
               <span className={`text-xs px-2 py-0.5 rounded font-medium flex-shrink-0 ${
                 isDone ? 'bg-green-100 text-green-700' : 'bg-[#F2F4F7] text-[#667085]'
               }`}>

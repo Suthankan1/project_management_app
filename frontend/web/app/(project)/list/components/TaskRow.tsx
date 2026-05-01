@@ -25,6 +25,7 @@ const TaskRow = React.memo(function TaskRow({
   onMilestoneChange,
   selected = false,
   onToggleSelect,
+  projectStatuses,
 }: {
   task: Task;
   onOpenModal: (id: number) => void;
@@ -40,6 +41,7 @@ const TaskRow = React.memo(function TaskRow({
   onMilestoneChange: (taskId: number, milestoneId: number | null) => void;
   selected?: boolean;
   onToggleSelect?: (taskId: number) => void;
+  projectStatuses?: Array<{ name: string; status: string; color: string }>;
 }) {
   const [statusOpen, setStatusOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
@@ -65,7 +67,9 @@ const TaskRow = React.memo(function TaskRow({
       ? [{ name: task.assigneeName, src: assigneePhotoUrl }]
       : [];
 
-  const sConf = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.TODO;
+  const currentStatus = projectStatuses?.find((s: { status: string; name: string; color: string }) => s.status === task.status) || { name: task.status, status: task.status, color: STATUS_CONFIG[task.status]?.badge || 'bg-gray-100 text-gray-600' };
+  
+  const sConf = STATUS_CONFIG[task.status] ?? { label: currentStatus.name, badge: currentStatus.color };
   const pConf = localPriority ? PRIORITY_CONFIG[localPriority] : null;
   const PriorityIcon = pConf?.icon ?? Minus;
   const priorityColor = pConf?.color ?? '#9CA3AF';
@@ -377,15 +381,27 @@ const TaskRow = React.memo(function TaskRow({
         </button>
         {statusOpen && (
           <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-[#E5E7EB] rounded-xl shadow-lg py-1 min-w-[130px]">
-            {STATUS_ORDER.map((s) => (
-              <button
-                key={s}
-                onClick={() => { onStatusChange(task.id, s); setStatusOpen(false); }}
-                className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F9FAFB] transition-colors ${task.status === s ? 'font-semibold text-[#155DFC]' : 'text-[#374151]'}`}
-              >
-                {STATUS_CONFIG[s]?.label ?? s}
-              </button>
-            ))}
+            {projectStatuses && projectStatuses.length > 0 ? (
+              projectStatuses.map((s: { status: string; name: string; color: string }) => (
+                <button
+                  key={s.status}
+                  onClick={() => { onStatusChange(task.id, s.status); setStatusOpen(false); }}
+                  className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F9FAFB] transition-colors ${task.status === s.status ? 'font-semibold text-[#155DFC]' : 'text-[#374151]'}`}
+                >
+                  {s.name}
+                </button>
+              ))
+            ) : (
+              STATUS_ORDER.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => { onStatusChange(task.id, s); setStatusOpen(false); }}
+                  className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F9FAFB] transition-colors ${task.status === s ? 'font-semibold text-[#155DFC]' : 'text-[#374151]'}`}
+                >
+                  {STATUS_CONFIG[s]?.label ?? s}
+                </button>
+              ))
+            )}
           </div>
         )}
       </div>

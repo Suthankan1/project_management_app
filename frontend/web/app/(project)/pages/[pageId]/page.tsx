@@ -49,6 +49,14 @@ export default function PageDetailPage() {
         </button>
       </div>
 
+      {/* Mobile sidebar backdrop */}
+      {showDocSidebar && (
+        <div
+          className="fixed inset-0 bg-black/20 z-10 lg:hidden"
+          onClick={() => setShowDocSidebar(false)}
+        />
+      )}
+
       {/* Left Sidebar */}
       <div className={showDocSidebar ? 'flex' : 'hidden lg:flex'}>
         <DocumentSidebar

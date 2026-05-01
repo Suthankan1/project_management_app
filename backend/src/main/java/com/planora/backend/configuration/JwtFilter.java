@@ -93,10 +93,10 @@ public class JwtFilter extends OncePerRequestFilter {
             logger.info("User not found for token: {}", e.getMessage());
             sendErrorResponse(response, "User not found");
         } catch (ExpiredJwtException e) {
-            logger.info("JWT Token expired: {}", e.getMessage());
+            logger.debug("JWT expired for request: {}", request.getRequestURI());
             sendErrorResponse(response, "Token has expired");
         } catch (MalformedJwtException e) {
-            logger.warn("Malformed JWT received: {}", e.getMessage());
+            logger.debug("Malformed JWT on request: {}", request.getRequestURI());
             sendErrorResponse(response, "Invalid token format");
         } catch (JwtException | IllegalArgumentException e) {
             logger.error("JWT Error: {}", e.getMessage());
@@ -107,6 +107,7 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private void sendErrorResponse(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setHeader("WWW-Authenticate", "Bearer realm=\"planora\"");
         response.setContentType("application/json");
         response.getWriter().write("{\"error\": \"" + message + "\"}");
     }

@@ -25,12 +25,11 @@ import io.jsonwebtoken.security.Keys;
 @Service
 public class JWTService {
 
-    // Hardcoding TTLs (Time-To-Live) ensures predictable session lifespans.
-    // Access tokens are short-lived (1 day) to minimize risk if stolen.
-    private static final long ACCESS_TOKEN_TTL_MS  = 1000L * 60 * 60 * 24;       // 1 day
+    // Access tokens are short-lived (15 min) to minimize risk if stolen.
+    private static final long ACCESS_TOKEN_TTL_MS  = 1000L * 60 * 15;            // 15 minutes
 
-    // Refresh tokens are long-lived (7 days) and used strictly to get new Access tokens.
-    private static final long REFRESH_TOKEN_TTL_MS = 1000L * 60 * 60 * 24 * 7;   // 7 days
+    // Refresh tokens are long-lived (30 days) and used strictly to get new Access tokens.
+    private static final long REFRESH_TOKEN_TTL_MS = 1000L * 60 * 60 * 24 * 30; // 30 days
 
     // Custom claim keys to securely differentiate token purposes.
     private static final String CLAIM_TOKEN_TYPE = "tokenType";
@@ -45,11 +44,16 @@ public class JWTService {
 
     // Overloaded helper method for generating a basic access token without a username.
     public String generateToken(String email) {
-        return generateToken(email, null);
+        return generateToken(email, null, null);
+    }
+
+    // Overloaded helper for generating an access token with username but no userId.
+    public String generateToken(String email, String username) {
+        return generateToken(email, username, null);
     }
 
     // Generates a short-lived Access Token used for authenticating standard API requests.
-    public String generateToken(String email, String username) {
+    public String generateToken(String email, String username, Long userId) {
         // Step 1. Initialize an empty map for our custom payloads (claims).
         Map<String, Object> claims = new HashMap<>();
 
@@ -64,8 +68,20 @@ public class JWTService {
             claims.put("username", username);
         }
 
-        // Step 4. Delegate to the core builder method.
+        // Step 4. Embed the userId so the frontend can extract it without an extra API call.
+        if (userId != null) {
+            claims.put("userId", userId);
+        }
+
+        // Step 5. Delegate to the core builder method.
         return buildToken(email, claims, ACCESS_TOKEN_TTL_MS);
+    }
+
+    /** Extracts the userId claim from an access token. Returns null if not present. */
+    public Long extractUserId(String token) {
+        Object raw = extractAllClaims(token).get("userId");
+        if (raw instanceof Number) return ((Number) raw).longValue();
+        return null;
     }
 
     // ── Refresh token ─────────────────────────────────────────────────────────

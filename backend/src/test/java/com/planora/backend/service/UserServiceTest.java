@@ -187,7 +187,7 @@ public class UserServiceTest {
         when(authentication.isAuthenticated()).thenReturn(true);
         when(authenticationManager.authenticate(any())).thenReturn(authentication);
         when(userRepository.findFirstByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
-        when(jwtService.generateToken(anyString(), anyString())).thenReturn("mock-access-token");
+        when(jwtService.generateToken(anyString(), anyString(), any())).thenReturn("mock-access-token");
         when(jwtService.generateRefreshToken(anyString())).thenReturn("mock-refresh-token");
 
         LoginResponse result = userService.loginUser(testUser);
@@ -426,7 +426,7 @@ public class UserServiceTest {
         when(jwtService.extractJti("old-refresh")).thenReturn("old-jti");
         when(jwtService.extractJti("new-refresh")).thenReturn("new-jti");
         when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.REFRESH_TOKEN)).thenReturn(storedToken);
-        when(jwtService.generateToken(anyString(), anyString())).thenReturn("new-access");
+        when(jwtService.generateToken(anyString(), anyString(), any())).thenReturn("new-access");
         when(jwtService.generateRefreshToken(anyString())).thenReturn("new-refresh");
 
         LoginResponse result = userService.refreshTokens("old-refresh");

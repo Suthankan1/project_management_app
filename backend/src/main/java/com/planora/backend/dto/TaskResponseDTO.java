@@ -21,6 +21,7 @@ public class TaskResponseDTO {
     private LocalDate dueDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime completedAt;
 
     private Long projectId;
     private String projectName;
@@ -68,6 +69,8 @@ public class TaskResponseDTO {
         private Long id;
         private String title;
         private String status;
+        private String priority;
+        private java.time.LocalDate dueDate;
     }
 
     @Data

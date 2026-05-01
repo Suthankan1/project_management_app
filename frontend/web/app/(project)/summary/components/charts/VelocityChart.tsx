@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { Task, Sprint } from '@/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { SafeChartFrame } from './SafeChartFrame';
+import { SafeChartFrame } from '@/components/shared/SafeChartFrame';
 
 /**
  * Tracks the amount of work (story points) completed in the last few sprints.

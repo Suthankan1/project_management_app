@@ -5,6 +5,7 @@ import { Hash, Plus, User, X } from 'lucide-react';
 import axios from '@/lib/axios';
 import LabelPicker from '@/components/shared/LabelPicker';
 import type { Label } from '@/types';
+import { useProjectStatuses } from '@/hooks/useProjectStatuses';
 
 interface TeamMember {
   id: number;
@@ -13,6 +14,7 @@ interface TeamMember {
 
 export interface CreateTaskData {
   title: string;
+  status?: string;
   priority: string;
   assigneeId?: number;
   storyPoint: number;
@@ -45,6 +47,7 @@ export default function CreateTaskModal({
   initialDueDate,
 }: CreateTaskModalProps) {
   const [title, setTitle] = useState('');
+  const [status, setStatus] = useState('TODO');
   const [priority, setPriority] = useState('MEDIUM');
   const [assignee, setAssignee] = useState<number | ''>('');
   const [storyPoint, setStoryPoint] = useState(0);
@@ -54,6 +57,13 @@ export default function CreateTaskModal({
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const { statuses } = useProjectStatuses(projectId);
+
+  useEffect(() => {
+    if (statuses.length > 0 && status === 'TODO') {
+      setStatus(statuses[0].status);
+    }
+  }, [statuses, status]);
 
   useEffect(() => {
     if (!isOpen || !projectId) return;
@@ -87,6 +97,8 @@ export default function CreateTaskModal({
 
   const resetForm = () => {
     setTitle('');
+    if (statuses.length > 0) setStatus(statuses[0].status);
+    else setStatus('TODO');
     setPriority('MEDIUM');
     setAssignee('');
     setStoryPoint(0);
@@ -108,6 +120,7 @@ export default function CreateTaskModal({
     try {
       await onCreateTask({
         title: title.trim(),
+        status,
         priority,
         assigneeId: assignee || undefined,
         storyPoint,
@@ -157,6 +170,20 @@ export default function CreateTaskModal({
               autoFocus
             />
             {error && <p className="text-red-500 text-xs font-medium">{error}</p>}
+          </div>
+
+          {/* Status */}
+          <div className="space-y-2">
+            <label className="text-[13px] font-bold text-[#344054]">STATUS</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm text-[#475467] focus:ring-2 focus:ring-[#155DFC]/20 focus:outline-none transition-all appearance-none"
+            >
+              {statuses.map((s) => (
+                <option key={s.status} value={s.status}>{s.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Priority */}

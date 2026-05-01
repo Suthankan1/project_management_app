@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { Task } from '@/types';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { SafeChartFrame } from './SafeChartFrame';
+import { SafeChartFrame } from '@/components/shared/SafeChartFrame';
 
 const PRIORITY_COLORS = {
   URGENT: '#DE350B',

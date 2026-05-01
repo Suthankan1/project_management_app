@@ -71,8 +71,10 @@ public class MilestoneService {
     }
 
     @Transactional(readOnly = true)
-    public MilestoneResponseDTO getMilestoneById(Long milestoneId) {
-        return toDTO(findOrThrow(milestoneId));
+    public MilestoneResponseDTO getMilestoneById(Long milestoneId, Long currentUserId) {
+        Milestone milestone = findOrThrow(milestoneId);
+        requireAtLeastMember(milestone.getProject().getTeam().getId(), currentUserId);
+        return toDTO(milestone);
     }
 
     // Updates an existing milestone's metadata.
@@ -159,8 +161,13 @@ public class MilestoneService {
         dto.setDueDate(m.getDueDate());
         dto.setStatus(m.getStatus());
 
-        // Dynamically calculate how many tasks are currently sitting in this milestone
-        dto.setTaskCount(m.getTasks() != null ? m.getTasks().size() : 0L);
+        long total = m.getTasks() != null ? m.getTasks().size() : 0L;
+        long completed = m.getTasks() != null
+                ? m.getTasks().stream().filter(t -> "DONE".equals(t.getStatus())).count()
+                : 0L;
+        dto.setTaskCount(total);
+        dto.setCompletedTaskCount(completed);
+        dto.setProgressPercent(total > 0 ? (int) Math.round(completed * 100.0 / total) : 0);
 
         dto.setCreatedAt(m.getCreatedAt());
         dto.setUpdatedAt(m.getUpdatedAt());

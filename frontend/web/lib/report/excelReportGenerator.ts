@@ -384,7 +384,7 @@ function buildMilestoneSheet(data: ReportData, XLSX: XLSX): WorkSheet {
 
   data.milestones.forEach((m, idx) => {
     const rowBg = idx % 2 === 0 ? C.whiteBg : C.rowAlt;
-    const statusBg = m.status === 'COMPLETED' ? C.greenBg : m.status === 'ARCHIVED' ? C.midFg : C.orangeBg;
+    const statusBg = m.status === 'COMPLETED' ? C.greenBg : m.status === 'CANCELLED' ? C.midFg : m.status === 'IN_PROGRESS' ? C.orangeBg : C.primaryBg;
     setCell(ws, r, 0, m.name, dataStyle(rowBg, 'left', true), XLSX);
     setCell(ws, r, 1, m.status, headerStyle(statusBg, C.primaryFg, 9), XLSX);
     setCell(ws, r, 2, m.dueDate ? new Date(m.dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—', dataStyle(rowBg, 'center'), XLSX);

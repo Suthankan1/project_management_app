@@ -7,6 +7,7 @@ import TaskSidebar from './TaskSidebar';
 import api from '@/lib/axios';
 import { toast } from '@/components/ui';
 import { motion } from 'framer-motion';
+import { useStomp } from '@/ws/stomp-provider';
 
 interface MultiAssignee {
   memberId: number;
@@ -33,7 +34,7 @@ interface TaskData {
   createdAt: string;
   updatedAt: string;
   dueDate: string | null;
-  subtasks: Array<{ id: number; title: string; status: string }>;
+  subtasks: Array<{ id: number; title: string; status: string; priority?: string; dueDate?: string | null }>;
   dependencies: Array<{ id: number; title: string; relation: string }>;
   assignees?: MultiAssignee[];
   recurrenceRule?: string | null;
@@ -41,6 +42,7 @@ interface TaskData {
   reporterId?: number | null;
   sprintId?: number | null;
   startDate?: string | null;
+  completedAt?: string | null;
 }
 
 interface ProjectMemberOption {
@@ -76,6 +78,8 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
   // useRef instead of useState so wasModified always holds the current value inside
   // the Escape keydown listener without needing it in the dependency array.
   const wasModified = useRef<boolean>(false);
+  const { subscribe } = useStomp();
+  const commentRefetchRef = useRef<(() => void) | null>(null);
 
   const fetchTaskData = async () => {
     try {
@@ -150,6 +154,23 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
   }, [taskId]);
 
   useEffect(() => { wasModified.current = false; }, [taskId]);
+
+  useEffect(() => {
+    if (!taskData?.projectId) return;
+    const sub = subscribe(
+      `/topic/project/${taskData.projectId}/tasks`,
+      (msg: { body: string }) => {
+        try {
+          const event = JSON.parse(msg.body) as { type: string; taskId?: number };
+          if (event.type === 'TASK_COMMENT_ADDED' && event.taskId === taskId) {
+            commentRefetchRef.current?.();
+          }
+        } catch { /* ignore malformed messages */ }
+      },
+    );
+    return () => { sub?.unsubscribe(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskData?.projectId, taskId]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(wasModified.current); };

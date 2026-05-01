@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { DayPicker } from 'react-day-picker';
 import { format, parseISO } from 'date-fns';
@@ -23,6 +23,11 @@ const DateSection: React.FC<DateSectionProps> = ({ dates, onUpdateDueDate, onUpd
   // parseISO is used instead of new Date() to avoid timezone offset issues with bare YYYY-MM-DD strings
   const parsedDueDate = dates.dueDate ? parseISO(dates.dueDate) : undefined;
   const parsedStartDate = dates.startDate ? parseISO(dates.startDate) : undefined;
+  const dueDateIsPast = useMemo(() => {
+    if (!parsedDueDate) return false;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return parsedDueDate < today;
+  }, [parsedDueDate]);
 
   const handleSelect = (date: Date | undefined) => {
     if (onUpdateDueDate) {
@@ -52,34 +57,41 @@ const DateSection: React.FC<DateSectionProps> = ({ dates, onUpdateDueDate, onUpd
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-500 font-medium">Due date</span>
             {onUpdateDueDate ? (
-              <div className="flex items-center gap-2">
-                <Popover.Root open={open} onOpenChange={setOpen}>
-                  <Popover.Trigger asChild>
-                    <button className="flex items-center gap-2 text-sm text-gray-800 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
-                      <CalendarIcon size={14} className="text-gray-500" />
-                      {parsedDueDate ? format(parsedDueDate, 'MMM d, yyyy') : 'No date'}
+              <div className="flex flex-col items-end">
+                <div className="flex items-center gap-2">
+                  <Popover.Root open={open} onOpenChange={setOpen}>
+                    <Popover.Trigger asChild>
+                      <button className="flex items-center gap-2 text-sm text-gray-800 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+                        <CalendarIcon size={14} className="text-gray-500" />
+                        {parsedDueDate ? format(parsedDueDate, 'MMM d, yyyy') : 'No date'}
+                      </button>
+                    </Popover.Trigger>
+                    <Popover.Portal>
+                      {/* Popover.Portal renders outside the sidebar so overflow:hidden on the modal panel can't clip the calendar */}
+                      <Popover.Content className="z-[10000] p-3 bg-white rounded-xl shadow-xl border border-gray-200" sideOffset={5} align="end">
+                        <DayPicker
+                          mode="single"
+                          selected={parsedDueDate}
+                          onSelect={handleSelect}
+                          showOutsideDays
+                        />
+                      </Popover.Content>
+                    </Popover.Portal>
+                  </Popover.Root>
+                  {parsedDueDate && (
+                    <button
+                      onClick={() => handleSelect(undefined)}
+                      className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                      title="Clear date"
+                    >
+                      <X size={14} />
                     </button>
-                  </Popover.Trigger>
-                  <Popover.Portal>
-                    {/* Popover.Portal renders outside the sidebar so overflow:hidden on the modal panel can't clip the calendar */}
-                    <Popover.Content className="z-[10000] p-3 bg-white rounded-xl shadow-xl border border-gray-200" sideOffset={5} align="end">
-                      <DayPicker
-                        mode="single"
-                        selected={parsedDueDate}
-                        onSelect={handleSelect}
-                        showOutsideDays
-                      />
-                    </Popover.Content>
-                  </Popover.Portal>
-                </Popover.Root>
-                {parsedDueDate && (
-                  <button
-                    onClick={() => handleSelect(undefined)}
-                    className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-                    title="Clear date"
-                  >
-                    <X size={14} />
-                  </button>
+                  )}
+                </div>
+                {dueDateIsPast && (
+                  <p className="text-xs text-orange-500 mt-1 max-w-[200px] text-right leading-tight">
+                    This date is in the past — task will be immediately overdue.
+                  </p>
                 )}
               </div>
             ) : (

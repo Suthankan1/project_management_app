@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '@/lib/axios';
 
 /*
@@ -15,6 +15,30 @@ export function useForgotPasswordForm() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [cooldown, setCooldown] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (cooldown <= 0) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      return;
+    }
+    intervalRef.current = setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) {
+          setSubmitted(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [cooldown]);
 
   // Step 2: Form Submission Handler
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -35,6 +59,7 @@ export function useForgotPasswordForm() {
       // On success:
       setSuccess(response.data);
       setSubmitted(true);
+      setCooldown(60);
       setEmail(''); // Clear the input field for security/cleanliness.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
@@ -64,6 +89,7 @@ export function useForgotPasswordForm() {
     submitted, setSubmitted,
     error,
     success,
+    cooldown,
     handleSubmit,
   };
 }

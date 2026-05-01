@@ -15,16 +15,17 @@ interface Comment {
 
 interface CommentSectionProps {
   taskId?: number;
+  onFetchRef?: (fn: () => void) => void;
 }
 
 // Relative profile picture URLs from the API need a host prefix; absolute CDN URLs are used as-is.
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
-const CommentSection: React.FC<CommentSectionProps> = ({ taskId }) => {
+const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) => {
   const [activeTab, setActiveTab] = useState<'Comments' | 'History'>('Comments');
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ username?: string; email: string; profilePicUrl?: string | null } | null>(null);
   const [usersMap, setUsersMap] = useState<Record<string, string | null>>({});
 
@@ -79,11 +80,16 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
+  useEffect(() => {
+    onFetchRef?.(fetchComments);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchComments]);
+
   const handleAddComment = async () => {
-    if (!newComment.trim() || !taskId) return;
+    if (!newComment.trim() || !taskId || isSubmitting) return;
 
     try {
-      setLoading(true);
+      setIsSubmitting(true);
       await api.post(`/api/tasks/${taskId}/comments`, {
         content: newComment
       });
@@ -92,7 +98,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId }) => {
     } catch (error) {
       console.error('Failed to add comment:', error);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -135,22 +141,26 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId }) => {
           )}
         </div>
         <div className="flex-1">
-          <input 
-            type="text" 
-            placeholder="Add a comment..." 
+          <textarea
+            rows={2}
+            placeholder="Add a comment..."
             value={newComment}
+            maxLength={2000}
             onChange={(e) => setNewComment(e.target.value)}
-            onKeyPress={(e) => {
+            onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                handleAddComment();
+                void handleAddComment();
               }
             }}
-            disabled={loading}
-            className="w-full border border-[#D0D5DD] rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] focus:outline-none transition-all placeholder:text-[#98A2B3] disabled:bg-[#F2F4F7]"
+            disabled={isSubmitting}
+            className="w-full border border-[#D0D5DD] rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] focus:outline-none transition-all placeholder:text-[#98A2B3] disabled:bg-[#F2F4F7] resize-none"
           />
-          <div className="text-xs text-[#98A2B3] mt-2">
-            <strong>Pro tip:</strong> press <span className="bg-[#F2F4F7] border border-[#D0D5DD] px-1 rounded text-[#667085] font-mono">Enter</span> to comment
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-xs text-[#98A2B3]">
+              <strong>Pro tip:</strong> press <span className="bg-[#F2F4F7] border border-[#D0D5DD] px-1 rounded text-[#667085] font-mono">Enter</span> to comment
+            </p>
+            <p className="text-xs text-gray-400">{newComment.length}/2000</p>
           </div>
         </div>
       </div>

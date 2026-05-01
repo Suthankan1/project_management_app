@@ -5,9 +5,13 @@ export interface User {
     username?: string;
     fullName?: string;
     userId?: number;
+    exp?: number;
 }
 
 export const AUTH_TOKEN_CHANGED_EVENT = 'planora-auth-token-changed';
+
+const TOKEN_KEY = 'planora:access_token';
+const REFRESH_TOKEN_KEY = 'planora:refresh_token';
 
 interface JwtPayload {
     sub?: string;
@@ -53,14 +57,14 @@ function tokenStorage(): Storage {
 export function getUserFromToken(): User | null {
     if (typeof window === 'undefined') return null;
 
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem('token')
+        || sessionStorage.getItem(TOKEN_KEY) || sessionStorage.getItem('token');
     if (!token) return null;
 
     try {
         const tokenParts = token.split('.');
         if (tokenParts.length < 2) {
-            localStorage.removeItem('token');
-            sessionStorage.removeItem('token');
+            clearTokens();
             return null;
         }
 
@@ -72,27 +76,26 @@ export function getUserFromToken(): User | null {
 
         const payload: JwtPayload = JSON.parse(jsonPayload);
         if (!payload.sub) {
-            localStorage.removeItem('token');
-            sessionStorage.removeItem('token');
+            clearTokens();
             return null;
         }
 
         if (payload.exp && payload.exp * 1000 <= Date.now()) {
-            localStorage.removeItem('token');
-            sessionStorage.removeItem('token');
+            clearTokens();
             return null;
         }
 
         type ExtendedJwtPayload = JwtPayload & { userId?: number; id?: number };
         const extPayload = payload as ExtendedJwtPayload;
         let userId: number | undefined = undefined;
-        if (typeof extPayload.userId === 'number') userId = extPayload.userId;
+        if (extPayload.userId != null) userId = Number(extPayload.userId);
         else if (typeof extPayload.id === 'number') userId = extPayload.id;
 
         const decodedUser: User = {
             email: payload.sub,
             username: payload.username,
             userId,
+            exp: payload.exp,
         };
 
         const cachedProfile = localStorage.getItem('userProfile');
@@ -117,11 +120,18 @@ export function getUserFromToken(): User | null {
     }
 }
 
+export function getUserIdFromToken(): number | null {
+    const user = getUserFromToken();
+    return user?.userId ?? null;
+}
+
 export function saveToken(token: string): void {
     if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
         sessionStorage.removeItem('token');
-        tokenStorage().setItem('token', token);
+        localStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(TOKEN_KEY);
+        tokenStorage().setItem(TOKEN_KEY, token);
         initializeSessionCacheForCurrentAuth(token);
         emitAuthTokenChanged();
     }
@@ -131,23 +141,30 @@ export function saveRefreshToken(token: string): void {
     if (typeof window !== 'undefined') {
         localStorage.removeItem('refreshToken');
         sessionStorage.removeItem('refreshToken');
-        tokenStorage().setItem('refreshToken', token);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+        sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+        tokenStorage().setItem(REFRESH_TOKEN_KEY, token);
     }
 }
 
 export function getRefreshToken(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
+    return localStorage.getItem(REFRESH_TOKEN_KEY) || localStorage.getItem('refreshToken')
+        || sessionStorage.getItem(REFRESH_TOKEN_KEY) || sessionStorage.getItem('refreshToken');
 }
 
 export function clearTokens(): void {
     if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
         localStorage.removeItem('userProfile');
         localStorage.removeItem('rememberMe');
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('refreshToken');
+        sessionStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(REFRESH_TOKEN_KEY);
         // Wipe all planora: prefixed data caches so the next user session
         // starts with a clean slate
         Object.keys(localStorage)
@@ -167,7 +184,8 @@ export function clearTokens(): void {
 export function getValidToken(): string | null {
     if (typeof window === 'undefined') return null;
     if (getUserFromToken()) {
-        return localStorage.getItem('token') || sessionStorage.getItem('token');
+        return localStorage.getItem(TOKEN_KEY) || localStorage.getItem('token')
+            || sessionStorage.getItem(TOKEN_KEY) || sessionStorage.getItem('token');
     }
     return null;
 }

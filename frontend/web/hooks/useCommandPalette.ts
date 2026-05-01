@@ -41,7 +41,7 @@ export default function useCommandPalette() {
 
     const search = useCallback(async (q: string) => {
         const projectId = typeof window !== 'undefined' ? localStorage.getItem('currentProjectId') : null;
-        if (!q.trim() || !projectId) { setResults([]); return; }
+        if (!q.trim() || !projectId || projectId === 'null') { setResults([]); return; }
         setIsSearching(true);
         try {
             const res = await api.get<TaskResult[]>(`/api/tasks/project/${projectId}`);

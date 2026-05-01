@@ -18,6 +18,8 @@ public class MilestoneResponseDTO {
     private LocalDate dueDate;
     private String status;
     private long taskCount;
+    private long completedTaskCount;
+    private int progressPercent;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
