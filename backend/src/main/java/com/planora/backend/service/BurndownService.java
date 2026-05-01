@@ -77,6 +77,12 @@ public class BurndownService {
 
         long totalDays = java.time.temporal.ChronoUnit.DAYS.between(sprintStart, sprintEnd);
 
+        // For DONE tasks missing completedAt: treat as completed on the sprint end date
+        // (or today if the sprint hasn't ended yet), so historical views stay accurate.
+        final LocalDate effectiveNullCompletion = sprintEnd.isBefore(LocalDate.now())
+                ? sprintEnd
+                : LocalDate.now();
+
         List<BurndownDataPointDTO> points = new ArrayList<>();
         DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE;
 
@@ -98,8 +104,7 @@ public class BurndownService {
                     .filter(t -> {
                         LocalDateTime completedAt = t.getCompletedAt();
                         if (completedAt == null) {
-                            // If DONE but no completedAt, treat as completed today
-                            return !LocalDate.now().isAfter(day);
+                            return !effectiveNullCompletion.isAfter(day);
                         }
                         return !completedAt.toLocalDate().isAfter(day);
                     })

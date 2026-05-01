@@ -221,12 +221,23 @@ function BurndownContent() {
 
           {/* Stats cards */}
           {burndown && (
-            <BurndownStatsGrid
-              totalStoryPoints={burndown.totalStoryPoints}
-              donePoints={donePoints}
-              remainingPoints={burndown.dataPoints[burndown.dataPoints.length - 1]?.remainingPoints ?? 0}
-              progressPct={progressPct}
-            />
+            <>
+              <BurndownStatsGrid
+                totalStoryPoints={burndown.totalStoryPoints}
+                donePoints={donePoints}
+                remainingPoints={burndown.dataPoints[burndown.dataPoints.length - 1]?.remainingPoints ?? 0}
+                progressPct={progressPct}
+              />
+              {filterTo && selectedSprint?.endDate && filterTo !== selectedSprint.endDate && (
+                <p className="text-[12px] text-[#98A2B3] -mt-2">
+                  Stats shown as of{' '}
+                  <strong className="text-[#667085]">
+                    {new Date(filterTo + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </strong>
+                  {' '}· adjust the date range to see the full sprint
+                </p>
+              )}
+            </>
           )}
 
           {/* Chart card */}

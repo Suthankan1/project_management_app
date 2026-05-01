@@ -35,6 +35,15 @@ export default function BurndownChart({ sprintName, dataPoints, totalStoryPoints
   const actualRef = useRef<SVGPathElement | null>(null);
   const idealRef = useRef<SVGPathElement | null>(null);
 
+  // Reset lengths when data changes so the animation remounts and replays
+  // We do this during render to avoid cascading renders from an effect
+  const [prevDataPoints, setPrevDataPoints] = useState(dataPoints);
+  if (dataPoints !== prevDataPoints) {
+    setPrevDataPoints(dataPoints);
+    setActualPathLen(null);
+    setIdealPathLen(null);
+  }
+
   useEffect(() => {
     if (!containerRef.current) return;
     const ro = new ResizeObserver(([entry]) => {
@@ -44,11 +53,13 @@ export default function BurndownChart({ sprintName, dataPoints, totalStoryPoints
     return () => ro.disconnect();
   }, []);
 
-  // Measure path lengths for animation after render
   useEffect(() => {
-    if (actualRef.current) setActualPathLen(actualRef.current.getTotalLength());
-    if (idealRef.current)  setIdealPathLen(idealRef.current.getTotalLength());
-  }, []);
+    const rafId = requestAnimationFrame(() => {
+      if (actualRef.current) setActualPathLen(actualRef.current.getTotalLength());
+      if (idealRef.current)  setIdealPathLen(idealRef.current.getTotalLength());
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [dataPoints]);
 
   if (!dataPoints.length) {
     return (
@@ -262,7 +273,8 @@ export default function BurndownChart({ sprintName, dataPoints, totalStoryPoints
           let tx = tooltip.x - tw / 2;
           if (tx < svgLeft + 4) tx = svgLeft + 4;
           if (tx + tw > width - 4) tx = width - tw - 4;
-          const ty = tooltip.y - th - 10;
+          // Flip tooltip below the dot when it would overflow above the chart
+          const ty = tooltip.y - PAD.top < th + 14 ? tooltip.y + 12 : tooltip.y - th - 10;
           return (
             <div
               className="pointer-events-none absolute rounded-lg border border-[#E4E7EC] bg-white px-3 py-2.5 shadow-lg"
