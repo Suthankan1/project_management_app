@@ -1,4 +1,5 @@
 import api from '@/lib/axios';
+import axios from 'axios';
 
 export type DocumentStatus = 'ACTIVE' | 'SOFT_DELETED';
 
@@ -17,9 +18,11 @@ export interface DocumentItem {
     name: string;
     contentType: string;
     fileSize: number;
+    humanReadableSize?: string;
     status: DocumentStatus;
     projectId: number;
     folderId: number | null;
+    folderName?: string | null;
     latestVersionNumber: number;
     downloadUrl: string | null;
     uploadedById: number;
@@ -159,6 +162,16 @@ export async function getDocumentDownloadUrl(projectId: number, documentId: numb
     return response.data.downloadUrl;
 }
 
+export interface UserProject {
+    id: number;
+    name: string;
+}
+
+export async function listUserProjects(): Promise<UserProject[]> {
+    const response = await api.get<UserProject[]>('/api/projects');
+    return response.data;
+}
+
 async function initUpload(projectId: number, request: UploadInitRequest): Promise<UploadInitResponse> {
     try {
         const response = await api.post<UploadInitResponse>(`/api/projects/${projectId}/documents/upload/init`, request);
@@ -197,7 +210,12 @@ async function uploadViaBackend(projectId: number, file: File, folderId?: number
     }
 }
 
-export async function uploadDocument(projectId: number, file: File, folderId?: number): Promise<DocumentItem> {
+export async function uploadDocument(
+    projectId: number,
+    file: File,
+    folderId?: number,
+    onProgress?: (percent: number) => void
+): Promise<DocumentItem> {
     const contentType = inferContentType(file);
 
     const initResponse = await initUpload(projectId, {
@@ -207,20 +225,16 @@ export async function uploadDocument(projectId: number, file: File, folderId?: n
         folderId,
     });
 
-    let putResponse: Response;
     try {
-        putResponse = await fetch(initResponse.uploadUrl, {
-            method: 'PUT',
-            body: file,
-            headers: {
-                'Content-Type': contentType,
+        await axios.put(initResponse.uploadUrl, file, {
+            headers: { 'Content-Type': contentType },
+            onUploadProgress: (progressEvent) => {
+                if (onProgress && progressEvent.total) {
+                    onProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
+                }
             },
         });
     } catch {
-        return uploadViaBackend(projectId, file, folderId);
-    }
-
-    if (!putResponse.ok) {
         return uploadViaBackend(projectId, file, folderId);
     }
 

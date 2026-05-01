@@ -6,6 +6,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StreamUtils;
 
@@ -35,6 +36,7 @@ public class EmailService {
         }
     }
 
+    @Async("emailTaskExecutor")
     public void sendVerificationEmail(String toEmail, String otp) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -53,6 +55,7 @@ public class EmailService {
         }
     }
 
+    @Async("emailTaskExecutor")
     public void sendPasswordResetRequest(String toEmail, String otp) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -71,6 +74,7 @@ public class EmailService {
         }
     }
 
+    @Async("emailTaskExecutor")
     public void sendProjectInvitationEmail(String toEmail, String inviterName, String projectName) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom("no-reply@planora.com");
@@ -85,6 +89,7 @@ public class EmailService {
     }
 
     // ✅ Redesigned HTML Email Method
+    @Async("emailTaskExecutor")
     public void sendProjectInvitationHtmlEmail(String toEmail, String inviterName, String projectName, String token) {
         try {
             String html = loadTemplate("templates/invite_email.html");

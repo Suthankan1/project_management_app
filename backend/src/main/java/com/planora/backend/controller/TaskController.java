@@ -1,48 +1,91 @@
 package com.planora.backend.controller;
 
 import com.planora.backend.dto.CommentRequestDTO;
+import com.planora.backend.dto.TaskActivityResponseDTO;
 import com.planora.backend.dto.TaskRequestDTO;
 import com.planora.backend.dto.TaskResponseDTO;
-import com.planora.backend.model.Task;
+import com.planora.backend.dto.TaskTemplateDTO;
 import com.planora.backend.model.UserPrincipal;
+import com.planora.backend.service.TaskActivityService;
 import com.planora.backend.service.TaskService;
+import com.planora.backend.service.TaskTemplateService;
+import jakarta.validation.Valid;
+import jakarta.validation.groups.Default;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/tasks")
-@CrossOrigin(origins = "http://localhost:3000")
 public class TaskController {
 
     @Autowired
     TaskService service;
 
+    @Autowired
+    TaskActivityService activityService;
+
+    @Autowired
+    TaskTemplateService templateService;
+
+    // Spring's WebSocket messaging template used for real-time push notifications.
+    @Autowired
+    SimpMessagingTemplate messagingTemplate;
+
+    //Creates a new task and broadcasts the creation to all connected clients.
     @PostMapping
     public ResponseEntity<TaskResponseDTO> createTask(
-            @RequestBody TaskRequestDTO request,
+            // @Validated enforces strict rules specifically for creation (e.g., Title is mandatory).
+            @Validated({TaskRequestDTO.OnCreate.class, Default.class}) @RequestBody TaskRequestDTO request,
             @AuthenticationPrincipal UserPrincipal currentUser){
         Long currentUserId = currentUser.getUserId();
-        return new ResponseEntity<>(service.createTask(request, currentUserId), HttpStatus.CREATED);
+        TaskResponseDTO task = service.createTask(request, currentUserId);
+
+        // REAL-TIME PUSH: Tell everyone currently viewing this project's board that a new task appeared.
+        messagingTemplate.convertAndSend(
+                "/topic/project/" + task.getProjectId() + "/tasks",
+                Map.of("type", "TASK_CREATED", "task", task));
+        return new ResponseEntity<>(task, HttpStatus.CREATED);
     }
 
+    /*
+     * Fetches a single task and silently logs that the user viewed it
+     * (used to populate their "Recently Viewed" dashboard).
+     */
     @GetMapping("/{taskId}")
     public ResponseEntity<TaskResponseDTO> getTaskById(
-            @PathVariable Long taskId){
+            @PathVariable Long taskId,
+            @AuthenticationPrincipal UserPrincipal currentUser){
+        if (currentUser != null) {
+            service.recordTaskAccess(taskId, currentUser.getUserId());
+        }
         return new ResponseEntity<>(service.getTaskById(taskId), HttpStatus.OK);
     }
 
     @PutMapping("/{taskId}")
     public ResponseEntity<TaskResponseDTO> updateTask(
             @PathVariable Long taskId,
-            @RequestBody TaskRequestDTO request,
+            @Validated @RequestBody TaskRequestDTO request,
             @AuthenticationPrincipal UserPrincipal currentUser){
         Long currentUserId = currentUser.getUserId();
-        return new ResponseEntity<>(service.updateTask(taskId, request, currentUserId), HttpStatus.OK);
+        TaskResponseDTO task = service.updateTask(taskId, request, currentUserId);
+
+        // REAL-TIME PUSH: Update the task card on everyone's screen.
+        messagingTemplate.convertAndSend(
+                "/topic/project/" + task.getProjectId() + "/tasks",
+                Map.of("type", "TASK_UPDATED", "task", task));
+        return new ResponseEntity<>(task, HttpStatus.OK);
     }
 
     @DeleteMapping("/{taskId}")
@@ -50,30 +93,77 @@ public class TaskController {
             @PathVariable Long taskId,
             @AuthenticationPrincipal UserPrincipal currentUser){
         Long currentUserId = currentUser.getUserId();
-        service.deleteTask(taskId, currentUserId);
+        Long projectId = service.deleteTask(taskId, currentUserId);
+
+        // REAL-TIME PUSH: Make the task visually disappear for all connected users.
+        messagingTemplate.convertAndSend(
+                "/topic/project/" + projectId + "/tasks",
+                Map.of("type", "TASK_DELETED", "taskId", taskId));
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
+    /*
+     * The heavy-lifter endpoint for populating the main Kanban or List views.
+     * Supports multiple optional filters via query parameters.
+     */
     @GetMapping("/project/{projectId}")
     public ResponseEntity<List<TaskResponseDTO>> getTasksByProject(
             @PathVariable Long projectId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long assigneeId,
+            @RequestParam(required = false) String priority,
+            @RequestParam(required = false) Long sprintId,
+            @RequestParam(required = false) Long milestoneId,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
-        return new ResponseEntity<>(service.getTasksByProject(projectId, currentUserId), HttpStatus.OK);
+        return new ResponseEntity<>(service.getTasksByProject(projectId, currentUserId, status, assigneeId, priority, sprintId, milestoneId), HttpStatus.OK);
     }
 
-    // SUBTASKS
+    // ── DASHBOARD ENDPOINTS ─────────────────────────────────────────────────────
+
+    @PostMapping("/{taskId}/access")
+    public ResponseEntity<Void> recordTaskAccess(
+            @PathVariable Long taskId,
+            @AuthenticationPrincipal UserPrincipal currentUser){
+        service.recordTaskAccess(taskId, currentUser.getUserId());
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @GetMapping("/recent")
+    public ResponseEntity<List<TaskResponseDTO>> getRecentTasks(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam(defaultValue = "20") int limit){
+        return new ResponseEntity<>(service.getRecentTasks(currentUser.getUserId(), limit), HttpStatus.OK);
+    }
+
+    @GetMapping("/assigned")
+    public ResponseEntity<List<TaskResponseDTO>> getAssignedTasks(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam(defaultValue = "20") int limit){
+        return new ResponseEntity<>(service.getAssignedTasks(currentUser.getUserId(), limit), HttpStatus.OK);
+    }
+
+    @GetMapping("/worked-on")
+    public ResponseEntity<List<TaskResponseDTO>> getWorkedOnTasks(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam(defaultValue = "20") int limit){
+        return new ResponseEntity<>(service.getWorkedOnTasks(currentUser.getUserId(), limit), HttpStatus.OK);
+    }
+
+    // ── SUBTASKS ────────────────────────────────────────────────────────────────
 
     @PostMapping("/{parentId}/subtasks")
     public ResponseEntity<TaskResponseDTO> createSubTask(
             @PathVariable Long parentId,
-            @RequestBody TaskRequestDTO subTaskRequest,
+            @Validated({TaskRequestDTO.OnCreate.class, Default.class}) @RequestBody TaskRequestDTO subTaskRequest,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
         return new ResponseEntity<>(service.createSubTask(parentId, subTaskRequest, currentUserId), HttpStatus.OK);
     }
+
+    // ── DEPENDENCIES ────────────────────────────────────────────────────────────
 
     @PostMapping("/{taskId}/dependencies/{blockerId}")
     public ResponseEntity<Void> addDependency(
@@ -97,7 +187,7 @@ public class TaskController {
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
-    //LABEL
+    // ── LABELS ──────────────────────────────────────────────────────────────────
 
     @PostMapping("/{taskId}/label/{labelId}")
     public ResponseEntity<Void> addLabel(
@@ -121,12 +211,12 @@ public class TaskController {
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
-    //COMMENTS
+    // ── COMMENTS ────────────────────────────────────────────────────────────────
 
     @PostMapping("/{taskId}/comments")
     public ResponseEntity<Void> addComment(
             @PathVariable Long taskId,
-            @RequestBody CommentRequestDTO request,
+            @Valid @RequestBody CommentRequestDTO request,
             @AuthenticationPrincipal UserPrincipal currentUser
             ){
         Long currentUserId = currentUser.getUserId();
@@ -134,7 +224,15 @@ public class TaskController {
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
-    //ASSIGNMENT
+    @GetMapping("/{taskId}/comments")
+    public ResponseEntity<List<com.planora.backend.dto.CommentResponseDTO>> getComments(
+            @PathVariable Long taskId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ){
+        return new ResponseEntity<>(service.getComments(taskId, currentUser.getUserId()), HttpStatus.OK);
+    }
+
+    // ── ASSIGNMENT ──────────────────────────────────────────────────────────────
 
     @PatchMapping("{taskID}/assign/{userId}")
     public ResponseEntity<Void> assignUser(
@@ -145,5 +243,163 @@ public class TaskController {
         Long currentUserId = currentUser.getUserId();
         service.assignUser(taskID,userId,currentUserId);
         return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @DeleteMapping("/{taskId}/assignee")
+    public ResponseEntity<Void> unassignTask(
+            @PathVariable Long taskId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ){
+        service.unassignTask(taskId, currentUser.getUserId());
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
+    /** PATCH /api/tasks/{taskId}/assignees — replace the multi-assignee list without requiring a full task body. */
+    @PatchMapping("/{taskId}/assignees")
+    public ResponseEntity<TaskResponseDTO> updateAssignees(
+            @PathVariable Long taskId,
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        List<Long> assigneeIds = body.containsKey("assigneeIds")
+                ? ((List<?>) body.get("assigneeIds")).stream()
+                    .filter(Objects::nonNull)
+                    .map(id -> Long.valueOf(id.toString()))
+                    .toList()
+                : List.of();
+        TaskResponseDTO task = service.updateAssignees(taskId, assigneeIds, currentUser.getUserId());
+        messagingTemplate.convertAndSend(
+                "/topic/project/" + task.getProjectId() + "/tasks",
+                Map.of("type", "TASK_UPDATED", "task", task));
+        return ResponseEntity.ok(task);
+    }
+
+    // ── BULK OPERATIONS ─────────────────────────────────────────────────────────
+
+    @PatchMapping("/bulk/status")
+    public ResponseEntity<Void> bulkUpdateStatus(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ){
+        List<Long> taskIds = body.containsKey("taskIds")
+                ? ((List<?>) body.get("taskIds")).stream()
+                    .filter(Objects::nonNull)
+                    .map(id -> Long.valueOf(id.toString()))
+                    .toList()
+                : List.of();
+        String status = (String) body.get("status");
+        service.bulkUpdateStatus(taskIds, status, currentUser.getUserId());
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @DeleteMapping("/bulk")
+    public ResponseEntity<Void> bulkDelete(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ){
+        List<Long> taskIds = body.containsKey("taskIds")
+                ? ((List<?>) body.get("taskIds")).stream()
+                    .filter(Objects::nonNull)
+                    .map(id -> Long.valueOf(id.toString()))
+                    .toList()
+                : List.of();
+        service.bulkDelete(taskIds, currentUser.getUserId());
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
+    // ── LIGHTWEIGHT UI PATCHES ──────────────────────────────────────────────────
+
+    @PatchMapping("/{taskId}/priority")
+    public ResponseEntity<TaskResponseDTO> updatePriority(
+            @PathVariable Long taskId,
+            @RequestBody java.util.Map<String, String> body,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ){
+        Long currentUserId = currentUser.getUserId();
+        String priority = body.get("priority");
+        return new ResponseEntity<>(service.updatePriority(taskId, priority, currentUserId), HttpStatus.OK);
+    }
+
+    /**
+     * PATCH /api/tasks/{taskId}/status
+     * Lightweight endpoint for Kanban drag-and-drop status changes.
+     * Accepts { "status": "IN_PROGRESS" }.
+     */
+    @PatchMapping("/{taskId}/status")
+    public ResponseEntity<TaskResponseDTO> updateStatus(
+            @PathVariable Long taskId,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ){
+        Long currentUserId = currentUser.getUserId();
+        String status = body.get("status");
+        TaskResponseDTO task = service.updateStatus(taskId, status, currentUserId);
+        messagingTemplate.convertAndSend(
+                "/topic/project/" + task.getProjectId() + "/tasks",
+                Map.of(
+                    "type", "TASK_STATUS_CHANGED",
+                    "taskId", task.getId(),
+                    "status", task.getStatus(),
+                    "projectId", task.getProjectId()
+                ));
+        return new ResponseEntity<>(task, HttpStatus.OK);
+    }
+
+    /**
+     * PATCH /api/tasks/{taskId}/dates
+     * Lightweight endpoint for calendar drag-and-drop date updates.
+     * Accepts { startDate: "YYYY-MM-DD", dueDate: "YYYY-MM-DD" }.
+     */
+    @PatchMapping("/{taskId}/dates")
+    public ResponseEntity<Void> patchTaskDates(
+            @PathVariable Long taskId,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        boolean startDateProvided = body.containsKey("startDate");
+        boolean dueDateProvided = body.containsKey("dueDate");
+        LocalDate startDate = startDateProvided && body.get("startDate") != null && !body.get("startDate").trim().isEmpty()
+                ? LocalDate.parse(body.get("startDate")) : null;
+        LocalDate dueDate = dueDateProvided && body.get("dueDate") != null && !body.get("dueDate").trim().isEmpty()
+                ? LocalDate.parse(body.get("dueDate")) : null;
+        service.patchTaskDates(taskId, startDate, startDateProvided, dueDate, dueDateProvided, currentUser.getUserId());
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
+    @PatchMapping("/reorder")
+    public ResponseEntity<Void> reorderTasks(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        Long projectId = body.get("projectId") == null ? null : Long.valueOf(String.valueOf(body.get("projectId")));
+        Long sprintId = body.get("sprintId") == null ? null : Long.valueOf(String.valueOf(body.get("sprintId")));
+        @SuppressWarnings("unchecked")
+        List<Object> rawIds = (List<Object>) body.get("orderedTaskIds");
+        List<Long> orderedTaskIds = rawIds == null
+                ? List.of()
+                : rawIds.stream().map(id -> Long.valueOf(String.valueOf(id))).toList();
+        if (projectId == null) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+        service.reorderTasks(projectId, sprintId, orderedTaskIds, currentUser.getUserId());
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
+    @GetMapping("/{taskId}/activities")
+    public ResponseEntity<List<TaskActivityResponseDTO>> getActivities(
+            @PathVariable Long taskId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ){
+        return new ResponseEntity<>(activityService.getActivities(taskId), HttpStatus.OK);
+    }
+
+    /** Save the task as a reusable template for the project. */
+    @PostMapping("/{taskId}/save-as-template")
+    public ResponseEntity<TaskTemplateDTO> saveAsTemplate(
+            @PathVariable Long taskId,
+            @RequestBody TaskTemplateDTO.SaveFromTaskRequest req,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        TaskTemplateDTO dto = templateService.saveTaskAsTemplate(taskId, req.getTemplateName(), currentUser.getUserId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 }

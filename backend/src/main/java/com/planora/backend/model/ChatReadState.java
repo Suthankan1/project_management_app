@@ -23,6 +23,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @Getter
 @Setter
+// Stores per-user read cursors so unread counts can be computed incrementally.
 public class ChatReadState {
 
     @Id
@@ -37,10 +38,24 @@ public class ChatReadState {
 
     private Long roomId;
 
+    // otherParticipant is used for private chat and team sentinel keys when roomId is null.
     private String otherParticipant;
 
     private Long lastReadMessageId;
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ChatReadState that = (ChatReadState) o;
+        return java.util.Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(id);
+    }
 }

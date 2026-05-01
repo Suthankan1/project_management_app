@@ -1,84 +1,128 @@
-'use client';
+'use client'; // Tells Next.js to render this component on the browser, not the server.
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import api from '@/lib/axios';
+import api from '@/lib/axios'; // Centralized Axios instance (hopefully configured with base URLs and interceptors)
 
 import AuthCard from './UI/AuthCard';
 import Button from './UI/Button';
 
+/*
+ * The OTP Verification Form.
+ * Handles extracting the email from the URL, submitting the OTP to the backend,
+ * gracefully handling Spring Boot error responses, and managing the resend logic.
+ */
 export default function VerifyEmailForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Grabs ?email=suthankan@example.com from the URL bar.
   const email = searchParams.get('email'); 
 
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const resendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  useEffect(() => {
+    if (resendCooldown <= 0) {
+      if (resendIntervalRef.current) {
+        clearInterval(resendIntervalRef.current);
+        resendIntervalRef.current = null;
+      }
+      return;
+    }
+    resendIntervalRef.current = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) return 0;
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (resendIntervalRef.current) clearInterval(resendIntervalRef.current);
+    };
+  }, [resendCooldown]);
+
+  // ── OTP VERIFICATION SUBMIT ───────────────────────────────────────────────
   const handleVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevents the browser from doing a full page refresh
     setIsLoading(true);
     setError('');
 
     try {
+      // Hit the Spring Boot backend
       await api.post('/api/auth/reg/verify', { email, otp });
-      alert("Email verified successfully! Please login.");
-      router.push('/login');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      console.error("Verification error:", err);
-      
+
+      setSuccessMsg('Email verified! Redirecting to login...');
+      // UX: Give the user 1.5 seconds to read the success message before kicking them to login.
+      setTimeout(() => router.push('/login'), 1500);
+
+    } catch (_err: unknown) {
+      // Safely parse the Axios error object.
+      const errResponse = (_err as { response?: { status?: number; data?: unknown } })?.response;
+      const status = errResponse?.status;
+      const errorData = errResponse?.data;
+
       let errorMessage = 'Invalid OTP. Please try again.';
-      const errorData = err.response?.data;
-      
-      // Handle different error response formats
-      if (typeof errorData === 'string') {
+
+      // Backend Error Translation: 
+      // We map specific HTTP status codes and backend string responses to user-friendly messages.
+      if (status === 429) {
+        errorMessage = 'Too many failed attempts. Please request a new OTP.';
+      } else if (typeof errorData === 'string' && errorData.trim()) {
         errorMessage = errorData;
-      } else if (errorData?.message) {
-        errorMessage = errorData.message;
+        if (errorData.toLowerCase().includes('attempt')) {
+          errorMessage = 'Too many failed attempts. Please request a new OTP.';
+        }
+      } else if (errorData && typeof errorData === 'object' && 'message' in errorData) {
+        // Fallback for standard JSON error objects from Spring Boot.
+        errorMessage = (errorData as { message: string }).message;
       }
-      
+
       setError(errorMessage);
     } finally {
+      // Always turn off the loading spinner, whether it succeeded or failed.
       setIsLoading(false);
     }
   };
 
+  // ── RESEND OTP LOGIC ──────────────────────────────────────────────────────
   const handleResend = async () => {
-    if (!email) return;
-    
-    setIsLoading(true);
+    if (!email || isResending || resendCooldown > 0) return;
+
+    setIsResending(true);
     setError('');
 
     try {
       const response = await api.post('/api/auth/resend', { email });
       setError('');
-      
-      let successMsg = 'New OTP sent to your email.';
-      if (typeof response.data === 'string') {
-        successMsg = response.data;
-      }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      console.error("Resend error:", err);
-      
+
+      const msg = typeof response.data === 'string' ? response.data : 'Verification code resent.';
+      setSuccessMsg(msg);
+      setResendCooldown(60);
+    } catch (_err: unknown) {
+
       let errorMessage = 'Failed to resend OTP. Please try again.';
-      const errorData = err.response?.data;
-      
+      const res = (_err as { response?: { data?: unknown } })?.response;
+      const errorData = res?.data;
+
       if (typeof errorData === 'string') {
         errorMessage = errorData;
-      } else if (errorData?.message) {
-        errorMessage = errorData.message;
+      } else if (errorData && typeof errorData === 'object' && 'message' in errorData) {
+        errorMessage = (errorData as { message: string }).message;
       }
-      
+
       setError(errorMessage);
     } finally {
-      setIsLoading(false);
+      setIsResending(false);
     }
   };
 
+  // ── RENDER ────────────────────────────────────────────────────────────────
   return (
     <AuthCard>
       <div className="text-center mb-8">
@@ -91,40 +135,56 @@ export default function VerifyEmailForm() {
 
       <form onSubmit={handleVerify} className="space-y-6">
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">
+          <label htmlFor="otp-input" className="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">
             Verification Code (OTP)
           </label>
           <input
+            id="otp-input"
             type="text"
             required
             maxLength={6}
             value={otp}
             onChange={(e) => setOtp(e.target.value)}
+            // 'font-mono' and 'tracking-widest' makes the numbers spread out, 
+            // mimicking standard authenticator app UI.
             className="w-full px-4 py-3 rounded-xl border border-gray-200 text-center text-lg tracking-widest font-mono focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
             placeholder="123456"
+            aria-label="Six-digit verification code"
+            aria-describedby={error ? 'verify-error' : undefined}
           />
         </div>
 
+        {/* Error State - aria-live="polite" tells screen readers to read this out loud when it appears */}
         {error && (
-          <p className="text-xs text-red-600 text-center bg-red-50 p-2 rounded-lg">
+          <p id="verify-error" role="alert" aria-live="polite" className="text-xs text-red-600 text-center bg-red-50 p-2 rounded-lg">
             {error}
           </p>
         )}
 
+        {/* Success State */}
+        {successMsg && (
+          <p role="status" aria-live="polite" className="text-xs text-green-700 text-center bg-green-50 p-2 rounded-lg">
+            {successMsg}
+          </p>
+        )}
+
+        {/* Uses our custom Button component */}
         <Button type="submit" isLoading={isLoading}>
             {isLoading ? 'Verifying...' : 'Verify Email'}
         </Button>
       </form>
 
+      {/* Footer Links */}
       <div className="mt-6 text-center">
         <p className="text-xs text-gray-400">
           Didn&apos;t receive the code?{' '}
-          <button 
+          <button
             onClick={handleResend}
-            disabled={isLoading}
+            disabled={isLoading || isResending || resendCooldown > 0}
+            aria-label="Resend verification code"
             className="text-blue-600 font-semibold hover:underline disabled:opacity-50"
           >
-            Resend
+            {isResending ? 'Sending...' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend'}
           </button>
         </p>
       </div>

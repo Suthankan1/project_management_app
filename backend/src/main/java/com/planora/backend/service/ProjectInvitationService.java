@@ -1,11 +1,15 @@
 package com.planora.backend.service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.planora.backend.controller.ProjectMemberController;
 import com.planora.backend.dto.ProjectInviteRequest;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.TeamInvitation;
@@ -29,39 +33,57 @@ public class ProjectInvitationService {
     private final TeamMemberService teamMemberService;
     private final TeamMemberRepository teamMemberRepository;
     private final EmailService emailService;
+    private final NotificationService notificationService;
+    private final UserService userService;
+
+    // ── Real-time: broadcast MEMBER_JOINED to members page viewers ────────────
+    // Uses the same STOMP broker as the chat system (/ws endpoint).
+    private final SimpMessagingTemplate simpMessagingTemplate;
+    // ─────────────────────────────────────────────────────────────────
 
     @Transactional
     public void inviteToProject(Long projectId, ProjectInviteRequest request, Long inviterUserId) {
-        if (request == null || request.getEmail() == null || request.getEmail().trim().isEmpty()) {
-            throw new RuntimeException("Email is required");
-        }
-        if (request.getRole() == null || request.getRole().trim().isEmpty()) {
-            throw new RuntimeException("Role is required");
+        if (request == null) {
+            throw new RuntimeException("Invite request is required");
         }
 
         String inviteeEmail = request.getEmail().trim().toLowerCase();
-        String roleStr = request.getRole().trim().toUpperCase();
-        // Validate role is a valid TeamRole
-        try {
-            TeamRole.valueOf(roleStr);
-        } catch (Exception e) {
-            throw new RuntimeException("Invalid role: " + roleStr);
-        }
+        TeamRole inviteRole = request.getRole();
+        String roleStr = inviteRole.name();
 
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new RuntimeException("Project not found"));
 
         Long teamId = project.getTeam().getId();
+        Long projectOwnerUserId = project.getOwner().getUserId();
+        String projectOwnerEmail = project.getOwner().getEmail();
+
+        teamMemberService.enforceCreatorOnlyOwnerRole(teamId, projectOwnerUserId);
 
         // Allow TEAM OWNER and ADMIN to invite
         teamMemberService.validateOwnerOrAdmin(teamId, inviterUserId);
 
-        // If already invited and not expired -> block
-        teamInvitationRepository.findByTeamIdAndEmail(teamId, inviteeEmail).ifPresent(existing -> {
-            if (existing.getExpiresAt() == null || existing.getExpiresAt().isAfter(LocalDateTime.now())) {
+        if (inviteRole == TeamRole.OWNER && !inviteeEmail.equalsIgnoreCase(projectOwnerEmail)) {
+            throw new AccessDeniedException("Only the project creator can hold OWNER role");
+        }
+
+
+        // Block if user is already a member
+        userRepository.findFirstByEmailIgnoreCase(inviteeEmail).ifPresent(existingUser -> {
+            teamMemberRepository.findByTeamIdAndUserUserId(teamId, existingUser.getUserId())
+                .ifPresent(member -> {
+                    throw new RuntimeException("This user is already a member of the project.");
+                });
+        });
+
+        // Block if already invited and not expired (pending)
+        List<TeamInvitation> existingInvitations = teamInvitationRepository.findByTeamIdAndEmail(teamId, inviteeEmail);
+        for (TeamInvitation existing : existingInvitations) {
+            if ((existing.getStatus() == null || existing.getStatus().equalsIgnoreCase("PENDING")) &&
+                (existing.getExpiresAt() == null || existing.getExpiresAt().isAfter(LocalDateTime.now()))) {
                 throw new RuntimeException("Invitation already sent to this email");
             }
-        });
+        }
 
         User inviter = userRepository.findById(inviterUserId)
                 .orElseThrow(() -> new RuntimeException("Inviter not found"));
@@ -74,7 +96,7 @@ public class ProjectInvitationService {
         invitation.setInvitedAt(LocalDateTime.now());
         invitation.setExpiresAt(LocalDateTime.now().plusDays(7));
         invitation.setStatus("PENDING");
-        invitation.setRole(roleStr); // Save the invited role
+        invitation.setRole(roleStr);
 
         teamInvitationRepository.save(invitation);
 
@@ -97,6 +119,13 @@ public class ProjectInvitationService {
 
         TeamInvitation invitation = teamInvitationRepository.findByToken(token)
                 .orElseThrow(() -> new RuntimeException("Invitation not found or invalid"));
+
+        Project project = invitation.getTeam().getProjects().stream().findFirst().orElse(null);
+        Long projectOwnerUserId = (project != null && project.getOwner() != null)
+            ? project.getOwner().getUserId()
+            : null;
+
+        teamMemberService.enforceCreatorOnlyOwnerRole(invitation.getTeam().getId(), projectOwnerUserId);
 
         if (invitation.getExpiresAt() != null && invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new RuntimeException("Invitation has expired");
@@ -138,11 +167,63 @@ public class ProjectInvitationService {
             System.out.println("[DEBUG] Invalid role, defaulting to MEMBER");
             invitedRole = TeamRole.MEMBER; // fallback
         }
+
+        if (invitedRole == TeamRole.OWNER && (projectOwnerUserId == null || !projectOwnerUserId.equals(userId))) {
+            invitedRole = TeamRole.ADMIN;
+        }
+
         member.setRole(invitedRole);
         System.out.println("  Assigned TeamMember Role: '" + invitedRole + "'");
         teamMemberRepository.save(member);
 
         invitation.setStatus("ACCEPTED");
         teamInvitationRepository.save(invitation);
+
+        // ── NOTIFICATION: tell OWNERs and ADMINs that someone joined ──────────
+        String joinerName = (user.getFullName() != null && !user.getFullName().isBlank())
+                ? user.getFullName()
+                : (user.getUsername() != null && !user.getUsername().isBlank())
+                        ? user.getUsername()
+                        : user.getEmail();
+
+        String projectName = project != null ? project.getName() : "your project";
+        String projectId = project != null && project.getId() != null ? String.valueOf(project.getId()) : "";
+
+        String message = joinerName + " accepted your invitation and joined project \""
+                + projectName + "\"";
+        String link = "/members/" + projectId;
+
+        List<TeamMember> currentMembers = teamMemberRepository.findByTeamId(invitation.getTeam().getId());
+        currentMembers.stream()
+                .filter(m -> m.getRole() == TeamRole.OWNER || m.getRole() == TeamRole.ADMIN)
+                .filter(m -> !m.getUser().getUserId().equals(userId))
+                .forEach(m -> notificationService.createNotification(m.getUser(), message, link));
+        // ─────────────────────────────────────────────────────────────────────
+
+        // ── REAL-TIME: push MEMBER_JOINED to all members page viewers ─────────
+        // Broadcast the new member's full profile so the UI can append them
+        // to the list without needing a page refresh.
+        if (!projectId.isEmpty()) {
+            var memberPayload = new ProjectMemberController.MemberPayload(
+                    user.getUserId(),
+                    user.getUsername(),
+                    user.getFullName(),
+                    user.getEmail(),
+                    userService.generatePresignedUrl(user.getProfilePicUrl()),
+                    invitedRole.name(),
+                    0,        // task count starts at 0 for a brand-new member
+                    "Active"
+            );
+            simpMessagingTemplate.convertAndSend(
+                    "/topic/project/" + projectId + "/members",
+                    new ProjectMemberController.MemberEvent(
+                            ProjectMemberController.MemberEventAction.MEMBER_JOINED,
+                            user.getUserId(),
+                            invitedRole.name(),
+                            memberPayload
+                    )
+            );
+        }
+        // ─────────────────────────────────────────────────────────────────────
     }
 }

@@ -23,6 +23,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @Getter
 @Setter
+// Thread rows map a root message to thread metadata, avoiding repeated root lookups in hot paths.
 public class ChatThread {
 
     @Id
@@ -33,10 +34,24 @@ public class ChatThread {
 
     private Long rootMessageId;
 
+    // roomId is captured for room-scoped threads; null means team/private context.
     private Long roomId;
 
     private String createdBy;
 
     @CreationTimestamp
     private LocalDateTime createdAt;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ChatThread that = (ChatThread) o;
+        return java.util.Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(id);
+    }
 }

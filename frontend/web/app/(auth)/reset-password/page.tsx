@@ -2,13 +2,15 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import api from '@/lib/axios';
+import { validatePassword } from '@/lib/passwordValidation';
 import ResetPasswordForm from './components/ResetPasswordForm';
 import SuccessMessage from './components/SuccessMessage';
 
 export default function ResetPasswordPage() {
-  const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
+  const searchParams = useSearchParams();
+  const [otp, setOtp] = useState(() => searchParams.get('token') ?? '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -19,8 +21,14 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError('');
 
-    if (!email || !otp) {
-      setError('Please enter both email and OTP.');
+    if (!otp || otp.trim().length < 6) {
+      setError('Please enter the 6-digit reset code from your email.');
+      return;
+    }
+
+    const { valid, message } = validatePassword(newPassword);
+    if (!valid) {
+      setError(message);
       return;
     }
 
@@ -29,29 +37,20 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters long.');
-      return;
-    }
-
     setIsLoading(true);
 
     try {
       await api.post('/api/auth/reset', {
-        email: email.toLowerCase(),
-        otp: otp,
-        newPassword: newPassword
+        token: otp.trim(),
+        newPassword,
       });
 
       setSubmitted(true);
-      setEmail('');
-      setOtp('');
+      // Clear plaintext passwords from React state immediately after a successful reset as a security measure
       setNewPassword('');
       setConfirmPassword('');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      console.error("Reset password error:", err);
-      
       let errorMessage = 'Failed to reset password. Please try again.';
       const errorData = err.response?.data;
       
@@ -68,7 +67,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className='min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] p-4'>
+    <div className='min-h-screen flex flex-col items-center justify-center p-4'>
       {/* Back to Login Link */}
       <div className="w-full max-w-[420px] mb-4">
         <Link href="/login" className='inline-flex items-center text-sm text-gray-500 hover:text-gray-900 transition-colors'>
@@ -87,22 +86,21 @@ export default function ResetPasswordPage() {
           </svg>
         </div>
         <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Reset Password</h1>
-        <p className="text-gray-500 text-sm mt-2">Enter your email and OTP to create a new password</p>
+        <p className="text-gray-500 text-sm mt-2">Choose a new password to complete your reset</p>
       </div>
 
       {/* Main Card Container */}
-      <div className='w-full max-w-[420px] bg-white rounded-[24px] shadow-sm p-8'>
+      <div className='w-full max-w-[420px] glass-panel rounded-[24px] shadow-xl p-4 sm:p-8'>
+        {/* Swap to SuccessMessage in-place so the user sees confirmation before being asked to navigate */}
         {submitted ? (
           <SuccessMessage />
         ) : (
           <ResetPasswordForm
-            email={email}
             otp={otp}
             newPassword={newPassword}
             confirmPassword={confirmPassword}
             error={error}
             isLoading={isLoading}
-            onEmailChange={setEmail}
             onOtpChange={setOtp}
             onPasswordChange={setNewPassword}
             onConfirmPasswordChange={setConfirmPassword}

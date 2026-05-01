@@ -1,7 +1,9 @@
 import axios from "axios";
+import { clearTokens, getRefreshToken, getValidToken, getUserFromToken, refreshAccessToken, saveRefreshToken, saveToken } from "@/lib/auth";
 
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080',
+    // Changed fallback from 'http://localhost:8080' to ''
+    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || '', 
     headers: {
         'Content-Type': 'application/json'
     },
@@ -11,11 +13,11 @@ const api = axios.create({
 api.interceptors.request.use(
     (config) => {
         // Don't add token to auth endpoints
-        const authEndpoints = ['/api/auth/login', '/api/auth/register', '/api/auth/forgot', '/api/auth/reset', '/api/auth/reg/verify', '/api/auth/resend'];
+        const authEndpoints = ['/api/auth/login', '/api/auth/register', '/api/auth/forgot', '/api/auth/reset', '/api/auth/reg/verify', '/api/auth/resend', '/api/auth/refresh'];
         const isAuthEndpoint = authEndpoints.some(endpoint => config.url?.includes(endpoint));
         
         if (!isAuthEndpoint && typeof window !== 'undefined') {
-            const token = localStorage.getItem('token');
+            const token = getValidToken();
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
             }
@@ -27,23 +29,94 @@ api.interceptors.request.use(
     }
 );
 
+// Proactively refresh the access token if it expires within 60 seconds
+api.interceptors.request.use(async (config) => {
+    const authEndpoints = ['/api/auth/login', '/api/auth/register', '/api/auth/forgot', '/api/auth/reset', '/api/auth/reg/verify', '/api/auth/resend', '/api/auth/refresh'];
+    const isAuthEndpoint = authEndpoints.some(endpoint => config.url?.includes(endpoint));
+    if (!isAuthEndpoint && typeof window !== 'undefined') {
+        try {
+            const user = getUserFromToken();
+            if (user?.exp && (user.exp - Date.now() / 1000) < 60) {
+                const newToken = await refreshAccessToken();
+                config.headers['Authorization'] = `Bearer ${newToken}`;
+                return config;
+            }
+        } catch { /* token expired or invalid — let the 401 handler deal with it */ }
+    }
+    return config;
+});
+
+// Track whether a token refresh is in progress to avoid infinite loop
+let isRefreshing = false;
+let failedQueue: Array<{ resolve: (value: unknown) => void; reject: (reason?: unknown) => void }> = [];
+
+function processQueue(error: unknown, token: string | null = null) {
+    failedQueue.forEach(({ resolve, reject }) => {
+        if (error) {
+            reject(error);
+        } else {
+            resolve(token);
+        }
+    });
+    failedQueue = [];
+}
+
 // Add response interceptor to handle auth errors
 api.interceptors.response.use(
     (response) => response,
-    (error) => {
-        if (error.response?.status === 401) {
-            // Don't redirect if this is a login or auth endpoint
-            const authEndpoints = ['/api/auth/login', '/api/auth/forgot', '/api/auth/reset', '/api/auth/register', '/api/auth/reg/verify'];
-            const isAuthEndpoint = authEndpoints.some(endpoint => error.config?.url?.includes(endpoint));
-            
-            if (!isAuthEndpoint) {
-                // Token expired or invalid - redirect to login
+    async (error) => {
+        const originalRequest = error.config;
+
+        // Don't attempt refresh on auth endpoints
+        const authEndpoints = ['/api/auth/login', '/api/auth/forgot', '/api/auth/reset', '/api/auth/register', '/api/auth/reg/verify', '/api/auth/refresh'];
+        const isAuthEndpoint = authEndpoints.some(endpoint => originalRequest?.url?.includes(endpoint));
+
+        if (error.response?.status === 401 && !isAuthEndpoint && !originalRequest._retry) {
+            if (isRefreshing) {
+                // Wait for the in-progress refresh to complete, then retry
+                return new Promise((resolve, reject) => {
+                    failedQueue.push({ resolve, reject });
+                }).then((token) => {
+                    originalRequest.headers.Authorization = `Bearer ${token}`;
+                    return api(originalRequest);
+                });
+            }
+
+            originalRequest._retry = true;
+            isRefreshing = true;
+
+            const refreshToken = getRefreshToken();
+            if (!refreshToken) {
+                isRefreshing = false;
+                clearTokens();
                 if (typeof window !== 'undefined') {
-                    localStorage.removeItem('token');
-                    window.location.href = '/login';
+                    // 500ms delay lets toast notifications render before reload
+                    setTimeout(() => { window.location.href = '/login'; }, 500);
                 }
+                return Promise.reject(error);
+            }
+
+            try {
+                const refreshResponse = await api.post('/api/auth/refresh', { refreshToken });
+                const { token: newAccessToken, refreshToken: newRefreshToken } = refreshResponse.data;
+                saveToken(newAccessToken);
+                saveRefreshToken(newRefreshToken);
+                processQueue(null, newAccessToken);
+                originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+                return api(originalRequest);
+            } catch (refreshError) {
+                processQueue(refreshError, null);
+                clearTokens();
+                if (typeof window !== 'undefined') {
+                    // 500ms delay lets toast notifications render before reload
+                    setTimeout(() => { window.location.href = '/login'; }, 500);
+                }
+                return Promise.reject(refreshError);
+            } finally {
+                isRefreshing = false;
             }
         }
+
         return Promise.reject(error);
     }
 );

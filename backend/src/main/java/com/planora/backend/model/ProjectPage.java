@@ -29,9 +29,28 @@ public class ProjectPage {
     @Column(columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "created_by_user_id")
+    private Long createdByUserId;
+
+    @Column(name = "updated_by_user_id")
+    private Long updatedByUserId;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ProjectPage that = (ProjectPage) o;
+        return java.util.Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(id);
+    }
 }

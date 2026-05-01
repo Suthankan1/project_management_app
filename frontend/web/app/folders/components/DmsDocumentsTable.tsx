@@ -2,11 +2,15 @@
 
 import { DocumentItem } from '@/lib/dms';
 import { Download, Eye, FileClock, FileText, Info, Pencil, RotateCcw, Star, Trash2 } from 'lucide-react';
+import { formatBytes, timeAgo } from '@/app/folders/components/dmsUtils';
+import { ViewMode } from '@/app/folders/components/types';
 
 interface DmsDocumentsTableProps {
     filteredDocuments: DocumentItem[];
     favoriteIds: number[];
     isTrashMode: boolean;
+    mode: ViewMode;
+    loading?: boolean;
     onToggleFavorite: (documentId: number) => void;
     onView: (documentId: number) => void;
     onDownload: (documentId: number) => void;
@@ -22,6 +26,8 @@ export default function DmsDocumentsTable({
     filteredDocuments,
     favoriteIds,
     isTrashMode,
+    mode,
+    loading = false,
     onToggleFavorite,
     onView,
     onDownload,
@@ -38,14 +44,39 @@ export default function DmsDocumentsTable({
                 <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.08em] text-[#667085] border-b border-[#EAECF0] bg-[#FCFCFD]">
                         <th className="px-5 py-3 font-semibold">Name</th>
+                        {mode === 'recent' && <th className="px-5 py-3 font-semibold">Last Modified</th>}
                         <th className="px-5 py-3 font-semibold">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {filteredDocuments.length === 0 && (
+                    {loading && filteredDocuments.length === 0 && (
+                        Array.from({ length: 3 }).map((_, i) => (
+                            <tr key={`skeleton-${i}`} className="border-b border-[#F2F4F7] animate-pulse">
+                                <td className="px-5 py-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 w-4 h-4 rounded bg-[#EAECF0]" />
+                                        <div className="space-y-2">
+                                            <div className="h-3.5 w-40 rounded bg-[#EAECF0]" />
+                                            <div className="h-2.5 w-24 rounded bg-[#F2F4F7]" />
+                                        </div>
+                                    </div>
+                                </td>
+                                {mode === 'recent' && <td className="px-5 py-4"><div className="h-3 w-16 rounded bg-[#F2F4F7]" /></td>}
+                                <td className="px-5 py-4"><div className="h-8 w-32 rounded bg-[#F2F4F7]" /></td>
+                            </tr>
+                        ))
+                    )}
+
+                    {!loading && filteredDocuments.length === 0 && (
                         <tr>
-                            <td className="px-5 py-8 text-sm text-[#667085]" colSpan={2}>
-                                No documents found.
+                            <td className="px-5 py-12 text-center" colSpan={mode === 'recent' ? 3 : 2}>
+                                <FileText size={32} className="mx-auto text-[#D0D5DD] mb-3" />
+                                <p className="text-sm font-medium text-[#344054]">
+                                    {isTrashMode ? 'Trash is empty' : 'No documents yet'}
+                                </p>
+                                <p className="text-xs text-[#98A2B3] mt-1">
+                                    {isTrashMode ? 'Deleted documents will appear here.' : 'Upload a file to get started.'}
+                                </p>
                             </td>
                         </tr>
                     )}
@@ -69,10 +100,16 @@ export default function DmsDocumentsTable({
                                                     <Star size={14} fill={isFavorite ? '#F79009' : 'none'} color={isFavorite ? '#F79009' : 'currentColor'} />
                                                 </button>
                                             </div>
-                                            <p className="text-xs text-[#667085] mt-1">{doc.contentType} • v{doc.latestVersionNumber}</p>
+                                            <p className="text-xs text-[#667085] mt-1">{doc.contentType} • {doc.humanReadableSize ?? formatBytes(doc.fileSize)} • v{doc.latestVersionNumber}</p>
                                         </div>
                                     </div>
                                 </td>
+                                {/* FEATURE-2: last modified column in recent mode */}
+                                {mode === 'recent' && (
+                                    <td className="px-5 py-4 text-xs text-[#667085] whitespace-nowrap">
+                                        {timeAgo(doc.updatedAt)}
+                                    </td>
+                                )}
                                 <td className="px-5 py-4">
                                     <div className="flex flex-wrap items-center gap-2">
                                         {!isTrashMode && (

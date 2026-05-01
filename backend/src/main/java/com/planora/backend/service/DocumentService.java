@@ -1,6 +1,7 @@
 package com.planora.backend.service;
 
 import com.planora.backend.dto.*;
+import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.*;
 import com.planora.backend.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -10,28 +11,32 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.*;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
-import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
-import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
-import software.amazon.awssdk.core.sync.RequestBody;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * This service handles a highly scalable two-step upload process (Direct-to-S3),
+ * hierarchical folder structures, document versioning, and strict role-based access control.
+ */
 @Service
 @RequiredArgsConstructor
 public class DocumentService {
 
     private static final Logger logger = LoggerFactory.getLogger(DocumentService.class);
-    private static final long MAX_FILE_SIZE_BYTES = 25L * 1024 * 1024;
+
+    private static final long MAX_FILE_SIZE_BYTES = 100L * 1024 * 1024;
+
+    // Security: Presigned URLs are only valid for a short window. If the client doesn't
+    // complete the upload/download in 15 minutes, they have to request a new URL.
     private static final Duration URL_DURATION = Duration.ofMinutes(15);
+
+    // Strict whitelist of acceptable file formats. Prevents users from uploading
+    // malicious executables (.exe, .sh) or heavy video files.
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "application/pdf",
             "application/msword",
@@ -51,37 +56,35 @@ public class DocumentService {
     private final ProjectRepository projectRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
-    private final S3Presigner s3Presigner;
-    private final S3Client s3Client;
+    private final S3StorageService s3StorageService;
 
     @Value("${aws.s3.dms-bucket}")
     private String dmsBucket;
 
+    /*
+     * Instead of the frontend sending a 25MB file to our Spring Boot server (which eats up our bandwidth),
+     * we give the frontend a cryptographic "ticket" (Presigned URL) so it can upload the file directly to AWS.
+     */
     @Transactional(readOnly = true)
     public DocumentUploadInitResponseDTO initUpload(Long projectId, Long userId, DocumentUploadInitRequestDTO request) {
+        // Step 1: Security check. Are they in the project? Are they allowed to upload?
         TeamMember member = getProjectMember(projectId, userId);
         requireNotViewer(member);
 
+        // Step 2: Sanity check the file metadata before we authorize AWS to accept it.
         validateFileRequest(request.getFileName(), request.getContentType(), request.getFileSize());
 
+        // Step 3: Validate the target folder exists and isn't deleted.
         Long folderId = request.getFolderId();
         if (folderId != null) {
             resolveFolder(projectId, folderId);
         }
 
+        // Step 4: Generate a collision-free path in our S3 bucket.
         String objectKey = buildObjectKey(projectId, folderId, request.getFileName());
-        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                .bucket(dmsBucket)
-                .key(objectKey)
-                .contentType(request.getContentType())
-                .build();
 
-        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
-                .signatureDuration(URL_DURATION)
-                .putObjectRequest(putObjectRequest)
-                .build();
-
-        String uploadUrl = s3Presigner.presignPutObject(presignRequest).url().toString();
+        // Step 5: Ask AWS for the temporary upload ticket.
+        String uploadUrl = s3StorageService.generatePresignedUploadUrl(dmsBucket, objectKey, request.getContentType(), URL_DURATION);
 
         return DocumentUploadInitResponseDTO.builder()
                 .uploadUrl(uploadUrl)
@@ -90,24 +93,34 @@ public class DocumentService {
                 .build();
     }
 
+    // After successfully uploading a file, we need to save the metadata to our database.
     @Transactional
     public DocumentResponseDTO finalizeUpload(Long projectId, Long userId, DocumentUploadFinalizeRequestDTO request) {
+        // Step 1: Re-verify permissions.
         TeamMember member = getProjectMember(projectId, userId);
         requireNotViewer(member);
 
+        // Step 2: Validate the request and ensure the user isn't trying to hijack someone else's object key.
         validateFileRequest(request.getFileName(), request.getContentType(), request.getFileSize());
         validateObjectKeyOwnership(projectId, request.getObjectKey());
+
+        // Step 3: Crucial check — did the file actually make it to S3?
+        // We don't want a database record pointing to a ghost file.
         verifyObjectExists(request.getObjectKey());
 
+        // Step 4: Idempotency check. If the frontend had a network blip and sent this
+        // request twice, we just return the existing document instead of crashing.
         DocumentVersion existingVersion = documentVersionRepository.findByObjectKey(request.getObjectKey()).orElse(null);
         if (existingVersion != null) {
             return mapDocument(existingVersion.getDocument(), true);
         }
 
+        // Step 5: Fetch relationships.
         Project project = getProject(projectId);
         User uploader = getUser(userId);
         DocumentFolder folder = resolveFolder(projectId, request.getFolderId());
 
+        // Step 6: Create the parent Document record.
         Document document = new Document();
         document.setProject(project);
         document.setUploadedBy(uploader);
@@ -121,6 +134,7 @@ public class DocumentService {
 
         Document savedDocument = documentRepository.save(document);
 
+        // Step 7: Create the Version 1 record.
         DocumentVersion version = new DocumentVersion();
         version.setDocument(savedDocument);
         version.setVersionNumber(1);
@@ -133,6 +147,11 @@ public class DocumentService {
         return mapDocument(savedDocument, true);
     }
 
+
+    /*
+     * Fallback method for clients that cannot support Direct-to-S3 uploads.
+     * This streams the file entirely through our backend server.
+     */
     @Transactional
     public DocumentResponseDTO uploadDocumentViaBackend(Long projectId, Long userId, MultipartFile file, Long folderId) {
         TeamMember member = getProjectMember(projectId, userId);
@@ -154,20 +173,14 @@ public class DocumentService {
         String objectKey = buildObjectKey(projectId, folderId, fileName);
 
         try {
-            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                    .bucket(dmsBucket)
-                    .key(objectKey)
-                    .contentType(resolvedContentType)
-                    .build();
-
-            s3Client.putObject(
-                    putObjectRequest,
-                    RequestBody.fromInputStream(file.getInputStream(), file.getSize())
-            );
+            // Stream the file bytes to S3
+            s3StorageService.putObject(dmsBucket, objectKey, resolvedContentType, file.getInputStream(), file.getSize());
         } catch (Exception e) {
             throw new RuntimeException("Could not upload file to S3 from backend: " + e.getMessage());
         }
 
+        // Instead of rewriting the database logic, we just build a fake request
+        // and pass it to our existing finalizeUpload method! Code reuse for the win.
         DocumentUploadFinalizeRequestDTO finalizeRequest = new DocumentUploadFinalizeRequestDTO();
         finalizeRequest.setFileName(fileName);
         finalizeRequest.setContentType(resolvedContentType);
@@ -178,11 +191,13 @@ public class DocumentService {
         return finalizeUpload(projectId, userId, finalizeRequest);
     }
 
+    // Generates a ticket for uploading a NEW version of an EXISTING document.
     @Transactional(readOnly = true)
     public DocumentUploadInitResponseDTO initNewVersionUpload(Long projectId, Long documentId, Long userId, DocumentUploadInitRequestDTO request) {
         TeamMember member = getProjectMember(projectId, userId);
         requireNotViewer(member);
 
+        // Make sure the document actually exists and isn't sitting in the trash.
         Document document = getDocument(projectId, documentId);
         if (document.getStatus() == DocumentStatus.SOFT_DELETED) {
             throw new RuntimeException("Cannot upload new version for a deleted document");
@@ -191,19 +206,7 @@ public class DocumentService {
         validateFileRequest(request.getFileName(), request.getContentType(), request.getFileSize());
 
         String objectKey = buildObjectKey(projectId, document.getFolder() != null ? document.getFolder().getId() : null, request.getFileName());
-
-        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                .bucket(dmsBucket)
-                .key(objectKey)
-                .contentType(request.getContentType())
-                .build();
-
-        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
-                .signatureDuration(URL_DURATION)
-                .putObjectRequest(putObjectRequest)
-                .build();
-
-        String uploadUrl = s3Presigner.presignPutObject(presignRequest).url().toString();
+        String uploadUrl = s3StorageService.generatePresignedUploadUrl(dmsBucket, objectKey, request.getContentType(), URL_DURATION);
 
         return DocumentUploadInitResponseDTO.builder()
                 .uploadUrl(uploadUrl)
@@ -212,6 +215,7 @@ public class DocumentService {
                 .build();
     }
 
+    // Saves the metadata for a new document version and updates the parent document.
     @Transactional
     public DocumentResponseDTO finalizeNewVersionUpload(Long projectId, Long documentId, Long userId, DocumentUploadFinalizeRequestDTO request) {
         TeamMember member = getProjectMember(projectId, userId);
@@ -226,8 +230,10 @@ public class DocumentService {
         validateObjectKeyOwnership(projectId, request.getObjectKey());
         verifyObjectExists(request.getObjectKey());
 
+        // Step 1: Idempotency check. If we already saved this version, don't crash.
         DocumentVersion existingVersion = documentVersionRepository.findByObjectKey(request.getObjectKey()).orElse(null);
         if (existingVersion != null) {
+            // Security check: Make sure they aren't trying to attach a version to the wrong parent doc.
             if (!existingVersion.getDocument().getId().equals(documentId)) {
                 throw new RuntimeException("Provided object key already belongs to another document");
             }
@@ -236,10 +242,12 @@ public class DocumentService {
 
         User uploader = getUser(userId);
 
+        // Step 2: Calculate the next version number safely.
         int nextVersion = documentVersionRepository.findTopByDocumentIdOrderByVersionNumberDesc(documentId)
                 .map(v -> v.getVersionNumber() + 1)
                 .orElse(document.getLatestVersionNumber() + 1);
 
+        // Step 3: Save the new historical version record.
         DocumentVersion version = new DocumentVersion();
         version.setDocument(document);
         version.setVersionNumber(nextVersion);
@@ -249,6 +257,7 @@ public class DocumentService {
         version.setUploadedBy(uploader);
         documentVersionRepository.save(version);
 
+        // Step 4: Update the parent document to point to this new version.
         document.setLatestVersionNumber(nextVersion);
         document.setLatestObjectKey(request.getObjectKey());
         document.setContentType(request.getContentType());
@@ -266,16 +275,18 @@ public class DocumentService {
         List<Document> documents;
         if (folderId != null) {
             resolveFolder(projectId, folderId);
+            // If they want trash included, don't filter by status. Otherwise, only get ACTIVE.
             documents = includeDeleted
                     ? documentRepository.findByProjectIdAndFolderIdOrderByCreatedAtDesc(projectId, folderId)
                     : documentRepository.findByProjectIdAndFolderIdAndStatusOrderByCreatedAtDesc(projectId, folderId, DocumentStatus.ACTIVE);
         } else {
+            // Same logic, but for the root directory (no folder).
             documents = includeDeleted
                     ? documentRepository.findByProjectIdOrderByCreatedAtDesc(projectId)
                     : documentRepository.findByProjectIdAndStatusOrderByCreatedAtDesc(projectId, DocumentStatus.ACTIVE);
         }
 
-        return documents.stream().map(document -> mapDocument(document, true)).toList();
+        return documents.stream().limit(200).map(document -> mapDocument(document, false)).toList();
     }
 
     @Transactional(readOnly = true)
@@ -284,16 +295,23 @@ public class DocumentService {
         return mapDocument(getDocument(projectId, documentId), true);
     }
 
+    // Generates a temporary, secure URL for the user to download the file directly from S3.
     @Transactional(readOnly = true)
     public String getDownloadUrl(Long projectId, Long documentId, Long userId) {
         getProjectMember(projectId, userId);
 
         Document document = getDocument(projectId, documentId);
         if (document.getStatus() == DocumentStatus.SOFT_DELETED) {
-            throw new RuntimeException("Document is deleted");
+            throw new ResourceNotFoundException("Document is deleted");
         }
 
-        return generateDownloadUrl(document.getLatestObjectKey());
+        // Safety check: Ensure the file wasn't manually deleted in the AWS console by an admin.
+        try {
+            s3StorageService.verifyObjectExists(dmsBucket, document.getLatestObjectKey());
+        } catch (ResourceNotFoundException e) {
+            throw new ResourceNotFoundException("Document file is no longer available in storage. The file may have been deleted externally.");
+        }
+        return s3StorageService.generatePresignedDownloadUrl(dmsBucket, document.getLatestObjectKey(), URL_DURATION);
     }
 
     @Transactional(readOnly = true)
@@ -307,6 +325,7 @@ public class DocumentService {
                 .toList();
     }
 
+    // Allows renaming a file or moving it to a different folder.
     @Transactional
     public DocumentResponseDTO updateMetadata(Long projectId, Long documentId, Long userId, DocumentMetadataUpdateRequestDTO request) {
         TeamMember member = getProjectMember(projectId, userId);
@@ -321,6 +340,7 @@ public class DocumentService {
             document.setName(normalizeFileName(request.getName()));
         }
 
+        // Moving the document to a new folder
         if (request.getFolderId() != null) {
             DocumentFolder folder = resolveFolder(projectId, request.getFolderId());
             document.setFolder(folder);
@@ -330,6 +350,8 @@ public class DocumentService {
         return mapDocument(document, true);
     }
 
+    // Soft Delete: Moves the document to the "Trash" without actually deleting the file from S3.
+    // Can be restored later.
     @Transactional
     public void softDelete(Long projectId, Long documentId, Long userId) {
         TeamMember member = getProjectMember(projectId, userId);
@@ -337,7 +359,7 @@ public class DocumentService {
 
         Document document = getDocument(projectId, documentId);
         if (document.getStatus() == DocumentStatus.SOFT_DELETED) {
-            return;
+            return; // Already deleted, nothing to do.
         }
 
         document.setStatus(DocumentStatus.SOFT_DELETED);
@@ -345,6 +367,7 @@ public class DocumentService {
         documentRepository.save(document);
     }
 
+    // Restores a soft-deleted document back to the active project workspace.
     @Transactional
     public DocumentResponseDTO restore(Long projectId, Long documentId, Long userId) {
         TeamMember member = getProjectMember(projectId, userId);
@@ -358,6 +381,7 @@ public class DocumentService {
         return mapDocument(document, true);
     }
 
+    // Hard Delete: Completely wipes the document
     @Transactional
     public void permanentDelete(Long projectId, Long documentId, Long userId) {
         TeamMember member = getProjectMember(projectId, userId);
@@ -366,18 +390,18 @@ public class DocumentService {
         Document document = getDocument(projectId, documentId);
         List<DocumentVersion> versions = documentVersionRepository.findByDocumentIdOrderByVersionNumberDesc(documentId);
 
+        // Step 1: Nuke all physical files from AWS.
         for (DocumentVersion version : versions) {
             try {
-                DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
-                        .bucket(dmsBucket)
-                        .key(version.getObjectKey())
-                        .build();
-                s3Client.deleteObject(deleteObjectRequest);
+                s3StorageService.deleteObject(dmsBucket, version.getObjectKey());
             } catch (Exception e) {
+                // If S3 fails, we log it but don't crash. We still want to delete the DB records.
+                // (Though in a perfect world, we'd queue a retry for the S3 deletion).
                 logger.warn("Failed to delete object from S3 for key {}: {}", version.getObjectKey(), e.getMessage());
             }
         }
 
+        // Step 2: Wipe the database records.
         documentVersionRepository.deleteAll(versions);
         documentRepository.delete(document);
     }
@@ -392,6 +416,7 @@ public class DocumentService {
         DocumentFolder parent = resolveFolder(projectId, request.getParentFolderId());
         String normalizedName = normalizeFolderName(request.getName());
 
+        // Prevent users from making two folders named "Financials" in the exact same directory.
         boolean exists = documentFolderRepository.existsByProjectIdAndParentFolderIdAndNameIgnoreCaseAndDeletedAtIsNull(
                 projectId,
                 parent != null ? parent.getId() : null,
@@ -413,6 +438,7 @@ public class DocumentService {
     @Transactional(readOnly = true)
     public List<DocumentFolderResponseDTO> listFolders(Long projectId, Long userId) {
         getProjectMember(projectId, userId);
+        // Only return folders that haven't been soft-deleted.
         return documentFolderRepository.findByProjectIdAndDeletedAtIsNullOrderByCreatedAtAsc(projectId)
                 .stream()
                 .map(this::mapFolder)
@@ -430,11 +456,13 @@ public class DocumentService {
         DocumentFolder parent = null;
         if (request.getParentFolderId() != null) {
             parent = resolveFolder(projectId, request.getParentFolderId());
+            // Infinite loop prevention: A folder cannot be placed inside itself.
             if (parent.getId().equals(folderId)) {
                 throw new RuntimeException("Folder cannot be its own parent");
             }
         }
 
+        // Check for naming collisions, but allow the user to save if they didn't actually change the name.
         boolean exists = documentFolderRepository.existsByProjectIdAndParentFolderIdAndNameIgnoreCaseAndDeletedAtIsNull(
                 projectId,
                 parent != null ? parent.getId() : null,
@@ -452,23 +480,36 @@ public class DocumentService {
         return mapFolder(documentFolderRepository.save(folder));
     }
 
+    // Deletes a folder and cascadingly deletes EVERYTHING inside of it.
     @Transactional
     public void deleteFolder(Long projectId, Long folderId, Long userId) {
         TeamMember member = getProjectMember(projectId, userId);
         requireOwnerOrAdmin(member);
 
         DocumentFolder folder = resolveFolder(projectId, folderId);
+        softDeleteFolderRecursive(folder);
+    }
 
-        long childFolders = documentFolderRepository.countByParentFolderIdAndDeletedAtIsNull(folderId);
-        if (childFolders > 0) {
-            throw new RuntimeException("Cannot delete folder with child folders");
+    // Recursive helper: Digs through the tree structure and soft-deletes every child folder
+    // and document it finds.
+    private void softDeleteFolderRecursive(DocumentFolder folder) {
+        // Find child folders and recurse down.
+        List<DocumentFolder> children = documentFolderRepository.findByParentFolderIdAndDeletedAtIsNull(folder.getId());
+        for (DocumentFolder child : children) {
+            softDeleteFolderRecursive(child);
         }
 
-        long activeDocs = documentRepository.countByFolderIdAndStatus(folderId, DocumentStatus.ACTIVE);
-        if (activeDocs > 0) {
-            throw new RuntimeException("Cannot delete folder with active documents");
+        // Find documents in this specific folder and delete them.
+        List<Document> activeDocs = documentRepository.findByFolderIdAndStatus(folder.getId(), DocumentStatus.ACTIVE);
+        for (Document doc : activeDocs) {
+            doc.setStatus(DocumentStatus.SOFT_DELETED);
+            doc.setDeletedAt(LocalDateTime.now());
+        }
+        if (!activeDocs.isEmpty()) {
+            documentRepository.saveAll(activeDocs);
         }
 
+        // Finally, delete the folder itself.
         folder.setDeletedAt(LocalDateTime.now());
         documentFolderRepository.save(folder);
     }
@@ -492,57 +533,23 @@ public class DocumentService {
     }
 
     private void validateFileRequest(String fileName, String contentType, Long fileSize) {
-        if (fileName == null || fileName.isBlank()) {
-            throw new RuntimeException("fileName is required");
-        }
-
-        if (contentType == null || contentType.isBlank()) {
-            throw new RuntimeException("contentType is required");
-        }
-
-        if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {
-            throw new RuntimeException("Unsupported file type");
-        }
-
-        if (fileSize == null || fileSize <= 0 || fileSize > MAX_FILE_SIZE_BYTES) {
-            throw new RuntimeException("fileSize must be between 1 byte and 25MB");
-        }
+        s3StorageService.validateFileRequest(fileName, contentType, fileSize, MAX_FILE_SIZE_BYTES, ALLOWED_CONTENT_TYPES);
     }
 
     private String resolveContentType(String contentType, String fileName) {
-        if (contentType != null && !contentType.isBlank() && !"application/octet-stream".equalsIgnoreCase(contentType)) {
-            return contentType;
-        }
-
-        String extension = "";
-        int dotIndex = fileName.lastIndexOf('.');
-        if (dotIndex >= 0 && dotIndex < fileName.length() - 1) {
-            extension = fileName.substring(dotIndex + 1).toLowerCase();
-        }
-
-        Map<String, String> mimeMap = Map.ofEntries(
-                Map.entry("pdf", "application/pdf"),
-                Map.entry("doc", "application/msword"),
-                Map.entry("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-                Map.entry("xls", "application/vnd.ms-excel"),
-                Map.entry("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-                Map.entry("txt", "text/plain"),
-                Map.entry("jpeg", "image/jpeg"),
-                Map.entry("jpg", "image/jpeg"),
-                Map.entry("png", "image/png"),
-                Map.entry("gif", "image/gif"),
-                Map.entry("webp", "image/webp")
-        );
-
-        return mimeMap.getOrDefault(extension, "application/octet-stream");
+        return s3StorageService.resolveContentType(contentType, fileName);
     }
 
+    // Builds a predictable, secure S3 Object Key.
+    // Format: project-{id}/folder-{id}/{uuid}-filename.ext
+    // The UUID prevents files with the same name from overwriting each other.
     private String buildObjectKey(Long projectId, Long folderId, String fileName) {
         String safeName = normalizeFileName(fileName).replace(" ", "_");
         String folderPart = folderId != null ? "folder-" + folderId : "root";
         return "project-" + projectId + "/" + folderPart + "/" + UUID.randomUUID() + "-" + safeName;
     }
 
+    // Prevents path traversal attacks (e.g., uploading a file named "../../../etc/passwd").
     private String normalizeFileName(String fileName) {
         String trimmed = fileName.trim();
         String withoutPath = trimmed.replace("\\", "/");
@@ -561,6 +568,7 @@ public class DocumentService {
         return normalized;
     }
 
+    // Ensures users can't finalize an upload using an S3 key that belongs to a different project.
     private void validateObjectKeyOwnership(Long projectId, String objectKey) {
         if (objectKey == null || objectKey.isBlank()) {
             throw new RuntimeException("objectKey is required");
@@ -573,49 +581,26 @@ public class DocumentService {
     }
 
     private void verifyObjectExists(String objectKey) {
-        try {
-            HeadObjectRequest headObjectRequest = HeadObjectRequest.builder()
-                    .bucket(dmsBucket)
-                    .key(objectKey)
-                    .build();
-            s3Client.headObject(headObjectRequest);
-        } catch (NoSuchKeyException ex) {
-            throw new RuntimeException("Uploaded object not found in storage");
-        } catch (S3Exception ex) {
-            if (ex.statusCode() == 404) {
-                throw new RuntimeException("Uploaded object not found in storage");
-            }
-            throw new RuntimeException("Failed to verify uploaded object");
-        }
+        s3StorageService.verifyObjectExists(dmsBucket, objectKey);
     }
 
     private String generateDownloadUrl(String objectKey) {
-        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                .bucket(dmsBucket)
-                .key(objectKey)
-                .build();
-
-        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-                .signatureDuration(URL_DURATION)
-                .getObjectRequest(getObjectRequest)
-                .build();
-
-        return s3Presigner.presignGetObject(presignRequest).url().toString();
+        return s3StorageService.generatePresignedDownloadUrl(dmsBucket, objectKey, URL_DURATION);
     }
 
     private Project getProject(Long projectId) {
         return projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found with id: " + projectId));
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + projectId));
     }
 
     private User getUser(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
     }
 
     private Document getDocument(Long projectId, Long documentId) {
         return documentRepository.findByIdAndProjectId(documentId, projectId)
-                .orElseThrow(() -> new RuntimeException("Document not found with id: " + documentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found with id: " + documentId));
     }
 
     private DocumentFolder resolveFolder(Long projectId, Long folderId) {
@@ -624,10 +609,10 @@ public class DocumentService {
         }
 
         DocumentFolder folder = documentFolderRepository.findByIdAndProjectId(folderId, projectId)
-                .orElseThrow(() -> new RuntimeException("Folder not found with id: " + folderId));
+                .orElseThrow(() -> new ResourceNotFoundException("Folder not found with id: " + folderId));
 
         if (folder.getDeletedAt() != null) {
-            throw new RuntimeException("Folder is deleted");
+            throw new ResourceNotFoundException("Folder is deleted");
         }
 
         return folder;
@@ -639,9 +624,11 @@ public class DocumentService {
                 .name(document.getName())
                 .contentType(document.getContentType())
                 .fileSize(document.getFileSize())
+                .humanReadableSize(formatFileSize(document.getFileSize()))
                 .status(document.getStatus())
                 .projectId(document.getProject().getId())
                 .folderId(document.getFolder() != null ? document.getFolder().getId() : null)
+                .folderName(document.getFolder() != null ? document.getFolder().getName() : null)
                 .latestVersionNumber(document.getLatestVersionNumber())
                 .downloadUrl(includeDownloadUrl && document.getStatus() == DocumentStatus.ACTIVE
                         ? generateDownloadUrl(document.getLatestObjectKey())
@@ -652,6 +639,14 @@ public class DocumentService {
                 .updatedAt(document.getUpdatedAt())
                 .deletedAt(document.getDeletedAt())
                 .build();
+    }
+
+    private String formatFileSize(Long bytes) {
+        if (bytes == null || bytes < 0) return "0 B";
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
+        if (bytes < 1024L * 1024 * 1024) return String.format("%.1f MB", bytes / (1024.0 * 1024));
+        return String.format("%.1f GB", bytes / (1024.0 * 1024 * 1024));
     }
 
     private DocumentVersionResponseDTO mapVersion(DocumentVersion version) {

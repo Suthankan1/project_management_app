@@ -20,6 +20,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @Getter
 @Setter
+// Room metadata is intentionally lightweight; membership and message history live in separate tables.
 public class ChatRoom {
 
     @Id
@@ -34,6 +35,7 @@ public class ChatRoom {
 
     private String topic;
 
+    // Longer description supports channel guidelines without creating a separate profile entity.
     @Column(length = 1000)
     private String description;
 
@@ -48,4 +50,17 @@ public class ChatRoom {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ChatRoom chatRoom = (ChatRoom) o;
+        return java.util.Objects.equals(id, chatRoom.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(id);
+    }
 }

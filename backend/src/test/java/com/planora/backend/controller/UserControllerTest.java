@@ -1,7 +1,12 @@
 package com.planora.backend.controller;
 
+import com.planora.backend.annotation.WithMockUserPrincipal;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.planora.backend.dto.LoginResponse;
+import com.planora.backend.dto.OtpRequest;
+import com.planora.backend.dto.ResetPasswordRequest;
+import com.planora.backend.dto.UserResponseDTO;
 import com.planora.backend.dto.VerifyRequest;
 import com.planora.backend.model.User;
 import com.planora.backend.service.UserService;
@@ -10,16 +15,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -29,13 +36,13 @@ public class UserControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private UserService userService;
 
-    @MockBean
+    @MockitoBean
     private JWTService jwtService;
 
-    @MockBean
+    @MockitoBean
     private UserDetailsService userDetailsService;
 
     @Autowired
@@ -47,16 +54,15 @@ public class UserControllerTest {
     void setUp() {
         testUser = new User();
         testUser.setEmail("test@example.com");
-        testUser.setPassword("password123");
+        testUser.setPassword("Test@1234");
+        testUser.setUsername("testuser");
     }
 
     @Test
-    @WithMockUser
+    @WithMockUserPrincipal
     void testRegister_Success() throws Exception {
-        // Arrange
         when(userService.register(any())).thenReturn("OTP send successfully");
 
-        // Act & Assert
         mockMvc.perform(post("/api/auth/register")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -65,41 +71,210 @@ public class UserControllerTest {
                 .andExpect(content().string("OTP send successfully"));
     }
 
+    // (a) Register with already-verified email returns the "already verified" message
     @Test
-    @WithMockUser
+    @WithMockUserPrincipal
+    void testRegister_AlreadyVerifiedUser_ReturnsAlreadyVerifiedMessage() throws Exception {
+        when(userService.register(any())).thenReturn("User already verified. Please login.");
+
+        mockMvc.perform(post("/api/auth/register")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(testUser)))
+                .andExpect(status().isOk())
+                .andExpect(content().string("User already verified. Please login."));
+    }
+
+    @Test
+    @WithMockUserPrincipal
     void testLogin_Success() throws Exception {
-        // Arrange
         LoginResponse response = new LoginResponse();
         response.setSuccess(true);
         response.setMessage("Login successful");
-        response.setToken("mock-jwt-token");
+        response.setToken("mock-access-token");
+        response.setRefreshToken("mock-refresh-token");
         when(userService.loginUser(any())).thenReturn(response);
 
-        // Act & Assert
         mockMvc.perform(post("/api/auth/login")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(testUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.token").value("mock-jwt-token"));
+                .andExpect(jsonPath("$.token").value("mock-access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("mock-refresh-token"));
+    }
+
+    // (d) Login with unverified account returns 403 with UNVERIFIED_EMAIL errorCode
+    @Test
+    @WithMockUserPrincipal
+    void testLogin_UnverifiedAccount_ReturnsUnverifiedEmailErrorCode() throws Exception {
+        LoginResponse response = new LoginResponse();
+        response.setSuccess(false);
+        response.setErrorCode("UNVERIFIED_EMAIL");
+        response.setMessage("Email is not verified");
+        when(userService.loginUser(any())).thenReturn(response);
+
+        mockMvc.perform(post("/api/auth/login")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(testUser)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode").value("UNVERIFIED_EMAIL"));
     }
 
     @Test
-    @WithMockUser
+    @WithMockUserPrincipal
     void testVerifyEmail_Success() throws Exception {
-        // Arrange
         VerifyRequest request = new VerifyRequest();
         request.setEmail("test@example.com");
         request.setOtp("123456");
         when(userService.verifyToken(anyString(), anyString())).thenReturn(true);
 
-        // Act & Assert
         mockMvc.perform(post("/api/auth/reg/verify")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(content().string("Verification Success!"));
+    }
+
+    // (b) verifyEmail with expired/invalid OTP returns 401 (controller behaviour)
+    @Test
+    @WithMockUserPrincipal
+    void testVerifyEmail_InvalidOtp_Returns401() throws Exception {
+        VerifyRequest request = new VerifyRequest();
+        request.setEmail("test@example.com");
+        request.setOtp("000000");
+        when(userService.verifyToken(anyString(), anyString())).thenReturn(false);
+
+        mockMvc.perform(post("/api/auth/reg/verify")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // (e) forgotPassword with unknown email still returns 200 (safe response, no user enumeration)
+    @Test
+    @WithMockUserPrincipal
+    void testForgotPassword_UnknownEmail_Returns200SafeMessage() throws Exception {
+        OtpRequest request = new OtpRequest();
+        request.setEmail("unknown@example.com");
+        when(userService.forgotPassword(anyString())).thenReturn("If that email exists, an OTP has been sent.");
+
+        mockMvc.perform(post("/api/auth/forgot")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(content().string("If that email exists, an OTP has been sent."));
+    }
+
+    // (f) resetPassword with wrong token returns 401 (controller behaviour)
+    @Test
+    @WithMockUserPrincipal
+    void testResetPassword_InvalidToken_Returns401() throws Exception {
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setToken("999999");
+        request.setNewPassword("NewPassword1!");
+        when(userService.resetPassword(anyString(), anyString())).thenReturn(false);
+
+        mockMvc.perform(post("/api/auth/reset")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // Password complexity: register with a password missing uppercase and special char returns 400
+    @Test
+    @WithMockUserPrincipal
+    void testRegister_WeakPassword_Returns400() throws Exception {
+        User weakUser = new User();
+        weakUser.setEmail("weak@example.com");
+        weakUser.setUsername("weakuser");
+        weakUser.setPassword("password123");
+
+        mockMvc.perform(post("/api/auth/register")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(weakUser)))
+                .andExpect(status().isBadRequest());
+    }
+
+    // Password complexity: resetPassword with a weak newPassword returns 400 before reaching service
+    @Test
+    @WithMockUserPrincipal
+    void testResetPassword_WeakNewPassword_Returns400() throws Exception {
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setToken("123456");
+        request.setNewPassword("weakpass");
+
+        mockMvc.perform(post("/api/auth/reset")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    // Refresh token endpoint returns new tokens on valid refresh token
+    @Test
+    @WithMockUserPrincipal
+    void testRefresh_ValidToken_ReturnsNewTokens() throws Exception {
+        LoginResponse response = new LoginResponse();
+        response.setSuccess(true);
+        response.setToken("new-access-token");
+        response.setRefreshToken("new-refresh-token");
+        when(userService.refreshTokens(anyString())).thenReturn(response);
+
+        mockMvc.perform(post("/api/auth/refresh")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"refreshToken\":\"old-refresh-token\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("new-access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"));
+    }
+
+    @Test
+    @WithMockUserPrincipal(email = "test@example.com")
+    void testGetCurrentUser_ReturnsFullUserResponseDTO() throws Exception {
+        UserResponseDTO dto = new UserResponseDTO();
+        dto.setUserId(42L);
+        dto.setEmail("test@example.com");
+        dto.setUsername("testuser");
+        dto.setVerified(true);
+        
+        when(userService.getCurrentUserDTO(anyString())).thenReturn(dto);
+
+        mockMvc.perform(get("/api/auth/me").with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("test@example.com"))
+                .andExpect(jsonPath("$.username").value("testuser"))
+                .andExpect(jsonPath("$.verified").value(true));
+    }
+
+    // BUG-2: GET /api/auth/users/{userId}/photo returns 404 when user has no profile picture
+    @Test
+    @WithMockUserPrincipal
+    void testGetUserPhoto_NoPicture_Returns404() throws Exception {
+        when(userService.generatePresignedUrlForUser(anyLong())).thenReturn(null);
+
+        mockMvc.perform(get("/api/auth/users/99/photo").with(csrf()))
+                .andExpect(status().isNotFound());
+    }
+
+    // BUG-2: GET /api/auth/users/{userId}/photo returns presigned URL when photo exists
+    @Test
+    @WithMockUserPrincipal
+    void testGetUserPhoto_WithPicture_ReturnsPresignedUrl() throws Exception {
+        when(userService.generatePresignedUrlForUser(anyLong()))
+                .thenReturn("https://s3.amazonaws.com/bucket/photo.jpg?Signature=abc");
+
+        mockMvc.perform(get("/api/auth/users/1/photo").with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.url").value("https://s3.amazonaws.com/bucket/photo.jpg?Signature=abc"));
     }
 }

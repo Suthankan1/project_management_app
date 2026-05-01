@@ -11,11 +11,17 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "users")
 @AllArgsConstructor
@@ -26,20 +32,58 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long userId;
 
+    @NotBlank(message = "Username is required")
+    @Size(min = 2, max = 50, message = "Username must be between 2 and 50 characters")
     @Column(nullable = false)
     private String username;
 
     private String fullName;
 
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email must be a valid address")
     @Column(unique = true, nullable = false)
     private String email;
 
+    @NotBlank(message = "Password is required")
+    @Size(min = 8, max = 128, message = "Password must be between 8 and 128 characters")
+    @Pattern(
+        regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,128}$",
+        message = "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+    )
     private String password;
 
     private boolean verified = false;
 
     @Column(name = "profile_picture_url")
     private String profilePicUrl;
+
+    // Extended profile fields
+    @Column(name = "first_name", length = 100)
+    private String firstName;
+
+    @Column(name = "last_name", length = 100)
+    private String lastName;
+
+    @Column(name = "contact_number", length = 30)
+    private String contactNumber;
+
+    @Column(name = "country_code", length = 10)
+    private String countryCode;
+
+    @Column(name = "job_title", length = 150)
+    private String jobTitle;
+
+    @Column(name = "company", length = 150)
+    private String company;
+
+    @Column(name = "position", length = 150)
+    private String position;
+
+    @Column(columnDefinition = "TEXT")
+    private String bio;
+
+    @Column(name = "notify_due_date_reminders", nullable = false)
+    private boolean notifyDueDateReminders = true;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
@@ -50,4 +94,17 @@ public class User {
     private LocalDateTime updatedAt;
 
     private LocalDateTime lastActive;
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        User user = (User) o;
+        return java.util.Objects.equals(userId, user.userId);
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(userId);
+    }
 }

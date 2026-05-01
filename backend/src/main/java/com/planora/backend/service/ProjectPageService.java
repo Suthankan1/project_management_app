@@ -10,16 +10,23 @@ import com.planora.backend.model.TeamRole;
 import com.planora.backend.repository.ProjectPageRepository;
 import com.planora.backend.repository.ProjectRepository;
 import com.planora.backend.repository.TeamMemberRepository;
+import com.planora.backend.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+// Manages rich-text documentation pages (like a Wiki) attached to a Project.
 @Service
 @RequiredArgsConstructor
 public class ProjectPageService {
@@ -27,9 +34,12 @@ public class ProjectPageService {
     private final ProjectPageRepository repository;
     private final ProjectRepository projectRepository;
     private final TeamMemberRepository teamMemberRepository;
+    private final UserRepository userRepository;
+    private final NotificationService notificationService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
-    public ProjectPage createPage(Long projectId, PageRequestDto request, Long userId) {
+    public PageDetailResponseDto createPage(Long projectId, PageRequestDto request, Long userId) {
         Objects.requireNonNull(projectId, "projectId cannot be null");
         Objects.requireNonNull(userId, "userId cannot be null");
 
@@ -40,11 +50,19 @@ public class ProjectPageService {
                 .projectId(projectId)
                 .title(request.getTitle())
                 .content(request.getContent())
+                .createdByUserId(userId)
+                .updatedByUserId(userId)
                 .build();
 
-        return repository.save(page);
+        ProjectPage saved = repository.save(page);
+        notifyProjectOwnersAndAdminsOnCreate(project, userId, saved);
+        return toDetailDto(saved);
     }
 
+    /*
+     * Retrieves a lightweight list of pages for the sidebar navigation.
+     * We purposefully DO NOT load the `content` field here to save database memory and bandwidth.
+     */
     @Transactional(readOnly = true)
     public List<PageSummaryResponseDto> getProjectPages(Long projectId, Long userId) {
         Objects.requireNonNull(projectId, "projectId cannot be null");
@@ -54,10 +72,14 @@ public class ProjectPageService {
         validateProjectMembership(project.getTeam().getId(), userId, false);
 
         return repository.findByProjectId(projectId).stream()
+                .sorted(Comparator.comparing(ProjectPage::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(this::toSummaryDto)
                 .collect(Collectors.toList());
     }
 
+    /*
+     * Retrieves the full rich-text content of a specific page when the user clicks on it.
+     */
     @Transactional(readOnly = true)
     public PageDetailResponseDto getPageById(Long pageId, Long userId) {
         Objects.requireNonNull(pageId, "pageId cannot be null");
@@ -67,13 +89,7 @@ public class ProjectPageService {
         Project project = findProject(page.getProjectId());
         validateProjectMembership(project.getTeam().getId(), userId, false);
 
-        PageDetailResponseDto dto = new PageDetailResponseDto();
-        dto.setId(page.getId());
-        dto.setTitle(page.getTitle());
-        dto.setContent(page.getContent());
-        dto.setUpdatedAt(page.getUpdatedAt().toString());
-
-        return dto;
+        return toDetailDto(page);
     }
 
     @Transactional
@@ -83,23 +99,26 @@ public class ProjectPageService {
 
         ProjectPage existingPage = findPage(pageId);
         Project project = findProject(existingPage.getProjectId());
+
+        // Security Check: Viewers can read pages, but they cannot edit them.
         validateProjectMembership(project.getTeam().getId(), userId, true);
 
+        // Step 1: Snapshot old data to determine if we need to send notifications.
+        String oldTitle = existingPage.getTitle();
+        Long oldUpdatedByUserId = existingPage.getUpdatedByUserId();
+
+        // Step 2: Apply updates.
         existingPage.setTitle(request.getTitle());
         existingPage.setContent(request.getContent());
+        existingPage.setUpdatedByUserId(userId);
 
         ProjectPage updatedPage = repository.save(existingPage);
 
-        PageDetailResponseDto dto = new PageDetailResponseDto();
-        dto.setId(updatedPage.getId());
-        dto.setTitle(updatedPage.getTitle());
-        dto.setContent(updatedPage.getContent());
-
-        if (updatedPage.getUpdatedAt() != null) {
-            dto.setUpdatedAt(updatedPage.getUpdatedAt().toString());
+        if (!Objects.equals(oldTitle, updatedPage.getTitle())) {
+            notifyImpactedStakeholdersOnRename(project, updatedPage, userId, oldTitle, oldUpdatedByUserId);
         }
 
-        return dto;
+        return toDetailDto(updatedPage);
     }
 
     @Transactional
@@ -109,9 +128,112 @@ public class ProjectPageService {
 
         ProjectPage existingPage = findPage(pageId);
         Project project = findProject(existingPage.getProjectId());
+
+        // Viewers cannot delete pages.
         validateProjectMembership(project.getTeam().getId(), userId, true);
 
+        notifyImpactedStakeholdersOnDelete(project, existingPage, userId);
+
         repository.delete(existingPage);
+
+        messagingTemplate.convertAndSend(
+            "/topic/project/" + project.getId() + "/pages",
+            Map.of("type", "PAGE_DELETED", "pageId", pageId, "projectId", project.getId())
+        );
+    }
+
+    // ── Notification Strategies ───────────────────────────────────────────────────
+
+    /*
+     * Alert Strategy: "Managerial Oversight"
+     * When a page is created, we only notify Owners and Admins, keeping regular Members focused on their tasks.
+     */
+    private void notifyProjectOwnersAndAdminsOnCreate(Project project, Long actorUserId, ProjectPage page) {
+        Set<TeamRole> roles = Set.of(TeamRole.OWNER, TeamRole.ADMIN);
+        List<TeamMember> recipients = teamMemberRepository
+                .findByTeamIdAndRoleIn(project.getTeam().getId(), roles);
+
+        String actorName = resolveActorName(actorUserId);
+        String message = actorName + " created page: " + page.getTitle();
+        String link = "/pages/" + page.getId() + "?projectId=" + project.getId();
+
+        recipients.stream()
+                .map(TeamMember::getUser)
+                .filter(Objects::nonNull)
+                .filter(user -> !user.getUserId().equals(actorUserId))
+                .forEach(user -> notificationService.createNotification(user, message, link));
+    }
+
+    /*
+     * Alert Strategy: "Direct Stakeholders"
+     * If a page is renamed, we only notify the person who originally created it,
+     * and the person who last edited it. We don't spam the whole team.
+     */
+    private void notifyImpactedStakeholdersOnRename(Project project,
+                                                    ProjectPage page,
+                                                    Long actorUserId,
+                                                    String oldTitle,
+                                                    Long oldUpdatedByUserId) {
+        Set<Long> recipientIds = new LinkedHashSet<>();
+        if (page.getCreatedByUserId() != null) {
+            recipientIds.add(page.getCreatedByUserId());
+        }
+        if (oldUpdatedByUserId != null) {
+            recipientIds.add(oldUpdatedByUserId);
+        }
+
+        recipientIds.remove(actorUserId);
+        if (recipientIds.isEmpty()) {
+            return;
+        }
+
+        String actorName = resolveActorName(actorUserId);
+        String before = oldTitle != null ? oldTitle : "Untitled";
+        String after = page.getTitle() != null ? page.getTitle() : "Untitled";
+        String message = actorName + " renamed page from \"" + before + "\" to \"" + after + "\"";
+        String link = "/pages/" + page.getId() + "?projectId=" + project.getId();
+
+        notifyUsersByIds(recipientIds, message, link);
+    }
+
+    /*
+     * Alert Strategy: "Direct Stakeholders"
+     * Tells the creator and last editor that their work has been deleted.
+     */
+    private void notifyImpactedStakeholdersOnDelete(Project project, ProjectPage page, Long actorUserId) {
+        Set<Long> recipientIds = new LinkedHashSet<>();
+        if (page.getCreatedByUserId() != null) {
+            recipientIds.add(page.getCreatedByUserId());
+        }
+        if (page.getUpdatedByUserId() != null) {
+            recipientIds.add(page.getUpdatedByUserId());
+        }
+
+        recipientIds.remove(actorUserId);
+        if (recipientIds.isEmpty()) {
+            return;
+        }
+
+        String actorName = resolveActorName(actorUserId);
+        String message = actorName + " deleted page: " + page.getTitle();
+        String link = "/pages?projectId=" + project.getId();
+        notifyUsersByIds(recipientIds, message, link);
+    }
+
+    // ── Internal Helpers ──────────────────────────────────────────────────────────
+
+    // Resolves the display name for notifications, preferring Full Name over Username.
+    private String resolveActorName(Long actorUserId) {
+        return userRepository.findById(actorUserId)
+                .map(user -> user.getFullName() != null && !user.getFullName().isBlank()
+                        ? user.getFullName()
+                        : user.getUsername())
+                .orElse("A team member");
+    }
+
+    private void notifyUsersByIds(Set<Long> recipientIds, String message, String link) {
+        userRepository.findAllById(recipientIds)
+                .forEach(user -> notificationService.createNotification(user, message, link));
     }
 
     private ProjectPage findPage(Long pageId) {
@@ -126,6 +248,10 @@ public class ProjectPageService {
                 .orElseThrow(() -> new EntityNotFoundException("Project not found with ID: " + projectId));
     }
 
+    /*
+     * RBAC helper.
+     * @param denyViewer If true, users with the "VIEWER" role will trigger an AccessDeniedException.
+     */
     private void validateProjectMembership(Long teamId, Long userId, boolean denyViewer) {
         TeamMember member = teamMemberRepository.findByTeamIdAndUserUserId(teamId, userId)
                 .orElseThrow(() -> new AccessDeniedException("User is not a member of this team"));
@@ -139,6 +265,29 @@ public class ProjectPageService {
         PageSummaryResponseDto dto = new PageSummaryResponseDto();
         dto.setId(page.getId());
         dto.setTitle(page.getTitle());
+        dto.setUpdatedAt(page.getUpdatedAt() != null ? page.getUpdatedAt().toString() : null);
+        dto.setUpdatedByUsername(page.getUpdatedByUserId() != null ? resolveUsername(page.getUpdatedByUserId()) : null);
         return dto;
+    }
+
+    private PageDetailResponseDto toDetailDto(ProjectPage page) {
+        PageDetailResponseDto dto = new PageDetailResponseDto();
+        dto.setId(page.getId());
+        dto.setProjectId(page.getProjectId());
+        dto.setTitle(page.getTitle());
+        dto.setContent(page.getContent());
+        dto.setCreatedByUserId(page.getCreatedByUserId());
+        dto.setCreatedByUsername(page.getCreatedByUserId() != null ? resolveUsername(page.getCreatedByUserId()) : null);
+        dto.setUpdatedByUserId(page.getUpdatedByUserId());
+        dto.setUpdatedByUsername(page.getUpdatedByUserId() != null ? resolveUsername(page.getUpdatedByUserId()) : null);
+        dto.setCreatedAt(page.getCreatedAt() != null ? page.getCreatedAt().toString() : null);
+        dto.setUpdatedAt(page.getUpdatedAt() != null ? page.getUpdatedAt().toString() : null);
+        return dto;
+    }
+
+    private String resolveUsername(Long userId) {
+        return userRepository.findById(userId)
+                .map(u -> u.getUsername() != null ? u.getUsername() : u.getEmail())
+                .orElse("Unknown");
     }
 }
