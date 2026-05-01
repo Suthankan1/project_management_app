@@ -12,13 +12,16 @@ function getStatusConfig(status: string, dueDate?: string | null) {
   if (status === 'COMPLETED') {
     return { color: '#16A34A', bg: '#F0FDF4', border: '#BBF7D0', label: 'Completed', Icon: CheckCircle2 };
   }
-  if (status === 'ARCHIVED') {
-    return { color: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB', label: 'Archived', Icon: Archive };
+  if (status === 'CANCELLED') {
+    return { color: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB', label: 'Cancelled', Icon: Archive };
+  }
+  if (status === 'IN_PROGRESS') {
+    return { color: '#F59E0B', bg: '#FFFBEB', border: '#FDE68A', label: 'In Progress', Icon: Flag };
   }
   if (isOverdue) {
     return { color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', label: 'Overdue', Icon: Clock };
   }
-  return { color: '#F59E0B', bg: '#FFFBEB', border: '#FDE68A', label: 'Open', Icon: Flag };
+  return { color: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', label: 'Open', Icon: Flag };
 }
 
 function fmtShort(d?: string | null) {
@@ -49,7 +52,7 @@ export default function MilestoneSection({ milestones }: Props) {
   }
 
   // Sort: overdue first, then open, then completed, then archived
-  const ORDER = { Overdue: 0, Open: 1, Completed: 2, Archived: 3 };
+  const ORDER = { Overdue: 0, Open: 1, 'In Progress': 2, Completed: 3, Cancelled: 4 };
   const sorted = [...milestones].sort((a, b) => {
     const la = getStatusConfig(a.status, a.dueDate).label;
     const lb = getStatusConfig(b.status, b.dueDate).label;

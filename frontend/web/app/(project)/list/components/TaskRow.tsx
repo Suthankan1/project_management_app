@@ -25,6 +25,7 @@ const TaskRow = React.memo(function TaskRow({
   onMilestoneChange,
   selected = false,
   onToggleSelect,
+  projectStatuses,
 }: {
   task: Task;
   onOpenModal: (id: number) => void;

@@ -33,7 +33,7 @@ export function UpcomingMilestones({
 
   const sortedMilestones = useMemo(
     () => [...milestones]
-        .filter((m) => m.status !== 'COMPLETED' && m.status !== 'ARCHIVED')
+        .filter((m) => m.status === 'OPEN' || m.status === 'IN_PROGRESS')
         .sort((a, b) => {
           if (!a.dueDate) return 1;
           if (!b.dueDate) return -1;
