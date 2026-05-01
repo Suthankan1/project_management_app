@@ -11,6 +11,7 @@ interface TaskData {
   id: number;
   title: string;
   description: string;
+  projectId: number;
   projectName: string;
   status: string;
   priority: string;
@@ -168,6 +169,7 @@ function TaskPageContent() {
 
           {/* 3. Sidebar Component (Right Side) — full width on mobile, fixed on lg+ */}
           <TaskSidebar 
+              projectId={taskData.projectId}
               status={taskData.status}
               assignee={taskData.assigneeName}
               reporter={taskData.reporterName}

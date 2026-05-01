@@ -98,7 +98,7 @@ export default function GlobalSearch({ projectId }: GlobalSearchProps = {}) {
       setLoading(true);
       try {
         const params: { q: string; projectId?: string } = { q: normalized };
-        if (currentScope === 'PROJECT' && currentProjectId) {
+        if (currentScope === 'PROJECT' && currentProjectId && currentProjectId !== 'null') {
           params.projectId = currentProjectId;
         }
         const { data } = await api.get<GlobalSearchResult>('/api/search', { params });

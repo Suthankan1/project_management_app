@@ -5,6 +5,7 @@ import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector, PieSectorShapeProps } from 'recharts';
 import { UserPlus, Briefcase } from 'lucide-react';
 import Link from 'next/link';
+import { SafeChartFrame } from '@/components/shared/SafeChartFrame';
 import { WorkloadEntry } from './types';
 
 interface ActiveShapeProps {
@@ -45,30 +46,6 @@ const renderActiveShape = (props: ActiveShapeProps) => {
     </g>
   );
 };
-
-function SafeChartFrame({ children }: { children: React.ReactNode }) {
-  const hostRef = React.useRef<HTMLDivElement | null>(null);
-  const [ready, setReady] = React.useState(false);
-
-  React.useEffect(() => {
-    const element = hostRef.current;
-    if (!element) return;
-    const evaluateSize = () => {
-      const rect = element.getBoundingClientRect();
-      setReady(rect.width > 0 && rect.height > 0);
-    };
-    evaluateSize();
-    const observer = new ResizeObserver(evaluateSize);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <div ref={hostRef} className="h-full min-h-[250px] w-full">
-      {ready ? children : null}
-    </div>
-  );
-}
 
 interface WorkloadPieChartProps {
   projectId: number | string;

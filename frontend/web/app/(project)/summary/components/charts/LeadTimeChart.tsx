@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { Task } from '@/types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { SafeChartFrame } from './SafeChartFrame';
+import { SafeChartFrame } from '@/components/shared/SafeChartFrame';
 
 /**
  * Visualizes the average time taken to complete tasks over the last 30 days.
