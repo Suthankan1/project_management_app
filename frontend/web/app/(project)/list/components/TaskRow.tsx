@@ -67,7 +67,7 @@ const TaskRow = React.memo(function TaskRow({
       ? [{ name: task.assigneeName, src: assigneePhotoUrl }]
       : [];
 
-  const currentStatus = projectStatuses?.find(s => s.status === task.status) || { name: task.status, status: task.status, color: STATUS_CONFIG[task.status]?.badge || 'bg-gray-100 text-gray-600' };
+  const currentStatus = projectStatuses?.find((s: { status: string; name: string; color: string }) => s.status === task.status) || { name: task.status, status: task.status, color: STATUS_CONFIG[task.status]?.badge || 'bg-gray-100 text-gray-600' };
   
   const sConf = STATUS_CONFIG[task.status] ?? { label: currentStatus.name, badge: currentStatus.color };
   const pConf = localPriority ? PRIORITY_CONFIG[localPriority] : null;
@@ -382,7 +382,7 @@ const TaskRow = React.memo(function TaskRow({
         {statusOpen && (
           <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-[#E5E7EB] rounded-xl shadow-lg py-1 min-w-[130px]">
             {projectStatuses && projectStatuses.length > 0 ? (
-              projectStatuses.map((s) => (
+              projectStatuses.map((s: { status: string; name: string; color: string }) => (
                 <button
                   key={s.status}
                   onClick={() => { onStatusChange(task.id, s.status); setStatusOpen(false); }}
