@@ -162,9 +162,9 @@ export default function DmsModals({
                     <div className="px-5 py-4 space-y-3 text-sm text-[#344054]">
                         <p><span className="font-medium text-[#101828]">Name:</span> {selectedInfoDoc.name}</p>
                         <p><span className="font-medium text-[#101828]">Owner:</span> {selectedInfoDoc.uploadedByName}</p>
-                        <p><span className="font-medium text-[#101828]">Folder:</span> {getFolderName(selectedInfoDoc.folderId)}</p>
+                        <p><span className="font-medium text-[#101828]">Folder:</span> {selectedInfoDoc.folderName ?? getFolderName(selectedInfoDoc.folderId)}</p>
                         <p><span className="font-medium text-[#101828]">Updated:</span> {toDateLabel(selectedInfoDoc.updatedAt || selectedInfoDoc.createdAt)}</p>
-                        <p><span className="font-medium text-[#101828]">Size:</span> {formatBytes(selectedInfoDoc.fileSize)}</p>
+                        <p><span className="font-medium text-[#101828]">Size:</span> {selectedInfoDoc.humanReadableSize ?? formatBytes(selectedInfoDoc.fileSize)}</p>
                     </div>
                 </div>
             )}

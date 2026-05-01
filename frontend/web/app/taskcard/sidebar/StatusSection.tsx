@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, AlertTriangle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Single source of truth for status display — badge color and dot color are co-located so
 // adding a new status only requires one entry here, not edits across multiple render sites.
@@ -12,6 +13,7 @@ const STATUS_CONFIG: Record<string, { label: string; badge: string; dot: string 
 };
 
 const STATUS_OPTIONS = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'] as const;
+const STATUS_ORDER: Record<string, number> = { TODO: 0, IN_PROGRESS: 1, IN_REVIEW: 2, DONE: 3 };
 
 interface StatusSectionProps {
   status: string;
@@ -20,7 +22,17 @@ interface StatusSectionProps {
 
 const StatusSection: React.FC<StatusSectionProps> = ({ status, onUpdateStatus }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showDone, setShowDone] = useState(false);
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.TODO;
+
+  const isBackward = (option: string) =>
+    (STATUS_ORDER[option] ?? 0) < (STATUS_ORDER[status] ?? 0);
+
+  const handleSelect = (option: string) => {
+    if (option === 'DONE' && status !== 'DONE') setShowDone(true);
+    onUpdateStatus?.(option);
+    setIsOpen(false);
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -48,20 +60,38 @@ const StatusSection: React.FC<StatusSectionProps> = ({ status, onUpdateStatus })
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 overflow-hidden">
             {STATUS_OPTIONS.map((option) => {
               const s = STATUS_CONFIG[option] ?? STATUS_CONFIG.TODO;
+              const backward = isBackward(option);
               return (
                 <button
                   key={option}
-                  onClick={(e) => { e.stopPropagation(); onUpdateStatus?.(option); setIsOpen(false); }}
+                  onClick={(e) => { e.stopPropagation(); handleSelect(option); }}
                   className={`w-full text-left px-3 py-2 min-h-[44px] sm:min-h-0 text-sm border-b border-gray-50 last:border-b-0 flex items-center gap-2 transition-colors hover:opacity-80 font-medium ${s.badge}`}
+                  title={backward ? 'This moves the task backward in the workflow.' : undefined}
                 >
                   <span className={`w-2 h-2 rounded-full ${s.dot}`} />
                   {s.label}
+                  {backward && (
+                    <AlertTriangle size={12} className="ml-auto text-amber-500 flex-shrink-0" />
+                  )}
                 </button>
               );
             })}
           </div>
         )}
       </div>
+      <AnimatePresence>
+        {showDone && (
+          <motion.div
+            className="flex items-center justify-center mt-2"
+            initial={{ scale: 0, opacity: 1 }}
+            animate={{ scale: [1.2, 1], opacity: [1, 0] }}
+            transition={{ duration: 0.6 }}
+            onAnimationComplete={() => setShowDone(false)}
+          >
+            <span className="text-2xl text-green-500">✓</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -91,8 +91,10 @@ export interface MilestoneResponse {
   name: string;
   description?: string;
   dueDate?: string;
-  status: 'OPEN' | 'COMPLETED' | 'ARCHIVED';
+  status: 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   taskCount: number;
+  completedTaskCount: number;
+  progressPercent: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -101,7 +103,7 @@ export interface MilestoneRequest {
   name: string;
   description?: string;
   dueDate?: string;
-  status?: 'OPEN' | 'COMPLETED' | 'ARCHIVED';
+  status?: 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 }
 
 // ── Kanban / Board ─────────────────────────────────

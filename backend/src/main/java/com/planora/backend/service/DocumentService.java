@@ -29,8 +29,7 @@ public class DocumentService {
 
     private static final Logger logger = LoggerFactory.getLogger(DocumentService.class);
 
-    // We cap files at 25MB to prevent storage abuse and memory exhaustion.
-    private static final long MAX_FILE_SIZE_BYTES = 25L * 1024 * 1024;
+    private static final long MAX_FILE_SIZE_BYTES = 100L * 1024 * 1024;
 
     // Security: Presigned URLs are only valid for a short window. If the client doesn't
     // complete the upload/download in 15 minutes, they have to request a new URL.
@@ -287,7 +286,7 @@ public class DocumentService {
                     : documentRepository.findByProjectIdAndStatusOrderByCreatedAtDesc(projectId, DocumentStatus.ACTIVE);
         }
 
-        return documents.stream().map(document -> mapDocument(document, false)).toList();
+        return documents.stream().limit(200).map(document -> mapDocument(document, false)).toList();
     }
 
     @Transactional(readOnly = true)
@@ -625,9 +624,11 @@ public class DocumentService {
                 .name(document.getName())
                 .contentType(document.getContentType())
                 .fileSize(document.getFileSize())
+                .humanReadableSize(formatFileSize(document.getFileSize()))
                 .status(document.getStatus())
                 .projectId(document.getProject().getId())
                 .folderId(document.getFolder() != null ? document.getFolder().getId() : null)
+                .folderName(document.getFolder() != null ? document.getFolder().getName() : null)
                 .latestVersionNumber(document.getLatestVersionNumber())
                 .downloadUrl(includeDownloadUrl && document.getStatus() == DocumentStatus.ACTIVE
                         ? generateDownloadUrl(document.getLatestObjectKey())
@@ -638,6 +639,14 @@ public class DocumentService {
                 .updatedAt(document.getUpdatedAt())
                 .deletedAt(document.getDeletedAt())
                 .build();
+    }
+
+    private String formatFileSize(Long bytes) {
+        if (bytes == null || bytes < 0) return "0 B";
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
+        if (bytes < 1024L * 1024 * 1024) return String.format("%.1f MB", bytes / (1024.0 * 1024));
+        return String.format("%.1f GB", bytes / (1024.0 * 1024 * 1024));
     }
 
     private DocumentVersionResponseDTO mapVersion(DocumentVersion version) {

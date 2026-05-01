@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -85,6 +86,9 @@ public class TaskService {
 
     @Autowired
     private TeamMembershipLookupService teamMembershipLookupService;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
 
     // ── 1. CREATE TASK ──────────────────────────────────────────────────────────
 
@@ -551,6 +555,16 @@ public class TaskService {
         taskActivityService.logActivity(taskId, TaskActivityType.COMMENT_ADDED,
                 author.getUsername(), author.getUsername() + " commented: " + preview);
 
+        // Broadcast real-time event so open task cards refresh their comment list.
+        // We do NOT include the comment body in the payload to avoid unescaped HTML over WebSocket.
+        messagingTemplate.convertAndSend(
+                "/topic/project/" + task.getProject().getId() + "/tasks",
+                java.util.Map.of(
+                    "type", "TASK_COMMENT_ADDED",
+                    "taskId", task.getId(),
+                    "projectId", task.getProject().getId()
+                ));
+
         // Alert stakeholders, making sure we don't send a notification to the person
         // who actually wrote the comment.
         Set<Long> recipientIds = new LinkedHashSet<>();
@@ -960,6 +974,7 @@ public class TaskService {
         dto.setStartDate(task.getStartDate());
         dto.setCreatedAt(task.getCreatedAt());
         dto.setUpdatedAt(task.getUpdatedAt());
+        dto.setCompletedAt(task.getCompletedAt());
 
         if(task.getSprint() != null){
             dto.setSprintId(task.getSprint().getId());
@@ -1000,7 +1015,12 @@ public class TaskService {
         // Map subtasks
         if(task.getSubTasks() != null){
             dto.setSubtasks(new ArrayList<>(task.getSubTasks()).stream()
-                .map(st -> new SubtaskDTO(st.getId(), st.getTitle(), st.getStatus()))
+                .map(st -> new SubtaskDTO(
+                    st.getId(),
+                    st.getTitle(),
+                    st.getStatus(),
+                    st.getPriority() != null ? st.getPriority().name() : null,
+                    st.getDueDate()))
                 .collect(Collectors.toList()));
         }
 
