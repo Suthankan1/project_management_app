@@ -21,16 +21,20 @@ const MilestoneCard: React.FC<MilestoneCardProps> = ({ milestone, onEdit, onDele
   const dueDateStr = milestone.dueDate
     ? new Date(milestone.dueDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
     : null;
-  // Only flag overdue when status is OPEN — completed milestones shouldn't show a red overdue badge
-  const isOverdue = milestone.dueDate && milestone.status === 'OPEN' && new Date(milestone.dueDate) < new Date();
+  // Flag overdue for active statuses only — completed/cancelled milestones shouldn't show a red overdue badge
+  const isOverdue = milestone.dueDate
+    && (milestone.status === 'OPEN' || milestone.status === 'IN_PROGRESS')
+    && new Date(milestone.dueDate) < new Date();
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow group">
       <div className="flex items-start gap-4">
         {/* Progress ring */}
         <div className="flex flex-col items-center gap-1 flex-shrink-0">
-          <ProgressRing value={milestone.status === 'COMPLETED' ? milestone.taskCount : 0} max={milestone.taskCount} />
-          <span className="text-[10px] text-gray-400">{milestone.taskCount} tasks</span>
+          <ProgressRing value={milestone.completedTaskCount ?? 0} max={milestone.taskCount} />
+          <span className="text-[10px] text-gray-400">
+            {milestone.completedTaskCount ?? 0}/{milestone.taskCount}
+          </span>
         </div>
 
         {/* Main content */}

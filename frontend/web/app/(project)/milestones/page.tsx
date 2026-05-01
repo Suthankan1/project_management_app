@@ -47,6 +47,15 @@ export default function MilestonesPage() {
 
   useEffect(() => { void loadMilestones(); }, [loadMilestones]);
 
+  // Debounced cache write: coalesces rapid milestone state changes into a single localStorage write
+  useEffect(() => {
+    if (!cacheKey || milestones.length === 0) return;
+    const id = setTimeout(() => {
+      localStorage.setItem(cacheKey, JSON.stringify(milestones));
+    }, 500);
+    return () => clearTimeout(id);
+  }, [milestones, cacheKey]);
+
   const invalidateCache = useCallback(() => {
     if (cacheKey) localStorage.removeItem(cacheKey);
   }, [cacheKey]);
@@ -60,11 +69,7 @@ export default function MilestonesPage() {
         dueDate: data.dueDate || undefined,
         status: data.status,
       });
-      setMilestones((prev) => {
-        const next = [created, ...prev];
-        if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
-        return next;
-      });
+      setMilestones((prev) => [created, ...prev]);
       setShowCreate(false);
     } catch {
       setError('Failed to create milestone');
@@ -80,11 +85,7 @@ export default function MilestonesPage() {
         dueDate: data.dueDate || undefined,
         status: data.status,
       });
-      setMilestones((prev) => {
-        const next = prev.map((m) => m.id === updated.id ? updated : m);
-        if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
-        return next;
-      });
+      setMilestones((prev) => prev.map((m) => m.id === updated.id ? updated : m));
       setEditing(null);
     } catch {
       setError('Failed to update milestone');
@@ -95,11 +96,7 @@ export default function MilestonesPage() {
     if (!confirm('Delete this milestone? Tasks will not be deleted.')) return;
     try {
       await deleteMilestone(id);
-      setMilestones((prev) => {
-        const next = prev.filter((m) => m.id !== id);
-        if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
-        return next;
-      });
+      setMilestones((prev) => prev.filter((m) => m.id !== id));
     } catch {
       setError('Failed to delete milestone');
     }
@@ -109,11 +106,7 @@ export default function MilestonesPage() {
     const m = milestones.find((x) => x.id === id);
     if (!m) return;
     // Optimistic update so the badge flips immediately without a loading spinner
-    setMilestones((prev) => {
-      const next = prev.map((x) => x.id === id ? { ...x, status } : x);
-      if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
-      return next;
-    });
+    setMilestones((prev) => prev.map((x) => x.id === id ? { ...x, status } : x));
     try {
       await updateMilestone(id, { name: m.name, status });
     } catch {
