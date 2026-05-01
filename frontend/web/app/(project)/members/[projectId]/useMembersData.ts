@@ -156,7 +156,17 @@ export function useMembersData(projectId: string) {
 
   // Real-time sync via STOMP
   const handleRoleChangedLive = useCallback((userId: number, newRole: string) => {
-    setMembers(prev => prev.map(m => m.user.userId === userId ? { ...m, role: newRole } : m));
+    setMembers(prev => {
+      let changed = false;
+      const next = prev.map(member => {
+        if (member.user.userId !== userId || member.role === newRole) {
+          return member;
+        }
+        changed = true;
+        return { ...member, role: newRole };
+      });
+      return changed ? next : prev;
+    });
   }, []);
 
   const handleMemberRemovedLive = useCallback((userId: number) => {
@@ -198,6 +208,10 @@ export function useMembersData(projectId: string) {
       ...(payload.username ? { [`username:${payload.username.toLowerCase()}`]: payload.profilePicUrl || null } : {}),
       ...(payload.fullName ? { [`fullname:${payload.fullName.toLowerCase()}`]: payload.profilePicUrl || null } : {}),
     }));
+
+    if (payload.email) {
+      setPending(prev => prev.filter(p => p.email.toLowerCase() !== payload.email.toLowerCase()));
+    }
   }, []);
 
   useMembersSync(projectId, {
@@ -249,7 +263,7 @@ export function useMembersData(projectId: string) {
 
   const getAvailableOptions = useCallback(() => {
     if (currentUserRole?.toUpperCase() === "ADMIN") return ["MEMBER", "VIEWER"];
-    return ["OWNER", "ADMIN", "MEMBER", "VIEWER"];
+    return ["ADMIN", "MEMBER", "VIEWER"];
   }, [currentUserRole]);
 
   const resolveProfilePicUrl = useCallback(
@@ -309,9 +323,13 @@ export function useMembersData(projectId: string) {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    setInviteLoading(true);
     setInviteError("");
     setInviteSuccess("");
+    if (!inviteRole) {
+      setInviteError("Please select a role for the invitee.");
+      return;
+    }
+    setInviteLoading(true);
     try {
       await membersApi.sendInvite(projectId, inviteEmail, inviteRole.toUpperCase());
       setInviteSuccess("Invitation sent!");
@@ -320,9 +338,9 @@ export function useMembersData(projectId: string) {
       setShowModal(false);
       const pendingData = await membersApi.fetchPendingInvites(projectId);
       setPending(pendingData as unknown as PendingInvite[]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      setInviteError(err?.response?.data?.message || "Failed to send invite");
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setInviteError(error?.response?.data?.message || "Failed to send invite");
     } finally {
       setInviteLoading(false);
     }

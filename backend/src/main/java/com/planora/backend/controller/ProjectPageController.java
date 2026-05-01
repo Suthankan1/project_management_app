@@ -3,7 +3,7 @@ package com.planora.backend.controller;
 import com.planora.backend.dto.PageDetailResponseDto;
 import com.planora.backend.dto.PageRequestDto;
 import com.planora.backend.dto.PageSummaryResponseDto;
-import com.planora.backend.model.ProjectPage;
+import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.service.ProjectPageService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,16 +21,12 @@ public class ProjectPageController {
     @Autowired
     private ProjectPageService service;
 
-    // Creates a new documentation page inside a specific project.
     @PostMapping("/projects/{projectId}/pages")
-    public ResponseEntity<ProjectPage> createPage(
+    public ResponseEntity<PageDetailResponseDto> createPage(
             @PathVariable Long projectId,
             @Valid @RequestBody PageRequestDto request,
-            // SECURITY TRICK: Using SpEL (expression = "userId") directly extracts
-            // the Long ID from the UserPrincipal. This keeps the controller parameter
-            // clean and saves us from having to do `currentUser.getUserId()` inside the method.
-            @AuthenticationPrincipal(expression = "userId") Long userId){
-        return new ResponseEntity<>(service.createPage(projectId, request, userId), HttpStatus.CREATED);
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(service.createPage(projectId, request, principal.getUserId()), HttpStatus.CREATED);
     }
 
     /*
@@ -42,9 +38,9 @@ public class ProjectPageController {
     @GetMapping("/projects/{projectId}/pages")
     public ResponseEntity<List<PageSummaryResponseDto>> getPagesByProject(
             @PathVariable Long projectId,
-            @AuthenticationPrincipal(expression = "userId") Long userId) {
+            @AuthenticationPrincipal UserPrincipal principal) {
         return new ResponseEntity<>(
-                service.getProjectPages(projectId, userId),
+                service.getProjectPages(projectId, principal.getUserId()),
                 HttpStatus.OK
         );
     }
@@ -57,8 +53,8 @@ public class ProjectPageController {
     @GetMapping("/pages/{pageId}")
     public ResponseEntity<PageDetailResponseDto> getPage(
             @PathVariable Long pageId,
-            @AuthenticationPrincipal(expression = "userId") Long userId) {
-        return new ResponseEntity<>(service.getPageById(pageId, userId), HttpStatus.OK);
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(service.getPageById(pageId, principal.getUserId()), HttpStatus.OK);
     }
 
     /*
@@ -70,10 +66,8 @@ public class ProjectPageController {
     public ResponseEntity<PageDetailResponseDto> updatePage(
             @PathVariable Long pageId,
             @Valid @RequestBody PageRequestDto request,
-            @AuthenticationPrincipal(expression = "userId") Long userId) {
-
-        PageDetailResponseDto updatedPage = service.updatePage(pageId, request, userId);
-        return new ResponseEntity<>(updatedPage, HttpStatus.OK);
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(service.updatePage(pageId, request, principal.getUserId()), HttpStatus.OK);
     }
 
     /*
@@ -84,8 +78,8 @@ public class ProjectPageController {
     @DeleteMapping("/pages/{pageId}")
     public ResponseEntity<Void> deletePage(
             @PathVariable Long pageId,
-            @AuthenticationPrincipal(expression = "userId") Long userId) {
-        service.deletePage(pageId, userId);
+            @AuthenticationPrincipal UserPrincipal principal) {
+        service.deletePage(pageId, principal.getUserId());
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/axios';
 import { getValidToken, saveToken, saveRefreshToken, setRememberMe } from '@/lib/auth';
 
@@ -11,6 +11,7 @@ import { getValidToken, saveToken, saveRefreshToken, setRememberMe } from '@/lib
  */
 export function useLoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // ── Form State ──
   const [email, setEmail] = useState('');
@@ -39,8 +40,20 @@ export function useLoginForm() {
   // Core Login Execution
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isLoading) return;
     setIsLoading(true);
     setError('');
+
+    // This regex is a basic check for the presence of "@" and "." in the right order, 
+    // but it doesn't guarantee the email is deliverable or that the user has access to it.
+    // This regex checks for text + @ + text + . + text
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address.');
+      setIsLoading(false);
+      return;
+    }
+    
 
     try {
       // API CONTRACT: Send credentials to Spring Boot.
@@ -61,8 +74,9 @@ export function useLoginForm() {
           saveRefreshToken(response.data.refreshToken);
         }
 
-        // Step 4: Route to the authenticated app.
-        router.push('/dashboard');
+        // Step 4: Route to the authenticated app (or back to the deep link they came from).
+        const redirectTo = searchParams.get('redirect') || '/dashboard';
+        router.push(redirectTo);
       } else {
         setError(response.data.message || 'Login failed. Please try again.');
       }
@@ -86,7 +100,7 @@ export function useLoginForm() {
         setError(errorMessage || 'Email is not verified. Please check your email.');
       } else if (err.response?.status === 401) {
         // 401 Unauthorized is standard for bad credentials.
-        setError(errorMessage || 'Incorrect username or password');
+        setError(errorMessage || 'Incorrect email or password.');
       } else {
         // 500s or unknown errors.
         setError(errorMessage);

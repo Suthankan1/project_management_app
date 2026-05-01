@@ -32,14 +32,14 @@ class UserRepositoryTest {
         alice = new User();
         alice.setEmail("alice@example.com");
         alice.setUsername("alice");
-        alice.setPassword("hashedPass1");
+        alice.setPassword("HashedPass1!");
         alice.setVerified(true);
         entityManager.persist(alice);
 
         bob = new User();
         bob.setEmail("Bob@Example.COM");  // Mixed case to test case-insensitive
         bob.setUsername("BobUser");
-        bob.setPassword("hashedPass2");
+        bob.setPassword("HashedPass2!");
         bob.setVerified(true);
         entityManager.persist(bob);
 
@@ -61,25 +61,25 @@ class UserRepositoryTest {
         assertNull(result);
     }
 
-    // ── findByEmailIgnoreCase ────────────────────────────────────────────────
+    // ── findFirstByEmailIgnoreCase ────────────────────────────────────────────────
 
     @Test
-    void findByEmailIgnoreCase_returnsUser_withLowerCaseInput() {
-        Optional<User> result = userRepository.findByEmailIgnoreCase("bob@example.com");
+    void findFirstByEmailIgnoreCase_returnsUser_withLowerCaseInput() {
+        Optional<User> result = userRepository.findFirstByEmailIgnoreCase("bob@example.com");
         assertTrue(result.isPresent());
         assertEquals("BobUser", result.get().getUsername());
     }
 
     @Test
-    void findByEmailIgnoreCase_returnsUser_withUpperCaseInput() {
-        Optional<User> result = userRepository.findByEmailIgnoreCase("ALICE@EXAMPLE.COM");
+    void findFirstByEmailIgnoreCase_returnsUser_withUpperCaseInput() {
+        Optional<User> result = userRepository.findFirstByEmailIgnoreCase("ALICE@EXAMPLE.COM");
         assertTrue(result.isPresent());
         assertEquals("alice", result.get().getUsername());
     }
 
     @Test
-    void findByEmailIgnoreCase_returnsEmpty_whenNotFound() {
-        Optional<User> result = userRepository.findByEmailIgnoreCase("nobody@example.com");
+    void findFirstByEmailIgnoreCase_returnsEmpty_whenNotFound() {
+        Optional<User> result = userRepository.findFirstByEmailIgnoreCase("nobody@example.com");
         assertTrue(result.isEmpty());
     }
 
@@ -87,7 +87,7 @@ class UserRepositoryTest {
 
     @Test
     void findByUsername_returnsUser_forExactUsername() {
-        Optional<User> result = userRepository.findByUsername("alice");
+        Optional<User> result = userRepository.findFirstByUsername("alice");
         assertTrue(result.isPresent());
         assertEquals("alice@example.com", result.get().getEmail());
     }
@@ -95,28 +95,28 @@ class UserRepositoryTest {
     @Test
     void findByUsername_returnsEmpty_whenCaseDiffers() {
         // findByUsername is case-sensitive
-        Optional<User> result = userRepository.findByUsername("ALICE");
+        Optional<User> result = userRepository.findFirstByUsername("ALICE");
         assertTrue(result.isEmpty());
     }
 
     @Test
     void findByUsername_returnsEmpty_whenUserNotFound() {
-        Optional<User> result = userRepository.findByUsername("ghost");
+        Optional<User> result = userRepository.findFirstByUsername("ghost");
         assertTrue(result.isEmpty());
     }
 
-    // ── findByUsernameIgnoreCase ─────────────────────────────────────────────
+    // ── findFirstByUsernameIgnoreCase ─────────────────────────────────────────────
 
     @Test
-    void findByUsernameIgnoreCase_returnsUser_withDifferentCase() {
-        Optional<User> result = userRepository.findByUsernameIgnoreCase("BOBUSER");
+    void findFirstByUsernameIgnoreCase_returnsUser_withDifferentCase() {
+        Optional<User> result = userRepository.findFirstByUsernameIgnoreCase("BOBUSER");
         assertTrue(result.isPresent());
         assertEquals("Bob@Example.COM", result.get().getEmail());
     }
 
     @Test
-    void findByUsernameIgnoreCase_returnsEmpty_whenNotFound() {
-        Optional<User> result = userRepository.findByUsernameIgnoreCase("unknownuser");
+    void findFirstByUsernameIgnoreCase_returnsEmpty_whenNotFound() {
+        Optional<User> result = userRepository.findFirstByUsernameIgnoreCase("unknownuser");
         assertTrue(result.isEmpty());
     }
 
@@ -171,7 +171,7 @@ class UserRepositoryTest {
         User charlie = new User();
         charlie.setEmail("charlie@example.com");
         charlie.setUsername("charlie");
-        charlie.setPassword("hashedPass3");
+        charlie.setPassword("HashedPass3!");
         charlie.setVerified(false);
 
         User saved = userRepository.save(charlie);

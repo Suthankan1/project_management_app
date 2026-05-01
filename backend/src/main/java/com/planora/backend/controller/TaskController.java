@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/tasks")
@@ -260,10 +261,12 @@ public class TaskController {
             @RequestBody Map<String, Object> body,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        // Safe casting: Jackson deserializes generic JSON arrays into Lists of Integers.
-        @SuppressWarnings("unchecked")
-        List<Integer> rawIds = (List<Integer>) body.get("assigneeIds");
-        List<Long> assigneeIds = rawIds == null ? List.of() : rawIds.stream().map(Integer::longValue).toList();
+        List<Long> assigneeIds = body.containsKey("assigneeIds")
+                ? ((List<?>) body.get("assigneeIds")).stream()
+                    .filter(Objects::nonNull)
+                    .map(id -> Long.valueOf(id.toString()))
+                    .toList()
+                : List.of();
         TaskResponseDTO task = service.updateAssignees(taskId, assigneeIds, currentUser.getUserId());
         messagingTemplate.convertAndSend(
                 "/topic/project/" + task.getProjectId() + "/tasks",
@@ -278,9 +281,12 @@ public class TaskController {
             @RequestBody Map<String, Object> body,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
-        @SuppressWarnings("unchecked")
-        List<Integer> rawIds = (List<Integer>) body.get("taskIds");
-        List<Long> taskIds = rawIds.stream().map(i -> i.longValue()).toList();
+        List<Long> taskIds = body.containsKey("taskIds")
+                ? ((List<?>) body.get("taskIds")).stream()
+                    .filter(Objects::nonNull)
+                    .map(id -> Long.valueOf(id.toString()))
+                    .toList()
+                : List.of();
         String status = (String) body.get("status");
         service.bulkUpdateStatus(taskIds, status, currentUser.getUserId());
         return new ResponseEntity<>(HttpStatus.OK);
@@ -291,9 +297,12 @@ public class TaskController {
             @RequestBody Map<String, Object> body,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
-        @SuppressWarnings("unchecked")
-        List<Integer> rawIds = (List<Integer>) body.get("taskIds");
-        List<Long> taskIds = rawIds.stream().map(i -> i.longValue()).toList();
+        List<Long> taskIds = body.containsKey("taskIds")
+                ? ((List<?>) body.get("taskIds")).stream()
+                    .filter(Objects::nonNull)
+                    .map(id -> Long.valueOf(id.toString()))
+                    .toList()
+                : List.of();
         service.bulkDelete(taskIds, currentUser.getUserId());
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
@@ -327,7 +336,12 @@ public class TaskController {
         TaskResponseDTO task = service.updateStatus(taskId, status, currentUserId);
         messagingTemplate.convertAndSend(
                 "/topic/project/" + task.getProjectId() + "/tasks",
-                Map.of("type", "TASK_UPDATED", "task", task));
+                Map.of(
+                    "type", "TASK_STATUS_CHANGED",
+                    "taskId", task.getId(),
+                    "status", task.getStatus(),
+                    "projectId", task.getProjectId()
+                ));
         return new ResponseEntity<>(task, HttpStatus.OK);
     }
 

@@ -34,7 +34,7 @@ class TaskTemplateRepositoryTest {
         User owner = new User();
         owner.setEmail("owner@test.com");
         owner.setUsername("owner");
-        owner.setPassword("valid_password");
+        owner.setPassword("ValidPassword123!");
         owner.setVerified(true);
         entityManager.persist(owner);
 
@@ -50,7 +50,7 @@ class TaskTemplateRepositoryTest {
         creator = new User();
         creator.setEmail("alice@test.com");
         creator.setUsername("alice");
-        creator.setPassword("valid_password");
+        creator.setPassword("ValidPassword123!");
         creator.setVerified(true);
         entityManager.persist(creator);
 

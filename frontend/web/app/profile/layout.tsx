@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import SidebarLayout from '@/navBar/SidebarLayout';
+import FullLayout from '@/components/layout/FullLayout';
 
 export default function ProfileLayout({
     children,
@@ -9,11 +9,11 @@ export default function ProfileLayout({
     children: React.ReactNode;
 }) {
     return (
-        <SidebarLayout>
+        <FullLayout>
             <main className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#F7F8FA]">
                 {children}
             </main>
-        </SidebarLayout>
+        </FullLayout>
     );
 }
 

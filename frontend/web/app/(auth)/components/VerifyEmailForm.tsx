@@ -1,6 +1,6 @@
 'use client'; // Tells Next.js to render this component on the browser, not the server.
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/axios'; // Centralized Axios instance (hopefully configured with base URLs and interceptors)
@@ -22,8 +22,30 @@ export default function VerifyEmailForm() {
 
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const resendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) {
+      if (resendIntervalRef.current) {
+        clearInterval(resendIntervalRef.current);
+        resendIntervalRef.current = null;
+      }
+      return;
+    }
+    resendIntervalRef.current = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) return 0;
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (resendIntervalRef.current) clearInterval(resendIntervalRef.current);
+    };
+  }, [resendCooldown]);
 
   // ── OTP VERIFICATION SUBMIT ───────────────────────────────────────────────
   const handleVerify = async (e: React.FormEvent) => {
@@ -70,32 +92,33 @@ export default function VerifyEmailForm() {
 
   // ── RESEND OTP LOGIC ──────────────────────────────────────────────────────
   const handleResend = async () => {
-    if (!email) return;
-    
-    setIsLoading(true);
+    if (!email || isResending || resendCooldown > 0) return;
+
+    setIsResending(true);
     setError('');
 
     try {
       const response = await api.post('/api/auth/resend', { email });
       setError('');
 
-      const msg = typeof response.data === 'string' ? response.data : 'New OTP sent to your email.';
+      const msg = typeof response.data === 'string' ? response.data : 'Verification code resent.';
       setSuccessMsg(msg);
+      setResendCooldown(60);
     } catch (_err: unknown) {
-      
+
       let errorMessage = 'Failed to resend OTP. Please try again.';
       const res = (_err as { response?: { data?: unknown } })?.response;
       const errorData = res?.data;
-      
+
       if (typeof errorData === 'string') {
         errorMessage = errorData;
       } else if (errorData && typeof errorData === 'object' && 'message' in errorData) {
         errorMessage = (errorData as { message: string }).message;
       }
-      
+
       setError(errorMessage);
     } finally {
-      setIsLoading(false);
+      setIsResending(false);
     }
   };
 
@@ -155,13 +178,13 @@ export default function VerifyEmailForm() {
       <div className="mt-6 text-center">
         <p className="text-xs text-gray-400">
           Didn&apos;t receive the code?{' '}
-          <button 
+          <button
             onClick={handleResend}
-            disabled={isLoading}
+            disabled={isLoading || isResending || resendCooldown > 0}
             aria-label="Resend verification code"
             className="text-blue-600 font-semibold hover:underline disabled:opacity-50"
           >
-            Resend
+            {isResending ? 'Sending...' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend'}
           </button>
         </p>
       </div>

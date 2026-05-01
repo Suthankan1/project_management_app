@@ -26,12 +26,10 @@ public class TaskRequestDTO {
 
     private String description;
 
-    @Pattern(regexp = "^(LOW|MEDIUM|HIGH|URGENT)$",
-             message = "Priority must be LOW, MEDIUM, HIGH, or URGENT")
+    @Pattern(regexp = "^(LOW|NORMAL|MEDIUM|HIGH|URGENT)$",
+             message = "Priority must be LOW, NORMAL, MEDIUM, HIGH, or URGENT")
     private String priority;
-
-    @Pattern(regexp = "^[A-Z0-9_]{1,50}$",
-             message = "Status must contain only uppercase letters, digits, or underscores (max 50 chars)")
+    
     private String status;
 
     @Min(value = 0, message = "Story points must be at least 0")

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
-import SidebarLayout from '@/navBar/SidebarLayout';
+import FullLayout from '@/components/layout/FullLayout';
 import api from '@/lib/axios';
 import { getValidToken } from '@/lib/auth';
 
@@ -18,7 +18,7 @@ import { getValidToken } from '@/lib/auth';
  * - members
  * - pages
  * 
- * This ensures that navigating between project tabs does not re-mount the SidebarLayout,
+ * This ensures that navigating between project tabs does not re-mount the FullLayout,
  * providing a smooth SPA feel.
  */
 export default function ProjectLayout({
@@ -84,7 +84,7 @@ export default function ProjectLayout({
   }, [projectId, router]);
 
   return (
-    <SidebarLayout>
+    <FullLayout>
       <main
         className={
           isChatRoute
@@ -96,6 +96,6 @@ export default function ProjectLayout({
       >
         {children}
       </main>
-    </SidebarLayout>
+    </FullLayout>
   );
 }

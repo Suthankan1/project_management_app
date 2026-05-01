@@ -309,7 +309,7 @@ public class ChatService {
         }
 
         var readState = chatReadStateRepository
-                .findByProjectIdAndUserUserIdAndOtherParticipantIgnoreCase(projectId, user.getUserId(), normalizedOtherParticipant)
+                .findFirstByProjectIdAndUserUserIdAndOtherParticipantIgnoreCase(projectId, user.getUserId(), normalizedOtherParticipant)
                 .orElseGet(ChatReadState::new);
 
         readState.setProjectId(projectId);
@@ -332,7 +332,7 @@ public class ChatService {
         }
 
         var readState = chatReadStateRepository
-                .findByProjectIdAndUserUserIdAndOtherParticipantIgnoreCase(projectId, user.getUserId(), TEAM_CHAT_READ_KEY)
+                .findFirstByProjectIdAndUserUserIdAndOtherParticipantIgnoreCase(projectId, user.getUserId(), TEAM_CHAT_READ_KEY)
                 .orElseGet(ChatReadState::new);
 
         readState.setProjectId(projectId);
@@ -357,7 +357,7 @@ public class ChatService {
 
         var latestMessage = chatMessageRepository.findTopByProjectIdAndRecipientIsNullAndRoomIdIsNullAndParentMessageIdIsNullOrderByIdDesc(projectId).orElse(null);
         var readState = chatReadStateRepository
-                .findByProjectIdAndUserUserIdAndOtherParticipantIgnoreCase(projectId, currentUserEntity.getUserId(), TEAM_CHAT_READ_KEY)
+                .findFirstByProjectIdAndUserUserIdAndOtherParticipantIgnoreCase(projectId, currentUserEntity.getUserId(), TEAM_CHAT_READ_KEY)
                 .orElse(null);
         var unseenCount = chatMessageRepository.countUnreadTeamMessagesByAliases(
                 projectId,

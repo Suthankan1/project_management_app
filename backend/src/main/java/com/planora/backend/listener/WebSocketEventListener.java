@@ -48,7 +48,7 @@ public class WebSocketEventListener {
 
         if (username != null) {
             logger.info("User Disconnected : " + username);
-            userRepository.findByUsernameIgnoreCase(username).ifPresent(user -> {
+            userRepository.findFirstByUsernameIgnoreCase(username).ifPresent(user -> {
                 user.setLastActive(LocalDateTime.now());
                 userRepository.save(user);
             });

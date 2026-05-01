@@ -70,11 +70,14 @@ public class DocumentController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "folderId", required = false) Long folderId,
             @AuthenticationPrincipal UserPrincipal principal) {
+        if (file.getSize() > 100L * 1024 * 1024) {
+            return new ResponseEntity<>(HttpStatus.PAYLOAD_TOO_LARGE);
+        }
         return new ResponseEntity<>(
                 documentService.uploadDocumentViaBackend(projectId, principal.getUserId(), file, folderId),
                 HttpStatus.CREATED
         );
-        }
+    }
 
     // ── Version Control ───────────────────────────────────────────────────────────
 

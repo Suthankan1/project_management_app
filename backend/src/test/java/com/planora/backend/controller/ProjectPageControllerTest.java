@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.planora.backend.dto.PageDetailResponseDto;
 import com.planora.backend.dto.PageRequestDto;
 import com.planora.backend.dto.PageSummaryResponseDto;
-import com.planora.backend.model.ProjectPage;
 import com.planora.backend.service.JWTService;
 import com.planora.backend.service.ProjectPageService;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,10 +66,7 @@ class ProjectPageControllerTest {
     @Test
     @WithMockUserPrincipal
     void createPage_returns201WithCreatedPage() throws Exception {
-        ProjectPage page = new ProjectPage();
-        page.setId(1L);
-        page.setTitle("My First Page");
-        when(service.createPage(eq(10L), any(), any())).thenReturn(page);
+        when(service.createPage(eq(10L), any(), any())).thenReturn(pageDetail);
 
         mockMvc.perform(post("/api/projects/10/pages")
                         .with(csrf())

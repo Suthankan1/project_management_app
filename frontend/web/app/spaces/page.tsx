@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getUserFromToken, User } from '@/lib/auth';
 import api from '@/lib/axios';
-import RecentProjectCard from '../dashboard/components/RecentProjectCard';
+import RecentProjectCard from '../dashboard/components/recentspaces/RecentProjectCard';
+
 import Link from 'next/link';
 import { LayoutGrid, List } from 'lucide-react';
 

@@ -133,13 +133,8 @@ a {
   border-radius: 6px;
 }
 
-/* ── Mobile bottom-nav spacing - REMOVED legacy navigation padding ── */
+/* ── Mobile Page Transition Fix ── */
 @media (max-width: 767px) {
-  .main-content-area {
-    padding-bottom: 0px;
-    transition: filter 280ms ease;
-  }
-
   body.mobile-sidebar-open .main-content-area {
     filter: blur(6px);
     pointer-events: none;
@@ -167,7 +162,7 @@ a {
   box-shadow: 0 8px 24px -4px rgba(16, 24, 40, 0.12);
 }
 
-/* ── FAB (Floating Action Button) — clears BottomNav on any page ── */
+/* ── FAB (Floating Action Button) ── */
 .fab {
   position: fixed;
   bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));

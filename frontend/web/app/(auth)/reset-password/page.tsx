@@ -4,13 +4,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import api from '@/lib/axios';
+import { validatePassword } from '@/lib/passwordValidation';
 import ResetPasswordForm from './components/ResetPasswordForm';
 import SuccessMessage from './components/SuccessMessage';
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
-  // The token is embedded in the reset link email — reading it from the URL avoids requiring the user to copy-paste it
-  const token = searchParams.get('token') || '';
+  const [otp, setOtp] = useState(() => searchParams.get('token') ?? '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -21,21 +21,19 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError('');
 
-    // Catch a missing/tampered token before the API call to give a clearer error than a generic 400
-    if (!token) {
-      setError('Invalid or missing reset token. Please use the reset link from your email.');
+    if (!otp || otp.trim().length < 6) {
+      setError('Please enter the 6-digit reset code from your email.');
       return;
     }
 
-    // Client-side mismatch check saves a network round-trip for the most common user error
+    const { valid, message } = validatePassword(newPassword);
+    if (!valid) {
+      setError(message);
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match.');
-      return;
-    }
-
-    // Mirrors the backend minimum length constraint so the user gets instant feedback
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters long.');
       return;
     }
 
@@ -43,8 +41,8 @@ export default function ResetPasswordPage() {
 
     try {
       await api.post('/api/auth/reset', {
-        token,
-        newPassword: newPassword
+        token: otp.trim(),
+        newPassword,
       });
 
       setSubmitted(true);
@@ -98,10 +96,12 @@ export default function ResetPasswordPage() {
           <SuccessMessage />
         ) : (
           <ResetPasswordForm
+            otp={otp}
             newPassword={newPassword}
             confirmPassword={confirmPassword}
             error={error}
             isLoading={isLoading}
+            onOtpChange={setOtp}
             onPasswordChange={setNewPassword}
             onConfirmPasswordChange={setConfirmPassword}
             onSubmit={handleSubmit}

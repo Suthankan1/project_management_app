@@ -27,6 +27,10 @@ const nextConfig = {
       proxy('dms'),
       proxy('milestones'),
       proxy('user'),
+      proxy('pages'),
+      proxy('scheduled-reports'),
+      proxy('reports'),
+      proxy('search'),
     ];
   },
   images: {
@@ -39,7 +43,7 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: '*.amazonaws.com',
+        hostname: '**.amazonaws.com',
         port: '',
         pathname: '/**',
       },

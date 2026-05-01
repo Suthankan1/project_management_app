@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { DocumentFolder } from '@/lib/dms';
-import { Clock, Folder, Plus, Share2, Star, Trash2 } from 'lucide-react';
+import { Clock, Folder, Plus, Star, Trash2 } from 'lucide-react';
 import { ViewMode } from '@/app/folders/components/types';
 
 interface DmsSidebarProps {
     mode: ViewMode;
     isTrashMode: boolean;
     projectId: number | null;
+    projectName: string | null;
     folders: DocumentFolder[];
     selectedFolderId?: number;
     setSelectedFolderId: (id: number | undefined) => void;
@@ -26,6 +27,7 @@ export default function DmsSidebar({
     mode,
     isTrashMode,
     projectId,
+    projectName,
     folders,
     selectedFolderId,
     setSelectedFolderId,
@@ -80,15 +82,6 @@ export default function DmsSidebar({
                         <span className="inline-flex items-center gap-2">
                             <Star size={14} />
                             Favorites
-                        </span>
-                    </Link>
-                    <Link
-                        href={withProjectId('/folders/shared')}
-                        className={navLinkClass(mode === 'shared')}
-                    >
-                        <span className="inline-flex items-center gap-2">
-                            <Share2 size={14} />
-                            Shared with me
                         </span>
                     </Link>
                     <Link
@@ -165,7 +158,10 @@ export default function DmsSidebar({
 
             {/* ---- Stats ---- */}
             <div className="mt-auto rounded-md border border-[#E6E8EC] bg-white p-3 text-xs text-[#667085]">
-                <p className="font-medium text-[#344054] mb-1">Project #{projectId}</p>
+                <p className="font-semibold text-[#101828] truncate mb-0.5">
+                    {projectName ?? `Project #${projectId}`}
+                </p>
+                <p className="text-[#98A2B3] mb-2">Project documents</p>
                 <p>Folders: <span className="font-semibold text-[#101828]">{folderCount}</span></p>
                 <p className="mt-0.5">Documents: <span className="font-semibold text-[#101828]">{filteredDocumentCount}</span></p>
             </div>

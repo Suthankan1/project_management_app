@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import TaskHeader from './TaskHeader';
 import TaskMainContent from './TaskMainContent';
 import TaskSidebar from './TaskSidebar';
 import api from '@/lib/axios';
 import { toast } from '@/components/ui';
 import { motion } from 'framer-motion';
+import { useStomp } from '@/ws/stomp-provider';
 
 interface MultiAssignee {
   memberId: number;
@@ -33,7 +34,7 @@ interface TaskData {
   createdAt: string;
   updatedAt: string;
   dueDate: string | null;
-  subtasks: Array<{ id: number; title: string; status: string }>;
+  subtasks: Array<{ id: number; title: string; status: string; priority?: string; dueDate?: string | null }>;
   dependencies: Array<{ id: number; title: string; relation: string }>;
   assignees?: MultiAssignee[];
   recurrenceRule?: string | null;
@@ -41,6 +42,7 @@ interface TaskData {
   reporterId?: number | null;
   sprintId?: number | null;
   startDate?: string | null;
+  completedAt?: string | null;
 }
 
 interface ProjectMemberOption {
@@ -69,12 +71,15 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [canEdit, setCanEdit] = useState(true);
+  const [canChangeReporter, setCanChangeReporter] = useState(false);
   const [projectMembers, setProjectMembers] = useState<ProjectMemberOption[]>([]);
   const [projectLabels, setProjectLabels] = useState<LabelOption[]>([]);
   const [projectSprints, setProjectSprints] = useState<SprintOption[]>([]);
   // useRef instead of useState so wasModified always holds the current value inside
   // the Escape keydown listener without needing it in the dependency array.
   const wasModified = useRef<boolean>(false);
+  const { subscribe } = useStomp();
+  const commentRefetchRef = useRef<(() => void) | null>(null);
 
   const fetchTaskData = async () => {
     try {
@@ -105,9 +110,11 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
       ]);
       const teamId = projectRes.data?.teamId as number | undefined;
       const currentUserId = currentUserRes.data?.userId as number | undefined;
-      const membersRaw = (membersRes.data || []) as Array<{ id: number; user?: { userId: number; username: string } }>;
-      const memberRole = membersRaw.find((member) => member.user?.userId === currentUserId) as { role?: string } | undefined;
-      setCanEdit((memberRole?.role || 'MEMBER') !== 'VIEWER');
+      const membersRaw = (membersRes.data || []) as Array<{ id: number; role?: string; user?: { userId: number; username: string } }>;
+      const currentMember = membersRaw.find((member) => member.user?.userId === currentUserId);
+      const role = currentMember?.role || 'MEMBER';
+      setCanEdit(role !== 'VIEWER');
+      setCanChangeReporter(role === 'ADMIN' || role === 'OWNER');
       setProjectMembers(
         membersRaw
           .filter((member) => member.user?.userId != null)
@@ -119,8 +126,12 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
       );
       const labelsRaw = (labelsRes.data || []) as Array<{ id: number; name: string }>;
       setProjectLabels(labelsRaw.map((label) => ({ id: label.id, name: label.name })));
-      const sprintsRaw = (sprintsRes.data || []) as Array<{ id: number; name: string }>;
-      setProjectSprints(sprintsRaw.map((sprint) => ({ id: sprint.id, name: sprint.name })));
+      const sprintsRaw = (sprintsRes.data || []) as Array<{ id: number; name: string; status?: string }>;
+      setProjectSprints(
+        sprintsRaw
+          .filter((sprint) => sprint.status !== 'COMPLETED')
+          .map((sprint) => ({ id: sprint.id, name: sprint.name })),
+      );
       if (!teamId) {
         setCanEdit(true);
       }
@@ -143,6 +154,23 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
   }, [taskId]);
 
   useEffect(() => { wasModified.current = false; }, [taskId]);
+
+  useEffect(() => {
+    if (!taskData?.projectId) return;
+    const sub = subscribe(
+      `/topic/project/${taskData.projectId}/tasks`,
+      (msg: { body: string }) => {
+        try {
+          const event = JSON.parse(msg.body) as { type: string; taskId?: number };
+          if (event.type === 'TASK_COMMENT_ADDED' && event.taskId === taskId) {
+            commentRefetchRef.current?.();
+          }
+        } catch { /* ignore malformed messages */ }
+      },
+    );
+    return () => { sub?.unsubscribe(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskData?.projectId, taskId]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(wasModified.current); };
@@ -226,11 +254,34 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
           <div className="w-10 h-1 bg-gray-300 rounded-full" />
         </div>
 
-        {loading && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border border-gray-300 border-t-blue-600 mx-auto mb-4" />
-              <p className="text-gray-600">Loading task...</p>
+        {loading && !taskData && (
+          <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden animate-pulse">
+            <div className="flex-1 p-6 border-r border-[#EAECF0] space-y-6">
+              <div className="h-8 w-3/4 rounded-lg bg-[#F2F4F7]" />
+              <div className="flex gap-2">
+                <div className="h-9 w-20 rounded-xl bg-[#F2F4F7]" />
+                <div className="h-9 w-28 rounded-xl bg-[#F2F4F7]" />
+                <div className="h-9 w-24 rounded-xl bg-[#F2F4F7]" />
+              </div>
+              <div>
+                <div className="h-3 w-24 rounded bg-[#EAECF0] mb-3" />
+                <div className="h-28 rounded-xl bg-[#F2F4F7]" />
+              </div>
+              <div>
+                <div className="h-3 w-20 rounded bg-[#EAECF0] mb-3" />
+                <div className="space-y-2">
+                  <div className="h-10 rounded-xl bg-[#F2F4F7]" />
+                  <div className="h-10 rounded-xl bg-[#F2F4F7]" />
+                </div>
+              </div>
+            </div>
+            <div className="w-full md:w-80 p-4 bg-[#F7F8FA] space-y-4 flex-shrink-0">
+              <div className="grid grid-cols-2 md:grid-cols-1 gap-2">
+                <div className="h-10 rounded-xl bg-[#EAECF0]" />
+                <div className="h-10 rounded-xl bg-[#EAECF0]" />
+              </div>
+              <div className="h-52 rounded-xl bg-white border border-[#E5E7EB]" />
+              <div className="h-32 rounded-xl bg-white border border-[#E5E7EB]" />
             </div>
           </div>
         )}
@@ -311,7 +362,8 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
                   members={projectMembers}
                   allLabels={projectLabels}
                   sprints={projectSprints}
-                  onUpdateReporter={(reporterId) => canEdit && updateTask({ reporterId })}
+                  canChangeReporter={canChangeReporter}
+                  onUpdateReporter={(reporterId) => canChangeReporter && updateTask({ reporterId })}
                   onUpdateSprint={(sprintId) => canEdit && updateTask({ sprintId })}
                   onUpdateLabels={(labelIds) => canEdit && handleUpdateLabels(labelIds)}
                   onUnassign={async () => {

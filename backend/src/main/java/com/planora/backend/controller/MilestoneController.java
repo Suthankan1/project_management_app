@@ -7,8 +7,10 @@ import com.planora.backend.service.MilestoneService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,7 +31,10 @@ public class MilestoneController {
      * every single endpoint with boilerplate code.
      */
     private Long currentUserId(Authentication auth) {
-        return ((UserPrincipal) auth.getPrincipal()).getUserId();
+        if (auth != null && auth.getPrincipal() instanceof UserPrincipal up) {
+            return up.getUserId();
+        }
+        throw new AccessDeniedException("Authentication required");
     }
 
     /*
@@ -42,7 +47,7 @@ public class MilestoneController {
     @PostMapping("/api/projects/{projectId}/milestones")
     public ResponseEntity<MilestoneResponseDTO> createMilestone(
             @PathVariable Long projectId,
-            @RequestBody MilestoneRequestDTO dto,
+            @Valid @RequestBody MilestoneRequestDTO dto,
             Authentication auth) {
         return ResponseEntity.ok(milestoneService.createMilestone(projectId, dto, currentUserId(auth)));
     }
@@ -65,15 +70,17 @@ public class MilestoneController {
      */
     @Operation(summary = "Get a single milestone")
     @GetMapping("/api/milestones/{milestoneId}")
-    public ResponseEntity<MilestoneResponseDTO> getMilestone(@PathVariable Long milestoneId) {
-        return ResponseEntity.ok(milestoneService.getMilestoneById(milestoneId));
+    public ResponseEntity<MilestoneResponseDTO> getMilestone(
+            @PathVariable Long milestoneId,
+            Authentication auth) {
+        return ResponseEntity.ok(milestoneService.getMilestoneById(milestoneId, currentUserId(auth)));
     }
 
     @Operation(summary = "Update a milestone")
     @PutMapping("/api/milestones/{milestoneId}")
     public ResponseEntity<MilestoneResponseDTO> updateMilestone(
             @PathVariable Long milestoneId,
-            @RequestBody MilestoneRequestDTO dto,
+            @Valid @RequestBody MilestoneRequestDTO dto,
             Authentication auth) {
         return ResponseEntity.ok(milestoneService.updateMilestone(milestoneId, dto, currentUserId(auth)));
     }

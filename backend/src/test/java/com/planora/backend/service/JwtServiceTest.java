@@ -42,7 +42,7 @@ class JwtServiceTest {
     void validateToken_returnsTrueForValidAccessToken() {
         String token = jwtService.generateToken("alice@example.com");
         UserDetails userDetails = User.withUsername("alice@example.com")
-                .password("pass").authorities(Collections.emptyList()).build();
+                .password("ValidPassword123!").authorities(Collections.emptyList()).build();
 
         assertTrue(jwtService.validateToken(token, userDetails));
     }
@@ -51,7 +51,7 @@ class JwtServiceTest {
     void validateToken_returnsFalseForWrongUser() {
         String token = jwtService.generateToken("alice@example.com");
         UserDetails otherUser = User.withUsername("bob@example.com")
-                .password("pass").authorities(Collections.emptyList()).build();
+                .password("ValidPassword123!").authorities(Collections.emptyList()).build();
 
         assertFalse(jwtService.validateToken(token, otherUser));
     }
@@ -60,7 +60,7 @@ class JwtServiceTest {
     void validateToken_returnsFalseForRefreshToken() {
         String refreshToken = jwtService.generateRefreshToken("alice@example.com");
         UserDetails userDetails = User.withUsername("alice@example.com")
-                .password("pass").authorities(Collections.emptyList()).build();
+                .password("ValidPassword123!").authorities(Collections.emptyList()).build();
 
         // Refresh tokens must not validate as access tokens
         assertFalse(jwtService.validateToken(refreshToken, userDetails));

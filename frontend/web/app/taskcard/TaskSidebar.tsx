@@ -56,6 +56,7 @@ interface TaskSidebarProps {
   onUnassign?: () => void;
   onAssigneesChanged?: () => void;
   canEdit?: boolean;
+  canChangeReporter?: boolean;
   members?: Array<{ memberId: number; userId: number; name: string }>;
   allLabels?: Array<{ id: number; name: string }>;
   sprints?: Array<{ id: number; name: string }>;
@@ -66,7 +67,7 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
   milestoneId, milestoneName, assignees, recurrenceRule, recurrenceEnd, dates, reporterId, sprintId,
   onUpdateStatus, onUpdatePriority, onUpdateStoryPoint, onUpdateDueDate, onUpdateMilestone,
   onUpdateRecurrence, onUnassign, onAssigneesChanged, onUpdateReporter, onUpdateSprint, onUpdateLabels, onUpdateStartDate,
-  canEdit = true, members = [], allLabels = [], sprints = [],
+  canEdit = true, canChangeReporter = false, members = [], allLabels = [], sprints = [],
 }) => {
   const [sections, setSections] = React.useState<Record<string, boolean>>({
     details: true,
@@ -130,7 +131,7 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
         </div>
       )}
       <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
-        <StatusSection status={status} onUpdateStatus={canEdit ? onUpdateStatus : undefined} />
+        <StatusSection projectId={projectId} status={status} onUpdateStatus={canEdit ? onUpdateStatus : undefined} />
         <PrioritySection priority={priority} onUpdatePriority={canEdit ? onUpdatePriority : undefined} />
       </div>
       <div className="border border-[#E5E7EB] rounded-xl bg-white shadow-sm overflow-hidden">
@@ -154,12 +155,12 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
             <select
               value={reporterId ?? ''}
               onChange={(event) => onUpdateReporter?.(event.target.value ? Number(event.target.value) : null)}
-              disabled={!canEdit}
-              className="w-full text-sm border border-[#E5E7EB] rounded-lg px-2.5 h-9 bg-white disabled:bg-gray-100"
+              disabled={!canChangeReporter}
+              className="w-full text-sm border border-[#E5E7EB] rounded-lg px-2.5 h-9 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
               <option value="">{reporter ?? 'Select reporter'}</option>
               {members.map((member) => (
-                <option key={member.memberId} value={member.memberId}>{member.name}</option>
+                <option key={member.memberId} value={member.userId}>{member.name}</option>
               ))}
             </select>
           </SidebarField>
@@ -256,15 +257,15 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
           )}
         </div>}
       </div>
-      <div className="border rounded-md border-gray-200 bg-white shadow-sm">
-        <button onClick={() => toggleSection('dates')} className="w-full px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700 flex items-center justify-between">
+      <div className="border border-[#E5E7EB] rounded-xl bg-white shadow-sm overflow-hidden">
+        <button onClick={() => toggleSection('dates')} className="w-full px-4 py-2.5 border-b border-[#F2F4F7] text-[10px] font-bold text-[#6A7282] uppercase tracking-wider flex items-center justify-between">
           Dates <ChevronDown size={14} className={`transition-transform ${sections.dates ? '' : '-rotate-90'}`} />
         </button>
         {sections.dates && <DateSection dates={dates} onUpdateDueDate={canEdit ? onUpdateDueDate : undefined} onUpdateStartDate={canEdit ? onUpdateStartDate : undefined} />}
       </div>
       {taskId != null && projectId != null && (
-        <div className="border rounded-md border-gray-200 bg-white shadow-sm">
-          <button onClick={() => toggleSection('customFields')} className="w-full px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700 flex items-center justify-between">
+        <div className="border border-[#E5E7EB] rounded-xl bg-white shadow-sm overflow-hidden">
+          <button onClick={() => toggleSection('customFields')} className="w-full px-4 py-2.5 border-b border-[#F2F4F7] text-[10px] font-bold text-[#6A7282] uppercase tracking-wider flex items-center justify-between">
             Custom Fields <ChevronDown size={14} className={`transition-transform ${sections.customFields ? '' : '-rotate-90'}`} />
           </button>
           {sections.customFields && <div className="p-4"><CustomFieldsSection taskId={taskId} projectId={projectId} readOnly={!canEdit} /></div>}

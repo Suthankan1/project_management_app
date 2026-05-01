@@ -2,6 +2,7 @@
 
 import { Dispatch, FormEvent, SetStateAction } from 'react';
 import { Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react';
+import PasswordChecklist from '@/app/(auth)/components/UI/PasswordChecklist';
 import { inputCls, labelCls } from '../lib/profile-utils';
 
 type PwStep = 'idle' | 'sent' | 'done';
@@ -109,7 +110,7 @@ export default function ChangePasswordCard({
                                 type={showNewPw ? 'text' : 'password'}
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
-                                placeholder="At least 6 characters"
+                                placeholder="Min 8 chars, upper, lower, digit, symbol"
                                 className={inputCls + ' pr-11'}
                             />
                             <button
@@ -122,6 +123,11 @@ export default function ChangePasswordCard({
                                 {showNewPw ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
                         </div>
+                        {newPassword.length > 0 && (
+                            <div className="mt-1.5">
+                                <PasswordChecklist password={newPassword} unmetClassName="text-[#9CA3AF]" />
+                            </div>
+                        )}
                     </div>
                     <div>
                         <label className={labelCls}>Confirm Password</label>

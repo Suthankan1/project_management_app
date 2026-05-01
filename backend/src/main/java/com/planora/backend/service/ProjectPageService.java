@@ -13,12 +13,15 @@ import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -33,34 +36,27 @@ public class ProjectPageService {
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
-    public ProjectPage createPage(Long projectId, PageRequestDto request, Long userId) {
-        // Defensive Programming: Fail immediately if someone passes bad data internally.
+    public PageDetailResponseDto createPage(Long projectId, PageRequestDto request, Long userId) {
         Objects.requireNonNull(projectId, "projectId cannot be null");
         Objects.requireNonNull(userId, "userId cannot be null");
 
-        // Step 1: Verify the project exists.
         Project project = findProject(projectId);
-
-        // Step 2: Validate the user is actually in the project (Viewers are allowed to create pages).
         validateProjectMembership(project.getTeam().getId(), userId, false);
 
-        // Step 3: Map data and save. We track who created it and who last updated it
-        // to manage notifications later.
         ProjectPage page = ProjectPage.builder()
                 .projectId(projectId)
                 .title(request.getTitle())
                 .content(request.getContent())
-            .createdByUserId(userId)
-            .updatedByUserId(userId)
+                .createdByUserId(userId)
+                .updatedByUserId(userId)
                 .build();
 
         ProjectPage saved = repository.save(page);
-
-        // Step 4: Alert management that documentation is being added to their project.
         notifyProjectOwnersAndAdminsOnCreate(project, userId, saved);
-        return saved;
+        return toDetailDto(saved);
     }
 
     /*
@@ -76,6 +72,7 @@ public class ProjectPageService {
         validateProjectMembership(project.getTeam().getId(), userId, false);
 
         return repository.findByProjectId(projectId).stream()
+                .sorted(Comparator.comparing(ProjectPage::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(this::toSummaryDto)
                 .collect(Collectors.toList());
     }
@@ -92,13 +89,7 @@ public class ProjectPageService {
         Project project = findProject(page.getProjectId());
         validateProjectMembership(project.getTeam().getId(), userId, false);
 
-        PageDetailResponseDto dto = new PageDetailResponseDto();
-        dto.setId(page.getId());
-        dto.setTitle(page.getTitle());
-        dto.setContent(page.getContent());
-        dto.setUpdatedAt(page.getUpdatedAt().toString());
-
-        return dto;
+        return toDetailDto(page);
     }
 
     @Transactional
@@ -123,22 +114,11 @@ public class ProjectPageService {
 
         ProjectPage updatedPage = repository.save(existingPage);
 
-        // Step 3: Only alert stakeholders if the TITLE changed.
-        // We don't want to spam notifications every time someone fixes a typo in the content.
         if (!Objects.equals(oldTitle, updatedPage.getTitle())) {
             notifyImpactedStakeholdersOnRename(project, updatedPage, userId, oldTitle, oldUpdatedByUserId);
         }
 
-        PageDetailResponseDto dto = new PageDetailResponseDto();
-        dto.setId(updatedPage.getId());
-        dto.setTitle(updatedPage.getTitle());
-        dto.setContent(updatedPage.getContent());
-
-        if (updatedPage.getUpdatedAt() != null) {
-            dto.setUpdatedAt(updatedPage.getUpdatedAt().toString());
-        }
-
-        return dto;
+        return toDetailDto(updatedPage);
     }
 
     @Transactional
@@ -152,10 +132,14 @@ public class ProjectPageService {
         // Viewers cannot delete pages.
         validateProjectMembership(project.getTeam().getId(), userId, true);
 
-        // Notify people who wrote/edited this page BEFORE we delete it from the DB.
         notifyImpactedStakeholdersOnDelete(project, existingPage, userId);
 
         repository.delete(existingPage);
+
+        messagingTemplate.convertAndSend(
+            "/topic/project/" + project.getId() + "/pages",
+            Map.of("type", "PAGE_DELETED", "pageId", pageId, "projectId", project.getId())
+        );
     }
 
     // ── Notification Strategies ───────────────────────────────────────────────────
@@ -281,6 +265,29 @@ public class ProjectPageService {
         PageSummaryResponseDto dto = new PageSummaryResponseDto();
         dto.setId(page.getId());
         dto.setTitle(page.getTitle());
+        dto.setUpdatedAt(page.getUpdatedAt() != null ? page.getUpdatedAt().toString() : null);
+        dto.setUpdatedByUsername(page.getUpdatedByUserId() != null ? resolveUsername(page.getUpdatedByUserId()) : null);
         return dto;
+    }
+
+    private PageDetailResponseDto toDetailDto(ProjectPage page) {
+        PageDetailResponseDto dto = new PageDetailResponseDto();
+        dto.setId(page.getId());
+        dto.setProjectId(page.getProjectId());
+        dto.setTitle(page.getTitle());
+        dto.setContent(page.getContent());
+        dto.setCreatedByUserId(page.getCreatedByUserId());
+        dto.setCreatedByUsername(page.getCreatedByUserId() != null ? resolveUsername(page.getCreatedByUserId()) : null);
+        dto.setUpdatedByUserId(page.getUpdatedByUserId());
+        dto.setUpdatedByUsername(page.getUpdatedByUserId() != null ? resolveUsername(page.getUpdatedByUserId()) : null);
+        dto.setCreatedAt(page.getCreatedAt() != null ? page.getCreatedAt().toString() : null);
+        dto.setUpdatedAt(page.getUpdatedAt() != null ? page.getUpdatedAt().toString() : null);
+        return dto;
+    }
+
+    private String resolveUsername(Long userId) {
+        return userRepository.findById(userId)
+                .map(u -> u.getUsername() != null ? u.getUsername() : u.getEmail())
+                .orElse("Unknown");
     }
 }

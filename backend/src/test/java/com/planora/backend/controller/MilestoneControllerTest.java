@@ -85,7 +85,7 @@ class MilestoneControllerTest {
     @Test
     @WithMockUserPrincipal
     void getMilestone_returnsSingleMilestone() throws Exception {
-        when(milestoneService.getMilestoneById(1L)).thenReturn(sampleMilestone);
+        when(milestoneService.getMilestoneById(eq(1L), any())).thenReturn(sampleMilestone);
 
         mockMvc.perform(get("/api/milestones/1"))
                 .andExpect(status().isOk())

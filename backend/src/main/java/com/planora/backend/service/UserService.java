@@ -29,6 +29,8 @@ import com.planora.backend.repository.TokenRepository;
 import com.planora.backend.repository.UserRepository;
 
 import jakarta.transaction.Transactional;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -90,7 +92,7 @@ public class UserService {
     public String register(User user) {
 
         // Step 1. Check if the email already exists in the database.
-        User existingUser = userRepository.findByEmailIgnoreCase(user.getEmail().toLowerCase()).orElse(null);
+        User existingUser = userRepository.findFirstByEmailIgnoreCase(user.getEmail().toLowerCase()).orElse(null);
 
         if (existingUser != null) {
             // Step 2a. If the user exists but isn't verified yet, we reuse the entity.
@@ -138,7 +140,7 @@ public class UserService {
     @Transactional
     public boolean verifyToken(String email, String otp) {
         // Step 1. Fetch user. If no user, fail immediately.
-        User user = userRepository.findByEmailIgnoreCase(email.toLowerCase()).orElse(null);
+        User user = userRepository.findFirstByEmailIgnoreCase(email.toLowerCase()).orElse(null);
         if (user == null) {
             return false;
         }
@@ -184,10 +186,10 @@ public class UserService {
 
             // Step 2. If auth succeeds, generate JWT.
             if (authentication.isAuthenticated()) {
-                User authenticatedUser = userRepository.findByEmailIgnoreCase(user.getEmail().toLowerCase()).orElse(null);
+                User authenticatedUser = userRepository.findFirstByEmailIgnoreCase(user.getEmail().toLowerCase()).orElse(null);
 
                 // Create short-lived access token and long-lived refresh token.
-                String accessToken  = jwtService.generateToken(user.getEmail().toLowerCase(), authenticatedUser.getUsername());
+                String accessToken  = jwtService.generateToken(user.getEmail().toLowerCase(), authenticatedUser.getUsername(), authenticatedUser.getUserId());
                 String refreshToken = jwtService.generateRefreshToken(user.getEmail().toLowerCase());
 
                 // Store the JTI of the new refresh token for rotation tracking
@@ -233,7 +235,7 @@ public class UserService {
         try {
             // Step 1. Cryptographically validate the incoming token and extract the subject (email).
             String email = jwtService.validateRefreshToken(refreshToken);
-            User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+            User user = userRepository.findFirstByEmailIgnoreCase(email).orElse(null);
             if (user == null || !user.isVerified()) {
                 return null; // Token is structurally valid, but user is gone/disabled.
             }
@@ -266,8 +268,8 @@ public class UserService {
             storedToken.setUsed(true);
             tokenRepository.save(storedToken);
 
-            // Step 7. Issue new tokens
-            String newAccessToken  = jwtService.generateToken(email, user.getUsername());
+            // Step 7. Issue new tokens (rotate refresh token on every use to prevent replay attacks)
+            String newAccessToken  = jwtService.generateToken(email, user.getUsername(), user.getUserId());
             String newRefreshToken = jwtService.generateRefreshToken(email);
 
             // Step 8. Store the new refresh token JTI
@@ -306,7 +308,7 @@ public class UserService {
         jtiRecord.setUser(user);
         jtiRecord.setToken(jti);
         jtiRecord.setTokenType(VerificationToken.TokenType.REFRESH_TOKEN);
-        jtiRecord.setExpiry(java.time.Instant.now().plus(java.time.Duration.ofDays(7)));
+        jtiRecord.setExpiry(java.time.Instant.now().plus(java.time.Duration.ofDays(30)));
         jtiRecord.setUsed(false);
         tokenRepository.save(jtiRecord);
     }
@@ -464,6 +466,7 @@ public class UserService {
         );
     }
 
+    @Cacheable(value = "userProfile", key = "#email")
     public UserResponseDTO getCurrentUserDTO(String email) {
         // Orchestration method: Fetches user and immediately converts to DTO.
         User user = getUserByEmail(email);
@@ -471,6 +474,7 @@ public class UserService {
     }
 
     @Transactional
+    @CachePut(value = "userProfile", key = "#email")
     public UserResponseDTO updateUserProfileAndGetDTO(String email, UpdateProfileRequest request) {
         // Orchestration method: Updates user and immediately returns the fresh DTO state.
         User updatedUser = updateUserProfile(email, request);
@@ -503,7 +507,7 @@ public class UserService {
             throw new RuntimeException("User email is required");
         }
 
-        return userRepository.findByEmailIgnoreCase(email.toLowerCase())
+        return userRepository.findFirstByEmailIgnoreCase(email.toLowerCase())
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
@@ -511,7 +515,7 @@ public class UserService {
     @Transactional
     public User updateUserDetails(String email, String newFullName) {
         // Step 1. Fetch the user.
-        User user = userRepository.findByEmailIgnoreCase(email.toLowerCase()).orElse(null);
+        User user = userRepository.findFirstByEmailIgnoreCase(email.toLowerCase()).orElse(null);
         if (user == null) {
             throw new RuntimeException("User not found");
         }
@@ -537,7 +541,7 @@ public class UserService {
     @Transactional
     public User updateUserProfile(String email, UpdateProfileRequest request) {
         // Step 1. Fetch user.
-        User user = userRepository.findByEmailIgnoreCase(email.toLowerCase())
+        User user = userRepository.findFirstByEmailIgnoreCase(email.toLowerCase())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         // Step 2. Selectively apply updates. Null checks ensure we don't overwrite existing data with null.
@@ -582,7 +586,7 @@ public class UserService {
     @Transactional
     public String uploadProfilePicture(String email, MultipartFile file) {
         // Step 1. Validate User exists.
-        User user = userRepository.findByEmailIgnoreCase(email.toLowerCase()).orElse(null);
+        User user = userRepository.findFirstByEmailIgnoreCase(email.toLowerCase()).orElse(null);
         if (user == null) {
             throw new RuntimeException("User not found");
         }

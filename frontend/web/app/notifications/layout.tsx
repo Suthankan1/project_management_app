@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import SidebarLayout from '@/navBar/SidebarLayout';
+import FullLayout from '@/components/layout/FullLayout';
 
 export default function NotificationsLayout({
   children,
@@ -9,10 +9,10 @@ export default function NotificationsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarLayout>
+    <FullLayout>
       <main className="flex-1 overflow-y-auto bg-[#F7F8FA]">
         {children}
       </main>
-    </SidebarLayout>
+    </FullLayout>
   );
 }

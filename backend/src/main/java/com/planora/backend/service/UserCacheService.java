@@ -38,23 +38,23 @@ public class UserCacheService {
         // Step 3. Heuristic check: If it contains an '@', it is highly likely an email address.
         if (normalized.contains("@")) {
             // Step 3a. Attempt email lookup first (primary path).
-            var byEmail = userRepository.findByEmailIgnoreCase(normalized).orElse(null);
+            var byEmail = userRepository.findFirstByEmailIgnoreCase(normalized).orElse(null);
             if (byEmail != null) {
                 return byEmail;
             }
             // Step 3b. Fallback: Check usernames just in case a user managed to
             // register a username containing an '@' symbol.
-            return userRepository.findByUsernameIgnoreCase(normalized).orElse(null);
+            return userRepository.findFirstByUsernameIgnoreCase(normalized).orElse(null);
         }
 
         // Step 4. Heuristic check: No '@' found, so it is highly likely a username.
-        var byUsername = userRepository.findByUsernameIgnoreCase(normalized).orElse(null);
+        var byUsername = userRepository.findFirstByUsernameIgnoreCase(normalized).orElse(null);
         if (byUsername != null) {
             return byUsername;
         }
 
         // Step 4b. Final fallback: Check emails just in case it's a malformed email
         // without an '@' that somehow bypassed frontend validation.
-        return userRepository.findByEmailIgnoreCase(normalized).orElse(null);
+        return userRepository.findFirstByEmailIgnoreCase(normalized).orElse(null);
     }
 }

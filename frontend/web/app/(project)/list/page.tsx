@@ -10,6 +10,7 @@ import TaskRow from './components/TaskRow';
 import { useListTasks } from './hooks/useListTasks';
 import ListFilterBar, { type ListFilters } from './components/ListFilterBar';
 import ListBulkActionBar from './components/ListBulkActionBar';
+import { useProjectStatuses } from '@/hooks/useProjectStatuses';
 
 // ── Main Page ─────────────────────────────────────────────────────────────
 
@@ -51,6 +52,7 @@ export default function ListPage() {
     handleToggleTaskLabel,
     handleMilestoneChange,
   } = useListTasks();
+  const { statuses: projectStatuses } = useProjectStatuses(projectId ? Number(projectId) : undefined);
 
   const allAssigneeNames = useMemo(() => {
     const set = new Set<string>();
@@ -272,6 +274,7 @@ export default function ListPage() {
                   onOpenModal={setSelectedTaskId}
                   onStatusChange={handleStatusChange}
                   onDelete={handleDelete}
+                  projectStatuses={projectStatuses}
                 />
               ))
             )}
