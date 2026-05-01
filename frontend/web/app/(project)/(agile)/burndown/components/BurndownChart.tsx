@@ -35,6 +35,15 @@ export default function BurndownChart({ sprintName, dataPoints, totalStoryPoints
   const actualRef = useRef<SVGPathElement | null>(null);
   const idealRef = useRef<SVGPathElement | null>(null);
 
+  // Reset lengths when data changes so the animation remounts and replays
+  // We do this during render to avoid cascading renders from an effect
+  const [prevDataPoints, setPrevDataPoints] = useState(dataPoints);
+  if (dataPoints !== prevDataPoints) {
+    setPrevDataPoints(dataPoints);
+    setActualPathLen(null);
+    setIdealPathLen(null);
+  }
+
   useEffect(() => {
     if (!containerRef.current) return;
     const ro = new ResizeObserver(([entry]) => {
@@ -44,10 +53,7 @@ export default function BurndownChart({ sprintName, dataPoints, totalStoryPoints
     return () => ro.disconnect();
   }, []);
 
-  // Reset lengths when data changes so the animation remounts and replays
   useEffect(() => {
-    setActualPathLen(null);
-    setIdealPathLen(null);
     const rafId = requestAnimationFrame(() => {
       if (actualRef.current) setActualPathLen(actualRef.current.getTotalLength());
       if (idealRef.current)  setIdealPathLen(idealRef.current.getTotalLength());
