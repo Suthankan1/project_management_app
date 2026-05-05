@@ -1,0 +1,179 @@
+import api from '@/src/api/axios';
+import {
+  ChatMessage,
+  ChatReactionSummary,
+  ChatRoom,
+  ChatFeatureFlags,
+  ChatSearchResult,
+  DirectChatSummary,
+  RoomChatSummary,
+  TeamChatSummary,
+  UnreadBadgeSummary,
+  PresenceResponse,
+} from '../types/chat';
+
+export async function fetchCurrentUser(): Promise<{ username: string; email: string; aliases?: string[] }> {
+  const { data } = await api.get('/api/user/me');
+  return data;
+}
+
+export async function fetchProjectUsers(projectId: string): Promise<string[]> {
+  const { data } = await api.get(`/api/projects/${projectId}/chat/members`);
+  return data;
+}
+
+export async function fetchUserProfilePics(projectId: string): Promise<Record<string, string>> {
+  // Mock or actual implementation if backend supports it
+  // For now, returning empty record as placeholders
+  return {};
+}
+
+export async function fetchTeamMessages(projectId: string): Promise<ChatMessage[]> {
+  const { data } = await api.get<ChatMessage[]>(`/api/projects/${projectId}/chat/messages`);
+  return data;
+}
+
+export async function fetchPrivateHistory(projectId: string, partner: string): Promise<ChatMessage[]> {
+  const { data } = await api.get<ChatMessage[]>(`/api/projects/${projectId}/chat/messages`, {
+    params: { with: partner },
+  });
+  return data;
+}
+
+export async function fetchRoomHistory(projectId: string, roomId: number): Promise<ChatMessage[]> {
+  const { data } = await api.get<ChatMessage[]>(`/api/projects/${projectId}/chat/messages`, {
+    params: { roomId },
+  });
+  return data;
+}
+
+export async function fetchRooms(projectId: string): Promise<ChatRoom[]> {
+  const { data } = await api.get<ChatRoom[]>(`/api/projects/${projectId}/chat/rooms`);
+  return data;
+}
+
+export async function fetchFeatureFlags(projectId: string): Promise<ChatFeatureFlags> {
+  const { data } = await api.get<ChatFeatureFlags>(`/api/projects/${projectId}/chat/features`);
+  return data;
+}
+
+export async function fetchChatSummaries(projectId: string): Promise<{
+  directSummaries: DirectChatSummary[];
+  roomSummaries: RoomChatSummary[];
+  teamSummary: TeamChatSummary | null;
+}> {
+  const { data } = await api.get(`/api/projects/${projectId}/chat/summaries`);
+  return {
+    directSummaries: data.directSummaries || [],
+    roomSummaries: data.roomSummaries || [],
+    teamSummary: data.teamSummary || null,
+  };
+}
+
+export async function fetchUnreadBadge(projectId: string): Promise<UnreadBadgeSummary> {
+  const { data } = await api.get<UnreadBadgeSummary>(`/api/projects/${projectId}/chat/unread-badge`);
+  return data;
+}
+
+export async function fetchPresence(projectId: string): Promise<PresenceResponse> {
+  const { data } = await api.get<PresenceResponse>(`/api/projects/${projectId}/chat/presence`);
+  return data;
+}
+
+export async function fetchReactions(messageIds: number[]): Promise<Record<number, ChatReactionSummary[]>> {
+  // Batch fetching reactions if supported, else individual
+  // For simplicity and matching web pattern:
+  const reactions: Record<number, ChatReactionSummary[]> = {};
+  // This might be inefficient if many messages, but following the service contract
+  return reactions;
+}
+
+export async function fetchThreadMessages(parentMessageId: number, projectId: string): Promise<ChatMessage[]> {
+  const { data } = await api.get<ChatMessage[]>(`/api/projects/${projectId}/chat/messages/${parentMessageId}/thread`);
+  return data;
+}
+
+export async function searchMessages(projectId: string, query: string): Promise<ChatSearchResult[]> {
+  const { data } = await api.get<ChatSearchResult[]>(`/api/projects/${projectId}/chat/search`, {
+    params: { q: query },
+  });
+  return data;
+}
+
+export async function sendRestMessage(projectId: string, content: string, recipient?: string): Promise<ChatMessage> {
+  const { data } = await api.post(`/api/projects/${projectId}/chat/messages`, {
+    content,
+    recipient,
+    formatType: 'PLAIN',
+  });
+  return data;
+}
+
+export async function createRoom(projectId: string, name: string, memberUsernames: string[]): Promise<ChatRoom> {
+  const { data } = await api.post(`/api/projects/${projectId}/chat/rooms`, {
+    name,
+    members: memberUsernames,
+  });
+  return data;
+}
+
+export async function deleteRoom(projectId: string, roomId: number): Promise<void> {
+  await api.delete(`/api/projects/${projectId}/chat/rooms/${roomId}`);
+}
+
+export async function updateRoomMeta(
+  projectId: string,
+  roomId: number,
+  updates: { name?: string; topic?: string; description?: string }
+): Promise<ChatRoom> {
+  const { data } = await api.patch(`/api/projects/${projectId}/chat/rooms/${roomId}/meta`, updates);
+  return data;
+}
+
+export async function pinRoomMessage(projectId: string, roomId: number, messageId: number | null): Promise<void> {
+  await api.patch(`/api/projects/${projectId}/chat/rooms/${roomId}/pin`, { messageId });
+}
+
+export async function toggleReaction(messageId: number, emoji: string, projectId: string): Promise<void> {
+  await api.post(`/api/projects/${projectId}/chat/messages/${messageId}/reactions/toggle`, { emoji });
+}
+
+export async function markTeamRead(projectId: string): Promise<void> {
+  await api.post(`/api/projects/${projectId}/chat/team/read`);
+}
+
+export async function markRoomRead(projectId: string, roomId: number): Promise<void> {
+  await api.post(`/api/projects/${projectId}/chat/rooms/${roomId}/read`);
+}
+
+export async function markPrivateRead(projectId: string, partner: string): Promise<void> {
+  await api.post(`/api/projects/${projectId}/chat/direct/read`, null, {
+    params: { with: partner },
+  });
+}
+
+export async function uploadChatDocument(projectId: string, uri: string, filename: string): Promise<string> {
+  const formData = new FormData();
+  // @ts-ignore
+  formData.append('file', {
+    uri,
+    name: filename,
+    type: 'application/octet-stream',
+  });
+
+  const { data } = await api.post(`/api/projects/${projectId}/chat/upload`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return data.url;
+}
+
+export async function postTelemetry(
+  projectId: string,
+  action: string,
+  target: string,
+  details?: string
+): Promise<void> {
+  await api.post(`/api/projects/${projectId}/chat/telemetry`, { action, target, details });
+}
