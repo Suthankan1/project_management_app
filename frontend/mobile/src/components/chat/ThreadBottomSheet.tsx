@@ -11,6 +11,7 @@ import {
   Pressable,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/src/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { ChatMessage as ChatMessageType, ChatReactionSummary } from '../../types/chat';
@@ -47,6 +48,7 @@ export function ThreadBottomSheet(props: ThreadBottomSheetProps) {
   } = props;
 
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     Animated.spring(translateY, {
@@ -64,7 +66,7 @@ export function ThreadBottomSheet(props: ThreadBottomSheetProps) {
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose} />
-      <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+      <Animated.View style={[styles.sheet, { transform: [{ translateY }], paddingBottom: insets.bottom }]}>
         <View style={styles.handle} />
 
         <View style={styles.header}>

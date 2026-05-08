@@ -15,7 +15,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/src/constants/colors';
 import * as DocumentPicker from 'expo-document-picker';
 import { uploadChatDocument } from '../../services/chatService';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ChatInputProps {
   onSendMessage: (msg: string) => void;
@@ -53,7 +52,6 @@ export function ChatInput(props: ChatInputProps) {
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [inputHeight, setInputHeight] = useState(44);
 
-  const insets = useSafeAreaInsets();
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleTextChange = (text: string) => {
@@ -117,7 +115,7 @@ export function ChatInput(props: ChatInputProps) {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
-      <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+      <View style={styles.container}>
 
         {/* Mention Suggestions */}
         {mentionQuery !== null && filteredMentions.length > 0 && (
