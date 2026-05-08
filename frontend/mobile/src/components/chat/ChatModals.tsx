@@ -119,51 +119,36 @@ export function EditMessageModal({ isOpen, onClose, initialContent, onSave }: an
   );
 }
 
-export function EditChannelModal({ isOpen, onClose, initialName, initialTopic, initialDescription, onSave }: any) {
-  const [name, setName] = useState(initialName || '');
-  const [topic, setTopic] = useState(initialTopic || '');
-  const [description, setDescription] = useState(initialDescription || '');
-
-  React.useEffect(() => {
-    setName(initialName || '');
-    setTopic(initialTopic || '');
-    setDescription(initialDescription || '');
-  }, [initialName, initialTopic, initialDescription, isOpen]);
-
-  const handleSave = () => {
-    if (!name.trim()) return;
-    onSave({ name: name.trim(), topic: topic.trim(), description: description.trim() });
-    onClose();
-  };
+export function EditChannelModal({ isOpen, onClose, initialName, initialTopic, initialDescription, onSave }: {
+  isOpen: boolean;
+  onClose: () => void;
+  initialName: string;
+  initialTopic: string;
+  initialDescription: string;
+  onSave: (updates: { name?: string; topic?: string; description?: string }) => void;
+}) {
+  const [name, setName] = useState(initialName);
+  const [topic, setTopic] = useState(initialTopic);
+  const [description, setDescription] = useState(initialDescription);
 
   return (
     <Sheet visible={isOpen} onClose={onClose} title="Edit Channel">
-      <TextInput
-        style={styles.input}
-        placeholder="Channel name (e.g. general)"
-        value={name}
-        onChangeText={setName}
-        autoFocus
-      />
-      <TextInput
-        style={[styles.input, { marginTop: 8 }]}
-        placeholder="Topic"
-        value={topic}
-        onChangeText={setTopic}
-      />
-      <TextInput
-        style={[styles.input, { height: 100, marginTop: 8, textAlignVertical: 'top' }]}
-        placeholder="Description"
-        value={description}
-        onChangeText={setDescription}
-        multiline
-      />
+      <Text style={styles.label}>Channel Name</Text>
+      <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Channel name" />
+      <Text style={styles.label}>Topic</Text>
+      <TextInput style={styles.input} value={topic} onChangeText={setTopic} placeholder="Short topic (optional)" />
+      <Text style={styles.label}>Description</Text>
+      <TextInput style={[styles.input, { height: 80, textAlignVertical: 'top' }]} value={description} onChangeText={setDescription} multiline placeholder="Description (optional)" />
       <View style={styles.footerRow}>
         <TouchableOpacity style={styles.secondaryBtn} onPress={onClose}>
           <Text style={styles.secondaryBtnText}>Cancel</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.primaryBtn} onPress={handleSave}>
-          <Text style={styles.primaryBtnText}>Save Changes</Text>
+        <TouchableOpacity
+          style={[styles.primaryBtn, !name.trim() && styles.disabledBtn]}
+          disabled={!name.trim()}
+          onPress={() => { onSave({ name: name.trim(), topic: topic.trim(), description: description.trim() }); onClose(); }}
+        >
+          <Text style={styles.primaryBtnText}>Save</Text>
         </TouchableOpacity>
       </View>
     </Sheet>
