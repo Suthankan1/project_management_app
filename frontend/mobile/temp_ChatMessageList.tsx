@@ -11,6 +11,7 @@ import { ChatMessage } from './ChatMessage';
 import { ChatMessage as ChatMessageType, ChatReactionSummary } from '../../types/chat';
 import { shouldShowDateSeparator, formatDateSeparator, isGrouped } from '@/src/hooks/chat/chatUtils';
 import { Colors } from '@/src/constants/colors';
+import { shouldUseNativeDriver } from '@/src/lib/platform';
 
 interface ChatMessageListProps {
   projectId: string;
@@ -120,8 +121,8 @@ function TypingIndicator({ username }: { username: string }) {
       return Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(val, { toValue: 1, duration: 400, useNativeDriver: true }),
-          Animated.timing(val, { toValue: 0, duration: 400, useNativeDriver: true }),
+          Animated.timing(val, { toValue: 1, duration: 400, useNativeDriver: shouldUseNativeDriver }),
+          Animated.timing(val, { toValue: 0, duration: 400, useNativeDriver: shouldUseNativeDriver }),
         ])
       );
     };

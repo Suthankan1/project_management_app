@@ -1,21 +1,14 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  SectionList,
-  SafeAreaView,
+  View, Text, StyleSheet, TouchableOpacity,
+  TextInput, SectionList, Image, SafeAreaView,
   Alert,
-  Image,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/src/constants/colors';
 import { ChatRoom, ChatMessage } from '../../types/chat';
 import { formatTime, avatarColor, getMessagePreview } from '@/src/hooks/chat/chatUtils';
-import { LinearGradient } from 'expo-linear-gradient';
 
 interface ChatSidebarProps {
   currentUser: string;
@@ -37,194 +30,226 @@ interface ChatSidebarProps {
   roomTypingUsers: Record<number, string[]>;
   privateTypingUsers: string[];
   onOpenCreate: () => void;
-  onEditRoom: (room: ChatRoom) => void;
+  onEditRoom?: (room: ChatRoom) => void;
   onDeleteRoom: (roomId: number) => void;
-  onUpdateRoomMeta: (roomId: number, updates: {name?:string;topic?:string;description?:string}) => void;
+  onUpdateRoomMeta: (roomId: number, updates: { name?: string; topic?: string; description?: string }) => void;
   searchTerm: string;
   onSearchChange: (v: string) => void;
   isLoading?: boolean;
   roomMentionCounts?: Record<number, number>;
   teamMentionCount?: number;
+  onlineUsers?: string[];
 }
 
-export function ChatSidebar(props: ChatSidebarProps) {
-  const {
-    currentUser,
-    users,
-    userProfilePics = {},
-    rooms,
-    selectedUser,
-    selectedRoomId,
-    onSelectUser,
-    onSelectRoom,
-    privateUnseenCounts,
-    roomUnseenCounts,
-    privateLastMessages,
-    roomLastMessages,
-    teamUnseenCount,
-    teamLastMessage,
-    teamTypingUsers,
-    roomTypingUsers,
-    privateTypingUsers,
-    onOpenCreate,
-    onEditRoom,
-    onDeleteRoom,
-    searchTerm,
-    onSearchChange,
-    roomMentionCounts = {},
-    teamMentionCount = 0,
-  } = props;
+function UnreadBadge({ count }: { count: number }) {
+  if (!count) return null;
+  return (
+    <View style={styles.unreadBadge}>
+      <Text style={styles.badgeText}>{count > 99 ? '99+' : count}</Text>
+    </View>
+  );
+}
+
+function MentionBadge({ count }: { count: number }) {
+  if (!count) return null;
+  return (
+    <View style={styles.mentionBadge}>
+      <Text style={styles.badgeText}>🔔{count > 9 ? '9+' : count}</Text>
+    </View>
+  );
+}
+
+export function ChatSidebar({
+  currentUser, currentUserAliases = [], users, userProfilePics = {}, rooms,
+  selectedUser, selectedRoomId,
+  onSelectUser, onSelectRoom,
+  privateUnseenCounts, roomUnseenCounts,
+  privateLastMessages, roomLastMessages,
+  teamUnseenCount, teamLastMessage,
+  teamTypingUsers, roomTypingUsers, privateTypingUsers,
+  onOpenCreate, onEditRoom, onDeleteRoom,
+  searchTerm, onSearchChange,
+  roomMentionCounts = {}, teamMentionCount = 0,
+  onlineUsers = [],
+}: ChatSidebarProps) {
+  const identitySet = new Set([
+    currentUser.toLowerCase(),
+    ...currentUserAliases.map(a => a.toLowerCase()),
+  ]);
+  const dmUsers = users.reduce<string[]>((acc, user) => {
+    const key = user.toLowerCase();
+    if (!identitySet.has(key) && !acc.some(existing => existing.toLowerCase() === key)) {
+      acc.push(user);
+    }
+    return acc;
+  }, []);
+  const isTeamSelected = !selectedUser && selectedRoomId === null;
 
   const sections = [
-    { title: '', data: [{ type: 'team' }] },
-    { title: 'CHANNELS', data: rooms.map(r => ({ ...r, type: 'room' })) },
-    { title: 'DIRECT MESSAGES', data: users.map(u => ({ username: u, type: 'direct' })) },
+    { key: 'team', title: '', data: [{ type: 'team' as const }] },
+    { key: 'channels', title: 'CHANNELS', data: rooms.map(r => ({ ...r, type: 'room' as const })) },
+    { key: 'dms', title: 'DIRECT MESSAGES', data: dmUsers.map(u => ({ username: u, type: 'direct' as const })) },
   ];
 
-  const renderBadge = (count: number, isMention: boolean) => {
-    if (count <= 0) return null;
-    return (
-      <View style={[styles.badge, isMention ? styles.mentionBadge : styles.unreadBadge]}>
-        <Text style={styles.badgeText}>{count > 99 ? '99+' : count}</Text>
-      </View>
-    );
-  };
-
   const renderItem = ({ item }: { item: any }) => {
-    let title = '';
-    let preview = '';
-    let time = '';
-    let isSelected = false;
-    let onPress = () => {};
-    let onLongPress = () => {};
-    let icon: React.ReactNode = null;
-    let badge: React.ReactNode = null;
-    let isTyping = false;
-
     if (item.type === 'team') {
-      title = 'Team Chat';
-      isSelected = selectedUser === null && selectedRoomId === null;
-      onPress = () => { onSelectUser(null); onSelectRoom(null); };
-      preview = getMessagePreview(teamLastMessage?.content);
-      time = formatTime(teamLastMessage?.timestamp);
-      isTyping = teamTypingUsers.length > 0;
-      icon = (
-        <View style={[styles.avatarBox, { backgroundColor: Colors.primary }]}>
-          <Ionicons name="people" size={20} color={Colors.white} />
-        </View>
-      );
-      badge = (
-        <View style={styles.badgeRow}>
-          {renderBadge(teamMentionCount, true)}
-          {renderBadge(teamUnseenCount, false)}
-        </View>
-      );
-    } else if (item.type === 'room') {
-      title = item.name;
-      isSelected = selectedRoomId === item.id;
-      onPress = () => onSelectRoom(item.id);
-      const lastMsg = roomLastMessages[item.id];
-      preview = getMessagePreview(lastMsg?.content);
-      time = formatTime(lastMsg?.timestamp);
-      isTyping = (roomTypingUsers[item.id] || []).length > 0;
-      icon = (
-        <View style={[styles.avatarBox, { backgroundColor: Colors.borderDefault }]}>
-          <Text style={styles.hashIcon}>#</Text>
-        </View>
-      );
-      badge = (
-        <View style={styles.badgeRow}>
-          {renderBadge(roomMentionCounts[item.id] || 0, true)}
-          {renderBadge(roomUnseenCounts[item.id] || 0, false)}
-        </View>
-      );
-      onLongPress = () => {
-        Alert.alert(item.name, undefined, [
-          { text: 'Edit Channel', onPress: () => onEditRoom(item) }, // Open EditModal
-          { text: 'Delete Channel', style: 'destructive', onPress: () => onDeleteRoom(item.id) },
-          { text: 'Cancel', style: 'cancel' },
-        ]);
-      };
-    } else if (item.type === 'direct') {
-      title = item.username;
-      isSelected = selectedUser === item.username;
-      onPress = () => onSelectUser(item.username);
-      const lastMsg = privateLastMessages[item.username];
-      preview = getMessagePreview(lastMsg?.content);
-      time = formatTime(lastMsg?.timestamp);
-      isTyping = privateTypingUsers.includes(item.username.toLowerCase());
-      const pic = userProfilePics[item.username];
-      icon = pic ? (
-        <Image source={{ uri: pic }} style={styles.avatarCircle} />
-      ) : (
-        <LinearGradient
-          colors={[avatarColor(item.username), avatarColor(item.username + '2')]}
-          style={styles.avatarCircle}
+      const isTyping = teamTypingUsers.length > 0;
+      return (
+        <TouchableOpacity
+          style={[styles.row, isTeamSelected && styles.selectedRow]}
+          onPress={() => { onSelectUser(null); onSelectRoom(null); }}
+          activeOpacity={0.7}
         >
-          <Text style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</Text>
-        </LinearGradient>
+          <View style={[styles.iconBox, isTeamSelected ? styles.iconBoxActive : styles.iconBoxDefault]}>
+            <Ionicons name="people" size={18} color={isTeamSelected ? '#fff' : Colors.textSecondary} />
+          </View>
+          <View style={styles.rowContent}>
+            <View style={styles.rowTop}>
+              <Text style={[styles.rowTitle, isTeamSelected && styles.rowTitleActive]} numberOfLines={1}>
+                Team Chat
+              </Text>
+              {teamLastMessage?.timestamp && (
+                <Text style={styles.rowTime}>{formatTime(teamLastMessage.timestamp)}</Text>
+              )}
+            </View>
+            <Text style={[styles.rowPreview, isTyping && styles.typingText]} numberOfLines={1}>
+              {isTyping
+                ? `${teamTypingUsers[0]} is typing…`
+                : getMessagePreview(teamLastMessage?.content) || 'No messages yet'}
+            </Text>
+          </View>
+          <View style={styles.badges}>
+            <MentionBadge count={teamMentionCount} />
+            <UnreadBadge count={teamUnseenCount} />
+          </View>
+        </TouchableOpacity>
       );
-      badge = renderBadge(privateUnseenCounts[item.username] || 0, false);
     }
 
-    return (
-      <TouchableOpacity
-        style={[styles.row, isSelected && styles.selectedRow]}
-        onPress={onPress}
-        onLongPress={onLongPress}
-        activeOpacity={0.7}
-      >
-        {icon}
-        <View style={styles.rowContent}>
-          <View style={styles.rowTop}>
-            <Text style={styles.rowTitle} numberOfLines={1}>{title}</Text>
-            <Text style={styles.rowTime}>{time}</Text>
+    if (item.type === 'room') {
+      const isSelected = selectedRoomId === item.id;
+      const typingUsers: string[] = roomTypingUsers[item.id] || [];
+      const isTyping = typingUsers.length > 0 && !isSelected;
+      const lastMsg = roomLastMessages[item.id];
+      return (
+        <TouchableOpacity
+          style={[styles.row, isSelected && styles.selectedRow]}
+          onPress={() => onSelectRoom(item.id)}
+          onLongPress={() => {
+            Alert.alert(item.name, undefined, [
+              onEditRoom ? { text: '✏️ Edit Channel', onPress: () => onEditRoom(item) } : null,
+              { text: '🗑️ Delete Channel', style: 'destructive', onPress: () => onDeleteRoom(item.id) },
+              { text: 'Cancel', style: 'cancel' },
+            ].filter(Boolean) as any);
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.iconBox, isSelected ? styles.iconBoxActive : styles.iconBoxDefault]}>
+            <Text style={[styles.hashIcon, isSelected && { color: '#fff' }]}>#</Text>
           </View>
-          <Text style={[styles.rowPreview, isTyping && styles.typingText]} numberOfLines={1}>
-            {isTyping ? 'typing...' : preview}
-          </Text>
-        </View>
-        {badge}
-      </TouchableOpacity>
-    );
+          <View style={styles.rowContent}>
+            <View style={styles.rowTop}>
+              <Text style={[styles.rowTitle, isSelected && styles.rowTitleActive]} numberOfLines={1}>{item.name}</Text>
+              {lastMsg?.timestamp && <Text style={styles.rowTime}>{formatTime(lastMsg.timestamp)}</Text>}
+            </View>
+            <Text style={[styles.rowPreview, isTyping && styles.typingText]} numberOfLines={1}>
+              {isTyping
+                ? `${typingUsers[0]} is typing…`
+                : item.topic || getMessagePreview(lastMsg?.content) || `Created by ${item.createdBy}`}
+            </Text>
+          </View>
+          <View style={styles.badges}>
+            <MentionBadge count={roomMentionCounts[item.id] || 0} />
+            <UnreadBadge count={roomUnseenCounts[item.id] || 0} />
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    if (item.type === 'direct') {
+      const u = item.username;
+      const key = u.toLowerCase();
+      const isSelected = selectedUser?.toLowerCase() === key;
+      const isTyping = privateTypingUsers.includes(key) && !isSelected;
+      const isOnline = onlineUsers.includes(key);
+      const lastMsg = privateLastMessages[key];
+      const pic = userProfilePics[u];
+      return (
+        <TouchableOpacity
+          style={[styles.row, isSelected && styles.selectedRow]}
+          onPress={() => onSelectUser(u)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.avatarWrap}>
+            {pic ? (
+              <Image source={{ uri: pic }} style={styles.avatar} />
+            ) : (
+              <LinearGradient
+                colors={[avatarColor(u), avatarColor(u + '2')]}
+                style={styles.avatar}
+              >
+                <Text style={styles.avatarInitial}>{u.charAt(0).toUpperCase()}</Text>
+              </LinearGradient>
+            )}
+            {isOnline && <View style={styles.onlineDot} />}
+          </View>
+          <View style={styles.rowContent}>
+            <View style={styles.rowTop}>
+              <Text style={[styles.rowTitle, isSelected && styles.rowTitleActive]} numberOfLines={1}>{u}</Text>
+              {lastMsg?.timestamp && <Text style={styles.rowTime}>{formatTime(lastMsg.timestamp)}</Text>}
+            </View>
+            <Text style={[styles.rowPreview, isTyping && styles.typingText]} numberOfLines={1}>
+              {isTyping ? 'typing…'
+                : getMessagePreview(lastMsg?.content) || 'Start a conversation'}
+            </Text>
+          </View>
+          <UnreadBadge count={privateUnseenCounts[key] || 0} />
+        </TouchableOpacity>
+      );
+    }
+    return null;
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerTitleRow}>
-          <View style={styles.msgIconBox}>
-            <Ionicons name="chatbubbles" size={18} color={Colors.white} />
+        <View style={styles.headerLeft}>
+          <View style={styles.headerIcon}>
+            <Ionicons name="chatbubbles" size={16} color="#fff" />
           </View>
           <Text style={styles.headerTitle}>Messages</Text>
         </View>
-        <TouchableOpacity style={styles.addButton} hitSlop={{top:10,bottom:10,left:10,right:10}} onPress={onOpenCreate}>
-          <Ionicons name="add" size={28} color={Colors.textPrimary} />
+        <TouchableOpacity style={styles.addBtn} onPress={onOpenCreate} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="add" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.searchBox}>
-        <Ionicons name="search" size={18} color={Colors.textMuted} />
+      {/* Search */}
+      <View style={styles.searchBar}>
+        <Ionicons name="search" size={14} color={Colors.textMuted} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search people or channels"
+          placeholder="Search…"
+          placeholderTextColor={Colors.textMuted}
           value={searchTerm}
           onChangeText={onSearchChange}
         />
         {searchTerm.length > 0 && (
           <TouchableOpacity onPress={() => onSearchChange('')}>
-            <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+            <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
           </TouchableOpacity>
         )}
       </View>
 
+      {/* List */}
       <SectionList
         sections={sections}
-        keyExtractor={(item, index) => item.type + (item.id || item.username || index)}
+        keyExtractor={(item, i) => item.type + (item.id || item.username || i)}
         renderItem={renderItem}
-        renderSectionHeader={({ section: { title } }) => (
-          title ? <Text style={styles.sectionHeader}>{title}</Text> : null
-        )}
+        renderSectionHeader={({ section }) =>
+          section.title ? <Text style={styles.sectionHeader}>{section.title}</Text> : null
+        }
         contentContainerStyle={styles.listContent}
         stickySectionHeadersEnabled={false}
       />
@@ -233,97 +258,75 @@ export function ChatSidebar(props: ChatSidebarProps) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.chatSidebarBg },
+  container: { flex: 1, backgroundColor: '#fff' },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.chatDivider,
   },
-  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  msgIconBox: {
-    width: 32,
-    height: 32,
-    backgroundColor: Colors.primary,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerIcon: {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center',
   },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary },
-  addButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
+  headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.textPrimary },
+  addBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.pageBg, borderRadius: 12,
+    borderWidth: 1, borderColor: Colors.borderDefault,
+    marginHorizontal: 12, marginVertical: 10,
+    paddingHorizontal: 12, height: 38,
   },
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.pageBg,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    paddingHorizontal: 12,
-    height: 40,
-    borderRadius: 10,
-    gap: 8,
-  },
-  searchInput: { flex: 1, fontSize: 15, color: Colors.textPrimary },
+  searchInput: { flex: 1, fontSize: 14, color: Colors.textPrimary },
   sectionHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: Colors.textMuted,
-    letterSpacing: 1,
+    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 6,
+    fontSize: 10.5, fontWeight: '700', color: Colors.textMuted,
+    letterSpacing: 1.2, textTransform: 'uppercase',
   },
-  listContent: { paddingBottom: 24 },
+  listContent: { paddingBottom: 32 },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minHeight: 64,
-    gap: 12,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 12, paddingVertical: 10,
+    marginHorizontal: 4, borderRadius: 12, gap: 10,
+    borderWidth: 1, borderColor: 'transparent',
   },
   selectedRow: {
-    backgroundColor: '#EFF6FF',
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.primary,
+    backgroundColor: '#EFF6FF', borderColor: '#BFDBFE',
   },
-  avatarBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+  iconBox: {
+    width: 38, height: 38, borderRadius: 10,
+    justifyContent: 'center', alignItems: 'center', flexShrink: 0,
   },
-  avatarCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+  iconBoxDefault: { backgroundColor: Colors.pageBg },
+  iconBoxActive: { backgroundColor: Colors.primary },
+  hashIcon: { fontSize: 18, fontWeight: '700', color: Colors.textSecondary },
+  avatarWrap: { position: 'relative', flexShrink: 0 },
+  avatar: {
+    width: 38, height: 38, borderRadius: 19,
+    justifyContent: 'center', alignItems: 'center',
   },
-  avatarText: { color: Colors.white, fontWeight: 'bold', fontSize: 16 },
-  hashIcon: { fontSize: 20, fontWeight: 'bold', color: Colors.textSecondary },
-  rowContent: { flex: 1 },
+  avatarInitial: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  onlineDot: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 11, height: 11, borderRadius: 6,
+    backgroundColor: Colors.onlineGreen, borderWidth: 2, borderColor: '#fff',
+  },
+  rowContent: { flex: 1, minWidth: 0 },
   rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
-  rowTitle: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
-  rowTime: { fontSize: 11, color: Colors.textMuted },
-  rowPreview: { fontSize: 13, color: Colors.textSecondary },
+  rowTitle: { fontSize: 13.5, fontWeight: '600', color: Colors.textPrimary, flexShrink: 1 },
+  rowTitleActive: { color: '#1D4ED8', fontWeight: '700' },
+  rowTime: { fontSize: 10, color: Colors.textMuted, flexShrink: 0, marginLeft: 4 },
+  rowPreview: { fontSize: 12, color: Colors.textSecondary },
   typingText: { color: Colors.primary, fontStyle: 'italic' },
-  badgeRow: { flexDirection: 'row', gap: 4, alignItems: 'center' },
-  badge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
+  badges: { flexDirection: 'row', gap: 4, alignItems: 'center', flexShrink: 0 },
+  unreadBadge: {
+    minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6,
+    backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center',
   },
-  unreadBadge: { backgroundColor: Colors.primary },
-  mentionBadge: { backgroundColor: Colors.mentionAmber },
-  badgeText: { color: Colors.white, fontSize: 10, fontWeight: 'bold' },
+  mentionBadge: {
+    minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6,
+    backgroundColor: Colors.mentionAmber, justifyContent: 'center', alignItems: 'center',
+  },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 });

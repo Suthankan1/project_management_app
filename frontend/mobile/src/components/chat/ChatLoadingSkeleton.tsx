@@ -1,8 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, StyleSheet, Dimensions } from 'react-native';
+import { View, Animated, StyleSheet } from 'react-native';
 import { Colors } from '@/src/constants/colors';
-
-const { width } = Dimensions.get('window');
+import { shouldUseNativeDriver } from '@/src/lib/platform';
 
 export function ChatLoadingSkeleton() {
   const pulse = useRef(new Animated.Value(0.4)).current;
@@ -10,11 +9,11 @@ export function ChatLoadingSkeleton() {
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.4, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 800, useNativeDriver: shouldUseNativeDriver }),
+        Animated.timing(pulse, { toValue: 0.4, duration: 800, useNativeDriver: shouldUseNativeDriver }),
       ])
     ).start();
-  }, []);
+  }, [pulse]);
 
   const renderSidebarItem = (key: number) => (
     <Animated.View key={key} style={[styles.sidebarItem, { opacity: pulse }]}>

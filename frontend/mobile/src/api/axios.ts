@@ -1,7 +1,13 @@
 import axios from 'axios';
 import { clearTokens, getRefreshToken, getToken, saveRefreshToken, saveToken } from '../auth/storage';
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || '';
+const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL;
+
+if (!configuredApiUrl) {
+  throw new Error('Missing EXPO_PUBLIC_API_URL. Set it in your local mobile environment.');
+}
+
+export const API_BASE_URL = configuredApiUrl;
 
 const api = axios.create({
   baseURL: API_BASE_URL,

@@ -72,7 +72,7 @@ export function useChat(projectId: string) {
         return;
       }
 
-      const base = process.env.EXPO_PUBLIC_API_URL || API_BASE_URL || 'http://localhost:8080';
+      const base = API_BASE_URL;
       const wsUrl = base.replace(/^http/, 'ws') + '/ws-native';
 
       try {
@@ -136,15 +136,15 @@ export function useChat(projectId: string) {
 
     if (dest.includes('/topic/project.') && !dest.includes('.room.')) {
       // Team message
-      messagesHook.addMessage(body);
+      messagesHook.addTeamMessage(body);
       unreadHook.setTeamLastMessage(body);
       if (body.sender !== currentUser) {
         unreadHook.setTeamUnseenCount(prev => prev + 1);
       }
     } else if (dest.includes('.room.')) {
       // Room message
-      messagesHook.addMessage(body);
       if (body.roomId) {
+        messagesHook.addRoomMessage(body.roomId, body);
         unreadHook.setRoomLastMessages(prev => ({ ...prev, [body.roomId]: body }));
         if (body.sender !== currentUser && body.roomId !== selectedRoomId) {
           unreadHook.setRoomUnseenCounts(prev => ({ ...prev, [body.roomId]: (prev[body.roomId] || 0) + 1 }));
@@ -152,13 +152,9 @@ export function useChat(projectId: string) {
       }
     } else if (dest === '/user/queue/private') {
       // Private message
-      messagesHook.addMessage(body);
       const partner = body.sender === currentUser ? body.recipient : body.sender;
       if (partner) {
-        messagesHook.setPrivateMessages(prev => ({
-          ...prev,
-          [partner]: [...(prev[partner] || []), body]
-        }));
+        messagesHook.addPrivateMessage(partner, body);
         unreadHook.setPrivateLastMessages(prev => ({ ...prev, [partner]: body }));
         if (body.sender !== currentUser && partner !== selectedUser) {
           unreadHook.setPrivateUnseenCounts(prev => ({ ...prev, [partner]: (prev[partner] || 0) + 1 }));
