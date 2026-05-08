@@ -19,7 +19,7 @@ interface CommentSectionProps {
 }
 
 // Relative profile picture URLs from the API need a host prefix; absolute CDN URLs are used as-is.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
 const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) => {
   const [activeTab, setActiveTab] = useState<'Comments' | 'History'>('Comments');
