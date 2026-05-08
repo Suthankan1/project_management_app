@@ -36,6 +36,13 @@ export function useChatThreads(projectId: string) {
     }
   }, [projectId, activeThreadRoot]);
 
+  const addThreadMessage = useCallback((msg: ChatMessage) => {
+    setThreadMessages(prev => {
+      if (prev.some(m => m.id && m.id === msg.id)) return prev;
+      return [...prev, msg];
+    });
+  }, []);
+
   return {
     activeThreadRoot,
     threadMessages,
@@ -43,5 +50,6 @@ export function useChatThreads(projectId: string) {
     closeThread,
     sendThreadReply,
     setThreadMessages,
+    addThreadMessage,
   };
 }

@@ -42,13 +42,17 @@ export function useChatPresence(projectId: string) {
     }
   }, []);
 
+  const handlePresenceEvent = useCallback((event: { onlineUsers?: string[] }) => {
+    if (event.onlineUsers) setOnlineUsers(event.onlineUsers);
+  }, []);
+
   return {
     onlineUsers,
-    setOnlineUsers,
     teamTypingUsers,
     roomTypingUsers,
     privateTypingUsers,
     loadPresence,
     handleTypingEvent,
+    handlePresenceEvent,
   };
 }

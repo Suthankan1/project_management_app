@@ -49,10 +49,15 @@ export function useChatReactions(projectId: string) {
     }
   }, [projectId]);
 
+  const setReactionsForMessage = useCallback((messageId: number, reactions: ChatReactionSummary[]) => {
+    setMessageReactions(prev => ({ ...prev, [messageId]: reactions }));
+  }, []);
+
   return {
     messageReactions,
     setMessageReactions,
     loadReactions,
     toggleReaction,
+    setReactionsForMessage,
   };
 }

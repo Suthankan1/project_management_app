@@ -11,6 +11,7 @@ import { ChatMessage } from './ChatMessage';
 import { ChatMessage as ChatMessageType, ChatReactionSummary } from '../../types/chat';
 import { shouldShowDateSeparator, formatDateSeparator, isGrouped } from '@/src/hooks/chat/chatUtils';
 import { Colors } from '@/src/constants/colors';
+import { shouldUseNativeDriver } from '@/src/lib/platform';
 
 interface ChatMessageListProps {
   projectId: string;
@@ -29,7 +30,6 @@ interface ChatMessageListProps {
   onPinRoomMessage?: (messageId: number | null) => void;
   typingUser?: string;
   onLongPress: (message: ChatMessageType) => void;
-  onLoadMore?: () => void;
   isLoadingMore?: boolean;
 }
 
@@ -45,11 +45,14 @@ export function ChatMessageList(props: ChatMessageListProps) {
     onOpenThread,
     onToggleReaction,
     onLongPress,
-    onLoadMore,
     isLoadingMore,
   } = props;
 
   const flatListRef = useRef<FlatList>(null);
+  const identitySet = new Set([
+    currentUser.trim().toLowerCase(),
+    ...currentUserAliases.map(alias => alias.trim().toLowerCase()),
+  ]);
 
   // Sentinel for typing indicator - remove any existing typing sentinel
   const cleanedMessages = messages.filter((m: any) => !m || !m.__typing);
@@ -63,7 +66,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
     }
 
     const message = item as ChatMessageType;
-    const isMe = message.sender === currentUser || currentUserAliases.includes(message.sender);
+    const isMe = identitySet.has((message.sender || '').trim().toLowerCase());
 
     // Inverted list: index 0 is newest (bottom)
     // prev message is index + 1
@@ -98,11 +101,15 @@ export function ChatMessageList(props: ChatMessageListProps) {
       ref={flatListRef}
       data={displayData}
       inverted
-      keyExtractor={(item, index) => (item && item.__typing) ? 'typing' : (item.id?.toString() || index.toString())}
+      keyExtractor={(item, index) => {
+        if (item.__typing) return 'typing-indicator';
+        if (item.localId) return item.localId;
+        if (item.id) return `msg-${item.id}`;
+        return `idx-${index}`;
+      }}
       renderItem={renderItem}
+      extraData={reactionsByMessageId}
       contentContainerStyle={styles.listContent}
-      onEndReached={onLoadMore}
-      onEndReachedThreshold={0.2}
       ListFooterComponent={isLoadingMore ? <ActivityIndicator color={Colors.primary} style={{ padding: 16 }} /> : null}
       initialNumToRender={20}
       maxToRenderPerBatch={10}
@@ -121,8 +128,8 @@ function TypingIndicator({ username }: { username: string }) {
       return Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(val, { toValue: 1, duration: 400, useNativeDriver: true }),
-          Animated.timing(val, { toValue: 0, duration: 400, useNativeDriver: true }),
+          Animated.timing(val, { toValue: 1, duration: 400, useNativeDriver: shouldUseNativeDriver }),
+          Animated.timing(val, { toValue: 0, duration: 400, useNativeDriver: shouldUseNativeDriver }),
         ])
       );
     };
@@ -132,7 +139,7 @@ function TypingIndicator({ username }: { username: string }) {
       animate(dot2, 200),
       animate(dot3, 400),
     ]).start();
-  }, []);
+  }, [dot1, dot2, dot3]);
 
   const dotStyle = (val: Animated.Value) => ({
     opacity: val.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }),

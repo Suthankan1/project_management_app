@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Text, StyleSheet } from 'react-native';
 import { Colors } from '../../constants/colors';
+import { shouldUseNativeDriver } from '../../lib/platform';
 
 type Props = {
   message: string;
@@ -14,8 +15,8 @@ export default function SuccessBanner({ message, visible }: Props) {
   useEffect(() => {
     if (visible) {
       Animated.parallel([
-        Animated.timing(opacity,    { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(opacity,    { toValue: 1, duration: 200, useNativeDriver: shouldUseNativeDriver }),
+        Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: shouldUseNativeDriver }),
       ]).start();
     } else {
       opacity.setValue(0);

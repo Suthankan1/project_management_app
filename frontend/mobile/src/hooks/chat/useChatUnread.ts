@@ -2,6 +2,10 @@ import { useState, useCallback } from 'react';
 import { ChatMessage } from '../../types/chat';
 import * as chatService from '../../services/chatService';
 
+function dmKey(username: string): string {
+  return username.trim().toLowerCase();
+}
+
 export function useChatUnread(projectId: string) {
   const [privateUnseenCounts, setPrivateUnseenCounts] = useState<Record<string, number>>({});
   const [roomUnseenCounts, setRoomUnseenCounts] = useState<Record<number, number>>({});
@@ -21,8 +25,9 @@ export function useChatUnread(projectId: string) {
       const pUnseen: Record<string, number> = {};
       const pLast: Record<string, ChatMessage | null> = {};
       directSummaries.forEach(s => {
-        pUnseen[s.username] = s.unseenCount;
-        pLast[s.username] = s.lastMessage ? { content: s.lastMessage, sender: s.lastMessageSender || '', timestamp: s.lastMessageTimestamp || undefined } as ChatMessage : null;
+        const key = dmKey(s.username);
+        pUnseen[key] = s.unseenCount;
+        pLast[key] = s.lastMessage ? { content: s.lastMessage, sender: s.lastMessageSender || '', timestamp: s.lastMessageTimestamp || undefined } as ChatMessage : null;
       });
       setPrivateUnseenCounts(pUnseen);
       setPrivateLastMessages(pLast);
@@ -45,16 +50,6 @@ export function useChatUnread(projectId: string) {
     }
   }, [projectId]);
 
-  const loadUnreadBadge = useCallback(async () => {
-    try {
-      // This endpoint usually provides mention counts too in a real implementation
-      const data = await chatService.fetchUnreadBadge(projectId);
-      // In this specific mock/impl, we use it as a trigger or for total badges
-    } catch (err) {
-      console.error('Failed to load unread badge:', err);
-    }
-  }, [projectId]);
-
   return {
     privateUnseenCounts,
     setPrivateUnseenCounts,
@@ -73,6 +68,5 @@ export function useChatUnread(projectId: string) {
     teamMentionCount,
     setTeamMentionCount,
     loadSummaries,
-    loadUnreadBadge,
   };
 }
