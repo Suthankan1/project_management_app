@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { Animated, View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/src/constants/colors';
 import { ChatSearchResult } from '../../types/chat';
@@ -27,13 +27,21 @@ export function ChatSearchPanel({
   onOpenResult,
 }: ChatSearchPanelProps) {
   const panelHeight = useRef(new Animated.Value(0)).current;
+  const maxHeight = Dimensions.get('window').height * 0.35;
 
   useEffect(() => {
     Animated.timing(panelHeight, {
-      toValue: showSearch ? 300 : 0, // Expanded to show results list
+      toValue: showSearch ? maxHeight : 0,
       duration: 250,
       useNativeDriver: false,
     }).start();
+  }, [showSearch]);
+
+  useEffect(() => {
+    const sub = Dimensions.addEventListener('change', ({ window }) => {
+      if (showSearch) panelHeight.setValue(window.height * 0.35);
+    });
+    return () => sub?.remove();
   }, [showSearch]);
 
   if (!phaseDEnabled) return null;
