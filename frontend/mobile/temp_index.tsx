@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert, ActionSheetIOS, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
@@ -13,7 +13,7 @@ import { ChatLoadingSkeleton }    from '@/src/components/chat/ChatLoadingSkeleto
 import { ThreadBottomSheet }      from '@/src/components/chat/ThreadBottomSheet';
 import { CreateChannelModal, EditMessageModal, ConfirmDeleteModal, EditChannelModal } from '@/src/components/chat/ChatModals';
 import { Colors }                 from '@/src/constants/colors';
-import { ChatMessage, ChatRoom } from '@/src/types/chat';
+import { ChatMessage } from '@/src/types/chat';
 import { QUICK_REACTIONS } from '@/src/hooks/chat/chatUtils';
 import { QuickReactionBar } from '@/src/components/chat/QuickReactionBar';
 
@@ -58,10 +58,10 @@ export default function ChatScreen() {
   const isPrivateChat    = !!selectedUser && !hasSelectedRoom;
 
   const displayMessages  = hasSelectedRoom
-    ? (roomMessages[selectedRoomId as number] || [])
+    ? [...(roomMessages[selectedRoomId as number] || [])]
     : selectedUser
-      ? (privateMessages[selectedUser] || [])
-      : messages;
+      ? [...(privateMessages[selectedUser] || [])]
+      : [...messages];
 
   const filteredUsers = users.filter(u =>
     !currentUserAliases.some(a => a?.toLowerCase() === u.toLowerCase()) &&
@@ -159,7 +159,7 @@ export default function ChatScreen() {
           roomTypingUsers={roomTypingUsers}
           privateTypingUsers={privateTypingUsers}
           onOpenCreate={() => setIsCreateModalOpen(true)}
-          onEditRoom={(room: ChatRoom) => setEditingRoom({ id: room.id, name: room.name, topic: room.topic || '', description: room.description || '' })}
+          onEditRoom={(room) => setEditingRoom({ id: room.id, name: room.name, topic: room.topic || '', description: room.description || '' })}
           onDeleteRoom={deleteRoom}
           onUpdateRoomMeta={updateRoomMeta}
           searchTerm={searchTerm}
@@ -198,23 +198,7 @@ export default function ChatScreen() {
               onExecuteSearch={() => searchMessages(searchQuery)}
               isSearchLoading={isSearchLoading}
               searchResults={searchResults}
-              onOpenResult={async (result) => {
-                const aliases = new Set([currentUser.toLowerCase(), ...currentUserAliases.map(a => a.toLowerCase())]);
-                if (result.context === 'ROOM' && result.roomId) {
-                  selectRoom(result.roomId);
-                  await loadRoomHistory(result.roomId);
-                  setShowSearch(false);
-                } else if (result.context === 'PRIVATE') {
-                  const sender = (result.sender || '').toLowerCase();
-                  const recipient = (result.recipient || '').toLowerCase();
-                  const partner = aliases.has(sender) ? recipient : sender;
-                  if (partner) {
-                    selectPrivateUser(partner);
-                    await loadPrivateHistory(partner);
-                    setShowSearch(false);
-                  }
-                }
-              }}
+              onOpenResult={() => {/* implement jump-to */}}
             />
           )}
 
@@ -245,10 +229,10 @@ export default function ChatScreen() {
             disabled={isLoading || !isConnected || shouldShowErrorBanner}
             placeholder={
               hasSelectedRoom
-                ? `Message #${selectedRoom?.name ?? 'channel'}…`
+                ? `Message #${selectedRoom?.name ?? 'channel'}ΓÇª`
                 : selectedUser
-                ? `Message ${selectedUser}…`
-                : 'Message team…'
+                ? `Message ${selectedUser}ΓÇª`
+                : 'Message teamΓÇª'
             }
             enableMentions={!selectedUser}
             mentionCandidates={mentionCandidates}
@@ -312,7 +296,7 @@ export default function ChatScreen() {
         onReact={(emoji) => { if (reactionTarget?.id) toggleReaction(reactionTarget.id, emoji); }}
         onReply={() => reactionTarget && openThread(reactionTarget)}
         onEdit={reactionTarget && (reactionTarget.sender === currentUser || currentUserAliases.includes(reactionTarget.sender)) ? () => setEditingMessage(reactionTarget) : undefined}
-        onDelete={reactionTarget && (reactionTarget.sender === currentUser || currentUserAliases.includes(reactionTarget.sender)) && reactionTarget.id ? () => setDeletingMessageId(reactionTarget.id as number) : undefined}
+        onDelete={reactionTarget && (reactionTarget.sender === currentUser || currentUserAliases.includes(reactionTarget.sender)) && reactionTarget.id ? () => setDeletingMessageId(reactionTarget.id) : undefined}
       />
     </SafeAreaView>
   );

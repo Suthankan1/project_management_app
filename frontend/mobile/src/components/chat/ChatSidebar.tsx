@@ -37,6 +37,7 @@ interface ChatSidebarProps {
   roomTypingUsers: Record<number, string[]>;
   privateTypingUsers: string[];
   onOpenCreate: () => void;
+  onEditRoom: (room: ChatRoom) => void;
   onDeleteRoom: (roomId: number) => void;
   onUpdateRoomMeta: (roomId: number, updates: {name?:string;topic?:string;description?:string}) => void;
   searchTerm: string;
@@ -66,6 +67,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
     roomTypingUsers,
     privateTypingUsers,
     onOpenCreate,
+    onEditRoom,
     onDeleteRoom,
     searchTerm,
     onSearchChange,
@@ -138,7 +140,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
       );
       onLongPress = () => {
         Alert.alert(item.name, undefined, [
-          { text: 'Edit Channel', onPress: () => {} }, // Open EditModal
+          { text: 'Edit Channel', onPress: () => onEditRoom(item) }, // Open EditModal
           { text: 'Delete Channel', style: 'destructive', onPress: () => onDeleteRoom(item.id) },
           { text: 'Cancel', style: 'cancel' },
         ]);

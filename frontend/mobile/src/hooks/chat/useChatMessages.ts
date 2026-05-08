@@ -10,7 +10,7 @@ export function useChatMessages(projectId: string) {
   const loadTeamHistory = useCallback(async () => {
     try {
       const data = await chatService.fetchTeamMessages(projectId);
-      setMessages(data);
+      setMessages([...data].reverse());
     } catch (err) {
       console.error('Failed to load team messages:', err);
     }
@@ -19,7 +19,7 @@ export function useChatMessages(projectId: string) {
   const loadRoomHistory = useCallback(async (roomId: number) => {
     try {
       const data = await chatService.fetchRoomHistory(projectId, roomId);
-      setRoomMessages(prev => ({ ...prev, [roomId]: data }));
+      setRoomMessages(prev => ({ ...prev, [roomId]: [...data].reverse() }));
     } catch (err) {
       console.error('Failed to load room messages:', err);
     }
@@ -28,7 +28,7 @@ export function useChatMessages(projectId: string) {
   const loadPrivateHistory = useCallback(async (partner: string) => {
     try {
       const data = await chatService.fetchPrivateHistory(projectId, partner);
-      setPrivateMessages(prev => ({ ...prev, [partner]: data }));
+      setPrivateMessages(prev => ({ ...prev, [partner]: [...data].reverse() }));
     } catch (err) {
       console.error('Failed to load private messages:', err);
     }
@@ -38,13 +38,13 @@ export function useChatMessages(projectId: string) {
     if (msg.roomId) {
       setRoomMessages(prev => ({
         ...prev,
-        [msg.roomId!]: [...(prev[msg.roomId!] || []), msg]
+        [msg.roomId!]: [msg, ...(prev[msg.roomId!] || [])]
       }));
     } else if (msg.recipient) {
       // For DMs, we need to know who the "partner" is.
       // This will be handled in useChat.ts when merging socket events.
     } else {
-      setMessages(prev => [...prev, msg]);
+      setMessages(prev => [msg, ...prev]);
     }
   }, []);
 

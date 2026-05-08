@@ -62,6 +62,7 @@ export function useChatRooms(projectId: string) {
 
   return {
     rooms,
+    setRooms,
     selectedRoomId,
     loadRooms,
     selectRoom,

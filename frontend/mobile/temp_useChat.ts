@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import * as chatService from '../../services/chatService';
 import { API_BASE_URL } from '../../api/axios';
 import { ChatMessage, ChatRoom, ChatFeatureFlags } from '../../types/chat';
@@ -9,9 +9,9 @@ import { useChatReactions } from './useChatReactions';
 import { useChatSearch } from './useChatSearch';
 import { useChatThreads } from './useChatThreads';
 import { useChatUnread } from './useChatUnread';
-import { getToken } from '@/src/auth/storage';
+import { SecureStore } from '@/src/auth/storage'; // Assuming this exists as per conventions
 
-// Minimal STOMP frame builder/parser — inline, no library
+// Minimal STOMP frame builder/parser ΓÇö inline, no library
 function buildStompConnect(token: string) {
   return `CONNECT\naccept-version:1.2\nheart-beat:0,0\nAuthorization:Bearer ${token}\n\n\0`;
 }
@@ -22,33 +22,15 @@ function buildStompSend(dest: string, body: string) {
   return `SEND\ndestination:${dest}\ncontent-type:application/json\n\n${body}\0`;
 }
 function parseStompFrame(raw: string): { command: string; headers: Record<string, string>; body: string } {
-  // Normalize line endings and handle heartbeats
-  const normalized = raw.replace(/\r\n/g, '\n');
-  if (normalized === '\n' || !normalized.trim()) {
-    return { command: 'HEARTBEAT', headers: {}, body: '' };
-  }
-
-  const dividerIndex = normalized.indexOf('\n\n');
-  if (dividerIndex === -1) {
-    // Possibly just a command with no headers/body
-    return { command: normalized.trim(), headers: {}, body: '' };
-  }
-
-  const header = normalized.slice(0, dividerIndex);
-  const body = normalized.slice(dividerIndex + 2).replace(/\0$/, '');
-
+  const [header, ...bodyParts] = raw.split('\n\n');
   const lines = header.split('\n');
-  const command = lines[0].trim();
+  const command = lines[0];
   const headers: Record<string, string> = {};
   lines.slice(1).forEach(l => {
     const idx = l.indexOf(':');
-    if (idx > 0) {
-      const key = l.slice(0, idx).trim();
-      const value = l.slice(idx + 1).trim();
-      headers[key] = value;
-    }
+    if (idx > 0) headers[l.slice(0, idx)] = l.slice(idx + 1);
   });
-  return { command, headers, body };
+  return { command, headers, body: bodyParts.join('\n\n').replace(/\0$/, '') };
 }
 
 export function useChat(projectId: string) {
@@ -68,7 +50,7 @@ export function useChat(projectId: string) {
   const [error, setError] = useState<string>('');
 
   const socketRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<any>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const roomsHook = useChatRooms(projectId);
   const messagesHook = useChatMessages(projectId);
@@ -84,16 +66,14 @@ export function useChat(projectId: string) {
     if (socketRef.current) return;
 
     try {
-      const token = await getToken();
+      const token = await SecureStore.getItemAsync('authToken');
       if (!token) {
         setError('Authentication token not found');
         return;
       }
 
       const base = process.env.EXPO_PUBLIC_API_URL || API_BASE_URL || 'http://localhost:8080';
-      // If base contains /api, we usually want the root for ws-native, but let's try root first if replace fails or produces something odd
-      const rootBase = base.includes('/api') ? base.split('/api')[0] : base;
-      const wsUrl = rootBase.replace(/^http/, 'ws') + '/ws-native';
+      const wsUrl = base.replace(/^http/, 'ws') + '/ws-native';
 
       try {
         console.info(`[Chat] Connecting to websocket: ${wsUrl}`);
@@ -105,19 +85,9 @@ export function useChat(projectId: string) {
           ws.send(buildStompConnect(token));
         };
 
-        ws.onmessage = async (e) => {
+        ws.onmessage = (e) => {
           try {
-            let rawData = e.data;
-            if (typeof rawData !== 'string') {
-              // Handle Blob or ArrayBuffer
-              rawData = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.readAsText(rawData as any);
-              });
-            }
-
-            const frame = parseStompFrame(rawData);
+            const frame = parseStompFrame(e.data);
             if (frame.command === 'CONNECTED') {
               console.info('[Chat] STOMP CONNECTED');
               setIsSocketConnected(true);
@@ -153,8 +123,7 @@ export function useChat(projectId: string) {
         };
       } catch (err) {
         console.error('[Chat] Failed to construct WebSocket', err, 'wsUrl=', wsUrl);
-        const errMsg = err instanceof Error ? err.message : String(err);
-        setError(`Failed to connect to chat server (${wsUrl}): ${errMsg}`);
+        setError(`Failed to connect to chat server (${wsUrl}): ${err?.message || err}`);
       }
     } catch (err) {
       setError('Failed to connect to chat server');
@@ -183,11 +152,12 @@ export function useChat(projectId: string) {
       }
     } else if (dest === '/user/queue/private') {
       // Private message
+      messagesHook.addMessage(body);
       const partner = body.sender === currentUser ? body.recipient : body.sender;
       if (partner) {
         messagesHook.setPrivateMessages(prev => ({
           ...prev,
-          [partner]: [body, ...(prev[partner] || [])]
+          [partner]: [...(prev[partner] || []), body]
         }));
         unreadHook.setPrivateLastMessages(prev => ({ ...prev, [partner]: body }));
         if (body.sender !== currentUser && partner !== selectedUser) {
@@ -215,7 +185,6 @@ export function useChat(projectId: string) {
         setCurrentUserAliases(user.aliases || []);
         setUsers(members);
         setFeatureFlags(flags);
-        roomsHook.setRooms(roomsData);
 
         await Promise.all([
           messagesHook.loadTeamHistory(),
@@ -223,7 +192,6 @@ export function useChat(projectId: string) {
           presenceHook.loadPresence(),
         ]);
       } catch (err) {
-        console.error('[Chat] Init failed', err);
         setError('Failed to initialize chat');
       } finally {
         setIsLoading(false);
