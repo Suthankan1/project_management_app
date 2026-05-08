@@ -26,6 +26,7 @@ export default function ChatInterface() {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [showMobileThread, setShowMobileThread] = useState(false);
 
   const {
     currentUser,
@@ -245,6 +246,17 @@ export default function ChatInterface() {
     loadRoomHistory(normalizedRoomId);
   }, [selectedRoomId, hasSelectedRoom, loadRoomHistory]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!activeThreadRoot) {
+      setShowMobileThread(false);
+      return;
+    }
+    if (window.innerWidth < 1024) {
+      setShowMobileThread(true);
+    }
+  }, [activeThreadRoot]);
+
   const handleSendMessage = (content: string) => {
     if (hasSelectedRoom) sendRoomMessage(content, selectedRoomId as number);
     else sendMessage(content, selectedUser);
@@ -379,25 +391,80 @@ export default function ChatInterface() {
       </div>
 
       {/* ── Thread panel ── */}
+      <div className="hidden lg:flex">
+        <AnimatePresence>
+          {activeThreadRoot && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 340, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="overflow-hidden flex-shrink-0"
+            >
+              <ThreadPanel
+                rootMessage={activeThreadRoot}
+                threadMessages={threadMessages}
+                userProfilePics={userProfilePics}
+                reactionsByMessageId={messageReactions}
+                onClose={closeThread}
+                onSendReply={sendThreadReply}
+                onToggleReaction={toggleReaction}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       <AnimatePresence>
-        {activeThreadRoot && (
-          <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 340, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: 'easeInOut' }}
-            className="overflow-hidden flex-shrink-0 hidden lg:flex"
-          >
-            <ThreadPanel
-              rootMessage={activeThreadRoot}
-              threadMessages={threadMessages}
-              userProfilePics={userProfilePics}
-              reactionsByMessageId={messageReactions}
-              onClose={closeThread}
-              onSendReply={sendThreadReply}
-              onToggleReaction={toggleReaction}
+        {activeThreadRoot && showMobileThread && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <motion.button
+              type="button"
+              aria-label="Close thread panel overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 bg-black/45"
+              onClick={() => {
+                setShowMobileThread(false);
+                closeThread();
+              }}
             />
-          </motion.div>
+
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl"
+            >
+              <div className="flex items-center justify-end border-b border-gray-200 px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMobileThread(false);
+                    closeThread();
+                  }}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="h-[calc(100%-57px)]">
+                <ThreadPanel
+                  rootMessage={activeThreadRoot}
+                  threadMessages={threadMessages}
+                  userProfilePics={userProfilePics}
+                  reactionsByMessageId={messageReactions}
+                  onClose={closeThread}
+                  onSendReply={sendThreadReply}
+                  onToggleReaction={toggleReaction}
+                />
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
