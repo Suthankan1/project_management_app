@@ -15,6 +15,7 @@ import { CreateChannelModal, EditMessageModal, ConfirmDeleteModal, EditChannelMo
 import { Colors }                 from '@/src/constants/colors';
 import { ChatMessage } from '@/src/types/chat';
 import { QUICK_REACTIONS } from '@/src/hooks/chat/chatUtils';
+import { QuickReactionBar } from '@/src/components/chat/QuickReactionBar';
 
 export default function ChatScreen() {
   const { id: projectId } = useLocalSearchParams<{ id: string }>();
@@ -28,6 +29,7 @@ export default function ChatScreen() {
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [deletingMessageId, setDeletingMessageId] = useState<number | null>(null);
   const [editingRoom, setEditingRoom] = useState<{ id: number; name: string; topic: string; description: string } | null>(null);
+  const [reactionTarget, setReactionTarget] = useState<ChatMessage | null>(null);
 
   const {
     currentUser, currentUserAliases, users, userProfilePics,
@@ -96,25 +98,7 @@ export default function ChatScreen() {
   const shouldShowErrorBanner = Boolean(error) && !isReconnectError;
 
   const handleMessageLongPress = (message: ChatMessage) => {
-    const isMe = message.sender === currentUser || currentUserAliases.includes(message.sender);
-    const options = isMe
-      ? ['💬 Reply in Thread', '✏️ Edit', '🗑 Delete', '😀 React', 'Cancel']
-      : ['💬 Reply in Thread', '😀 React', 'Cancel'];
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options, cancelButtonIndex: options.length - 1, destructiveButtonIndex: isMe ? 2 : -1 },
-        (buttonIndex) => {
-          handleAction(buttonIndex, message, isMe);
-        }
-      );
-    } else {
-      Alert.alert('Message Actions', undefined, options.map((opt, i) => ({
-        text: opt,
-        onPress: () => handleAction(i, message, isMe),
-        style: opt === '🗑 Delete' ? 'destructive' : opt === 'Cancel' ? 'cancel' : 'default'
-      })));
-    }
+    setReactionTarget(message);
   };
 
   const handleAction = (index: number, message: ChatMessage, isMe: boolean) => {
@@ -294,6 +278,14 @@ export default function ChatScreen() {
         onSendReply={sendThreadReply}
         onToggleReaction={toggleReaction}
         projectId={projectId as string}
+      />
+      <QuickReactionBar
+        visible={!!reactionTarget}
+        onClose={() => setReactionTarget(null)}
+        onReact={(emoji) => { if (reactionTarget?.id) toggleReaction(reactionTarget.id, emoji); }}
+        onReply={() => reactionTarget && openThread(reactionTarget)}
+        onEdit={reactionTarget && (reactionTarget.sender === currentUser || currentUserAliases.includes(reactionTarget.sender)) ? () => setEditingMessage(reactionTarget) : undefined}
+        onDelete={reactionTarget && (reactionTarget.sender === currentUser || currentUserAliases.includes(reactionTarget.sender)) && reactionTarget.id ? () => setDeletingMessageId(reactionTarget.id) : undefined}
       />
     </SafeAreaView>
   );
