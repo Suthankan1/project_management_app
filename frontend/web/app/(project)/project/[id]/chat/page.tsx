@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { MessageCircle } from 'lucide-react';
 import { useChat } from './components/useChat';
 import { ChatSidebar } from './components/chatSidebar';
 import { ChatMessages } from './components/chatMessage';
@@ -348,8 +349,17 @@ export default function ChatInterface() {
         />
 
         <div className="flex-1 min-h-0 flex flex-col">
-          {/* No conversation selected — empty state */}
-          {!selectedUser && !hasSelectedRoom && displayMessages.length === 0 && !isLoading ? null : null}
+          {!selectedUser && !hasSelectedRoom && displayMessages.length === 0 && !isLoading && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center">
+                <MessageCircle size={28} className="text-blue-400" strokeWidth={1.5} />
+              </div>
+              <div>
+                <h3 className="text-[15px] font-semibold text-gray-800">Select a conversation</h3>
+                <p className="text-[13px] text-gray-400 mt-1">Choose a channel or direct message from the sidebar to start chatting.</p>
+              </div>
+            </div>
+          )}
 
           {/* Messages */}
           <ChatMessages
