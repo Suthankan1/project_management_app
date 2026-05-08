@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getToken, clearTokens, saveToken, saveRefreshToken } from '../auth/storage';
+import { clearTokens, getRefreshToken, getToken, saveRefreshToken, saveToken } from '../auth/storage';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || '';
 
@@ -18,7 +18,7 @@ api.interceptors.request.use(async (config) => {
 });
 
 let isRefreshing = false;
-let failedQueue: Array<{ resolve: (v: unknown) => void; reject: (e: unknown) => void }> = [];
+let failedQueue: { resolve: (v: unknown) => void; reject: (e: unknown) => void }[] = [];
 
 api.interceptors.response.use(
   (r) => r,
@@ -37,7 +37,13 @@ api.interceptors.response.use(
       req._retry = true;
       isRefreshing = true;
       try {
-        const { data } = await api.post('/api/auth/refresh');
+        const refreshToken = await getRefreshToken();
+        if (!refreshToken) {
+          await clearTokens();
+          return Promise.reject(error);
+        }
+
+        const { data } = await api.post('/api/auth/refresh', { refreshToken });
         await saveToken(data.token);
         if (data.refreshToken) await saveRefreshToken(data.refreshToken);
         failedQueue.forEach(({ resolve }) => resolve(data.token));
