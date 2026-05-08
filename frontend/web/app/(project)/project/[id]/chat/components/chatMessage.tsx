@@ -190,7 +190,8 @@ export const ChatMessages = ({
   const rowVirtualizer = useVirtualizer({
     count: visibleMessages.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 80,
+    estimateSize: () => 120,
+    measureElement: el => el?.getBoundingClientRect().height ?? 120,
     overscan: 10,
   });
 
@@ -228,7 +229,8 @@ export const ChatMessages = ({
     const virtualizer = virtualizerRef.current;
     if (!virtualizer || visibleMessages.length === 0) return;
     if (!isAtBottomRef.current) return;
-    virtualizer.scrollToIndex(visibleMessages.length - 1, { align: 'end' });
+    const t = setTimeout(() => virtualizer.scrollToIndex(visibleMessages.length - 1, { align: 'end' }), 50);
+    return () => clearTimeout(t);
   }, [visibleMessages.length]);
 
   const handleDocumentClick = async (
