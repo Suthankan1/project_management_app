@@ -23,6 +23,7 @@ export default function ChatScreen() {
   const [showSearch, setShowSearch]   = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchTerm, setSearchTerm]   = useState('');
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -87,6 +88,14 @@ export default function ChatScreen() {
   const handleCreateRoom = async (name: string, members: string[]) => {
     const created = await createRoom(name, members);
     if (created) { selectRoom(created.id); setShowSidebar(false); }
+  };
+
+  const handleLoadMore = async () => {
+    if (isLoadingMore) return;
+    setIsLoadingMore(true);
+    if (hasSelectedRoom && selectedRoomId) await loadRoomHistory(selectedRoomId);
+    else if (selectedUser) await loadPrivateHistory(selectedUser);
+    setIsLoadingMore(false);
   };
 
   const roomTyping    = hasSelectedRoom && selectedRoomId != null ? (roomTypingUsers[selectedRoomId] || []) : [];
@@ -210,6 +219,8 @@ export default function ChatScreen() {
             onPinRoomMessage={selectedRoomId ? (mid) => pinRoomMessage(selectedRoomId, mid) : undefined}
             typingUser={activeTyping}
             onLongPress={handleMessageLongPress}
+            onLoadMore={handleLoadMore}
+            isLoadingMore={isLoadingMore}
           />
 
           <ChatInput

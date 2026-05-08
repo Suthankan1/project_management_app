@@ -29,6 +29,8 @@ interface ChatMessageListProps {
   onPinRoomMessage?: (messageId: number | null) => void;
   typingUser?: string;
   onLongPress: (message: ChatMessageType) => void;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
 }
 
 export function ChatMessageList(props: ChatMessageListProps) {
@@ -43,6 +45,8 @@ export function ChatMessageList(props: ChatMessageListProps) {
     onOpenThread,
     onToggleReaction,
     onLongPress,
+    onLoadMore,
+    isLoadingMore,
   } = props;
 
   const flatListRef = useRef<FlatList>(null);
@@ -96,6 +100,9 @@ export function ChatMessageList(props: ChatMessageListProps) {
       keyExtractor={(item, index) => item.id?.toString() || item.__typing ? 'typing' : index.toString()}
       renderItem={renderItem}
       contentContainerStyle={styles.listContent}
+      onEndReached={onLoadMore}
+      onEndReachedThreshold={0.2}
+      ListFooterComponent={isLoadingMore ? <ActivityIndicator color={Colors.primary} style={{ padding: 16 }} /> : null}
       initialNumToRender={20}
       maxToRenderPerBatch={10}
       windowSize={10}
