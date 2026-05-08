@@ -74,42 +74,57 @@ export function useChat(projectId: string) {
 
       const base = process.env.EXPO_PUBLIC_API_URL || API_BASE_URL || 'http://localhost:8080';
       const wsUrl = base.replace(/^http/, 'ws') + '/ws-native';
-      const ws = new WebSocket(wsUrl);
-      socketRef.current = ws;
 
-      ws.onopen = () => {
-        ws.send(buildStompConnect(token));
-      };
+      try {
+        console.info(`[Chat] Connecting to websocket: ${wsUrl}`);
+        const ws = new WebSocket(wsUrl);
+        socketRef.current = ws;
 
-      ws.onmessage = (e) => {
-        const frame = parseStompFrame(e.data);
-        if (frame.command === 'CONNECTED') {
-          setIsSocketConnected(true);
-          setError('');
-          // Subscribe to channels
-          ws.send(buildStompSubscribe('sub-team', `/topic/project.${projectId}`));
-          ws.send(buildStompSubscribe('sub-private', `/user/queue/private`));
-          ws.send(buildStompSubscribe('sub-typing', `/user/queue/typing`));
-          ws.send(buildStompSubscribe('sub-notifications', `/user/queue/notifications`));
-        } else if (frame.command === 'MESSAGE') {
-          handleSocketMessage(frame);
-        }
-      };
+        ws.onopen = () => {
+          console.info('[Chat] WebSocket opened');
+          ws.send(buildStompConnect(token));
+        };
 
-      ws.onclose = () => {
-        setIsSocketConnected(false);
-        socketRef.current = null;
-        if (!reconnectTimeoutRef.current) {
-          reconnectTimeoutRef.current = setTimeout(() => {
-            reconnectTimeoutRef.current = null;
-            connectWebSocket();
-          }, 5000);
-        }
-      };
+        ws.onmessage = (e) => {
+          try {
+            const frame = parseStompFrame(e.data);
+            if (frame.command === 'CONNECTED') {
+              console.info('[Chat] STOMP CONNECTED');
+              setIsSocketConnected(true);
+              setError('');
+              // Subscribe to channels
+              ws.send(buildStompSubscribe('sub-team', `/topic/project.${projectId}`));
+              ws.send(buildStompSubscribe('sub-private', `/user/queue/private`));
+              ws.send(buildStompSubscribe('sub-typing', `/user/queue/typing`));
+              ws.send(buildStompSubscribe('sub-notifications', `/user/queue/notifications`));
+            } else if (frame.command === 'MESSAGE') {
+              handleSocketMessage(frame);
+            }
+          } catch (inner) {
+            console.error('[Chat] Failed to parse STOMP frame', inner, e.data);
+          }
+        };
 
-      ws.onerror = (e) => {
-        setError('Connection error. Retrying...');
-      };
+        ws.onclose = (ev) => {
+          console.warn('[Chat] WebSocket closed', ev);
+          setIsSocketConnected(false);
+          socketRef.current = null;
+          if (!reconnectTimeoutRef.current) {
+            reconnectTimeoutRef.current = setTimeout(() => {
+              reconnectTimeoutRef.current = null;
+              connectWebSocket();
+            }, 5000);
+          }
+        };
+
+        ws.onerror = (e) => {
+          console.error('[Chat] WebSocket error', e);
+          setError('Connection error. Retrying...');
+        };
+      } catch (err) {
+        console.error('[Chat] Failed to construct WebSocket', err, 'wsUrl=', wsUrl);
+        setError(`Failed to connect to chat server (${wsUrl}): ${err?.message || err}`);
+      }
     } catch (err) {
       setError('Failed to connect to chat server');
     }
