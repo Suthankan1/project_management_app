@@ -109,6 +109,40 @@ export async function sendRestMessage(projectId: string, content: string, recipi
   return data;
 }
 
+export async function editMessageRest(
+  projectId: string,
+  messageId: number,
+  content: string,
+): Promise<ChatMessage> {
+  const { data } = await api.patch<ChatMessage>(
+    `/api/projects/${projectId}/chat/messages/${messageId}`,
+    { content, formatType: 'PLAIN' },
+  );
+  return data;
+}
+
+export async function deleteMessageRest(
+  projectId: string,
+  messageId: number,
+): Promise<ChatMessage> {
+  const { data } = await api.delete<ChatMessage>(
+    `/api/projects/${projectId}/chat/messages/${messageId}`,
+  );
+  return data;
+}
+
+export async function postThreadReply(
+  projectId: string,
+  parentMessageId: number,
+  content: string,
+): Promise<ChatMessage> {
+  const { data } = await api.post<ChatMessage>(
+    `/api/projects/${projectId}/chat/messages/${parentMessageId}/thread/replies`,
+    { content, formatType: 'PLAIN' },
+  );
+  return data;
+}
+
 export async function createRoom(projectId: string, name: string, memberUsernames: string[]): Promise<ChatRoom> {
   const { data } = await api.post(`/api/projects/${projectId}/chat/rooms`, {
     name,
