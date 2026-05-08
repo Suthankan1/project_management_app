@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Colors } from '@/src/constants/colors';
 
 interface Props {
@@ -11,73 +12,89 @@ interface Props {
 }
 
 export function ChatConnectionBanner({ isConnected, shouldShowErrorBanner, error, onRetry }: Props) {
-  // Animate height 0 → 44 for the disconnected banner
-  const disconnectedHeight = useRef(new Animated.Value(0)).current;
-  const errorHeight        = useRef(new Animated.Value(0)).current;
+  const height = useSharedValue(0);
+  const showBanner = !isConnected || shouldShowErrorBanner;
+  const isError = shouldShowErrorBanner && !isConnected;
 
   useEffect(() => {
-    Animated.timing(disconnectedHeight, {
-      toValue: isConnected ? 0 : 44,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
-  }, [isConnected]);
+    height.value = withTiming(showBanner ? 44 : 0, { duration: 200 });
+  }, [showBanner]);
 
-  useEffect(() => {
-    Animated.timing(errorHeight, {
-      toValue: shouldShowErrorBanner ? 56 : 0,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
-  }, [shouldShowErrorBanner]);
+  const animatedStyle = useAnimatedStyle(() => ({
+    height: height.value,
+    overflow: 'hidden',
+  }));
+
+  if (!showBanner) return null;
 
   return (
-    <>
-      <Animated.View style={[styles.disconnectedBanner, { height: disconnectedHeight, overflow: 'hidden' }]}>
-        <View style={styles.bannerRow}>
-          <Ionicons name="wifi-outline" size={14} color={Colors.bannerAmberText} />
-          <Text style={styles.disconnectedText}>Disconnected — messages may not deliver</Text>
-          <TouchableOpacity onPress={onRetry} style={styles.retryBtn} hitSlop={{top:8,bottom:8,left:8,right:8}}>
-            <Text style={styles.retryAmberText}>Reconnect</Text>
-          </TouchableOpacity>
+    <Animated.View style={animatedStyle}>
+      <View style={[styles.banner, isError ? styles.errorBanner : styles.warnBanner]}>
+        <View style={styles.contentRow}>
+          {!isError && <Ionicons name="wifi-outline" size={14} color={Colors.bannerAmberText} />}
+          <Text style={[styles.bannerText, isError ? styles.errorText : styles.warnText]} numberOfLines={1}>
+            {isError ? error : 'Disconnected — reconnecting…'}
+          </Text>
         </View>
-      </Animated.View>
-
-      <Animated.View style={[styles.errorBanner, { height: errorHeight, overflow: 'hidden' }]}>
-        <View style={styles.bannerRow}>
-          <Text style={[styles.errorBannerText, { flex: 1 }]} numberOfLines={1}>{error}</Text>
-          <TouchableOpacity onPress={onRetry} style={styles.retryBtn} hitSlop={{top:8,bottom:8,left:8,right:8}}>
-            <Text style={styles.retryRedText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
-    </>
+        <TouchableOpacity
+          onPress={onRetry}
+          style={styles.retryBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={[styles.retryText, isError ? styles.errorText : styles.warnText]}>
+            {isError ? 'Retry' : 'Reconnect'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  disconnectedBanner: {
-    backgroundColor: Colors.bannerAmberBg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.bannerAmberBorder,
-    justifyContent: 'center',
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    height: 44,
+  },
+  warnBanner: {
+    backgroundColor: Colors.bannerAmberBg,
+    borderBottomColor: Colors.bannerAmberBorder,
   },
   errorBanner: {
     backgroundColor: Colors.bannerRedBg,
-    borderBottomWidth: 1,
     borderBottomColor: Colors.bannerRedBorder,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
   },
-  bannerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  disconnectedText: { flex: 1, fontSize: 12, fontWeight: '500', color: Colors.bannerAmberText },
-  errorBannerText:  { fontSize: 12, fontWeight: '600', color: Colors.bannerRedText },
+  contentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  bannerText: {
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
+  },
+  warnText: {
+    color: Colors.bannerAmberText,
+  },
+  errorText: {
+    color: Colors.bannerRedText,
+  },
   retryBtn: {
-    minHeight: 44, minWidth: 44,
-    alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 10, borderRadius: 8,
+    minHeight: 44,
+    minWidth: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    borderRadius: 8,
   },
-  retryAmberText: { fontSize: 12, fontWeight: '700', color: Colors.bannerAmberText },
-  retryRedText:   { fontSize: 12, fontWeight: '700', color: Colors.bannerRedText },
+  retryText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });
