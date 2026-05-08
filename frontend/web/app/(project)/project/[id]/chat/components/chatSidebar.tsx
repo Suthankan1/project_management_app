@@ -5,6 +5,7 @@ import { Search, Plus, Hash, MessageCircle, Users, X } from 'lucide-react';
 import { ChatMessage, ChatRoom } from './chat';
 import { isFileDocument } from './chatMessage';
 import { CreateChannelModal, EditChannelModal, ConfirmDeleteModal } from './chatModals';
+import { avatarColor } from '@/hooks/chat/chat-utils';
 
 interface ChatSidebarProps {
   currentUser: string;
@@ -37,19 +38,7 @@ interface ChatSidebarProps {
   onlineUsers: string[];
 }
 
-const AVATAR_COLORS = [
-  'from-blue-500 to-blue-600',
-  'from-emerald-500 to-teal-600',
-  'from-sky-400 to-blue-500',
-  'from-indigo-500 to-blue-600',
-  'from-teal-400 to-emerald-500',
-  'from-cyan-500 to-blue-600',
-  'from-blue-400 to-indigo-500',
-  'from-slate-400 to-slate-500',
-];
 
-const avatarColor = (name: string) =>
-  AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
 
 function formatTime(timestamp?: string | null): string {
   if (!timestamp) return '';
