@@ -1,3 +1,4 @@
+// Business logic for creating, updating, and managing scheduled report configs
 package com.planora.backend.service;
 
 import com.planora.backend.dto.ScheduledReportRequestDTO;
@@ -20,13 +21,13 @@ import java.util.stream.Collectors;
  * Business logic for creating, updating, and managing scheduled report configs.
  */
 @Service
-public class ScheduledReportService {
+public class ReportScheduledService {
 
-    private static final Logger log = LoggerFactory.getLogger(ScheduledReportService.class);
+    private static final Logger log = LoggerFactory.getLogger(ReportScheduledService.class);
 
     private final ScheduledReportRepository repo;
 
-    public ScheduledReportService(ScheduledReportRepository repo) {
+    public ReportScheduledService(ScheduledReportRepository repo) {
         this.repo = repo;
     }
 

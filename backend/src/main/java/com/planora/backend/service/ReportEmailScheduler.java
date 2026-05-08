@@ -1,3 +1,4 @@
+// Sends scheduled reports by email at the correct time
 package com.planora.backend.service;
 
 import com.planora.backend.model.ScheduledReport;
@@ -28,27 +29,27 @@ public class ReportEmailScheduler {
     private static final Logger log = LoggerFactory.getLogger(ReportEmailScheduler.class);
 
     private final ScheduledReportRepository  repo;
-    private final ScheduledReportService     service;
+    private final ReportScheduledService     service;
     private final JavaMailSenderImpl         mailSender;
     private final ProjectReportDataService   dataService;
-    private final PdfReportBuilder           pdfBuilder;
-    private final ExcelReportBuilder         excelBuilder;
+    private final ReportPdfBuilder           pdfBuilder;
+    private final ReportExcelBuilder         excelBuilder;
 
     private static final String FROM       = "no-reply@planora.com";
-    private static final String APP_BASE   = "http://localhost:3000";
+    private static final String APP_BASE   = "NEXT_PUBLIC_API_BASE_URL";
 
     public ReportEmailScheduler(ScheduledReportRepository repo,
-                                 ScheduledReportService     service,
-                                 JavaMailSenderImpl         mailSender,
-                                 ProjectReportDataService   dataService,
-                                 PdfReportBuilder           pdfBuilder,
-                                 ExcelReportBuilder         excelBuilder) {
-        this.repo         = repo;
-        this.service      = service;
-        this.mailSender   = mailSender;
-        this.dataService  = dataService;
-        this.pdfBuilder   = pdfBuilder;
-        this.excelBuilder = excelBuilder;
+                   ReportScheduledService     service,
+                   JavaMailSenderImpl         mailSender,
+                   ProjectReportDataService   dataService,
+                   ReportPdfBuilder           pdfBuilder,
+                   ReportExcelBuilder         excelBuilder) {
+      this.repo         = repo;
+      this.service      = service;
+      this.mailSender   = mailSender;
+      this.dataService  = dataService;
+      this.pdfBuilder   = pdfBuilder;
+      this.excelBuilder = excelBuilder;
     }
 
     @Scheduled(fixedDelay = 60_000)   // check every 60 seconds
