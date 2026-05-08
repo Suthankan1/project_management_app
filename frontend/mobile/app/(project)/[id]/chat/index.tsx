@@ -54,10 +54,10 @@ export default function ChatScreen() {
   const isPrivateChat    = !!selectedUser && !hasSelectedRoom;
 
   const displayMessages  = hasSelectedRoom
-    ? [...(roomMessages[selectedRoomId as number] || [])].reverse()
+    ? [...(roomMessages[selectedRoomId as number] || [])]
     : selectedUser
-      ? [...(privateMessages[selectedUser] || [])].reverse()
-      : [...messages].reverse();
+      ? [...(privateMessages[selectedUser] || [])]
+      : [...messages];
 
   const filteredUsers = users.filter(u =>
     !currentUserAliases.some(a => a?.toLowerCase() === u.toLowerCase()) &&
