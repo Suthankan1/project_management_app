@@ -271,8 +271,9 @@ export default function ChatInterface() {
   };
 
   const isConnected = isSocketConnected;
-  const isReconnectError = error.toLowerCase().includes('reconnect');
-  const shouldShowErrorBanner = Boolean(error) && !isReconnectError;
+  const errorMessage = typeof error === 'string' ? error : String(error ?? '');
+  const isReconnectError = errorMessage.toLowerCase().includes('reconnect');
+  const shouldShowErrorBanner = errorMessage.length > 0 && !isReconnectError;
 
   /* ── Loading skeleton ── */
   if (isLoading) {
