@@ -96,15 +96,13 @@ export default function ChatScreen() {
 
   const handleMessageLongPress = (message: ChatMessage) => {
     const isMe = message.sender === currentUser || currentUserAliases.includes(message.sender);
-
-    const options = ['💬 Reply in Thread', '😀 React', 'Cancel'];
-    if (isMe) {
-      options.splice(1, 0, '✏️ Edit', '🗑 Delete');
-    }
+    const options = isMe
+      ? ['💬 Reply in Thread', '✏️ Edit', '🗑 Delete', '😀 React', 'Cancel']
+      : ['💬 Reply in Thread', '😀 React', 'Cancel'];
 
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
-        { options, cancelButtonIndex: options.length - 1, destructiveButtonIndex: isMe ? 3 : -1 },
+        { options, cancelButtonIndex: options.length - 1, destructiveButtonIndex: isMe ? 2 : -1 },
         (buttonIndex) => {
           handleAction(buttonIndex, message, isMe);
         }
@@ -119,21 +117,25 @@ export default function ChatScreen() {
   };
 
   const handleAction = (index: number, message: ChatMessage, isMe: boolean) => {
-    const action = isMe
-      ? ['reply', 'edit', 'delete', 'react'][index]
-      : ['reply', 'react'][index];
+    const actions = isMe
+      ? ['reply', 'edit', 'delete', 'react', 'cancel']
+      : ['reply', 'react', 'cancel'];
 
-    switch(action) {
+    const action = actions[index];
+    if (!action || action === 'cancel') return;
+
+    switch (action) {
       case 'reply': openThread(message); break;
       case 'edit': setEditingMessage(message); break;
       case 'delete': message.id && setDeletingMessageId(message.id); break;
       case 'react':
-        // Show emoji quick picker (implemented in ChatMessage or as another modal)
-        // For simplicity, toggle a default emoji or show another alert
-        Alert.alert('React', undefined, QUICK_REACTIONS.map(emoji => ({
-          text: emoji,
-          onPress: () => message.id && toggleReaction(message.id, emoji)
-        })));
+        Alert.alert('React', undefined, [
+          ...QUICK_REACTIONS.map(emoji => ({
+            text: emoji,
+            onPress: () => message.id && toggleReaction(message.id, emoji),
+          })),
+          { text: 'Cancel', style: 'cancel' as const },
+        ]);
         break;
     }
   };
