@@ -164,7 +164,7 @@ export default function ChatScreen() {
           teamTypingUsers={teamTypingUsers}
           roomTypingUsers={roomTypingUsers}
           privateTypingUsers={privateTypingUsers}
-          onCreateRoom={() => setIsCreateModalOpen(true)}
+          onOpenCreate={() => setIsCreateModalOpen(true)}
           onDeleteRoom={deleteRoom}
           onUpdateRoomMeta={updateRoomMeta}
           searchTerm={searchTerm}

@@ -36,7 +36,7 @@ interface ChatSidebarProps {
   teamTypingUsers: string[];
   roomTypingUsers: Record<number, string[]>;
   privateTypingUsers: string[];
-  onCreateRoom: (name: string, members: string[]) => void;
+  onOpenCreate: () => void;
   onDeleteRoom: (roomId: number) => void;
   onUpdateRoomMeta: (roomId: number, updates: {name?:string;topic?:string;description?:string}) => void;
   searchTerm: string;
@@ -65,7 +65,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
     teamTypingUsers,
     roomTypingUsers,
     privateTypingUsers,
-    onCreateRoom,
+    onOpenCreate,
     onDeleteRoom,
     searchTerm,
     onSearchChange,
@@ -196,7 +196,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
           </View>
           <Text style={styles.headerTitle}>Messages</Text>
         </View>
-        <TouchableOpacity style={styles.addButton} hitSlop={{top:10,bottom:10,left:10,right:10}}>
+        <TouchableOpacity style={styles.addButton} hitSlop={{top:10,bottom:10,left:10,right:10}} onPress={onOpenCreate}>
           <Ionicons name="add" size={28} color={Colors.textPrimary} />
         </TouchableOpacity>
       </View>
