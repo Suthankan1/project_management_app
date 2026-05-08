@@ -198,7 +198,23 @@ export default function ChatScreen() {
               onExecuteSearch={() => searchMessages(searchQuery)}
               isSearchLoading={isSearchLoading}
               searchResults={searchResults}
-              onOpenResult={() => {/* implement jump-to */}}
+              onOpenResult={async (result) => {
+                const aliases = new Set([currentUser.toLowerCase(), ...currentUserAliases.map(a => a.toLowerCase())]);
+                if (result.context === 'ROOM' && result.roomId) {
+                  selectRoom(result.roomId);
+                  await loadRoomHistory(result.roomId);
+                  setShowSearch(false);
+                } else if (result.context === 'PRIVATE') {
+                  const sender = (result.sender || '').toLowerCase();
+                  const recipient = (result.recipient || '').toLowerCase();
+                  const partner = aliases.has(sender) ? recipient : sender;
+                  if (partner) {
+                    selectPrivateUser(partner);
+                    await loadPrivateHistory(partner);
+                    setShowSearch(false);
+                  }
+                }
+              }}
             />
           )}
 
