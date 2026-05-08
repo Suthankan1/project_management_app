@@ -1,3 +1,4 @@
+// Builds the PDF report with all analytics, tables, and charts
 package com.planora.backend.service;
 
 import com.lowagie.text.Chunk;
@@ -34,7 +35,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Component
-public class PdfReportBuilder {
+public class ReportPdfBuilder {
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MMM d, yyyy");
 

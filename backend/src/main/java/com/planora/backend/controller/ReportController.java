@@ -1,7 +1,8 @@
+// Handles API requests for downloading project reports (PDF/Excel)
 package com.planora.backend.controller;
 
 import com.planora.backend.model.UserPrincipal;
-import com.planora.backend.service.ProjectReportDownloadService;
+import com.planora.backend.service.ReportDownloadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
@@ -21,9 +22,9 @@ import java.nio.charset.StandardCharsets;
 @RestController
 @RequestMapping("/api/projects")
 @RequiredArgsConstructor
-public class ProjectReportController {
+public class ReportController {
 
-    private final ProjectReportDownloadService projectReportDownloadService;
+        private final ReportDownloadService reportDownloadService;
 
     @GetMapping("/{projectId}/reports/download")
     public ResponseEntity<byte[]> downloadProjectReport(
@@ -35,8 +36,8 @@ public class ProjectReportController {
                         throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
                 }
 
-        ProjectReportDownloadService.GeneratedReportFile file =
-                projectReportDownloadService.generate(projectId, principal.getUserId(), format);
+        ReportDownloadService.GeneratedReportFile file =
+                reportDownloadService.generate(projectId, principal.getUserId(), format);
 
         String contentDisposition = ContentDisposition.attachment()
                 .filename(file.fileName(), StandardCharsets.UTF_8)

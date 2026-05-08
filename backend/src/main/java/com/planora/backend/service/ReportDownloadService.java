@@ -1,3 +1,4 @@
+// Main service: Generates PDF or Excel report file based on user request
 package com.planora.backend.service;
 
 import com.planora.backend.exception.ForbiddenException;
@@ -15,13 +16,13 @@ import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
-public class ProjectReportDownloadService {
+public class ReportDownloadService {
 
     private final ProjectRepository projectRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final ProjectReportDataService projectReportDataService;
-    private final PdfReportBuilder pdfReportBuilder;
-    private final ExcelReportBuilder excelReportBuilder;
+    private final ReportPdfBuilder pdfReportBuilder;
+    private final ReportExcelBuilder excelReportBuilder;
 
     public GeneratedReportFile generate(Long projectId, Long userId, String format) {
         Project project = projectRepository.findById(projectId)
