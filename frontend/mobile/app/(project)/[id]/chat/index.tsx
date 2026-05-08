@@ -11,7 +11,7 @@ import { ChatMessageList }        from '@/src/components/chat/ChatMessageList';
 import { ChatInput }              from '@/src/components/chat/ChatInput';
 import { ChatLoadingSkeleton }    from '@/src/components/chat/ChatLoadingSkeleton';
 import { ThreadBottomSheet }      from '@/src/components/chat/ThreadBottomSheet';
-import { CreateChannelModal, EditMessageModal, ConfirmDeleteModal } from '@/src/components/chat/ChatModals';
+import { CreateChannelModal, EditMessageModal, ConfirmDeleteModal, EditChannelModal } from '@/src/components/chat/ChatModals';
 import { Colors }                 from '@/src/constants/colors';
 import { ChatMessage } from '@/src/types/chat';
 import { QUICK_REACTIONS } from '@/src/hooks/chat/chatUtils';
@@ -27,6 +27,7 @@ export default function ChatScreen() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [deletingMessageId, setDeletingMessageId] = useState<number | null>(null);
+  const [editingRoom, setEditingRoom] = useState<{ id: number; name: string; topic: string; description: string } | null>(null);
 
   const {
     currentUser, currentUserAliases, users, userProfilePics,
@@ -165,6 +166,7 @@ export default function ChatScreen() {
           roomTypingUsers={roomTypingUsers}
           privateTypingUsers={privateTypingUsers}
           onOpenCreate={() => setIsCreateModalOpen(true)}
+          onEditRoom={(room) => setEditingRoom({ id: room.id, name: room.name, topic: room.topic || '', description: room.description || '' })}
           onDeleteRoom={deleteRoom}
           onUpdateRoomMeta={updateRoomMeta}
           searchTerm={searchTerm}
@@ -266,6 +268,20 @@ export default function ChatScreen() {
         message="Are you sure you want to delete this message? This action cannot be undone."
         onConfirm={() => deletingMessageId && deleteMessage(deletingMessageId)}
       />
+
+      {editingRoom && (
+        <EditChannelModal
+          isOpen={!!editingRoom}
+          onClose={() => setEditingRoom(null)}
+          initialName={editingRoom.name}
+          initialTopic={editingRoom.topic}
+          initialDescription={editingRoom.description}
+          onSave={(updates) => {
+            updateRoomMeta(editingRoom.id, updates);
+            setEditingRoom(null);
+          }}
+        />
+      )}
 
       <ThreadBottomSheet
         visible={!!activeThreadRoot}

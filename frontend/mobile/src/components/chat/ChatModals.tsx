@@ -119,6 +119,57 @@ export function EditMessageModal({ isOpen, onClose, initialContent, onSave }: an
   );
 }
 
+export function EditChannelModal({ isOpen, onClose, initialName, initialTopic, initialDescription, onSave }: any) {
+  const [name, setName] = useState(initialName || '');
+  const [topic, setTopic] = useState(initialTopic || '');
+  const [description, setDescription] = useState(initialDescription || '');
+
+  React.useEffect(() => {
+    setName(initialName || '');
+    setTopic(initialTopic || '');
+    setDescription(initialDescription || '');
+  }, [initialName, initialTopic, initialDescription, isOpen]);
+
+  const handleSave = () => {
+    if (!name.trim()) return;
+    onSave({ name: name.trim(), topic: topic.trim(), description: description.trim() });
+    onClose();
+  };
+
+  return (
+    <Sheet visible={isOpen} onClose={onClose} title="Edit Channel">
+      <TextInput
+        style={styles.input}
+        placeholder="Channel name (e.g. general)"
+        value={name}
+        onChangeText={setName}
+        autoFocus
+      />
+      <TextInput
+        style={[styles.input, { marginTop: 8 }]}
+        placeholder="Topic"
+        value={topic}
+        onChangeText={setTopic}
+      />
+      <TextInput
+        style={[styles.input, { height: 100, marginTop: 8, textAlignVertical: 'top' }]}
+        placeholder="Description"
+        value={description}
+        onChangeText={setDescription}
+        multiline
+      />
+      <View style={styles.footerRow}>
+        <TouchableOpacity style={styles.secondaryBtn} onPress={onClose}>
+          <Text style={styles.secondaryBtnText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.primaryBtn} onPress={handleSave}>
+          <Text style={styles.primaryBtnText}>Save Changes</Text>
+        </TouchableOpacity>
+      </View>
+    </Sheet>
+  );
+}
+
 export function ConfirmDeleteModal({ isOpen, onClose, title, message, onConfirm }: any) {
   return (
     <Modal visible={isOpen} transparent animationType="fade">
