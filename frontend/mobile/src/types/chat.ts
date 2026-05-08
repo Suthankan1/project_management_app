@@ -1,16 +1,20 @@
 export interface ChatMessage {
   id?: number;
-  sender: string;
-  content: string;
-  timestamp?: string;
-  recipient?: string;
+  localId?: string;
   type?: 'CHAT' | 'JOIN' | 'LEAVE';
+  sender: string;
+  recipient?: string;
+  projectId?: number;
   roomId?: number;
+  chatType?: 'TEAM' | 'ROOM' | 'PRIVATE';
   parentMessageId?: number;
   formatType?: 'PLAIN' | 'MARKDOWN';
+  content: string;
+  timestamp?: string | null;
+  reactions?: ChatReactionSummary[];
   deleted?: boolean;
-  deletedAt?: string;
-  editedAt?: string;
+  deletedAt?: string | null;
+  editedAt?: string | null;
 }
 
 export interface ChatReactionSummary {
@@ -22,13 +26,12 @@ export interface ChatReactionSummary {
 export interface ChatRoom {
   id: number;
   name: string;
-  projectId: number;
-  createdBy: string;
-  topic?: string;
-  description?: string;
-  archived?: boolean;
+  projectId?: number;
+  createdBy?: string | null;
+  topic?: string | null;
+  description?: string | null;
   pinnedMessageId?: number | null;
-  updatedAt?: string;
+  members?: string[];
 }
 
 export interface ChatFeatureFlags {
@@ -42,10 +45,10 @@ export interface ChatSearchResult {
   messageId: number;
   sender: string;
   content: string;
-  context: 'TEAM' | 'ROOM' | 'PRIVATE' | string;
+  timestamp?: string | null;
+  context: 'TEAM' | 'ROOM' | 'PRIVATE';
   roomId?: number | null;
   recipient?: string | null;
-  timestamp?: string | null;
 }
 
 export interface DirectChatSummary {
