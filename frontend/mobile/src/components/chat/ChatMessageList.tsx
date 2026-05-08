@@ -51,10 +51,11 @@ export function ChatMessageList(props: ChatMessageListProps) {
 
   const flatListRef = useRef<FlatList>(null);
 
-  // Sentinel for typing indicator
+  // Sentinel for typing indicator - remove any existing typing sentinel
+  const cleanedMessages = messages.filter((m: any) => !m || !m.__typing);
   const displayData = typingUser
-    ? [{ __typing: true, sender: typingUser }, ...messages]
-    : messages;
+    ? [{ __typing: true, sender: typingUser }, ...cleanedMessages]
+    : cleanedMessages;
 
   const renderItem = ({ item, index }: { item: any, index: number }) => {
     if (item.__typing) {
@@ -97,7 +98,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
       ref={flatListRef}
       data={displayData}
       inverted
-      keyExtractor={(item, index) => item.id?.toString() || item.__typing ? 'typing' : index.toString()}
+      keyExtractor={(item, index) => (item && item.__typing) ? 'typing' : (item.id?.toString() || index.toString())}
       renderItem={renderItem}
       contentContainerStyle={styles.listContent}
       onEndReached={onLoadMore}

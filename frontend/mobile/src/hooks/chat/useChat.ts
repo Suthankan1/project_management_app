@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as chatService from '../../services/chatService';
+import { API_BASE_URL } from '../../api/axios';
 import { ChatMessage, ChatRoom, ChatFeatureFlags } from '../../types/chat';
 import { useChatRooms } from './useChatRooms';
 import { useChatMessages } from './useChatMessages';
@@ -71,7 +72,8 @@ export function useChat(projectId: string) {
         return;
       }
 
-      const wsUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/^http/, 'ws') + '/ws';
+      const base = process.env.EXPO_PUBLIC_API_URL || API_BASE_URL || 'http://localhost:8080';
+      const wsUrl = base.replace(/^http/, 'ws') + '/ws-native';
       const ws = new WebSocket(wsUrl);
       socketRef.current = ws;
 
