@@ -1,6 +1,5 @@
-// ══════════════════════════════════════════════════════════════════════════════
-//  excelReportGenerator.ts  ·  Multi-sheet premium xlsx report
-// ══════════════════════════════════════════════════════════════════════════════
+
+// Excel generator: Converts report data into a downloadable Excel file
 import type { ReportData, SprintStat } from './reportUtils';
 
 type WorkBook = import('xlsx').WorkBook;

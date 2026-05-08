@@ -1,7 +1,6 @@
 'use client';
-// ══════════════════════════════════════════════════════════════════════════════
-//  ReportPageContent.tsx  ·  Planora Report Studio — Analytics Dashboard
-// ══════════════════════════════════════════════════════════════════════════════
+
+// Main dashboard UI: Shows analytics, charts, download & schedule options for reports
 
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
