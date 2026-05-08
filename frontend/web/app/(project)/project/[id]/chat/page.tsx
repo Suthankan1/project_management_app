@@ -299,6 +299,7 @@ export default function ChatInterface() {
           isLoading={false}
           roomMentionCounts={roomMentionCounts}
           teamMentionCount={teamMentionCount}
+          onlineUsers={onlineUsers}
         />
       </div>
 
