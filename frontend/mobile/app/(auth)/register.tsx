@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
+  TextInput,
   ScrollView,
   TouchableOpacity,
   KeyboardAvoidingView,
@@ -23,6 +24,10 @@ import { isWeb } from '@/src/lib/platform';
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const fullNameRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
   const {
     username, setUsername,
     fullName, setFullName,
@@ -97,35 +102,53 @@ export default function RegisterScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   returnKeyType="next"
+                  blurOnSubmit={false}
+                  submitBehavior="submit"
+                  onSubmitEditing={() => fullNameRef.current?.focus()}
                 />
 
                 <TextInputField
+                  inputRef={fullNameRef}
                   label="Full Name"
                   value={fullName}
                   onChangeText={setFullName}
                   placeholder="John Doe"
                   autoCapitalize="words"
                   returnKeyType="next"
+                  blurOnSubmit={false}
+                  submitBehavior="submit"
+                  onSubmitEditing={() => emailRef.current?.focus()}
                 />
 
                 <TextInputField
+                  inputRef={emailRef}
                   label="Email Address"
                   value={email}
                   onChangeText={t => setEmail(t.toLowerCase())}
                   placeholder="Enter your email"
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoComplete="email"
+                  textContentType="emailAddress"
                   returnKeyType="next"
+                  blurOnSubmit={false}
+                  submitBehavior="submit"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
                 />
 
                 <View>
                   <PasswordInput
+                    inputRef={passwordRef}
                     label="Password"
                     value={password}
                     onChangeText={setPassword}
                     placeholder="Create a password (min 8 chars)"
+                    autoComplete="new-password"
                     textContentType="newPassword"
                     returnKeyType="next"
+                    blurOnSubmit={false}
+                    submitBehavior="submit"
+                    onSubmitEditing={() => confirmPasswordRef.current?.focus()}
                   />
                   {password.length > 0 && (
                     <PasswordStrengthBar strength={strength} password={password} />
@@ -133,12 +156,16 @@ export default function RegisterScreen() {
                 </View>
 
                 <PasswordInput
+                  inputRef={confirmPasswordRef}
                   label="Confirm Password"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   placeholder="Confirm your password"
+                  autoComplete="new-password"
                   textContentType="newPassword"
                   returnKeyType="done"
+                  blurOnSubmit
+                  submitBehavior="blurAndSubmit"
                   onSubmitEditing={handleRegister}
                 />
 
