@@ -16,7 +16,6 @@ import BacklogFilterBar from './components/BacklogFilterBar';
 import BacklogTaskDetail from './components/BacklogTaskDetail';
 import { useBacklogData } from './hooks/useBacklogData';
 import { fetchProject } from '../kanban/api';
->>>>>>> origin/responsive-pages
 export default function BacklogPage() {
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -199,28 +198,6 @@ export default function BacklogPage() {
                                     subtitle="Create your first issue to get started."
                                 />
                             ) : (
-<<<<<<< HEAD
-                                <div className="p-3">
-                                    <div className="hidden lg:grid grid-cols-[minmax(0,1.7fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_auto] gap-2.5 px-3.5 pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#98A2B3]">
-                                        <span>Task</span>
-                                        <span>Due Date</span>
-                                        <span>Assignee</span>
-                                        <span>Status</span>
-                                        <span>Points / Actions</span>
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                        {tasks.map((task) => (
-                                            <BacklogTaskRow
-                                                key={task.id}
-                                                task={task}
-                                                onDelete={handleDelete}
-                                                onClick={setSelectedTask}
-                                                onStatusChange={handleStatusChange}
-                                                onOpenModal={setSelectedTaskIdForModal}
-                                            />
-                                        ))}
-                                    </div>
-=======
                                 <div className="flex flex-col gap-[5px] p-3 sm:p-4">
                                     {/* Table header */}
                                     <div className="hidden sm:grid grid-cols-[auto_1.5fr_140px_110px_130px_110px_120px_32px] items-center gap-x-2 px-3 sm:px-4 text-[10px] font-semibold uppercase tracking-wider text-[#9CA3AF] mb-1">
@@ -246,7 +223,6 @@ export default function BacklogPage() {
                                             onDateChange={handleDateChange}
                                         />
                                     ))}
->>>>>>> origin/responsive-pages
                                 </div>
                             )}
                             <div className="px-3 py-2">
