@@ -1,7 +1,46 @@
 import axios from 'axios';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { getToken, clearTokens, saveToken, saveRefreshToken } from '../auth/storage';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || '';
+const API_PORT = '8080';
+
+function getExpoDevHost() {
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    Constants.manifest2?.extra?.expoGo?.debuggerHost ||
+    Constants.manifest?.debuggerHost;
+
+  return typeof hostUri === 'string' ? hostUri.split(':')[0] : undefined;
+}
+
+function resolveApiBaseUrl() {
+  const configuredUrl = process.env.EXPO_PUBLIC_API_URL || '';
+
+  if (!configuredUrl || Platform.OS === 'web') {
+    return configuredUrl;
+  }
+
+  const isLocalhostUrl = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredUrl);
+
+  if (!isLocalhostUrl) {
+    return configuredUrl;
+  }
+
+  const devHost = getExpoDevHost();
+
+  if (devHost && devHost !== 'localhost' && devHost !== '127.0.0.1') {
+    return configuredUrl.replace(/\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, `//${devHost}:${API_PORT}`);
+  }
+
+  if (Platform.OS === 'android') {
+    return configuredUrl.replace(/\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, `//10.0.2.2:${API_PORT}`);
+  }
+
+  return configuredUrl;
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -18,7 +57,7 @@ api.interceptors.request.use(async (config) => {
 });
 
 let isRefreshing = false;
-let failedQueue: Array<{ resolve: (v: unknown) => void; reject: (e: unknown) => void }> = [];
+let failedQueue: { resolve: (v: unknown) => void; reject: (e: unknown) => void }[] = [];
 
 api.interceptors.response.use(
   (r) => r,

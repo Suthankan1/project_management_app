@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
+  TextInput,
   ScrollView,
   TouchableOpacity,
   KeyboardAvoidingView,
@@ -22,6 +23,7 @@ import { isWeb } from '@/src/lib/platform';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const passwordRef = useRef<TextInput>(null);
   const {
     email, setEmail,
     password, setPassword,
@@ -92,15 +94,25 @@ export default function LoginScreen() {
                   placeholder="Enter your email"
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoComplete="email"
+                  textContentType="username"
                   returnKeyType="next"
+                  blurOnSubmit={false}
+                  submitBehavior="submit"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
                 />
 
                 <PasswordInput
+                  inputRef={passwordRef}
                   label="Password"
                   value={password}
                   onChangeText={setPassword}
                   placeholder="Enter your password"
+                  autoComplete="current-password"
+                  textContentType="password"
                   returnKeyType="done"
+                  blurOnSubmit
+                  submitBehavior="blurAndSubmit"
                   onSubmitEditing={() => handleLogin(email, password)}
                 />
 
