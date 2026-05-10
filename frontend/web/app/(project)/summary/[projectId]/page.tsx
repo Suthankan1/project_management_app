@@ -1,95 +1,57 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import api from '@/lib/axios';
-import { Task, Sprint, TeamMemberInfo, PageItem } from '@/types';
+// Removed individual type imports as we now get everything from the unified summary object.
+import useSWR from 'swr';
+import { isAgileProjectType } from '@/components/shared/ProjectTypeIcon';
+import SummaryPageSkeleton from "../components/SummarySkeleton";
+import dynamic from 'next/dynamic';
 
-import MetricsGrid from "../components/MetricsGrid";
-import { CurrentSprint } from "../components/ProjectTimeline";
-import RecentActivity from "../components/RecentActivity";
-import ProjectTeam from "../components/ProjectTeam";
-import DashboardCharts from "../components/DashboardCharts";
-import { Loader2 } from "lucide-react";
+// Dynamically load the heavy BentoDashboard component for better initial performance
+const BentoDashboard = dynamic(() => import('../components/BentoDashboard'), {
+    ssr: false,
+    loading: () => <SummaryPageSkeleton />
+});
 
+const fetcher = (url: string) => api.get(url).then(res => res.data);
+
+/**
+ * Main Summary Page component for a specific project.
+ * Handles primary data fetching using the Pro-level BFF pattern (Single API call).
+ */
 export default function SummaryPage() {
     const params = useParams();
     const projectId = Number(params.projectId);
 
-    const [tasks, setTasks] = useState<Task[]>([]);
-    const [sprints, setSprints] = useState<Sprint[]>([]);
-    const [members, setMembers] = useState<TeamMemberInfo[]>([]);
-    const [pages, setPages] = useState<PageItem[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    // Fetch ALL dashboard data in a single optimized API call!
+    const { data: summaryData, isLoading, error } = useSWR(
+        projectId ? `/api/projects/${projectId}/dashboard-summary` : null, 
+        fetcher
+    );
 
-    useEffect(() => {
-        if (!projectId) return;
+    // Determine project style based on its type metadata
+    const isAgileProject = isAgileProjectType(summaryData?.projectDetails?.type);
 
-        const fetchData = async () => {
-            try {
-                // Fetch all data points concurrently
-                const [
-                    _projRes,
-                    tasksRes,
-                    sprintsRes,
-                    membersRes,
-                    pagesRes
-                ] = await Promise.all([
-                    api.get(`/api/projects/${projectId}`),
-                    api.get(`/api/tasks/project/${projectId}`),
-                    api.get(`/api/sprints/project/${projectId}`),
-                    api.get(`/api/projects/${projectId}/members`),
-                    api.get(`/api/projects/${projectId}/pages`),
-                ]);
+    // Show skeleton loader while the single critical request is loading
+    if (isLoading || !summaryData) {
+        return <SummaryPageSkeleton />;
+    }
 
-                setTasks(tasksRes.data);
-                setSprints(sprintsRes.data);
-                setMembers(membersRes.data);
-                setPages(pagesRes.data);
-            } catch (error) {
-                console.error("Error fetching summary data:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchData();
-    }, [projectId]);
-
-    if (isLoading) {
-        return (
-            <div className="h-[50vh] flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-[#0052CC]" />
-            </div>
-        );
+    if (error) {
+        return <div className="p-4 text-center text-red-500">Failed to load dashboard data. Please refresh.</div>;
     }
 
     return (
-        <div className="mobile-page-padding max-w-[1200px] mx-auto pb-28 sm:pb-8">
-            
-            {/* Sub Header Content Removed */}
-
-            {/* Metrics Section */}
-            <div className="mb-6">
-                <MetricsGrid tasks={tasks} />
-            </div>
-
-            {/* Main Grid: 2 Columns */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                
-                {/* Left Column (Timeline & Sprint) - Spans 2 cols */}
-                <div className="lg:col-span-2 flex flex-col gap-6">
-                    <CurrentSprint projectId={projectId} sprints={sprints} tasks={tasks} />
-                    <DashboardCharts tasks={tasks} sprints={sprints} />
-                </div>
-
-                {/* Right Column (Activity & Team) - Spans 1 col */}
-                <div className="flex flex-col gap-6">
-                    <RecentActivity tasks={tasks} pages={pages} />
-                    <ProjectTeam projectId={projectId} tasks={tasks} members={members} />
-                </div>
-
-            </div>
+        <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 pb-6">
+            <BentoDashboard 
+                projectId={projectId}
+                tasks={summaryData.tasks}
+                sprints={summaryData.sprints}
+                metrics={summaryData.metrics}
+                projectDetails={summaryData.projectDetails}
+                isAgile={isAgileProject}
+            />
         </div>
     );
 }

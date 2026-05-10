@@ -1,12 +1,14 @@
 'use client';
+// force-dynamic prevents Next.js from statically rendering this page at build time,
+// because the content depends entirely on URL params that vary per request
 export const dynamic = 'force-dynamic';
 
-import React from 'react';
+import { useState } from 'react';
 import DocumentSidebar from '../components/DocumentSidebar';
 import Editor from '../components/Editor';
 import {
   Download, Upload, Trash2, CheckCircle2, Loader2,
-  Save, FileEdit, History, X, PanelLeft,
+  Save, FileEdit, History, X, PanelLeft, MoreHorizontal,
 } from 'lucide-react';
 import { usePageEditor } from './usePageEditor';
 import { useRouter } from 'next/navigation';
@@ -18,9 +20,13 @@ export default function PageDetailPage() {
     title, setTitle, showHistory, setShowHistory, historyMock,
     showDocSidebar, setShowDocSidebar, fileInputRef,
     filteredPages, error, searchQuery, setSearchQuery,
-    handleUpdateContent, handleManualCreate, handleDeletePage,
+    handleUpdateContent, setLatestContent, handleManualCreate, handleDeletePage,
+    handleConfirmDelete, showDeleteConfirm, setShowDeleteConfirm,
     handleFileImport, handleExport,
   } = usePageEditor();
+
+  // showMobileActions is local state because it's a purely visual toggle with no effect on data
+  const [showMobileActions, setShowMobileActions] = useState(false);
 
   if (!projectId) {
     return (
@@ -43,6 +49,14 @@ export default function PageDetailPage() {
         </button>
       </div>
 
+      {/* Mobile sidebar backdrop */}
+      {showDocSidebar && (
+        <div
+          className="fixed inset-0 bg-black/20 z-10 lg:hidden"
+          onClick={() => setShowDocSidebar(false)}
+        />
+      )}
+
       {/* Left Sidebar */}
       <div className={showDocSidebar ? 'flex' : 'hidden lg:flex'}>
         <DocumentSidebar
@@ -56,7 +70,7 @@ export default function PageDetailPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col h-full bg-white relative overflow-hidden pb-28 lg:pb-0">
+      <div className="flex-1 flex flex-col h-full bg-white relative overflow-hidden">
         {loadingPage ? (
           <div className="flex-1 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
@@ -117,7 +131,8 @@ export default function PageDetailPage() {
               </div>
 
               {/* Action buttons */}
-              <div className="flex items-center gap-1.5 ml-3 flex-shrink-0">
+              {/* Action buttons – desktop */}
+              <div className="hidden md:flex items-center gap-1.5 ml-3 flex-shrink-0">
                 <input
                   type="file" ref={fileInputRef} className="hidden"
                   accept=".md,.html" onChange={handleFileImport}
@@ -160,6 +175,55 @@ export default function PageDetailPage() {
                   <Trash2 size={16} />
                 </button>
               </div>
+
+              {/* Action button – mobile (three-dot) */}
+              <div className="flex md:hidden ml-2 relative">
+                <input
+                  type="file" ref={fileInputRef} className="hidden"
+                  accept=".md,.html" onChange={handleFileImport}
+                />
+                <button
+                  onClick={() => setShowMobileActions((v) => !v)}
+                  className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  aria-label="More actions"
+                >
+                  <MoreHorizontal size={18} />
+                </button>
+                {showMobileActions && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowMobileActions(false)} />
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1 overflow-hidden">
+                      <button
+                        onClick={() => { fileInputRef.current?.click(); setShowMobileActions(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <Upload size={16} className="text-gray-400" /> Import
+                      </button>
+                      <button
+                        onClick={() => { handleExport(); setShowMobileActions(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <Download size={16} className="text-gray-400" /> Export .md
+                      </button>
+                      {!isDraft && (
+                        <button
+                          onClick={() => { setShowHistory(!showHistory); setShowMobileActions(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <History size={16} className="text-gray-400" /> Version History
+                        </button>
+                      )}
+                      <div className="h-px bg-gray-100 my-1" />
+                      <button
+                        onClick={() => { handleDeletePage(); setShowMobileActions(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 size={16} /> {isDraft ? 'Discard Draft' : 'Delete Document'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* ─── Editor + History Panel ─── */}
@@ -168,6 +232,7 @@ export default function PageDetailPage() {
                 <Editor
                   content={selectedPage.content || ''}
                   onUpdate={handleUpdateContent}
+                  onImmediateUpdate={setLatestContent}
                 />
               </div>
 
@@ -220,6 +285,39 @@ export default function PageDetailPage() {
         <div className="fixed bottom-4 right-4 p-4 bg-red-50 border border-red-200 rounded-lg shadow-md z-50">
           <p className="text-sm text-red-600">{error}</p>
         </div>
+      )}
+
+      {showDeleteConfirm && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowDeleteConfirm(false)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[340px] bg-white rounded-2xl shadow-xl p-6 flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-9 h-9 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 size={18} className="text-red-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">Delete document?</p>
+                <p className="text-gray-500 text-sm mt-0.5">
+                  &ldquo;{title}&rdquo; will be permanently deleted and cannot be recovered.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

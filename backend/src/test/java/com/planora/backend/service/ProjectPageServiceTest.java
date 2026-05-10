@@ -19,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDateTime;
@@ -48,6 +49,8 @@ class ProjectPageServiceTest {
     private UserRepository userRepository;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     @InjectMocks
     private ProjectPageService service;
@@ -189,7 +192,7 @@ class ProjectPageServiceTest {
         when(repository.save(any(ProjectPage.class))).thenReturn(savedPage);
         when(userRepository.findById(200L)).thenReturn(Optional.of(actor));
 
-        ProjectPage result = service.createPage(40L, request, 200L);
+        PageDetailResponseDto result = service.createPage(40L, request, 200L);
 
         assertEquals(700L, result.getId());
         verify(notificationService).createNotification(owner, "editor created page: Runbook", "/pages/700?projectId=40");

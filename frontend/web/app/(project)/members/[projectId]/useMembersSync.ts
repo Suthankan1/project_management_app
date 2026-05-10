@@ -20,13 +20,12 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
-import SockJS from 'sockjs-client';
 import { CompatClient, Stomp } from '@stomp/stompjs';
 import { getValidToken } from '@/lib/auth';
 
 // ── Types that mirror the backend MemberEvent record ───────────────────────────
 
-export type MemberEventAction = 'ROLE_CHANGED' | 'MEMBER_REMOVED' | 'MEMBER_JOINED';
+export type MemberEventAction = 'ROLE_CHANGED' | 'MEMBER_ROLE_CHANGED' | 'MEMBER_REMOVED' | 'MEMBER_JOINED';
 
 export interface MemberPayload {
   userId: number;
@@ -43,6 +42,7 @@ export interface MemberEvent {
   action: MemberEventAction;
   userId: number;
   newRole?: string;   // populated when action === 'ROLE_CHANGED'
+  role?: string;      // backward-compatible field used by older backend payloads
   member?: MemberPayload; // populated when action === 'MEMBER_JOINED'
 }
 
@@ -123,8 +123,8 @@ export function useMembersSync(
     }
 
     const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-    const socket = new SockJS(`${backendUrl}/ws`);
-    const client = Stomp.over(socket);
+    const wsUrl = backendUrl.replace(/^http/, 'ws');
+    const client = Stomp.client(`${wsUrl}/ws-native`);
 
     // Silence the STOMP library's own console noise in production.
     client.debug = process.env.NODE_ENV === 'development'
@@ -160,10 +160,13 @@ export function useMembersSync(
 
           switch (event.action) {
             case 'ROLE_CHANGED':
-              if (event.userId != null && event.newRole) {
-                onRoleChangedRef.current(event.userId, event.newRole);
+            case 'MEMBER_ROLE_CHANGED': {
+              const nextRole = event.newRole || event.role;
+              if (event.userId != null && nextRole) {
+                onRoleChangedRef.current(event.userId, nextRole);
               }
               break;
+            }
 
             case 'MEMBER_REMOVED':
               if (event.userId != null) {

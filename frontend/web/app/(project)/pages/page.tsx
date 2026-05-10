@@ -1,7 +1,6 @@
 'use client';
-export const dynamic = 'force-dynamic';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PanelLeft } from 'lucide-react';
 import DocumentSidebar from './components/DocumentSidebar';
@@ -13,17 +12,23 @@ export default function PagesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Directly derive projectId from URL for immediate, lag-free UI
+  // URL param is the authoritative source; localStorage fallback preserves the project context
+  // when the user navigates here without a full URL (e.g. direct sidebar click after page refresh)
   const projectId = searchParams.get('projectId') || (typeof window !== 'undefined' ? localStorage.getItem('currentProjectId') : null);
 
   const {
     filteredPages,
     error,
-    searchQuery,
     setSearchQuery,
   } = usePages(projectId);
 
+  const [searchInput, setSearchInput] = useState('');
   const [showDocSidebar, setShowDocSidebar] = useState(false);
+
+  useEffect(() => {
+    const id = setTimeout(() => setSearchQuery(searchInput), 300);
+    return () => clearTimeout(id);
+  }, [searchInput, setSearchQuery]);
 
   const handleTemplateSelect = (template: Template) => {
     try {
@@ -61,10 +66,10 @@ export default function PagesPage() {
         <div className={showDocSidebar ? 'flex' : 'hidden lg:flex'}>
           <DocumentSidebar
             pages={filteredPages}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
+            searchQuery={searchInput}
+            onSearchChange={setSearchInput}
             projectId={projectId}
-            selectedPageId={null} // Root path has no selected page
+            selectedPageId={null}
             onCreateClick={() => {
               // Already showing template selector here in root, but just in case
             }}
@@ -72,7 +77,7 @@ export default function PagesPage() {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto pb-28 lg:pb-0">
+        <div className="flex-1 overflow-y-auto pb-0">
           <TemplateSelector 
             onSelect={handleTemplateSelect} 
           />

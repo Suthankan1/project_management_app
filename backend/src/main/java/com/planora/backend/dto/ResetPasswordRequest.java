@@ -14,12 +14,16 @@ import lombok.Setter;
 @Setter
 public class ResetPasswordRequest {
 
-    /** The OTP code received in the password-reset email (used as the token). */
+    /** Token from the password-reset link query param. */
     @NotBlank(message = "Token is required")
-    @Pattern(regexp = "^[0-9]{6}$", message = "Token must be a 6-digit OTP")
+    @Size(min = 6, max = 256, message = "Token is invalid")
     private String token;
 
     @NotBlank(message = "New password is required")
     @Size(min = 8, max = 128, message = "Password must be between 8 and 128 characters")
+    @Pattern(
+        regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,128}$",
+        message = "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+    )
     private String newPassword;
 }

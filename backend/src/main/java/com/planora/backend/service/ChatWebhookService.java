@@ -15,12 +15,12 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.planora.backend.dto.ChatMessageDTO;
 import com.planora.backend.model.ChatMessage;
 
 import lombok.extern.slf4j.Slf4j;
 
-// TODO: Wire this service to a ChatWebhookController when webhook integration is ready.
-// Currently this class is unreachable from any controller.
+// In-memory webhook registry intentionally keeps rollout simple before persistence is required.
 @Service
 @Slf4j
 public class ChatWebhookService {
@@ -43,6 +43,7 @@ public class ChatWebhookService {
                                          String timestamp) {}
 
     private final Map<Long, Map<String, ChatWebhook>> webhooksByProject = new ConcurrentHashMap<>();
+    // Shared client keeps webhook dispatch overhead low during high chat throughput.
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -51,6 +52,7 @@ public class ChatWebhookService {
     }
 
     public ChatWebhook createWebhook(Long projectId, String url, List<String> events, Boolean active, String secret) {
+        // Default events keep webhook setup ergonomic for first-time integrations.
         var normalizedEvents = (events == null || events.isEmpty())
                 ? List.of("MESSAGE_CREATED", "MESSAGE_UPDATED", "MESSAGE_DELETED")
                 : events.stream().filter(value -> value != null && !value.isBlank()).map(String::trim).map(String::toUpperCase).distinct().toList();
@@ -91,6 +93,29 @@ public class ChatWebhookService {
         return hooks.size();
     }
 
+    public void dispatchMessageEvent(Long projectId, String eventType, String scope, ChatMessageDTO message) {
+        var hooks = listWebhooks(projectId);
+        if (hooks.isEmpty() || message == null) {
+            return;
+        }
+
+        var payload = new WebhookDispatchPayload(
+                eventType,
+                projectId,
+                scope,
+                message.getId(),
+                message.getSender(),
+                message.getRecipient(),
+                message.getRoomId(),
+                message.getContent(),
+                message.getTimestamp() != null ? message.getTimestamp().toString() : null);
+
+        hooks.stream()
+                .filter(ChatWebhook::active)
+                .filter(hook -> hook.events().stream().anyMatch(event -> event.equalsIgnoreCase(eventType)))
+                .forEach(hook -> dispatchToWebhook(hook, payload));
+    }
+
     public void dispatchMessageEvent(Long projectId, String eventType, String scope, ChatMessage message) {
         var hooks = listWebhooks(projectId);
         if (hooks.isEmpty() || message == null) {
@@ -126,6 +151,7 @@ public class ChatWebhookService {
                 requestBuilder.header("X-Chat-Webhook-Secret", hook.secret());
             }
 
+            // Async fire-and-forget keeps websocket publish path responsive even on slow webhook targets.
             httpClient.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.discarding())
                     .exceptionally(error -> {
                         log.warn("Webhook dispatch failed: {}", error.getMessage());

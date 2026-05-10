@@ -18,9 +18,11 @@ export interface DocumentItem {
     name: string;
     contentType: string;
     fileSize: number;
+    humanReadableSize?: string;
     status: DocumentStatus;
     projectId: number;
     folderId: number | null;
+    folderName?: string | null;
     latestVersionNumber: number;
     downloadUrl: string | null;
     uploadedById: number;

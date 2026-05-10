@@ -10,4 +10,6 @@ import lombok.Setter;
 public class PageSummaryResponseDto {
     private Long id;
     private String title;
+    private String updatedAt;
+    private String updatedByUsername;
 }

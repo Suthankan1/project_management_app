@@ -13,6 +13,7 @@ import com.planora.backend.model.Team;
 import com.planora.backend.model.TeamMember;
 import com.planora.backend.model.TeamRole;
 import com.planora.backend.model.User;
+import com.planora.backend.model.Milestone;
 import com.planora.backend.repository.CommentRepository;
 import com.planora.backend.repository.LabelRepository;
 import com.planora.backend.repository.ProjectRepository;
@@ -21,12 +22,16 @@ import com.planora.backend.repository.TaskAccessRepository;
 import com.planora.backend.repository.TaskRepository;
 import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.UserRepository;
+import com.planora.backend.repository.MilestoneRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -38,14 +43,19 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.argThat;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class TaskServiceTest {
 
     @Mock
@@ -65,9 +75,17 @@ class TaskServiceTest {
     @Mock
     private TaskAccessRepository taskAccessRepository;
     @Mock
+    private MilestoneRepository milestoneRepository;
+    @Mock
     private NotificationService notificationService;
     @Mock
     private TaskActivityService taskActivityService;
+    @Mock
+    private UserService userService;
+    @Mock
+    private TeamMembershipLookupService teamMembershipLookupService;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     @InjectMocks
     private TaskService taskService;
@@ -120,6 +138,41 @@ class TaskServiceTest {
         actorMember.setRole(TeamRole.MEMBER);
         actorMember.setUser(actorUser);
         actorMember.setTeam(team);
+
+        lenient().when(userService.generatePresignedUrl(nullable(String.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(teamMembershipLookupService.getTeamMember(anyLong(), anyLong()))
+                .thenAnswer(invocation -> {
+                    Long teamId = invocation.getArgument(0);
+                    Long userId = invocation.getArgument(1);
+                    if (!Long.valueOf(20L).equals(teamId)) {
+                        return null;
+                    }
+                    if (Long.valueOf(100L).equals(userId)) {
+                        return creator;
+                    }
+                    if (Long.valueOf(200L).equals(userId)) {
+                        return assignee;
+                    }
+                    if (Long.valueOf(500L).equals(userId)) {
+                        return actorMember;
+                    }
+                    return null;
+                });
+        lenient().when(teamMembershipLookupService.getTeamMembersForTeams(any(), anyLong()))
+                .thenAnswer(invocation -> {
+                    java.util.Set<Long> teamIds = invocation.getArgument(0);
+                    Long userId = invocation.getArgument(1);
+                    if (teamIds == null || userId == null) {
+                        return java.util.List.of();
+                    }
+                    if (teamIds.contains(20L) && Long.valueOf(500L).equals(userId)) {
+                        return java.util.List.of(actorMember);
+                    }
+                    return java.util.List.of();
+                });
+        lenient().when(taskRepository.findByIdWithProjectTeam(anyLong()))
+                .thenAnswer(invocation -> Optional.of(buildTask(invocation.getArgument(0))));
     }
 
     private Task buildTask(Long taskId) {
@@ -144,27 +197,49 @@ class TaskServiceTest {
         request.setAssigneeId(200L);
 
         when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 100L)).thenReturn(Optional.of(creator));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 200L)).thenReturn(Optional.of(assignee));
         when(userRepository.findById(100L)).thenReturn(Optional.of(creator.getUser()));
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> {
             Task saved = invocation.getArgument(0);
             saved.setId(999L);
             return saved;
         });
+        when(taskRepository.findByIdWithDetails(999L)).thenAnswer(invocation -> {
+            Task t = buildTask(999L);
+            t.setAssignee(assignee);
+            t.setReporter(creator);
+            return Optional.of(t);
+        });
 
         TaskResponseDTO result = taskService.createTask(request, 100L);
 
         assertEquals(999L, result.getId());
         assertEquals("Build tests", result.getTitle());
-        assertEquals(LocalDate.now(), result.getStartDate());
-        assertEquals(LocalDate.now(), result.getDueDate());
+        assertNull(result.getStartDate());
+        assertNull(result.getDueDate());
         assertEquals(0, result.getStoryPoint());
         verify(notificationService).createNotification(
                 assignee.getUser(),
                 "You were assigned to a new task: Build tests",
                 "/taskcard?taskId=999"
         );
+    }
+
+    @Test
+    void getTasksByProject_batchesDependencyLookup() {
+        Task taskOne = buildTask(71L);
+        Task taskTwo = buildTask(72L);
+
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(taskRepository.findByProjectIdWithScalars(10L)).thenReturn(List.of(taskOne, taskTwo));
+        when(taskRepository.findByIdInWithCollections(List.of(71L, 72L))).thenReturn(List.of(taskOne, taskTwo));
+        when(taskRepository.findDependencyRowsByTaskIds(List.of(71L, 72L)))
+                .thenReturn(java.util.Collections.singletonList(new Object[] {71L, 99L, "Foundation task"}));
+
+        List<TaskResponseDTO> result = taskService.getTasksByProject(10L, 500L, null, null, null, null, null);
+
+        assertEquals(2, result.size());
+        assertNotNull(result.getFirst().getDependencies());
+        verify(taskRepository, times(1)).findDependencyRowsByTaskIds(List.of(71L, 72L));
     }
 
     @Test
@@ -177,7 +252,8 @@ class TaskServiceTest {
         request.setTitle("Blocked task");
 
         when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 100L)).thenReturn(Optional.of(viewer));
+        when(teamMembershipLookupService.getTeamMember(20L, 100L)).thenReturn(viewer);
+        when(userRepository.findById(100L)).thenReturn(Optional.of(creatorUser));
 
         ForbiddenException exception = assertThrows(ForbiddenException.class, () -> taskService.createTask(request, 100L));
 
@@ -193,10 +269,11 @@ class TaskServiceTest {
         request.setStatus("DONE");
 
         when(taskRepository.findById(50L)).thenReturn(Optional.of(task));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 500L)).thenReturn(Optional.of(actorMember));
+        when(taskRepository.findByIdWithProjectTeam(50L)).thenReturn(Optional.of(task));
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
         when(userRepository.findAllById(any())).thenReturn(List.of(creatorUser, assigneeUser));
+        when(taskRepository.findByIdWithDetails(50L)).thenReturn(Optional.of(task));
 
         TaskResponseDTO result = taskService.updateTask(50L, request, 500L);
 
@@ -211,10 +288,11 @@ class TaskServiceTest {
         task.setPriority(Priority.LOW);
 
         when(taskRepository.findById(51L)).thenReturn(Optional.of(task));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 500L)).thenReturn(Optional.of(actorMember));
+        when(taskRepository.findByIdWithProjectTeam(51L)).thenReturn(Optional.of(task));
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
         when(userRepository.findAllById(any())).thenReturn(List.of(creatorUser, assigneeUser));
+        when(taskRepository.findByIdWithDetails(51L)).thenReturn(Optional.of(task));
 
         TaskResponseDTO result = taskService.updatePriority(51L, "HIGH", 500L);
 
@@ -228,7 +306,7 @@ class TaskServiceTest {
         Task task = buildTask(60L);
         actorMember.setRole(TeamRole.OWNER);
 
-        when(taskRepository.findById(60L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByIdWithDetails(60L)).thenReturn(Optional.of(task));
         when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 500L)).thenReturn(Optional.of(actorMember));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
         when(userRepository.findAllById(any())).thenReturn(List.of(creatorUser, assigneeUser));
@@ -244,8 +322,7 @@ class TaskServiceTest {
         Task task = buildTask(70L);
 
         when(taskRepository.findById(70L)).thenReturn(Optional.of(task));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 500L)).thenReturn(Optional.of(actorMember));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 200L)).thenReturn(Optional.of(assignee));
+        when(taskRepository.findByIdWithProjectTeam(70L)).thenReturn(Optional.of(task));
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
 
@@ -264,8 +341,7 @@ class TaskServiceTest {
     void assignUser_doesNotNotifyWhenActorAssignsSelf() {
         Task task = buildTask(71L);
 
-        when(taskRepository.findById(71L)).thenReturn(Optional.of(task));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 500L)).thenReturn(Optional.of(actorMember));
+        when(taskRepository.findByIdWithProjectTeam(71L)).thenReturn(Optional.of(task));
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
 
@@ -277,13 +353,70 @@ class TaskServiceTest {
     }
 
     @Test
-    void addComment_notifiesAssigneeWhenCommenterIsDifferentUser() {
+    void updateAssignees_notifiesOnlyNewlyAddedAssignees() {
+        Task task = buildTask(72L);
+        task.getAssignees().add(assignee);
+
+        User newUser = new User();
+        newUser.setUserId(300L);
+        newUser.setUsername("newAssignee");
+
+        TeamMember newMember = new TeamMember();
+        newMember.setId(4L);
+        newMember.setRole(TeamRole.MEMBER);
+        newMember.setUser(newUser);
+        newMember.setTeam(team);
+
+        when(taskRepository.findByIdWithProjectTeam(72L)).thenReturn(Optional.of(task));
+        when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(taskRepository.findByIdWithDetails(72L)).thenReturn(Optional.of(task));
+        when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
+        when(teamMembershipLookupService.getTeamMember(20L, 300L)).thenReturn(newMember);
+        when(userRepository.findAllById(argThat(ids -> {
+            java.util.Set<Long> values = new java.util.LinkedHashSet<>();
+            ids.forEach(values::add);
+            return values.equals(java.util.Set.of(300L));
+        }))).thenReturn(List.of(newUser));
+
+        TaskResponseDTO result = taskService.updateAssignees(72L, List.of(200L, 300L), 500L);
+
+        assertEquals(72L, result.getId());
+        verify(taskActivityService).logActivity(eq(72L), any(), eq("actor"), contains("updated assignees"));
+        verify(notificationService, times(1)).createNotification(
+                eq(newUser),
+                eq("You were assigned to task: Build tests"),
+                eq("/taskcard?taskId=72")
+        );
+    }
+
+    @Test
+    void updateAssignees_doesNotNotifyExistingAssigneesOrActor() {
+        Task task = buildTask(73L);
+        task.getAssignees().add(assignee);
+        task.getAssignees().add(actorMember);
+
+        when(taskRepository.findByIdWithProjectTeam(73L)).thenReturn(Optional.of(task));
+        when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(taskRepository.findByIdWithDetails(73L)).thenReturn(Optional.of(task));
+        when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
+
+        TaskResponseDTO result = taskService.updateAssignees(73L, List.of(200L, 500L), 500L);
+
+        assertEquals(73L, result.getId());
+        verify(taskActivityService).logActivity(eq(73L), any(), eq("actor"), contains("updated assignees"));
+        verify(userRepository, never()).findAllById(any());
+        verify(notificationService, never()).createNotification(any(User.class), any(String.class), any(String.class));
+    }
+
+    @Test
+    void addComment_notifiesAssigneeAndReporterWhenCommenterIsDifferentUser() {
         Task task = buildTask(80L);
         CommentRequestDTO request = new CommentRequestDTO();
         request.setContent("Looks good, please review.");
 
         when(taskRepository.findById(80L)).thenReturn(Optional.of(task));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
+        when(userRepository.findAllById(any())).thenReturn(List.of(assigneeUser, creatorUser));
         when(commentRepository.save(any(Comment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         taskService.addComment(80L, request, 500L);
@@ -295,10 +428,15 @@ class TaskServiceTest {
                 eq("actor commented on task: Build tests"),
                 eq("/taskcard?taskId=80")
         );
+        verify(notificationService).createNotification(
+                eq(creatorUser),
+                eq("actor commented on task: Build tests"),
+                eq("/taskcard?taskId=80")
+        );
     }
 
     @Test
-    void addComment_doesNotNotifyWhenAssigneeIsCommentAuthor() {
+    void addComment_notifiesReporterWhenAssigneeIsCommentAuthor() {
         Task task = buildTask(81L);
         task.setAssignee(actorMember);
 
@@ -307,12 +445,40 @@ class TaskServiceTest {
 
         when(taskRepository.findById(81L)).thenReturn(Optional.of(task));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
+        when(userRepository.findAllById(any())).thenReturn(List.of(creatorUser));
         when(commentRepository.save(any(Comment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         taskService.addComment(81L, request, 500L);
 
         verify(commentRepository).save(any(Comment.class));
-        verify(notificationService, never()).createNotification(any(User.class), any(String.class), any(String.class));
+        verify(notificationService).createNotification(
+                eq(creatorUser),
+                eq("actor commented on task: Build tests"),
+                eq("/taskcard?taskId=81")
+        );
+    }
+
+    @Test
+    void addComment_deduplicatesWhenAssigneeAndReporterAreSameUser() {
+        Task task = buildTask(82L);
+        task.setReporter(assignee);
+
+        CommentRequestDTO request = new CommentRequestDTO();
+        request.setContent("Ping");
+
+        when(taskRepository.findById(82L)).thenReturn(Optional.of(task));
+        when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
+        when(userRepository.findAllById(any())).thenReturn(List.of(assigneeUser));
+        when(commentRepository.save(any(Comment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        taskService.addComment(82L, request, 500L);
+
+        verify(commentRepository).save(any(Comment.class));
+        verify(notificationService, times(1)).createNotification(
+                eq(assigneeUser),
+                eq("actor commented on task: Build tests"),
+                eq("/taskcard?taskId=82")
+        );
     }
 
     @Test
@@ -322,12 +488,16 @@ class TaskServiceTest {
         request.setTitle("Reporter test task");
 
         when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 100L)).thenReturn(Optional.of(creator));
         when(userRepository.findById(100L)).thenReturn(Optional.of(creatorUser));
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> {
             Task saved = invocation.getArgument(0);
             saved.setId(1001L);
             return saved;
+        });
+        when(taskRepository.findByIdWithDetails(1001L)).thenAnswer(invocation -> {
+            Task t = buildTask(1001L);
+            t.setReporter(creator);
+            return Optional.of(t);
         });
 
         TaskResponseDTO result = taskService.createTask(request, 100L);
@@ -343,7 +513,6 @@ class TaskServiceTest {
         request.setSprintId(999L);
 
         when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 100L)).thenReturn(Optional.of(creator));
         when(sprintRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> taskService.createTask(request, 100L));
@@ -355,9 +524,7 @@ class TaskServiceTest {
         Task task = buildTask(60L);
         actorMember.setRole(TeamRole.MEMBER);
 
-        when(taskRepository.findById(60L)).thenReturn(Optional.of(task));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 500L)).thenReturn(Optional.of(actorMember));
-
+        when(taskRepository.findByIdWithDetails(60L)).thenReturn(Optional.of(task));
         ForbiddenException exception = assertThrows(ForbiddenException.class,
                 () -> taskService.deleteTask(60L, 500L));
 
@@ -369,8 +536,7 @@ class TaskServiceTest {
     void addDependency_toItself_throwsIllegalArgumentException() {
         Task task = buildTask(50L);
 
-        when(taskRepository.findById(50L)).thenReturn(Optional.of(task));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 500L)).thenReturn(Optional.of(actorMember));
+        when(taskRepository.findByIdWithProjectTeam(50L)).thenReturn(Optional.of(task));
 
         assertThrows(IllegalArgumentException.class,
                 () -> taskService.addDependency(50L, 50L, 500L));
@@ -391,9 +557,9 @@ class TaskServiceTest {
         task2.setProject(otherProject);
 
         // actorMember is member of team 20, but not team 99
-        when(taskRepository.findAllById(List.of(101L, 102L))).thenReturn(List.of(task1, task2));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 500L)).thenReturn(Optional.of(actorMember));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(99L, 500L)).thenReturn(Optional.empty());
+        when(taskRepository.findByIdInWithDetails(List.of(101L, 102L))).thenReturn(List.of(task1, task2));
+        when(teamMembershipLookupService.getTeamMembersForTeams(java.util.Set.of(20L, 99L), 500L))
+                .thenReturn(java.util.List.of(actorMember));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
 
         assertThrows(ForbiddenException.class,
@@ -408,8 +574,8 @@ class TaskServiceTest {
         TaskRequestDTO request = new TaskRequestDTO();
         request.setStatus("DONE");
 
-        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 500L)).thenReturn(Optional.of(actorMember));
+        when(taskRepository.findByIdWithProjectTeam(1L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(task));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
         when(taskRepository.save(any(Task.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -427,8 +593,8 @@ class TaskServiceTest {
         TaskRequestDTO request = new TaskRequestDTO();
         request.setStatus("IN_PROGRESS");
 
-        when(taskRepository.findById(2L)).thenReturn(Optional.of(task));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 500L)).thenReturn(Optional.of(actorMember));
+        when(taskRepository.findByIdWithProjectTeam(2L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByIdWithDetails(2L)).thenReturn(Optional.of(task));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
         when(taskRepository.save(any(Task.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -442,8 +608,9 @@ class TaskServiceTest {
         Task task1 = buildTask(10L);
         task1.setStatus("TODO");
 
-        when(taskRepository.findAllById(List.of(10L))).thenReturn(List.of(task1));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 500L)).thenReturn(Optional.of(actorMember));
+        when(taskRepository.findByIdInWithDetails(List.of(10L))).thenReturn(List.of(task1));
+        when(teamMembershipLookupService.getTeamMembersForTeams(java.util.Set.of(20L), 500L))
+                .thenReturn(java.util.List.of(actorMember));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
         when(taskRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -457,8 +624,9 @@ class TaskServiceTest {
         Task task1 = buildTask(11L);
         task1.setStatus("TODO");
 
-        when(taskRepository.findAllById(List.of(11L))).thenReturn(List.of(task1));
-        when(teamMemberRepository.findByTeamIdAndUserUserId(20L, 500L)).thenReturn(Optional.of(actorMember));
+        when(taskRepository.findByIdInWithDetails(List.of(11L))).thenReturn(List.of(task1));
+        when(teamMembershipLookupService.getTeamMembersForTeams(java.util.Set.of(20L), 500L))
+                .thenReturn(java.util.List.of(actorMember));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
         when(userRepository.findAllById(any())).thenReturn(List.of(assigneeUser));
         when(taskRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -470,5 +638,58 @@ class TaskServiceTest {
                 contains("marked"),
                 contains("/taskcard?taskId=11")
         );
+    }
+
+    @Test
+    void createTask_withMilestoneId_assignsMilestone() {
+        TaskRequestDTO request = new TaskRequestDTO();
+        request.setProjectId(10L);
+        request.setTitle("Milestone create");
+        request.setMilestoneId(77L);
+
+        Milestone milestone = new Milestone();
+        milestone.setId(77L);
+        milestone.setProject(project);
+        milestone.setName("Phase 1");
+
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(userRepository.findById(100L)).thenReturn(Optional.of(creatorUser));
+        when(milestoneRepository.findById(77L)).thenReturn(Optional.of(milestone));
+        when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> {
+            Task saved = invocation.getArgument(0);
+            saved.setId(1200L);
+            return saved;
+        });
+        when(taskRepository.findByIdWithDetails(1200L)).thenAnswer(invocation -> {
+            Task task = buildTask(1200L);
+            task.setMilestone(milestone);
+            return Optional.of(task);
+        });
+
+        TaskResponseDTO response = taskService.createTask(request, 100L);
+
+        assertEquals(77L, response.getMilestoneId());
+        verify(taskRepository).save(argThat(task -> task.getMilestone() != null && task.getMilestone().getId().equals(77L)));
+    }
+
+    @Test
+    void updateTask_withExplicitNullMilestone_clearsMilestone() {
+        Task task = buildTask(1300L);
+        Milestone milestone = new Milestone();
+        milestone.setId(66L);
+        milestone.setProject(project);
+        task.setMilestone(milestone);
+
+        TaskRequestDTO request = new TaskRequestDTO();
+        request.setMilestoneId(null);
+
+        when(taskRepository.findByIdWithProjectTeam(1300L)).thenReturn(Optional.of(task));
+        when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
+        when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(taskRepository.findByIdWithDetails(1300L)).thenReturn(Optional.of(task));
+
+        taskService.updateTask(1300L, request, 500L);
+
+        assertNull(task.getMilestone());
     }
 }

@@ -18,6 +18,7 @@ import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.TaskRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -90,6 +91,18 @@ public class SprintService {
                 .build();
     }
 
+    private SprintResponseDTO toDTO(Object[] row) {
+        return SprintResponseDTO.builder()
+                .id((Long) row[0])
+                .projectId((Long) row[1])
+                .name((String) row[2])
+                .startDate((LocalDate) row[3])
+                .endDate((LocalDate) row[4])
+                .status(row[5] != null ? ((SprintStatus) row[5]).name() : null)
+                .goal((String) row[6])
+                .build();
+    }
+
     // ---------- Sprint APIs ----------
 
     @Transactional
@@ -118,8 +131,10 @@ public class SprintService {
     @Transactional(readOnly = true)
     public List<SprintResponseDTO> getSprintsByProject(Long projectId, Long currentUserId) {
         requireViewBoard(projectId, currentUserId);
-        return sprintRepository.findByProject_Id(projectId)
-                .stream().map(this::toDTO).collect(Collectors.toList());
+        return sprintRepository.findSprintRowsByProjectId(projectId)
+                .stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -234,8 +249,17 @@ public class SprintService {
                 .stream()
                 .filter(t -> !"DONE".equalsIgnoreCase(t.getStatus()))
                 .collect(Collectors.toList());
-        incomplete.forEach(t -> t.setSprint(null));
-        taskRepository.saveAll(incomplete);
+
+        if (!incomplete.isEmpty()) {
+            // Find next available NOT_STARTED sprint in the same project
+            List<Sprint> nextSprints = sprintRepository.findNextAvailableSprint(
+                    sprint.getProId(), SprintStatus.NOT_STARTED, id, PageRequest.of(0, 1)
+            );
+
+            Sprint targetSprint = nextSprints.isEmpty() ? null : nextSprints.get(0);
+            incomplete.forEach(t -> t.setSprint(targetSprint));
+            taskRepository.saveAll(incomplete);
+        }
 
         return toDTO(sprint);
     }

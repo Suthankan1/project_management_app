@@ -17,6 +17,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
@@ -43,6 +44,7 @@ public class SecurityConfig {
             "/api/auth/reset",
             "/api/auth/refresh",
             "/ws/**",
+            "/ws-native/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html"
@@ -63,6 +65,13 @@ public class SecurityConfig {
             .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((req, res, authException) -> {
+                            res.setContentType("application/json");
+                            res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            res.getWriter().write("{\"error\": \"Unauthorized\"}");
+                        })
+                )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

@@ -13,6 +13,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+import { SafeChartFrame } from "@/components/shared/SafeChartFrame";
+
 type BurndownPoint = {
   date: string;
   remainingPoints: number;
@@ -49,36 +51,38 @@ export default function BurndownChart({ sprintId }: { sprintId: number }) {
   }
 
   return (
-    <div style={{ width: "100%", height: 400 }}>
+    <div className="w-full h-[400px]">
       <h2 className="text-base font-semibold mb-2">Burndown Chart</h2>
 
-      <ResponsiveContainer>
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-          <YAxis allowDecimals={false} />
-          <Tooltip />
-          <Legend />
+      <SafeChartFrame minHeight="360px">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+            <YAxis allowDecimals={false} />
+            <Tooltip />
+            <Legend />
 
-          <Line
-            type="monotone"
-            dataKey="remainingPoints"
-            name="Actual"
-            stroke="#8884d8"
-            strokeWidth={2}
-            dot={false}
-          />
-          <Line
-            type="monotone"
-            dataKey="idealPoints"
-            name="Ideal"
-            stroke="#98A2B3"
-            strokeDasharray="5 5"
-            strokeWidth={1.5}
-            dot={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
+            <Line
+              type="monotone"
+              dataKey="remainingPoints"
+              name="Actual"
+              stroke="#8884d8"
+              strokeWidth={2}
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="idealPoints"
+              name="Ideal"
+              stroke="#98A2B3"
+              strokeDasharray="5 5"
+              strokeWidth={1.5}
+              dot={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </SafeChartFrame>
     </div>
   );
 }

@@ -69,6 +69,25 @@ const membersFixture: Member[] = [
   },
 ];
 
+const ownerMembersFixture: Member[] = [
+  {
+    id: 1,
+    role: 'OWNER',
+    user: { userId: 201, username: 'alice', fullName: 'Alice Admin', email: 'alice@example.com' },
+    taskCount: 8,
+    status: 'Active',
+    lastActive: '2026-04-01T10:00:00.000Z',
+  },
+  {
+    id: 2,
+    role: 'MEMBER',
+    user: { userId: 202, username: 'bob', fullName: 'Bob Member', email: 'bob@example.com' },
+    taskCount: 3,
+    status: 'Active',
+    lastActive: '2026-04-01T11:00:00.000Z',
+  },
+];
+
 const pendingFixture = [
   {
     id: 300,
@@ -170,14 +189,18 @@ describe('MembersPageClient', () => {
 
     await screen.findByText('Bob Member');
 
-    const roleSelect = screen.getAllByDisplayValue('MEMBER')[0];
+    const roleSelect = screen
+      .getAllByRole('combobox')
+      .find((element) => (element as HTMLSelectElement).value === 'MEMBER');
 
-    expect(within(roleSelect).queryByRole('option', { name: 'OWNER' })).not.toBeInTheDocument();
-    expect(within(roleSelect).queryByRole('option', { name: 'ADMIN' })).not.toBeInTheDocument();
-    expect(within(roleSelect).getByRole('option', { name: 'MEMBER' })).toBeInTheDocument();
-    expect(within(roleSelect).getByRole('option', { name: 'VIEWER' })).toBeInTheDocument();
+    expect(roleSelect).toBeDefined();
 
-    fireEvent.change(roleSelect, { target: { value: 'VIEWER' } });
+    expect(within(roleSelect as HTMLElement).queryByRole('option', { name: 'Owner' })).not.toBeInTheDocument();
+    expect(within(roleSelect as HTMLElement).queryByRole('option', { name: 'Admin' })).not.toBeInTheDocument();
+    expect(within(roleSelect as HTMLElement).getByRole('option', { name: 'Member' })).toBeInTheDocument();
+    expect(within(roleSelect as HTMLElement).getByRole('option', { name: 'Viewer' })).toBeInTheDocument();
+
+    fireEvent.change(roleSelect as HTMLElement, { target: { value: 'VIEWER' } });
 
     await waitFor(() => {
       expect(mockedAxios.patch).toHaveBeenCalledWith('/api/projects/7/members/202/role', {
@@ -186,6 +209,24 @@ describe('MembersPageClient', () => {
       });
       expect(screen.getByText('Role updated successfully!')).toBeInTheDocument();
     });
+  });
+
+  it('shows owner role options without owner assignment choice', async () => {
+    setupGetMocks({ members: ownerMembersFixture });
+
+    render(<MembersPageClient projectId="7" />);
+
+    await screen.findByText('Bob Member');
+
+    const roleSelect = screen
+      .getAllByRole('combobox')
+      .find((element) => (element as HTMLSelectElement).value === 'MEMBER');
+
+    expect(roleSelect).toBeDefined();
+    expect(within(roleSelect as HTMLElement).queryByRole('option', { name: 'Owner' })).not.toBeInTheDocument();
+    expect(within(roleSelect as HTMLElement).getByRole('option', { name: 'Admin' })).toBeInTheDocument();
+    expect(within(roleSelect as HTMLElement).getByRole('option', { name: 'Member' })).toBeInTheDocument();
+    expect(within(roleSelect as HTMLElement).getByRole('option', { name: 'Viewer' })).toBeInTheDocument();
   });
 
   it('removes a member after confirmation modal acceptance', async () => {
@@ -221,6 +262,7 @@ describe('MembersPageClient', () => {
     const inviteHeader = screen.getByText('Invite Team Member');
     const inviteModal = inviteHeader.closest('div');
     expect(inviteModal).toBeTruthy();
+    expect(within(inviteModal as HTMLElement).queryByRole('option', { name: 'OWNER' })).not.toBeInTheDocument();
 
     fireEvent.change(within(inviteModal as HTMLElement).getByRole('textbox'), {
       target: { value: 'newuser@example.com' },

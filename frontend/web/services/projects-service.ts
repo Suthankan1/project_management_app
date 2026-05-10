@@ -1,5 +1,5 @@
 import api from '@/lib/axios';
-import type { ProjectType } from '@/types';
+import type { ProjectType, ProjectMetrics } from '@/types';
 
 // ── Types ──
 
@@ -28,12 +28,22 @@ export async function fetchProjectDetails(projectId: string): Promise<ProjectSum
   return data;
 }
 
+export async function fetchProjectMetrics(projectId: string | number): Promise<ProjectMetrics> {
+  const { data } = await api.get<ProjectMetrics>(`/api/projects/${projectId}/metrics`);
+  return data;
+}
+
 export async function recordProjectAccess(projectId: number): Promise<void> {
   await api.post(`/api/projects/${projectId}/access`);
 }
 
 export async function toggleFavorite(projectId: number | string): Promise<void> {
   await api.post(`/api/projects/${projectId}/favorite`);
+}
+
+export async function updateProjectDetails(projectId: number | string, data: { name?: string; description?: string; type?: string }): Promise<ProjectSummary> {
+  const result = await api.put<ProjectSummary>(`/api/projects/${projectId}`, data);
+  return result.data;
 }
 
 export async function fetchDocuments(

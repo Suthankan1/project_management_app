@@ -29,6 +29,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @Getter
 @Setter
+// Separate reaction table keeps message rows immutable and supports fast aggregate counts.
 public class ChatReaction {
 
     @Id
@@ -45,6 +46,20 @@ public class ChatReaction {
 
     private String emoji;
 
+    // Creation order is used to keep deterministic reaction rendering when counts tie.
     @CreationTimestamp
     private LocalDateTime createdAt;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ChatReaction reaction = (ChatReaction) o;
+        return java.util.Objects.equals(id, reaction.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(id);
+    }
 }

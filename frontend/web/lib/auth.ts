@@ -1,11 +1,17 @@
+import { initializeSessionCacheForCurrentAuth } from '@/lib/session-cache';
+
 export interface User {
     email: string;
     username?: string;
     fullName?: string;
     userId?: number;
+    exp?: number;
 }
 
 export const AUTH_TOKEN_CHANGED_EVENT = 'planora-auth-token-changed';
+
+const TOKEN_KEY = 'planora:access_token';
+const REFRESH_TOKEN_KEY = 'planora:refresh_token';
 
 interface JwtPayload {
     sub?: string;
@@ -37,11 +43,13 @@ export function getRememberMe(): boolean {
     return localStorage.getItem('rememberMe') === 'true';
 }
 
-/** Pick the right storage based on the rememberMe flag.
- *  - rememberMe=true  -> localStorage  (survives browser restart)
- *  - rememberMe=false -> sessionStorage (cleared when the tab/window closes) */
+/** Always use localStorage so auth tokens are shared across browser tabs.
+ *  sessionStorage is tab-isolated, which causes new tabs to redirect to login.
+ *  Both localStorage and sessionStorage are JS-accessible, so there is no
+ *  meaningful security difference — HTTP-only cookies would be needed for that.
+ *  The rememberMe flag is kept for UX preference tracking only. */
 function tokenStorage(): Storage {
-    return getRememberMe() ? localStorage : sessionStorage;
+    return localStorage;
 }
 
 // Token helpers
@@ -49,14 +57,14 @@ function tokenStorage(): Storage {
 export function getUserFromToken(): User | null {
     if (typeof window === 'undefined') return null;
 
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem('token')
+        || sessionStorage.getItem(TOKEN_KEY) || sessionStorage.getItem('token');
     if (!token) return null;
 
     try {
         const tokenParts = token.split('.');
         if (tokenParts.length < 2) {
-            localStorage.removeItem('token');
-            sessionStorage.removeItem('token');
+            clearTokens();
             return null;
         }
 
@@ -68,27 +76,26 @@ export function getUserFromToken(): User | null {
 
         const payload: JwtPayload = JSON.parse(jsonPayload);
         if (!payload.sub) {
-            localStorage.removeItem('token');
-            sessionStorage.removeItem('token');
+            clearTokens();
             return null;
         }
 
         if (payload.exp && payload.exp * 1000 <= Date.now()) {
-            localStorage.removeItem('token');
-            sessionStorage.removeItem('token');
+            clearTokens();
             return null;
         }
 
         type ExtendedJwtPayload = JwtPayload & { userId?: number; id?: number };
         const extPayload = payload as ExtendedJwtPayload;
         let userId: number | undefined = undefined;
-        if (typeof extPayload.userId === 'number') userId = extPayload.userId;
+        if (extPayload.userId != null) userId = Number(extPayload.userId);
         else if (typeof extPayload.id === 'number') userId = extPayload.id;
 
         const decodedUser: User = {
             email: payload.sub,
             username: payload.username,
             userId,
+            exp: payload.exp,
         };
 
         const cachedProfile = localStorage.getItem('userProfile');
@@ -113,11 +120,19 @@ export function getUserFromToken(): User | null {
     }
 }
 
+export function getUserIdFromToken(): number | null {
+    const user = getUserFromToken();
+    return user?.userId ?? null;
+}
+
 export function saveToken(token: string): void {
     if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
         sessionStorage.removeItem('token');
-        tokenStorage().setItem('token', token);
+        localStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(TOKEN_KEY);
+        tokenStorage().setItem(TOKEN_KEY, token);
+        initializeSessionCacheForCurrentAuth(token);
         emitAuthTokenChanged();
     }
 }
@@ -126,23 +141,38 @@ export function saveRefreshToken(token: string): void {
     if (typeof window !== 'undefined') {
         localStorage.removeItem('refreshToken');
         sessionStorage.removeItem('refreshToken');
-        tokenStorage().setItem('refreshToken', token);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+        sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+        tokenStorage().setItem(REFRESH_TOKEN_KEY, token);
     }
 }
 
 export function getRefreshToken(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
+    return localStorage.getItem(REFRESH_TOKEN_KEY) || localStorage.getItem('refreshToken')
+        || sessionStorage.getItem(REFRESH_TOKEN_KEY) || sessionStorage.getItem('refreshToken');
 }
 
 export function clearTokens(): void {
     if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
         localStorage.removeItem('userProfile');
         localStorage.removeItem('rememberMe');
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('refreshToken');
+        sessionStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+        // Wipe all planora: prefixed data caches so the next user session
+        // starts with a clean slate
+        Object.keys(localStorage)
+            .filter((k) => k.startsWith('planora:'))
+            .forEach((k) => localStorage.removeItem(k));
+        Object.keys(sessionStorage)
+            .filter((k) => k.startsWith('planora:'))
+            .forEach((k) => sessionStorage.removeItem(k));
         emitAuthTokenChanged();
     }
 }
@@ -154,8 +184,41 @@ export function clearTokens(): void {
 export function getValidToken(): string | null {
     if (typeof window === 'undefined') return null;
     if (getUserFromToken()) {
-        return localStorage.getItem('token') || sessionStorage.getItem('token');
+        return localStorage.getItem(TOKEN_KEY) || localStorage.getItem('token')
+            || sessionStorage.getItem(TOKEN_KEY) || sessionStorage.getItem('token');
     }
     return null;
+}
+
+/**
+ * Uses native fetch (not axios) to avoid circular imports.
+ * POSTs the current refresh token to /api/auth/refresh, stores the new
+ * access token (and refresh token if rotated), and returns the new access token.
+ * On failure it clears all tokens and throws.
+ */
+export async function refreshAccessToken(): Promise<string> {
+    const rt = getRefreshToken();
+    if (!rt) {
+        clearTokens();
+        throw new Error('No refresh token available');
+    }
+    const res = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: rt }),
+    });
+    if (!res.ok) {
+        clearTokens();
+        throw new Error('Token refresh failed');
+    }
+    const data = await res.json();
+    saveToken(data.token);
+    if (data.refreshToken) saveRefreshToken(data.refreshToken);
+    return data.token;
+}
+
+/** Alias for clearTokens — clears all auth state and planora: caches. */
+export function logout(): void {
+    clearTokens();
 }
 

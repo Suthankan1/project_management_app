@@ -19,6 +19,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @Getter
 @Setter
+// Room membership row keeps authorization and role checks independent from message records.
 public class ChatRoomMember {
 
     @Id
@@ -33,6 +34,7 @@ public class ChatRoomMember {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    // Role drives management permissions (rename/archive/membership changes) inside a room.
     @Enumerated(EnumType.STRING)
     private RoomRole role = RoomRole.MEMBER;
 
@@ -40,5 +42,18 @@ public class ChatRoomMember {
         OWNER,
         ADMIN,
         MEMBER
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ChatRoomMember that = (ChatRoomMember) o;
+        return java.util.Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(id);
     }
 }

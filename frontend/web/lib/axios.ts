@@ -1,8 +1,9 @@
 import axios from "axios";
-import { clearTokens, getRefreshToken, getValidToken, saveRefreshToken, saveToken } from "@/lib/auth";
+import { clearTokens, getRefreshToken, getValidToken, getUserFromToken, refreshAccessToken, saveRefreshToken, saveToken } from "@/lib/auth";
 
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080',
+    // Changed fallback from 'http://localhost:8080' to ''
+    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || '', 
     headers: {
         'Content-Type': 'application/json'
     },
@@ -27,6 +28,23 @@ api.interceptors.request.use(
         return Promise.reject(error);
     }
 );
+
+// Proactively refresh the access token if it expires within 60 seconds
+api.interceptors.request.use(async (config) => {
+    const authEndpoints = ['/api/auth/login', '/api/auth/register', '/api/auth/forgot', '/api/auth/reset', '/api/auth/reg/verify', '/api/auth/resend', '/api/auth/refresh'];
+    const isAuthEndpoint = authEndpoints.some(endpoint => config.url?.includes(endpoint));
+    if (!isAuthEndpoint && typeof window !== 'undefined') {
+        try {
+            const user = getUserFromToken();
+            if (user?.exp && (user.exp - Date.now() / 1000) < 60) {
+                const newToken = await refreshAccessToken();
+                config.headers['Authorization'] = `Bearer ${newToken}`;
+                return config;
+            }
+        } catch { /* token expired or invalid — let the 401 handler deal with it */ }
+    }
+    return config;
+});
 
 // Track whether a token refresh is in progress to avoid infinite loop
 let isRefreshing = false;
@@ -71,7 +89,10 @@ api.interceptors.response.use(
             if (!refreshToken) {
                 isRefreshing = false;
                 clearTokens();
-                if (typeof window !== 'undefined') window.location.href = '/login';
+                if (typeof window !== 'undefined') {
+                    // 500ms delay lets toast notifications render before reload
+                    setTimeout(() => { window.location.href = '/login'; }, 500);
+                }
                 return Promise.reject(error);
             }
 
@@ -86,7 +107,10 @@ api.interceptors.response.use(
             } catch (refreshError) {
                 processQueue(refreshError, null);
                 clearTokens();
-                if (typeof window !== 'undefined') window.location.href = '/login';
+                if (typeof window !== 'undefined') {
+                    // 500ms delay lets toast notifications render before reload
+                    setTimeout(() => { window.location.href = '/login'; }, 500);
+                }
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;

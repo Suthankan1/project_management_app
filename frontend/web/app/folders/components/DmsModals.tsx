@@ -1,7 +1,7 @@
 'use client';
 
 import { DocumentItem, DocumentVersionItem } from '@/lib/dms';
-import { Info, Users, X } from 'lucide-react';
+import { Info, Pencil, Users, X } from 'lucide-react';
 import { formatBytes, toDateLabel } from '@/app/folders/components/dmsUtils';
 
 interface DmsModalsProps {
@@ -14,6 +14,12 @@ interface DmsModalsProps {
     getFolderName: (folderId: number | null) => string;
     isUploading?: boolean;
     uploadProgress?: number;
+    renameDoc: DocumentItem | null;
+    renameName: string;
+    setRenameName: (value: string) => void;
+    onConfirmRename: () => Promise<void>;
+    onCancelRename: () => void;
+    busy?: boolean;
 }
 
 export default function DmsModals({
@@ -26,13 +32,71 @@ export default function DmsModals({
     getFolderName,
     isUploading = false,
     uploadProgress = 0,
+    renameDoc,
+    renameName,
+    setRenameName,
+    onConfirmRename,
+    onCancelRename,
+    busy = false,
 }: DmsModalsProps) {
-    if (selectedVersionsDocId === null && selectedInfoDoc === null && !isUploading) {
+    if (selectedVersionsDocId === null && selectedInfoDoc === null && !isUploading && renameDoc === null) {
         return null;
     }
 
     return (
         <>
+            {renameDoc !== null && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-md rounded-xl border border-[#E6E8EC] bg-white shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-[#EAECF0] px-5 py-4">
+                            <div className="inline-flex items-center gap-2 text-[#101828]">
+                                <Pencil size={16} />
+                                <h3 className="text-sm font-semibold">Rename document</h3>
+                            </div>
+                            <button
+                                onClick={onCancelRename}
+                                className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-[#D0D5DD] hover:bg-[#F9FAFB]"
+                                title="Close"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                        <div className="px-5 py-4 space-y-4">
+                            <div>
+                                <label className="text-xs font-medium text-[#344054] mb-1.5 block">
+                                    Document name
+                                </label>
+                                <input
+                                    value={renameName}
+                                    onChange={(e) => setRenameName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') void onConfirmRename();
+                                        if (e.key === 'Escape') onCancelRename();
+                                    }}
+                                    className="w-full px-3 py-2 text-sm border border-[#D0D5DD] rounded-md focus:outline-none focus:ring-2 focus:ring-[#B2CCFF]"
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="flex items-center justify-end gap-2">
+                                <button
+                                    onClick={onCancelRename}
+                                    className="px-4 py-2 text-sm border border-[#D0D5DD] rounded-md hover:bg-[#F9FAFB]"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => void onConfirmRename()}
+                                    disabled={busy || !renameName.trim() || renameName.trim() === renameDoc.name}
+                                    className="px-4 py-2 text-sm bg-[#155DFC] text-white rounded-md hover:bg-[#1347D4] disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Rename
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {isUploading && (
                 <div className="fixed bottom-8 right-8 z-50 w-72 rounded-xl border border-[#E6E8EC] bg-white p-4 shadow-2xl">
                     <p className="text-sm font-medium text-[#101828] mb-2">Uploading...</p>
@@ -98,9 +162,9 @@ export default function DmsModals({
                     <div className="px-5 py-4 space-y-3 text-sm text-[#344054]">
                         <p><span className="font-medium text-[#101828]">Name:</span> {selectedInfoDoc.name}</p>
                         <p><span className="font-medium text-[#101828]">Owner:</span> {selectedInfoDoc.uploadedByName}</p>
-                        <p><span className="font-medium text-[#101828]">Folder:</span> {getFolderName(selectedInfoDoc.folderId)}</p>
+                        <p><span className="font-medium text-[#101828]">Folder:</span> {selectedInfoDoc.folderName ?? getFolderName(selectedInfoDoc.folderId)}</p>
                         <p><span className="font-medium text-[#101828]">Updated:</span> {toDateLabel(selectedInfoDoc.updatedAt || selectedInfoDoc.createdAt)}</p>
-                        <p><span className="font-medium text-[#101828]">Size:</span> {formatBytes(selectedInfoDoc.fileSize)}</p>
+                        <p><span className="font-medium text-[#101828]">Size:</span> {selectedInfoDoc.humanReadableSize ?? formatBytes(selectedInfoDoc.fileSize)}</p>
                     </div>
                 </div>
             )}

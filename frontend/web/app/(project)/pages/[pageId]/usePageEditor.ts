@@ -2,10 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { PageItem, PageHistoryItem } from '../components/types';
-import { predefinedTemplates } from '../components/TemplateSelector';
-import { usePages } from '../components/usePages';
-import axiosInstance from '../../../../lib/axios';
+import { usePageContent } from './hooks/usePageContent';
 import TurndownService from 'turndown';
 import { marked } from 'marked';
 
@@ -14,77 +11,35 @@ export function usePageEditor() {
   const params = useParams();
   const searchParams = useSearchParams();
   const pageId = params?.pageId as string;
-  const isDraft = pageId === 'new';
 
-  // Optimized: Derive projectId immediately for lag-free initialization
+  // Falls back to localStorage so projectId survives navigation events that strip query params
   const projectId = searchParams.get('projectId') || (typeof window !== 'undefined' ? localStorage.getItem('currentProjectId') : null);
 
-  const [selectedPage, setSelectedPage] = useState<PageItem | null>(null);
-  const [loadingPage, setLoadingPage] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle' | 'draft'>('idle');
-  const [title, setTitle] = useState('');
-  const [showHistory, setShowHistory] = useState(false);
-  const [historyMock, setHistoryMock] = useState<PageHistoryItem[]>([]);
-  const [showDocSidebar, setShowDocSidebar] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const {
+    selectedPage, setSelectedPage,
+    title, setTitle,
+    loadingPage,
+    historyMock, setHistoryMock,
+    isDraft,
     filteredPages, error, searchQuery, setSearchQuery,
     updatePage, createPage, deletePage, refetch,
-  } = usePages(projectId);
+  } = usePageContent(pageId, projectId);
 
-  useEffect(() => {
-    if (!pageId) return;
+  // saveStatus starts as 'draft' for new pages, 'idle' otherwise
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle' | 'draft'>(
+    () => (pageId === 'new' ? 'draft' : 'idle'),
+  );
+  const [showHistory, setShowHistory] = useState(false);
+  const [showDocSidebar, setShowDocSidebar] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-    if (isDraft) {
-      const templateId = searchParams.get('template') || 'blank';
-      const template = predefinedTemplates.find(t => t.id === templateId) || predefinedTemplates[0];
-      const defaultTitle = template.id === 'blank' ? 'Untitled Page' : template.name;
-      setSelectedPage({ id: 'new', title: defaultTitle, content: template.content, isStarred: false });
-      setTitle(defaultTitle);
-      setSaveStatus('draft');
-      setHistoryMock([]);
-      return;
-    }
-
-    const fetchPageDetail = async () => {
-      setLoadingPage(true);
-      try {
-        const response = await axiosInstance.get(`/api/pages/${pageId}`);
-        const pageData: PageItem = {
-          id: response.data.id,
-          title: response.data.title,
-          content: response.data.content || '',
-          updatedAt: response.data.updatedAt,
-          isStarred: false,
-        };
-        setSelectedPage(pageData);
-        setTitle(pageData.title);
-        setHistoryMock([
-          {
-            id: 'h1',
-            pageId: response.data.id,
-            action: 'edited',
-            editedBy: 'Current User',
-            editedAt: response.data.updatedAt || new Date().toISOString(),
-          },
-          {
-            id: 'h2',
-            pageId: response.data.id,
-            action: 'created',
-            editedBy: 'Document Owner',
-            editedAt: response.data.createdAt || new Date(Date.now() - 86400000).toISOString(),
-          },
-        ]);
-      } catch (err) {
-        console.error('Error fetching page:', err);
-      } finally {
-        setLoadingPage(false);
-      }
-    };
-
-    fetchPageDetail();
-  }, [pageId, isDraft, searchParams]);
+  // Tracks the latest editor HTML without waiting for the 800ms debounce.
+  // Used by handleManualCreate so Publish always captures what the user typed.
+  const latestContentRef = useRef<string>('');
+  const setLatestContent = useCallback((html: string) => {
+    latestContentRef.current = html;
+  }, []);
 
   const handleUpdateContent = useCallback(async (htmlContent: string) => {
     if (!selectedPage || !projectId) return;
@@ -107,7 +62,7 @@ export function usePageEditor() {
       console.error('Error auto-saving:', err);
       setSaveStatus('error');
     }
-  }, [selectedPage, title, projectId, updatePage, isDraft]);
+  }, [selectedPage, title, projectId, updatePage, isDraft, setSelectedPage, setHistoryMock]);
 
   // Debounced title save
   useEffect(() => {
@@ -129,14 +84,18 @@ export function usePageEditor() {
     }, 1000);
 
     return () => clearTimeout(timeoutId);
-  }, [title, selectedPage, projectId, updatePage, refetch, isDraft]);
+  }, [title, selectedPage, projectId, updatePage, refetch, isDraft, setSelectedPage]);
 
   const handleManualCreate = async () => {
     if (!selectedPage || !projectId) return;
     setSaveStatus('saving');
+    // Use latestContentRef to capture whatever is in the editor right now,
+    // even if the 800ms debounce hasn't fired yet.
+    const content = latestContentRef.current || selectedPage.content || '';
     try {
-      const newPage = await createPage(title, selectedPage.content || '');
+      const newPage = await createPage(title, content);
       setSaveStatus('saved');
+      // replace() instead of push() so the Back button skips the blank draft and returns to the page list
       router.replace(projectId ? `/pages/${newPage.id}?projectId=${projectId}` : `/pages/${newPage.id}`);
     } catch (err) {
       console.error('Error creating document:', err);
@@ -144,12 +103,18 @@ export function usePageEditor() {
     }
   };
 
-  const handleDeletePage = async () => {
+  const handleDeletePage = () => {
     if (isDraft) {
       router.push(projectId ? `/pages?projectId=${projectId}` : '/pages');
       return;
     }
-    if (!selectedPage || !confirm('Are you sure you want to delete this document?')) return;
+    if (!selectedPage) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedPage) return;
+    setShowDeleteConfirm(false);
     try {
       await deletePage(selectedPage.id);
       router.push(projectId ? `/pages?projectId=${projectId}` : '/pages');
@@ -205,8 +170,11 @@ export function usePageEditor() {
     error,
     searchQuery, setSearchQuery,
     handleUpdateContent,
+    setLatestContent,
     handleManualCreate,
     handleDeletePage,
+    handleConfirmDelete,
+    showDeleteConfirm, setShowDeleteConfirm,
     handleFileImport,
     handleExport,
   };

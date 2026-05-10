@@ -1,5 +1,4 @@
 "use client";
-export const dynamic = 'force-dynamic';
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TaskHeader from './TaskHeader';
@@ -12,6 +11,7 @@ interface TaskData {
   id: number;
   title: string;
   description: string;
+  projectId: number;
   projectName: string;
   status: string;
   priority: string;
@@ -43,15 +43,27 @@ function TaskPageContent() {
 
   const fetchTaskData = async () => {
     if (!taskId) return;
+    const cacheKey = `planora:task:${taskId}`;
+    // Stale-while-revalidate: show cached data instantly so the modal feels responsive,
+    // then overwrite with fresh data once the API responds.
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setTaskData(JSON.parse(cached) as TaskData);
+        setLoading(false);
+      } catch { /* ignore corrupt cache */ }
+    }
     try {
-      setLoading(true);
       const response = await api.get(`/api/tasks/${taskId}`);
       setTaskData(response.data);
+      localStorage.setItem(cacheKey, JSON.stringify(response.data));
       setError(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch task data');
-      setTaskData(null);
+      if (!cached) {
+        setError(err.response?.data?.message || 'Failed to fetch task data');
+        setTaskData(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -82,7 +94,8 @@ function TaskPageContent() {
     
     try {
       await api.put(`/api/tasks/${taskId}`, updates);
-      // Refresh task data after update
+      // Invalidate after update so the next page visit fetches fresh data instead of the old snapshot
+      localStorage.removeItem(`planora:task:${taskId}`);
       await fetchTaskData();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
@@ -95,15 +108,15 @@ function TaskPageContent() {
     window.history.back();
   };
 
-  // Only render after mounting to avoid hydration issues
+  // Defer render until after mount so useSearchParams (which is client-only) has resolved
   if (!mounted) {
     return null;
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-6xl bg-white rounded-xl p-6 space-y-4">
+      <div className="min-h-screen bg-[#F7F8FA] flex items-center justify-center p-4">
+        <div className="w-full max-w-[1200px] bg-white rounded-2xl border border-[#E5E7EB] p-6 space-y-4 shadow-sm">
           <div className="skeleton h-8 w-48 rounded-lg" />
           <div className="skeleton h-5 w-full rounded-lg" />
           <div className="skeleton h-5 w-3/4 rounded-lg" />
@@ -115,13 +128,13 @@ function TaskPageContent() {
 
   if (error || !taskData) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+      <div className="min-h-screen bg-[#F7F8FA] flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl border border-[#E5E7EB] shadow-sm max-w-md w-full">
           <h2 className="text-red-600 font-semibold mb-2">Error Loading Task</h2>
           <p className="text-gray-600 mb-4">{error || 'Task not found'}</p>
           <button
             onClick={handleClose}
-            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors"
+            className="w-full bg-[#155DFC] text-white py-2 rounded-xl hover:bg-[#0042A8] transition-colors"
           >
             Go Back
           </button>
@@ -131,8 +144,8 @@ function TaskPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-3 sm:p-4">
-      <div className="w-full max-w-6xl bg-white border border-gray-200 shadow-2xl flex flex-col font-sans rounded-xl overflow-hidden" style={{ maxHeight: '92dvh' }}>
+    <div className="min-h-screen bg-[#F7F8FA] flex items-center justify-center p-3 sm:p-4">
+      <div className="w-full max-w-[1200px] bg-white border border-[#E5E7EB] shadow-2xl flex flex-col font-sans rounded-2xl overflow-hidden" style={{ maxHeight: '94dvh' }}>
         
         {/* 1. Header Component */}
         <TaskHeader 
@@ -141,7 +154,7 @@ function TaskPageContent() {
           onClose={handleClose} 
         />
 
-        <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden">
+        <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-y-auto md:overflow-hidden">
           
           {/* 2. Main Content Component (Left Side) */}
           <TaskMainContent 
@@ -156,6 +169,7 @@ function TaskPageContent() {
 
           {/* 3. Sidebar Component (Right Side) — full width on mobile, fixed on lg+ */}
           <TaskSidebar 
+              projectId={taskData.projectId}
               status={taskData.status}
               assignee={taskData.assigneeName}
               reporter={taskData.reporterName}

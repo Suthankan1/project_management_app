@@ -1,86 +1,35 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import api from '@/lib/axios';
-import { getValidToken, saveToken, saveRefreshToken, setRememberMe } from '@/lib/auth';
+import { Eye, EyeOff } from 'lucide-react';
+import { useLoginForm } from './useLoginForm';
 
-
+/*
+ * The Login View Component.
+ * Because we abstracted the logic into `useLoginForm`, 
+ * this file is extremely clean. Its only job is to bind the state variables 
+ * to the HTML inputs and render the UI.
+ */
 export default function LoginPage() {
-    const router = useRouter();
-
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [remember, setRemember] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    // NTH-3: Skip login page if already authenticated
-    useEffect(() => {
-        if (getValidToken()) {
-            router.replace('/dashboard');
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setError('');
-
-        try {
-            // 1. Sign in using backend API
-            const response = await api.post('/api/auth/login', {
-                email: email.toLowerCase(),
-                password: password
-            });
-
-            // 2. Check if login was successful
-            if (response.data.success) {
-                // NTH-2: Persist rememberMe flag before saving tokens so saveToken
-                // picks the right storage (localStorage vs sessionStorage).
-                setRememberMe(remember);
-                saveToken(response.data.token);
-                if (response.data.refreshToken) {
-                    saveRefreshToken(response.data.refreshToken);
-                }
-
-                // 3. Redirect to dashboard
-                router.push('/dashboard');
-            } else {
-                setError(response.data.message || 'Login failed. Please try again.');
-            }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (error: any) {
-            let errorMessage = "Login failed. Please try again.";
-            const errorData = error.response?.data;
-
-            if (typeof errorData === 'string') {
-                errorMessage = errorData;
-            } else if (errorData?.message) {
-                errorMessage = errorData.message;
-            }
-
-            if (error.response?.status === 403) {
-                setError(errorMessage || "Email is not verified. Please check your email.");
-            } else if (error.response?.status === 401) {
-                setError(errorMessage || "Incorrect username or password");
-            } else {
-                setError(errorMessage);
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    // Destructure the state and handlers from our custom business logic hook.
+  const {
+    email, setEmail,
+    password, setPassword,
+    remember, setRemember,
+    showPassword, setShowPassword,
+    isLoading,
+    error,
+    handleLogin,
+  } = useLoginForm();
 
     return (
 
         <div className='min-h-screen flex flex-col items-center justify-center p-4'>
 
-            {/* 1. Back to Home Link */}
+            {/* ── 1. Navigation ── */}
             <div className="w-full max-w-[420px] mb-4">
                 <Link href={"/"} className='inline-flex items-center text-sm text-gray-500 hover:text-gray-900 transition-colors'>
+                    {/* Accessibility: aria-hidden="true" tells screen readers to ignore this decorative icon */}
                     <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                     </svg>
@@ -88,7 +37,7 @@ export default function LoginPage() {
                 </Link>
             </div>
 
-            {/* 2. Header Section */}
+            {/* ── 2. Brand Header ── */}
             <div className='mb-8 text-center'>
                 <div className='mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg mb-4' aria-hidden="true">
                     <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -99,9 +48,11 @@ export default function LoginPage() {
                 <p className="text-gray-500 text-sm mt-2">Project Management Platform</p>
             </div>
 
-            {/* 3. Main Card Container */}
-            <div className='w-full max-w-[420px] glass-panel rounded-[24px] shadow-xl p-8'>
-                {/* The Tab Switcher */}
+            {/* ── 3. Main Card Container ── */}
+            <div className='w-full max-w-[420px] glass-panel rounded-[24px] shadow-xl p-4 sm:p-8'>
+
+                {/* ── Tab Switcher ── */}
+                {/* Accessibility: role="tablist" and "tab" help screen readers understand this UI paradigm */}
                 <div className='flex bg-gray-100 p-1.5 rounded-xl mb-8' role="tablist">
                     <button
                         role="tab"
@@ -120,7 +71,8 @@ export default function LoginPage() {
                     </Link>
                 </div>
 
-                {/* FEATURE-1: Error banner with role="alert" and aria-live */}
+                {/* ── Error Banner ── */}
+                {/* Accessibility: aria-live="polite" ensures the error is read aloud exactly when it appears */}
                 {error && (
                     <div
                         id="login-error"
@@ -132,42 +84,66 @@ export default function LoginPage() {
                     </div>
                 )}
 
-                {/* The Form */}
+                {/* ── The Form ── */}
+                {/* noValidate tells the browser to let React handle the validation logic and error messages */}
                 <form className='space-y-5' onSubmit={handleLogin} noValidate>
-                    {/* FEATURE-1: id + htmlFor pairing on all label/input pairs */}
+
+                    {/* Email Input */}
                     <div>
+                        {/* Accessibility: htmlFor matches the input ID, making the label clickable */}
                         <label htmlFor="login-email" className="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">
                             Email Address
                         </label>
                         <input
                             id="login-email"
                             type="email"
+                            // Mobile OS hints for better UX on phones
                             autoComplete="email"
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-sm"
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            inputMode="email"
+                            // The text-[16px] prevents iOS Safari from auto-zooming
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-[16px] sm:text-sm"
                             placeholder="Enter your email"
                             value={email}
+                            // Data Normalization: Force lowercase immediately to prevent case-sensitive login bugs later.
                             onChange={(e) => setEmail(e.target.value.toLowerCase())}
+                            // Accessibility: Links this specific input to the error banner above
                             aria-describedby={error ? 'login-error' : undefined}
                             aria-invalid={!!error}
                         />
                     </div>
 
+                    {/* Password Input */}
                     <div>
                         <label htmlFor="login-password" className="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">Password</label>
-                        <input
-                            id="login-password"
-                            type="password"
-                            autoComplete="current-password"
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-sm"
-                            placeholder="Enter your password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            aria-describedby={error ? 'login-error' : undefined}
-                            aria-invalid={!!error}
-                        />
+                        <div className="relative">
+                            <input
+                                id="login-password"
+                                type={showPassword ? 'text' : 'password'}
+                                autoComplete="current-password"
+                                className="w-full px-4 py-3 pr-11 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-[16px] sm:text-sm"
+                                placeholder="Enter your password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                aria-describedby={error ? 'login-error' : undefined}
+                                aria-invalid={!!error}
+                            />
+
+                            {/* Visibility Toggle */}
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword((v) => !v)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                tabIndex={-1}
+                                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            >
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
                     </div>
 
-                    {/* NTH-2: Remember-me checkbox + Forgot password link */}
+                    {/* ── Utilities: Remember Me & Forgot Password ── */}
                     <div className="flex items-center justify-between mt-2">
                         <label htmlFor="login-remember" className="flex items-center gap-2 cursor-pointer">
                             <input
@@ -184,15 +160,18 @@ export default function LoginPage() {
                         </Link>
                     </div>
 
+                    {/* ── Submit Button ── */}
+                     {/* Accessibility: The button's disabled state is managed by the isLoading flag to prevent multiple submissions */}
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className={`w-full font-bold py-2 rounded-lg transition-colors text-white ${isLoading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                        className={`w-full font-bold py-2 min-h-[44px] rounded-lg transition-colors text-white ${isLoading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
                     >
                         {isLoading ? 'Signing in...' : 'Sign In'}
                     </button>
                 </form>
 
+                {/* ── Footer ── */}
                 <p className="mt-8 text-center text-xs text-gray-400">
                     © 2026 Planora. All rights reserved.
                 </p>

@@ -4,6 +4,9 @@ import java.time.LocalDateTime;
 
 import org.hibernate.annotations.CreationTimestamp;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -21,7 +24,14 @@ import lombok.Setter;
 @NoArgsConstructor
 @Setter
 @Getter
+@JsonIgnoreProperties(ignoreUnknown = true)
+// Central chat event record used for team, room, private, and thread messages.
 public class ChatMessage {
+    
+    // Reactions are excluded from default serialization to prevent recursive payload expansion.
+    @jakarta.persistence.OneToMany(mappedBy = "message", cascade = jakarta.persistence.CascadeType.ALL, fetch = jakarta.persistence.FetchType.LAZY)
+    @JsonIgnore
+    private java.util.List<ChatReaction> reactions = new java.util.ArrayList<>();
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -40,6 +50,7 @@ public class ChatMessage {
 
     private ChatType chatType;
 
+    // parentMessageId links replies to a thread root while keeping a single message table.
     private Long parentMessageId;
 
     @Enumerated(EnumType.STRING)
@@ -47,6 +58,7 @@ public class ChatMessage {
 
     private Boolean deleted = false;
 
+    // Soft-delete metadata allows moderation/history flows without hard deletes.
     private LocalDateTime deletedAt;
 
     private LocalDateTime editedAt;
@@ -72,36 +84,16 @@ public class ChatMessage {
         MARKDOWN
     }
 
-    // Getters and Setters
-//    public MessageType getType() {
-//        return type;
-//    }
-//
-//    public void setType(MessageType type) {
-//        this.type = type;
-//    }
-//
-//    public String getContent() {
-//        return content;
-//    }
-//
-//    public void setContent(String content) {
-//        this.content = content;
-//    }
-//
-//    public String getSender() {
-//        return sender;
-//    }
-//
-//    public void setSender(String sender) {
-//        this.sender = sender;
-//    }
-//
-//    public String getRecipient() {
-//        return recipient;
-//    }
-//
-//    public void setRecipient(String recipient) {
-//        this.recipient = recipient;
-//    }
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ChatMessage message = (ChatMessage) o;
+        return java.util.Objects.equals(id, message.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(id);
+    }
 }
