@@ -41,8 +41,11 @@ export function useChatMessages(projectId: string) {
         [msg.roomId!]: [msg, ...(prev[msg.roomId!] || [])]
       }));
     } else if (msg.recipient) {
-      // For DMs, we need to know who the "partner" is.
-      // This will be handled in useChat.ts when merging socket events.
+      // Private message - add to both sender and recipient conversation
+      setPrivateMessages(prev => ({
+        ...prev,
+        [msg.recipient!]: [msg, ...(prev[msg.recipient!] || [])]
+      }));
     } else {
       setMessages(prev => [msg, ...prev]);
     }

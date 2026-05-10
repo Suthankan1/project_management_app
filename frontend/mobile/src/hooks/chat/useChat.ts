@@ -69,6 +69,7 @@ export function useChat(projectId: string) {
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<any>(null);
+  const handleSocketMessageRef = useRef<((frame: any) => void) | null>(null);
 
   const roomsHook = useChatRooms(projectId);
   const messagesHook = useChatMessages(projectId);
@@ -123,12 +124,14 @@ export function useChat(projectId: string) {
               setIsSocketConnected(true);
               setError('');
               // Subscribe to channels
-              ws.send(buildStompSubscribe('sub-team', `/topic/project.${projectId}`));
-              ws.send(buildStompSubscribe('sub-private', `/user/queue/private`));
-              ws.send(buildStompSubscribe('sub-typing', `/user/queue/typing`));
-              ws.send(buildStompSubscribe('sub-notifications', `/user/queue/notifications`));
+              ws.send(buildStompSubscribe('sub-team', `/topic/project/${projectId}/public`));
+              ws.send(buildStompSubscribe('sub-private', `/user/queue/project/${projectId}/messages`));
+              ws.send(buildStompSubscribe('sub-typing-team', `/topic/project/${projectId}/typing/team`));
+              ws.send(buildStompSubscribe('sub-presence', `/topic/project/${projectId}/presence`));
+              ws.send(buildStompSubscribe('sub-typing-private', `/user/queue/project/${projectId}/typing/private`));
+              ws.send(buildStompSubscribe('sub-unread', `/user/queue/project/${projectId}/unread-badge`));
             } else if (frame.command === 'MESSAGE') {
-              handleSocketMessage(frame);
+              handleSocketMessageRef.current?.(frame);
             }
           } catch (inner) {
             console.error('[Chat] Failed to parse STOMP frame', inner, e.data);
@@ -161,45 +164,65 @@ export function useChat(projectId: string) {
     }
   }, [projectId]);
 
-  const handleSocketMessage = (frame: any) => {
+  const handleSocketMessage = useCallback((frame: any) => {
     const dest = frame.headers.destination;
-    const body = JSON.parse(frame.body);
-
-    if (dest.includes('/topic/project.') && !dest.includes('.room.')) {
-      // Team message
-      messagesHook.addMessage(body);
-      unreadHook.setTeamLastMessage(body);
-      if (body.sender !== currentUser) {
-        unreadHook.setTeamUnseenCount(prev => prev + 1);
-      }
-    } else if (dest.includes('.room.')) {
-      // Room message
-      messagesHook.addMessage(body);
-      if (body.roomId) {
-        unreadHook.setRoomLastMessages(prev => ({ ...prev, [body.roomId]: body }));
-        if (body.sender !== currentUser && body.roomId !== selectedRoomId) {
-          unreadHook.setRoomUnseenCounts(prev => ({ ...prev, [body.roomId]: (prev[body.roomId] || 0) + 1 }));
+    try {
+      const body = JSON.parse(frame.body);
+      
+      // Team messages
+      if (dest.includes(`/topic/project/${projectId}/public`)) {
+        messagesHook.addMessage(body);
+        unreadHook.setTeamLastMessage(body);
+        if (body.sender && body.sender.toLowerCase() !== currentUser.toLowerCase()) {
+          unreadHook.setTeamUnseenCount(prev => prev + 1);
         }
-      }
-    } else if (dest === '/user/queue/private') {
-      // Private message
-      const partner = body.sender === currentUser ? body.recipient : body.sender;
-      if (partner) {
-        messagesHook.setPrivateMessages(prev => ({
-          ...prev,
-          [partner]: [body, ...(prev[partner] || [])]
-        }));
-        unreadHook.setPrivateLastMessages(prev => ({ ...prev, [partner]: body }));
-        if (body.sender !== currentUser && partner !== selectedUser) {
-          unreadHook.setPrivateUnseenCounts(prev => ({ ...prev, [partner]: (prev[partner] || 0) + 1 }));
+      } 
+      // Room messages
+      else if (dest.includes(`/topic/project/${projectId}/room/`)) {
+        messagesHook.addMessage(body);
+        if (body.roomId) {
+          unreadHook.setRoomLastMessages(prev => ({ ...prev, [body.roomId]: body }));
+          if (body.sender && body.sender.toLowerCase() !== currentUser.toLowerCase() && body.roomId !== selectedRoomId) {
+            unreadHook.setRoomUnseenCounts(prev => ({ ...prev, [body.roomId]: (prev[body.roomId] || 0) + 1 }));
+          }
         }
+      } 
+      // Private messages
+      else if (dest.includes(`/user/queue/project/${projectId}/messages`)) {
+        messagesHook.addMessage(body);
+        const partner = body.sender === currentUser ? body.recipient : body.sender;
+        if (partner) {
+          unreadHook.setPrivateLastMessages(prev => ({ ...prev, [partner]: body }));
+          if (body.sender && body.sender.toLowerCase() !== currentUser.toLowerCase() && partner !== selectedUser) {
+            unreadHook.setPrivateUnseenCounts(prev => ({ ...prev, [partner]: (prev[partner] || 0) + 1 }));
+          }
+        }
+      } 
+      // Team typing events
+      else if (dest.includes(`/topic/project/${projectId}/typing/team`)) {
+        presenceHook.handleTypingEvent(body);
+      } 
+      // Private typing events
+      else if (dest.includes(`/user/queue/project/${projectId}/typing/private`)) {
+        presenceHook.handleTypingEvent(body);
       }
-    } else if (dest === '/user/queue/typing') {
-      presenceHook.handleTypingEvent(body);
-    } else if (dest === '/user/queue/notifications') {
-      unreadHook.loadSummaries();
+      // Presence events
+      else if (dest.includes(`/topic/project/${projectId}/presence`)) {
+        presenceHook.handlePresenceEvent(body);
+      }
+      // Unread badge updates
+      else if (dest.includes(`/user/queue/project/${projectId}/unread-badge`)) {
+        unreadHook.loadSummaries();
+      }
+    } catch (parseErr) {
+      console.error('[Chat] Failed to parse message body:', parseErr);
     }
-  };
+  }, [projectId, currentUser, selectedRoomId, selectedUser, messagesHook, unreadHook, presenceHook]);
+
+  // Update the ref whenever handleSocketMessage changes
+  useEffect(() => {
+    handleSocketMessageRef.current = handleSocketMessage;
+  }, [handleSocketMessage]);
 
   useEffect(() => {
     const init = async () => {
@@ -251,24 +274,34 @@ export function useChat(projectId: string) {
 
   const handleSelectRoom = (id: number | null) => {
     selectRoom(id);
-    if (id) {
+    if (id && socketRef.current && isSocketConnected) {
       setSelectedUser(null);
       messagesHook.loadRoomHistory(id);
       chatService.markRoomRead(projectId, id);
       unreadHook.setRoomUnseenCounts(prev => ({ ...prev, [id]: 0 }));
+      // Subscribe to room topic dynamically
+      socketRef.current.send(buildStompSubscribe(`sub-room-${id}`, `/topic/project/${projectId}/room/${id}`));
+    } else {
+      setSelectedUser(null);
+      messagesHook.loadRoomHistory(id!);
+      chatService.markRoomRead(projectId, id!);
+      unreadHook.setRoomUnseenCounts(prev => ({ ...prev, [id!]: 0 }));
     }
   };
 
   const sendMessage = async (content: string, recipient?: string | null) => {
     if (!socketRef.current || !isSocketConnected) return;
     const body = JSON.stringify({ content, recipient, roomId: null });
-    socketRef.current.send(buildStompSend(recipient ? '/app/chat.private' : `/app/chat.project.${projectId}`, body));
+    const destination = recipient 
+      ? `/app/project/${projectId}/chat.sendPrivateMessage`
+      : `/app/project/${projectId}/chat.sendMessage`;
+    socketRef.current.send(buildStompSend(destination, body));
   };
 
   const sendRoomMessage = async (content: string, roomId: number) => {
     if (!socketRef.current || !isSocketConnected) return;
     const body = JSON.stringify({ content, roomId });
-    socketRef.current.send(buildStompSend(`/app/chat.project.${projectId}.room.${roomId}`, body));
+    socketRef.current.send(buildStompSend(`/app/project/${projectId}/room/${roomId}/send`, body));
   };
 
   const sendTyping = (isTyping: boolean) => {
@@ -279,7 +312,7 @@ export function useChat(projectId: string) {
       recipient: selectedUser,
       isPrivate: !!selectedUser
     });
-    socketRef.current.send(buildStompSend('/app/chat.typing', body));
+    socketRef.current.send(buildStompSend(`/app/project/${projectId}/typing`, body));
   };
 
   return {

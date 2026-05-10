@@ -52,7 +52,7 @@ export function ChatInput(props: ChatInputProps) {
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [inputHeight, setInputHeight] = useState(44);
 
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleTextChange = (text: string) => {
     setInput(text);

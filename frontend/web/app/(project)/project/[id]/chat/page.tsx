@@ -27,7 +27,10 @@ export default function ChatInterface() {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
-  const [showMobileThread, setShowMobileThread] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 1024;
+  });
 
   const {
     currentUser,
@@ -99,6 +102,17 @@ export default function ChatInterface() {
     };
 
     handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      setIsMobileViewport(window.innerWidth < 1024);
+    };
+
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -247,16 +261,7 @@ export default function ChatInterface() {
     loadRoomHistory(normalizedRoomId);
   }, [selectedRoomId, hasSelectedRoom, loadRoomHistory]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!activeThreadRoot) {
-      setShowMobileThread(false);
-      return;
-    }
-    if (window.innerWidth < 1024) {
-      setShowMobileThread(true);
-    }
-  }, [activeThreadRoot]);
+  const showMobileThread = Boolean(activeThreadRoot) && isMobileViewport;
 
   const handleSendMessage = (content: string) => {
     if (hasSelectedRoom) sendRoomMessage(content, selectedRoomId as number);
@@ -438,7 +443,6 @@ export default function ChatInterface() {
               transition={{ duration: 0.2 }}
               className="absolute inset-0 bg-black/45"
               onClick={() => {
-                setShowMobileThread(false);
                 closeThread();
               }}
             />
@@ -454,7 +458,6 @@ export default function ChatInterface() {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowMobileThread(false);
                     closeThread();
                   }}
                   className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"

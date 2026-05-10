@@ -16,29 +16,36 @@ export function useChatPresence(projectId: string) {
     }
   }, [projectId]);
 
-  const handleTypingEvent = useCallback((event: { username: string; roomId?: number; isTyping: boolean; isPrivate?: boolean }) => {
-    const { username, roomId, isTyping, isPrivate } = event;
+  const handleTypingEvent = useCallback((event: { sender: string; scope: string; roomId?: number; recipient?: string; typing: boolean }) => {
+    const { sender, scope, roomId, recipient, typing: isTyping } = event;
 
-    if (roomId) {
+    if (scope === 'ROOM' && roomId) {
       setRoomTypingUsers(prev => {
         const users = prev[roomId] || [];
         const nextUsers = isTyping
-          ? [...new Set([...users, username])]
-          : users.filter(u => u !== username);
+          ? [...new Set([...users, sender])]
+          : users.filter(u => u !== sender);
         return { ...prev, [roomId]: nextUsers };
       });
-    } else if (isPrivate) {
+    } else if (scope === 'PRIVATE') {
       setPrivateTypingUsers(prev => {
         return isTyping
-          ? [...new Set([...prev, username])]
-          : prev.filter(u => u !== username);
+          ? [...new Set([...prev, sender])]
+          : prev.filter(u => u !== sender);
       });
-    } else {
+    } else if (scope === 'TEAM') {
       setTeamTypingUsers(prev => {
         return isTyping
-          ? [...new Set([...prev, username])]
-          : prev.filter(u => u !== username);
+          ? [...new Set([...prev, sender])]
+          : prev.filter(u => u !== sender);
       });
+    }
+  }, []);
+
+  const handlePresenceEvent = useCallback((event: { type: string; user: string; onlineUsers: string[] }) => {
+    const { onlineUsers: users } = event;
+    if (Array.isArray(users)) {
+      setOnlineUsers(users);
     }
   }, []);
 
@@ -50,5 +57,6 @@ export function useChatPresence(projectId: string) {
     privateTypingUsers,
     loadPresence,
     handleTypingEvent,
+    handlePresenceEvent,
   };
 }

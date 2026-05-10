@@ -220,7 +220,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
 
       <SectionList
         sections={sections}
-        keyExtractor={(item, index) => item.type + (item.id || item.username || index)}
+        keyExtractor={(item: any, index: number) => item?.id ? item.type + item.id : item?.username ? item.type + item.username : item.type + index}
         renderItem={renderItem}
         renderSectionHeader={({ section: { title } }) => (
           title ? <Text style={styles.sectionHeader}>{title}</Text> : null
