@@ -16,7 +16,6 @@ import BacklogFilterBar from './components/BacklogFilterBar';
 import BacklogTaskDetail from './components/BacklogTaskDetail';
 import { useBacklogData } from './hooks/useBacklogData';
 import { fetchProject } from '../kanban/api';
-
 export default function BacklogPage() {
     const searchParams = useSearchParams();
     const router = useRouter();
