@@ -42,6 +42,14 @@ export async function updateTaskStatus(
   }
 }
 
+export async function deleteKanbanColumn(columnId: number): Promise<void> {
+  try {
+    await axios.delete(`/api/kanban-columns/${columnId}`);
+  } catch (error) {
+    console.error('Error deleting kanban column:', error);
+    throw error;
+  }
+}
 /**
  * Update task with due date and other details
  * @param taskId - The task ID to update
