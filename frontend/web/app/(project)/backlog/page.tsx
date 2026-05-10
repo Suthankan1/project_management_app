@@ -60,6 +60,11 @@ function BacklogTaskRow({
 
     const isOverdue = !!(task.dueDate && task.status !== 'DONE' &&
         new Date(task.dueDate + 'T00:00:00') < new Date(new Date().toDateString()));
+    const dueDateText = task.dueDate
+        ? new Date(task.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : 'Set date';
+    const assigneeName = task.assigneeName || 'Unassigned';
+    const statusText = task.status?.replace(/_/g, ' ');
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -72,7 +77,7 @@ function BacklogTaskRow({
 
     return (
         <div
-            className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 min-h-[40px] rounded-lg border border-[#EAECF0] cursor-pointer select-none transition-colors ${
+            className={`group rounded-xl border border-[#EAECF0] cursor-pointer select-none transition-all duration-150 ${
                 isOverdue ? 'bg-[#FEE2E2] hover:bg-[#FEE2E2]' : 'bg-white hover:bg-[#F8FAFF]'
             }`}
             onClick={() => {
@@ -81,102 +86,117 @@ function BacklogTaskRow({
                 else onClick(task);
             }}
         >
-            {/* Priority indicator */}
-            <span className="shrink-0 w-1.5 h-6 rounded-full" style={{ background: priorityColor }} />
-
-            {/* Task ID */}
-            <span className="hidden md:block text-[11px] font-mono text-[#9CA3AF] shrink-0 w-14">#{task.id}</span>
-
-            {/* Title + labels */}
-            <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                <span className="md:hidden text-[11px] font-mono text-[#9CA3AF] shrink-0">#{task.id}</span>
-                <p className="text-[12px] font-medium text-[#101828] truncate">{task.title}</p>
-                {task.labels && task.labels.length > 0 && (
-                    <div className="hidden sm:flex gap-1">
-                        {task.labels.slice(0, 2).map((l) => (
-                            <span key={l.id} style={hexToLabelStyle(l.color ?? '#6366F1')} className="px-1.5 py-0.5 rounded-full text-[10px] font-medium">
-                                {l.name}
-                            </span>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* Right side */}
-            <div className="shrink-0 flex items-center gap-1.5 sm:gap-2">
-                {/* Due date */}
-                {task.dueDate && (
-                    <span className={`hidden sm:block text-[11px] px-1.5 py-0.5 rounded-full border ${
-                        isOverdue
-                            ? 'bg-[#FEF3F2] text-[#B42318] border-[#FDA29B]'
-                            : 'bg-[#F9FAFB] text-[#344054] border-[#EAECF0]'
-                    }`}>
-                        {new Date(task.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
-                )}
-
-                {/* Assignee avatar */}
-                {task.assigneeName && (
-                    <AssigneeAvatar name={task.assigneeName} profilePicUrl={task.assigneePhotoUrl} size={22} />
-                )}
-
-                {/* Story points */}
-                {task.storyPoint != null && (
-                    <span className="text-[11px] font-semibold text-[#374151] bg-[#F3F4F6] rounded px-1.5 py-0.5">
-                        {task.storyPoint}
-                    </span>
-                )}
-
-                {/* Status badge */}
-                <div className="relative" ref={statusRef}>
-                    <button
-                        onClick={(e) => { e.stopPropagation(); setStatusOpen(s => !s); }}
-                        className={`text-[10px] sm:text-[11px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${statusClass} whitespace-nowrap`}
-                    >
-                        <span className="max-w-[60px] sm:max-w-none truncate">{task.status?.replace(/_/g, ' ')}</span>
-                        <ChevronDown size={10} className="shrink-0" />
-                    </button>
-                    {statusOpen && (
-                        <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-[#E5E7EB] rounded-xl shadow-lg py-1 min-w-[130px]">
-                            {STATUS_OPTIONS.map((s) => (
-                                <button
-                                    key={s}
-                                    onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, s); setStatusOpen(false); }}
-                                    className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F9FAFB] transition-colors ${task.status === s ? 'font-semibold text-[#155DFC]' : 'text-[#374151]'}`}
-                                >
-                                    {s.replace(/_/g, ' ')}
-                                </button>
-                            ))}
+            <div className="grid gap-2.5 px-3 py-2.5 sm:px-3.5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_auto] lg:items-stretch">
+                {/* Task identity */}
+                <div className="flex min-w-0 items-start gap-3 lg:pr-4 lg:border-r lg:border-[#EAECF0]">
+                    <span className="mt-1 shrink-0 w-1.5 h-8 rounded-full" style={{ background: priorityColor }} />
+                    <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <span className="text-[11px] font-mono text-[#9CA3AF] shrink-0">#{task.id}</span>
+                            <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[#101828]">{task.title}</p>
                         </div>
-                    )}
+                        {task.labels && task.labels.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                {task.labels.slice(0, 2).map((l) => (
+                                    <span
+                                        key={l.id}
+                                        style={hexToLabelStyle(l.color ?? '#6366F1')}
+                                        className="px-2 py-0.5 rounded-full text-[10px] font-medium"
+                                    >
+                                        {l.name}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                <PriorityIcon size={13} color={priorityColor} className="shrink-0" />
-
-                {/* Context menu */}
-                <div className="relative" ref={menuRef}>
-                    <button
-                        onClick={(e) => { e.stopPropagation(); setMenuOpen(m => !m); }}
-                        className="p-1 rounded hover:bg-[#F3F4F6] text-[#9CA3AF] transition-colors"
+                {/* Due date */}
+                    <div className="grid gap-1 min-w-0 lg:px-3.5 lg:border-r lg:border-[#EAECF0]">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#98A2B3]">Due Date</span>
+                    <span
+                        className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[12px] font-medium ${
+                            task.dueDate
+                                ? isOverdue
+                                    ? 'bg-[#FEF3F2] text-[#B42318] border-[#FDA29B]'
+                                    : 'bg-[#F9FAFB] text-[#344054] border-[#EAECF0]'
+                                : 'bg-[#F9FAFB] text-[#98A2B3] border-[#EAECF0]'
+                        }`}
                     >
-                        <MoreHorizontal size={14} />
-                    </button>
-                    {menuOpen && (
-                        <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-[#E5E7EB] rounded-xl shadow-lg py-1 min-w-[120px]">
-                            <button
-                                onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onOpenModal(task.id); }}
-                                className="w-full text-left px-3 py-1.5 text-[12px] text-[#374151] hover:bg-[#F9FAFB] transition-colors"
-                            >
-                                Edit
-                            </button>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(task.id); }}
-                                className="w-full text-left px-3 py-1.5 text-[12px] text-red-600 hover:bg-red-50 transition-colors"
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    )}
+                        {dueDateText}
+                    </span>
+                </div>
+
+                {/* Assignee */}
+                    <div className="grid gap-1 min-w-0 lg:px-3.5 lg:border-r lg:border-[#EAECF0]">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#98A2B3]">Assignee</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                        <AssigneeAvatar name={assigneeName} profilePicUrl={task.assigneePhotoUrl} size={24} />
+                        <span className="truncate text-[12px] font-medium text-[#344054]">{assigneeName}</span>
+                    </div>
+                </div>
+
+                {/* Status */}
+                    <div className="grid gap-1 min-w-0 lg:px-3.5 lg:border-r lg:border-[#EAECF0]" ref={statusRef}>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#98A2B3]">Status</span>
+                    <div className="relative w-full sm:w-fit">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setStatusOpen(s => !s); }}
+                            className={`inline-flex w-full sm:w-[114px] items-center justify-between gap-2 rounded-full px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${statusClass} whitespace-nowrap`}
+                        >
+                            <span className="truncate">{statusText}</span>
+                            <ChevronDown size={10} className="shrink-0" />
+                        </button>
+                        {statusOpen && (
+                            <div className="absolute left-0 top-full mt-1 z-50 min-w-[146px] rounded-xl border border-[#E5E7EB] bg-white py-1 shadow-lg">
+                                {STATUS_OPTIONS.map((s) => (
+                                    <button
+                                        key={s}
+                                        onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, s); setStatusOpen(false); }}
+                                        className={`w-full px-3 py-2 text-left text-[12px] transition-colors hover:bg-[#F9FAFB] ${task.status === s ? 'font-semibold text-[#155DFC]' : 'text-[#374151]'}`}
+                                    >
+                                        {s.replace(/_/g, ' ')}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Story points and actions */}
+                <div className="grid gap-1 min-w-0 lg:px-3.5 lg:grid-cols-[minmax(0,64px)_auto] lg:items-end">
+                    <div className="grid gap-1 min-w-0">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#98A2B3]">Points</span>
+                        <span className="inline-flex w-fit items-center rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#374151]">
+                            {task.storyPoint ?? '—'}
+                        </span>
+                    </div>
+
+                    <div className="relative flex items-center justify-end gap-1" ref={menuRef}>
+                        <PriorityIcon size={13} color={priorityColor} className="shrink-0 text-[#9CA3AF]" />
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setMenuOpen(m => !m); }}
+                            className="rounded-md p-1.5 text-[#9CA3AF] transition-colors hover:bg-[#F3F4F6]"
+                        >
+                            <MoreHorizontal size={14} />
+                        </button>
+                        {menuOpen && (
+                            <div className="absolute right-0 top-full mt-1 z-50 min-w-[128px] rounded-xl border border-[#E5E7EB] bg-white py-1 shadow-lg">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onOpenModal(task.id); }}
+                                    className="w-full px-3 py-2 text-left text-[12px] text-[#374151] transition-colors hover:bg-[#F9FAFB]"
+                                >
+                                    Edit
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(task.id); }}
+                                    className="w-full px-3 py-2 text-left text-[12px] text-red-600 transition-colors hover:bg-red-50"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
@@ -375,17 +395,26 @@ export default function BacklogPage() {
                                     subtitle="Create your first issue to get started."
                                 />
                             ) : (
-                                <div className="flex flex-col gap-[5px] p-3">
-                                    {tasks.map((task) => (
-                                        <BacklogTaskRow
-                                            key={task.id}
-                                            task={task}
-                                            onDelete={handleDelete}
-                                            onClick={setSelectedTask}
-                                            onStatusChange={handleStatusChange}
-                                            onOpenModal={setSelectedTaskIdForModal}
-                                        />
-                                    ))}
+                                <div className="p-3">
+                                    <div className="hidden lg:grid grid-cols-[minmax(0,1.7fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_auto] gap-2.5 px-3.5 pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#98A2B3]">
+                                        <span>Task</span>
+                                        <span>Due Date</span>
+                                        <span>Assignee</span>
+                                        <span>Status</span>
+                                        <span>Points / Actions</span>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        {tasks.map((task) => (
+                                            <BacklogTaskRow
+                                                key={task.id}
+                                                task={task}
+                                                onDelete={handleDelete}
+                                                onClick={setSelectedTask}
+                                                onStatusChange={handleStatusChange}
+                                                onOpenModal={setSelectedTaskIdForModal}
+                                            />
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                             <div className="px-3 py-2">
