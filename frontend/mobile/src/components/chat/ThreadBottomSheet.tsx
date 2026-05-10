@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ChatMessage as ChatMessageType, ChatReactionSummary } from '../../types/chat';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
+import { shouldUseNativeDriver } from '../../lib/platform';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -27,6 +28,7 @@ interface ThreadBottomSheetProps {
   userProfilePics: Record<string, string>;
   reactionsByMessageId: Record<number, ChatReactionSummary[]>;
   currentUser: string;
+  currentUserAliases?: string[];
   onClose: () => void;
   onSendReply: (content: string) => void;
   onToggleReaction: (messageId: number, emoji: string) => void;
@@ -41,6 +43,7 @@ export function ThreadBottomSheet(props: ThreadBottomSheetProps) {
     userProfilePics,
     reactionsByMessageId,
     currentUser,
+    currentUserAliases = [],
     onClose,
     onSendReply,
     onToggleReaction,
@@ -53,15 +56,19 @@ export function ThreadBottomSheet(props: ThreadBottomSheetProps) {
   useEffect(() => {
     Animated.spring(translateY, {
       toValue: visible ? 0 : SCREEN_HEIGHT,
-      useNativeDriver: true,
-      tension: 50,
-      friction: 8,
+      useNativeDriver: shouldUseNativeDriver,
+      tension: 60,
+      friction: 10,
     }).start();
-  }, [visible]);
+  }, [translateY, visible]);
 
   if (!rootMessage && !visible) return null;
 
   const data = rootMessage ? [rootMessage, ...threadMessages] : [];
+  const identitySet = new Set([
+    currentUser.trim().toLowerCase(),
+    ...currentUserAliases.map(alias => alias.trim().toLowerCase()),
+  ]);
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
@@ -84,11 +91,11 @@ export function ThreadBottomSheet(props: ThreadBottomSheetProps) {
           renderItem={({ item, index }) => (
             <ChatMessage
               message={item}
-              isMe={item.sender === currentUser}
+              isMe={identitySet.has((item.sender || '').trim().toLowerCase())}
               showAvatar={index === 0 || item.sender !== data[index-1]?.sender}
               userProfilePics={userProfilePics}
               currentUser={currentUser}
-              currentUserAliases={[]}
+              currentUserAliases={currentUserAliases}
               reactions={item.id ? (reactionsByMessageId[item.id] || []) : []}
               onLongPress={() => {}} // Usually limited actions in threads
               onToggleReaction={onToggleReaction}
@@ -102,8 +109,11 @@ export function ThreadBottomSheet(props: ThreadBottomSheetProps) {
 
         <ChatInput
           onSendMessage={onSendReply}
-          placeholder="Reply in thread..."
+          onTypingChange={() => {}}
+          placeholder="Reply in thread…"
           projectId={projectId}
+          enableMentions={false}
+          mentionCandidates={[]}
         />
       </Animated.View>
     </Modal>

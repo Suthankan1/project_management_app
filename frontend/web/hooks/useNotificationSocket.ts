@@ -15,7 +15,9 @@ export default function useNotificationSocket({
   useEffect(() => {
     if (!enabled || !token) return;
 
-    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+    if (!backendUrl) return;
+
     const wsUrl = backendUrl.replace(/^http/, 'ws');
     const client: CompatClient = Stomp.client(`${wsUrl}/ws-native`);
     client.debug = () => {};

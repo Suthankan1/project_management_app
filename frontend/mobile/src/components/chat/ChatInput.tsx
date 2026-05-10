@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   TextInput,
@@ -12,6 +12,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/src/constants/colors';
 import * as DocumentPicker from 'expo-document-picker';
 import { uploadChatDocument } from '../../services/chatService';
@@ -36,6 +37,7 @@ const COMMON_EMOJIS = [
 ];
 
 export function ChatInput(props: ChatInputProps) {
+  const insets = useSafeAreaInsets();
   const {
     onSendMessage,
     onTypingChange,
@@ -89,7 +91,7 @@ export function ChatInput(props: ChatInputProps) {
       const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
       if (!result.canceled && result.assets?.[0]) {
         const asset = result.assets[0];
-        const url = await uploadChatDocument(projectId, asset.uri, asset.name);
+        const url = await uploadChatDocument(projectId, asset);
         onSendMessage(url);
       }
     } catch (err) {
@@ -114,59 +116,64 @@ export function ChatInput(props: ChatInputProps) {
   );
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
-      <View style={styles.container}>
-
-        {/* Mention Suggestions */}
-        {mentionQuery !== null && filteredMentions.length > 0 && (
-          <View style={styles.mentionList}>
-            <FlatList
-              data={filteredMentions}
-              keyExtractor={item => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity style={styles.mentionItem} onPress={() => insertMention(item)}>
-                  <View style={styles.mentionAvatar}>
-                    <Text style={styles.mentionAvatarText}>{item.charAt(0).toUpperCase()}</Text>
-                  </View>
-                  <Text style={styles.mentionName}>@{item}</Text>
-                </TouchableOpacity>
-              )}
-              style={{ maxHeight: 200 }}
-              keyboardShouldPersistTaps="always"
-            />
-          </View>
-        )}
-
-        <View style={[styles.inputBar, isFocused && styles.focusedBar]}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => setShowEmojiPicker(true)}>
-            <Ionicons name="happy-outline" size={24} color={Colors.textSecondary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.iconBtn} onPress={handleAttach}>
-            <Ionicons name="attach" size={24} color={Colors.textSecondary} />
-          </TouchableOpacity>
-
-          <TextInput
-            style={[styles.input, { height: Math.min(inputHeight, 120) }]}
-            placeholder={placeholder || "Type a message..."}
-            value={input}
-            onChangeText={handleTextChange}
-            multiline
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            onContentSizeChange={(e) => setInputHeight(e.nativeEvent.contentSize.height)}
-            editable={!disabled}
+    <>
+      {/* Mention suggestions float ABOVE the input, outside KeyboardAvoidingView */}
+      {mentionQuery !== null && filteredMentions.length > 0 && (
+        <View style={styles.mentionList}>
+          <FlatList
+            data={filteredMentions}
+            keyExtractor={item => item}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.mentionItem} onPress={() => insertMention(item)}>
+                <View style={styles.mentionAvatar}>
+                  <Text style={styles.mentionAvatarText}>{item.charAt(0).toUpperCase()}</Text>
+                </View>
+                <Text style={styles.mentionName}>@{item}</Text>
+              </TouchableOpacity>
+            )}
+            style={{ maxHeight: 200 }}
+            keyboardShouldPersistTaps="always"
           />
-
-          <TouchableOpacity
-            style={[styles.sendBtn, (!input.trim() || disabled) && styles.disabledSendBtn]}
-            onPress={handleSend}
-            disabled={!input.trim() || disabled}
-          >
-            <Ionicons name="send" size={20} color={Colors.white} />
-          </TouchableOpacity>
         </View>
-      </View>
+      )}
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+          <View style={[styles.inputBar, isFocused && styles.focusedBar]}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => setShowEmojiPicker(true)}>
+              <Ionicons name="happy-outline" size={24} color={Colors.textSecondary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.iconBtn} onPress={handleAttach}>
+              <Ionicons name="attach" size={24} color={Colors.textSecondary} />
+            </TouchableOpacity>
+
+            <TextInput
+              style={[styles.input, { height: Math.max(44, Math.min(inputHeight, 120)) }]}
+              placeholder={placeholder || 'Type a message...'}
+              placeholderTextColor={Colors.textMuted}
+              value={input}
+              onChangeText={handleTextChange}
+              multiline
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              onContentSizeChange={e => setInputHeight(e.nativeEvent.contentSize.height + 20)}
+              editable={!disabled}
+            />
+
+            <TouchableOpacity
+              style={[styles.sendBtn, (!input.trim() || disabled) && styles.disabledSendBtn]}
+              onPress={handleSend}
+              disabled={!input.trim() || disabled}
+            >
+              <Ionicons name="send" size={18} color={Colors.white} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
 
       {/* Emoji Picker Modal */}
       <Modal visible={showEmojiPicker} transparent animationType="slide">
@@ -189,7 +196,7 @@ export function ChatInput(props: ChatInputProps) {
           </View>
         </View>
       </Modal>
-    </KeyboardAvoidingView>
+    </>
   );
 }
 
@@ -238,18 +245,15 @@ const styles = StyleSheet.create({
   },
   disabledSendBtn: { backgroundColor: Colors.textMuted },
   mentionList: {
-    position: 'absolute',
-    bottom: '100%',
-    left: 12,
-    right: 12,
     backgroundColor: Colors.white,
     borderRadius: 12,
-    marginBottom: 8,
+    marginHorizontal: 12,
+    marginBottom: 4,
     borderWidth: 1,
     borderColor: Colors.chatDivider,
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 4 },
-      android: { elevation: 4 }
+      android: { elevation: 4 },
     }),
   },
   mentionItem: {

@@ -23,7 +23,6 @@ export default function ChatScreen() {
   const [showSearch, setShowSearch]   = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchTerm, setSearchTerm]   = useState('');
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -60,7 +59,7 @@ export default function ChatScreen() {
   const displayMessages  = hasSelectedRoom
     ? (roomMessages[selectedRoomId as number] || [])
     : selectedUser
-      ? (privateMessages[selectedUser] || [])
+      ? (privateMessages[selectedUser.toLowerCase()] || [])
       : messages;
 
   const filteredUsers = users.filter(u =>
@@ -90,17 +89,13 @@ export default function ChatScreen() {
     if (created) { selectRoom(created.id); setShowSidebar(false); }
   };
 
-  const handleLoadMore = async () => {
-    if (isLoadingMore) return;
-    setIsLoadingMore(true);
-    if (hasSelectedRoom && selectedRoomId) await loadRoomHistory(selectedRoomId);
-    else if (selectedUser) await loadPrivateHistory(selectedUser);
-    setIsLoadingMore(false);
-  };
-
   const roomTyping    = hasSelectedRoom && selectedRoomId != null ? (roomTypingUsers[selectedRoomId] || []) : [];
   const privateTyping = selectedUser ? privateTypingUsers.filter(u => u === selectedUser.toLowerCase()) : [];
   const activeTyping  = hasSelectedRoom ? roomTyping[0] : selectedUser ? privateTyping[0] : teamTypingUsers[0];
+  const currentUserIdentitySet = new Set([
+    currentUser.trim().toLowerCase(),
+    ...currentUserAliases.map(alias => alias.trim().toLowerCase()),
+  ]);
 
   const isConnected         = isSocketConnected;
   const isReconnectError    = error.toLowerCase().includes('reconnect');
@@ -158,6 +153,7 @@ export default function ChatScreen() {
           teamTypingUsers={teamTypingUsers}
           roomTypingUsers={roomTypingUsers}
           privateTypingUsers={privateTypingUsers}
+          onlineUsers={onlineUsers}
           onOpenCreate={() => setIsCreateModalOpen(true)}
           onEditRoom={(room: ChatRoom) => setEditingRoom({ id: room.id, name: room.name, topic: room.topic || '', description: room.description || '' })}
           onDeleteRoom={deleteRoom}
@@ -235,8 +231,6 @@ export default function ChatScreen() {
             onPinRoomMessage={selectedRoomId ? (mid) => pinRoomMessage(selectedRoomId, mid) : undefined}
             typingUser={activeTyping}
             onLongPress={handleMessageLongPress}
-            onLoadMore={handleLoadMore}
-            isLoadingMore={isLoadingMore}
           />
 
           <ChatInput
@@ -301,6 +295,7 @@ export default function ChatScreen() {
         userProfilePics={userProfilePics}
         reactionsByMessageId={messageReactions}
         currentUser={currentUser}
+        currentUserAliases={currentUserAliases}
         onClose={closeThread}
         onSendReply={sendThreadReply}
         onToggleReaction={toggleReaction}
@@ -311,8 +306,8 @@ export default function ChatScreen() {
         onClose={() => setReactionTarget(null)}
         onReact={(emoji) => { if (reactionTarget?.id) toggleReaction(reactionTarget.id, emoji); }}
         onReply={() => reactionTarget && openThread(reactionTarget)}
-        onEdit={reactionTarget && (reactionTarget.sender === currentUser || currentUserAliases.includes(reactionTarget.sender)) ? () => setEditingMessage(reactionTarget) : undefined}
-        onDelete={reactionTarget && (reactionTarget.sender === currentUser || currentUserAliases.includes(reactionTarget.sender)) && reactionTarget.id ? () => setDeletingMessageId(reactionTarget.id as number) : undefined}
+        onEdit={reactionTarget && currentUserIdentitySet.has((reactionTarget.sender || '').trim().toLowerCase()) ? () => setEditingMessage(reactionTarget) : undefined}
+        onDelete={reactionTarget && currentUserIdentitySet.has((reactionTarget.sender || '').trim().toLowerCase()) && reactionTarget.id ? () => setDeletingMessageId(reactionTarget.id as number) : undefined}
       />
     </SafeAreaView>
   );

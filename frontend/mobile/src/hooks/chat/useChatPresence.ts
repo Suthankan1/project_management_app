@@ -16,8 +16,20 @@ export function useChatPresence(projectId: string) {
     }
   }, [projectId]);
 
-  const handleTypingEvent = useCallback((event: { sender: string; scope: string; roomId?: number; recipient?: string; typing: boolean }) => {
-    const { sender, scope, roomId, recipient, typing: isTyping } = event;
+  const handleTypingEvent = useCallback((event: {
+    username?: string;
+    sender?: string;
+    roomId?: number;
+    isTyping?: boolean;
+    typing?: boolean;
+    isPrivate?: boolean;
+    scope?: string;
+  }) => {
+    const sender = (event.sender || event.username || '').toLowerCase();
+    if (!sender) return;
+    const roomId = event.roomId;
+    const isTyping = Boolean(event.typing ?? event.isTyping);
+    const scope = event.scope || (event.isPrivate ? 'PRIVATE' : roomId ? 'ROOM' : 'TEAM');
 
     if (scope === 'ROOM' && roomId) {
       setRoomTypingUsers(prev => {
@@ -42,16 +54,12 @@ export function useChatPresence(projectId: string) {
     }
   }, []);
 
-  const handlePresenceEvent = useCallback((event: { type: string; user: string; onlineUsers: string[] }) => {
-    const { onlineUsers: users } = event;
-    if (Array.isArray(users)) {
-      setOnlineUsers(users);
-    }
+  const handlePresenceEvent = useCallback((event: { onlineUsers?: string[] }) => {
+    if (event.onlineUsers) setOnlineUsers(event.onlineUsers);
   }, []);
 
   return {
     onlineUsers,
-    setOnlineUsers,
     teamTypingUsers,
     roomTypingUsers,
     privateTypingUsers,

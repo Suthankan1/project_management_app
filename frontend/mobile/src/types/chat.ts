@@ -8,6 +8,7 @@ export interface ChatMessage {
   roomId?: number;
   chatType?: 'TEAM' | 'ROOM' | 'PRIVATE';
   parentMessageId?: number;
+  replyCount?: number;
   formatType?: 'PLAIN' | 'MARKDOWN';
   content: string;
   timestamp?: string | null;

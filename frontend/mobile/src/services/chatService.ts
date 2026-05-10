@@ -186,21 +186,28 @@ export async function markPrivateRead(projectId: string, partner: string): Promi
   });
 }
 
-export async function uploadChatDocument(projectId: string, uri: string, filename: string): Promise<string> {
+export async function uploadChatDocument(
+  projectId: string,
+  file: { uri: string; name: string; mimeType?: string; file?: File },
+): Promise<string> {
   const formData = new FormData();
-  // @ts-ignore
-  formData.append('file', {
-    uri,
-    name: filename,
-    type: 'application/octet-stream',
-  });
 
-  const { data } = await api.post(`/api/projects/${projectId}/chat/upload`, formData, {
+  if (file.file) {
+    formData.append('file', file.file);
+  } else {
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType || 'application/octet-stream',
+    } as any);
+  }
+
+  const { data } = await api.post<string>(`/api/projects/${projectId}/chat/messages/upload-document`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
   });
-  return data.url;
+  return data;
 }
 
 export async function postTelemetry(

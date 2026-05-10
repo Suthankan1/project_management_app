@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as chatService from '../../services/chatService';
 import { API_BASE_URL } from '../../api/axios';
-import { ChatMessage, ChatRoom, ChatFeatureFlags } from '../../types/chat';
+import { ChatMessage, ChatFeatureFlags } from '../../types/chat';
 import { useChatRooms } from './useChatRooms';
 import { useChatMessages } from './useChatMessages';
 import { useChatPresence } from './useChatPresence';
@@ -11,220 +11,302 @@ import { useChatThreads } from './useChatThreads';
 import { useChatUnread } from './useChatUnread';
 import { getToken } from '@/src/auth/storage';
 
-// Minimal STOMP frame builder/parser — inline, no library
-function buildStompConnect(token: string) {
+// ── Minimal inline STOMP builder/parser ──────────────────────────────────────
+
+function buildConnect(token: string) {
   return `CONNECT\naccept-version:1.2\nheart-beat:0,0\nAuthorization:Bearer ${token}\n\n\0`;
 }
-function buildStompSubscribe(id: string, dest: string) {
+function buildSubscribe(id: string, dest: string) {
   return `SUBSCRIBE\nid:${id}\ndestination:${dest}\n\n\0`;
 }
-function buildStompSend(dest: string, body: string) {
+function buildSend(dest: string, body: string) {
   return `SEND\ndestination:${dest}\ncontent-type:application/json\n\n${body}\0`;
 }
-function parseStompFrame(raw: string): { command: string; headers: Record<string, string>; body: string } {
-  // Normalize line endings and handle heartbeats
-  const normalized = raw.replace(/\r\n/g, '\n');
-  if (normalized === '\n' || !normalized.trim()) {
-    return { command: 'HEARTBEAT', headers: {}, body: '' };
-  }
-
-  const dividerIndex = normalized.indexOf('\n\n');
-  if (dividerIndex === -1) {
-    // Possibly just a command with no headers/body
-    return { command: normalized.trim(), headers: {}, body: '' };
-  }
-
-  const header = normalized.slice(0, dividerIndex);
-  const body = normalized.slice(dividerIndex + 2).replace(/\0$/, '');
-
-  const lines = header.split('\n');
+function parseFrame(raw: string): { command: string; headers: Record<string, string>; body: string } {
+  const s = raw.replace(/\r\n/g, '\n');
+  if (!s.trim() || s === '\n') return { command: 'HEARTBEAT', headers: {}, body: '' };
+  const div = s.indexOf('\n\n');
+  if (div === -1) return { command: s.trim(), headers: {}, body: '' };
+  const headerSection = s.slice(0, div);
+  const body = s.slice(div + 2).replace(/\0$/, '');
+  const lines = headerSection.split('\n');
   const command = lines[0].trim();
   const headers: Record<string, string> = {};
   lines.slice(1).forEach(l => {
     const idx = l.indexOf(':');
-    if (idx > 0) {
-      const key = l.slice(0, idx).trim();
-      const value = l.slice(idx + 1).trim();
-      headers[key] = value;
-    }
+    if (idx > 0) headers[l.slice(0, idx).trim()] = l.slice(idx + 1).trim();
   });
   return { command, headers, body };
 }
 
+function dmKey(username: string): string {
+  return username.trim().toLowerCase();
+}
+
+function addUniqueUserByKey(prev: string[], username: string) {
+  const key = dmKey(username);
+  if (!key || prev.some(u => dmKey(u) === key)) return prev;
+  return [...prev, username];
+}
+
+function uniqueUsersByKey(usernames: string[]) {
+  return usernames.reduce<string[]>((acc, username) => addUniqueUserByKey(acc, username), []);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function useChat(projectId: string) {
-  const [currentUser, setCurrentUser] = useState<string>('');
+  const [currentUser, setCurrentUser] = useState('');
   const [currentUserAliases, setCurrentUserAliases] = useState<string[]>([]);
   const [users, setUsers] = useState<string[]>([]);
   const [userProfilePics, setUserProfilePics] = useState<Record<string, string>>({});
   const [featureFlags, setFeatureFlags] = useState<ChatFeatureFlags>({
-    phaseDEnabled: false,
-    phaseEEnabled: false,
-    webhooksEnabled: false,
-    telemetryEnabled: false,
+    phaseDEnabled: false, phaseEEnabled: false,
+    webhooksEnabled: false, telemetryEnabled: false,
   });
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState('');
 
+  // Refs so socket handlers always read fresh values without stale closures
+  const currentUserRef = useRef('');
+  const selectedUserRef = useRef<string | null>(null);
+  const usersRef = useRef<string[]>([]);
+  const selectedRoomIdRef = useRef<number | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<any>(null);
-  const handleSocketMessageRef = useRef<((frame: any) => void) | null>(null);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isConnectingRef = useRef(false);
+  // Track which rooms we've subscribed to already
+  const subscribedRoomsRef = useRef<Set<number>>(new Set());
 
-  const roomsHook = useChatRooms(projectId);
-  const messagesHook = useChatMessages(projectId);
-  const presenceHook = useChatPresence(projectId);
+  const roomsHook     = useChatRooms(projectId);
+  const messagesHook  = useChatMessages(projectId);
+  const presenceHook  = useChatPresence(projectId);
   const reactionsHook = useChatReactions(projectId);
-  const searchHook = useChatSearch(projectId);
-  const threadsHook = useChatThreads(projectId);
-  const unreadHook = useChatUnread(projectId);
+  const searchHook    = useChatSearch(projectId);
+  const threadsHook   = useChatThreads(projectId);
+  const unreadHook    = useChatUnread(projectId);
 
   const { selectedRoomId, selectRoom, rooms } = roomsHook;
 
+  // Keep refs in sync
+  useEffect(() => { selectedUserRef.current = selectedUser; }, [selectedUser]);
+  useEffect(() => { usersRef.current = users; }, [users]);
+  useEffect(() => { selectedRoomIdRef.current = selectedRoomId; }, [selectedRoomId]);
+
+  // ── Subscribe to a single room's message + typing channels ──────────────────
+  const subscribeRoom = useCallback((ws: WebSocket, roomId: number) => {
+    if (subscribedRoomsRef.current.has(roomId)) return;
+    subscribedRoomsRef.current.add(roomId);
+    ws.send(buildSubscribe(`sub-room-${roomId}`, `/topic/project/${projectId}/room/${roomId}`));
+    ws.send(buildSubscribe(`sub-room-typing-${roomId}`, `/topic/project/${projectId}/typing/room/${roomId}`));
+  }, [projectId]);
+
+  // ── Handle incoming STOMP MESSAGE frames ─────────────────────────────────────
+  const handleMessage = useCallback((frame: ReturnType<typeof parseFrame>) => {
+    if (!frame.body) return;
+    let body: any;
+    try { body = JSON.parse(frame.body); } catch { return; }
+    const dest = frame.headers.destination || '';
+    const me = currentUserRef.current.toLowerCase();
+
+    // ── Team / public channel ─────────────────────────────────────────────────
+    if (dest === `/topic/project/${projectId}/public`) {
+      if (body.type === 'JOIN') {
+        if (body.sender !== me) {
+          setUsers(prev => addUniqueUserByKey(prev, body.sender));
+        }
+        return;
+      }
+      if (!body.roomId && !body.recipient && !body.parentMessageId) {
+        messagesHook.addTeamMessage(body);
+        unreadHook.setTeamLastMessage(body);
+        if (body.sender?.toLowerCase() !== me && (selectedRoomIdRef.current !== null || selectedUserRef.current !== null)) {
+          unreadHook.setTeamUnseenCount(prev => prev + 1);
+        }
+      }
+      return;
+    }
+
+    // ── Private / DM channel ─────────────────────────────────────────────────
+    if (dest === `/user/queue/project/${projectId}/messages`) {
+      const sender = (body.sender || '').toLowerCase();
+      const recipient = (body.recipient || '').toLowerCase();
+      const isFromMe = sender === me;
+      const partner = isFromMe ? recipient : sender;
+      const partnerDisplay = isFromMe ? body.recipient : body.sender;
+      if (!partner || body.parentMessageId) return;
+      messagesHook.addPrivateMessage(partner, body);
+      unreadHook.setPrivateLastMessages(prev => ({ ...prev, [partner]: body }));
+      if (!isFromMe && selectedUserRef.current?.toLowerCase() !== partner) {
+        unreadHook.setPrivateUnseenCounts(prev => ({ ...prev, [partner]: (prev[partner] || 0) + 1 }));
+      }
+      setUsers(prev => addUniqueUserByKey(prev, partnerDisplay || partner));
+      return;
+    }
+
+    // ── Room message ──────────────────────────────────────────────────────────
+    const roomMsgMatch = dest.match(new RegExp(`/topic/project/${projectId}/room/(\\d+)$`));
+    if (roomMsgMatch) {
+      const roomId = Number(roomMsgMatch[1]);
+      if (!body.parentMessageId) {
+        messagesHook.addRoomMessage(roomId, body);
+        unreadHook.setRoomLastMessages(prev => ({ ...prev, [roomId]: body }));
+        if (body.sender?.toLowerCase() !== me && selectedRoomIdRef.current !== roomId) {
+          unreadHook.setRoomUnseenCounts(prev => ({ ...prev, [roomId]: (prev[roomId] || 0) + 1 }));
+        }
+      }
+      return;
+    }
+
+    // ── Team typing ───────────────────────────────────────────────────────────
+    if (dest === `/topic/project/${projectId}/typing/team`) {
+      presenceHook.handleTypingEvent({ username: body.sender, isTyping: body.isTyping ?? body.typing });
+      return;
+    }
+
+    // ── Private typing ────────────────────────────────────────────────────────
+    if (dest === `/user/queue/project/${projectId}/typing/private`) {
+      presenceHook.handleTypingEvent({ username: body.sender, isTyping: body.isTyping ?? body.typing, isPrivate: true });
+      return;
+    }
+
+    // ── Room typing ───────────────────────────────────────────────────────────
+    const roomTypingMatch = dest.match(new RegExp(`/topic/project/${projectId}/typing/room/(\\d+)$`));
+    if (roomTypingMatch) {
+      const roomId = Number(roomTypingMatch[1]);
+      presenceHook.handleTypingEvent({ username: body.sender, roomId, isTyping: body.isTyping ?? body.typing });
+      return;
+    }
+
+    // ── Unread badge update ───────────────────────────────────────────────────
+    if (dest === `/user/queue/project/${projectId}/unread-badge`) {
+      unreadHook.loadSummaries();
+      return;
+    }
+
+    // ── Thread reply ──────────────────────────────────────────────────────────
+    const threadMatch = dest.match(new RegExp(`/topic/project/${projectId}/thread/(\\d+)$`));
+    if (threadMatch) {
+      threadsHook.setThreadMessages(prev => [...prev, body]);
+      return;
+    }
+
+    // ── Reaction update ───────────────────────────────────────────────────────
+    const reactionMatch = dest.match(new RegExp(`/topic/project/${projectId}/messages/(\\d+)/reactions$`));
+    if (reactionMatch) {
+      const msgId = Number(reactionMatch[1]);
+      reactionsHook.setMessageReactions(prev => ({ ...prev, [msgId]: body }));
+      return;
+    }
+
+    // ── Presence ──────────────────────────────────────────────────────────────
+    if (dest === `/topic/project/${projectId}/presence`) {
+      presenceHook.handlePresenceEvent(body);
+      return;
+    }
+  }, [projectId, messagesHook, presenceHook, reactionsHook, threadsHook, unreadHook]);
+
+  // ── Connect WebSocket ─────────────────────────────────────────────────────
   const connectWebSocket = useCallback(async () => {
-    if (socketRef.current) return;
+    if (socketRef.current?.readyState === WebSocket.OPEN) return;
+    if (isConnectingRef.current) return;
+    isConnectingRef.current = true;
 
     try {
       const token = await getToken();
-      if (!token) {
-        setError('Authentication token not found');
-        return;
-      }
+      if (!token) { setError('Not authenticated'); isConnectingRef.current = false; return; }
 
-      const base = process.env.EXPO_PUBLIC_API_URL || API_BASE_URL || 'http://localhost:8080';
-      // If base contains /api, we usually want the root for ws-native, but let's try root first if replace fails or produces something odd
-      const rootBase = base.includes('/api') ? base.split('/api')[0] : base;
-      const wsUrl = rootBase.replace(/^http/, 'ws') + '/ws-native';
+      const base = API_BASE_URL.replace(/\/api$/, '');
+      const wsUrl = base.replace(/^https?/, 'ws') + '/ws-native';
 
-      try {
-        console.info(`[Chat] Connecting to websocket: ${wsUrl}`);
-        const ws = new WebSocket(wsUrl);
-        socketRef.current = ws;
+      console.info('[Chat] Connecting:', wsUrl);
+      const ws = new WebSocket(wsUrl);
+      socketRef.current = ws;
 
-        ws.onopen = () => {
-          console.info('[Chat] WebSocket opened');
-          ws.send(buildStompConnect(token));
-        };
+      ws.onopen = () => {
+        console.info('[Chat] WS open — sending STOMP CONNECT');
+        ws.send(buildConnect(token));
+      };
 
-        ws.onmessage = async (e) => {
-          try {
-            let rawData = e.data;
-            if (typeof rawData !== 'string') {
-              // Handle Blob or ArrayBuffer
-              rawData = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.readAsText(rawData as any);
-              });
-            }
-
-            const frame = parseStompFrame(rawData);
-            if (frame.command === 'CONNECTED') {
-              console.info('[Chat] STOMP CONNECTED');
-              setIsSocketConnected(true);
-              setError('');
-              // Subscribe to channels
-              ws.send(buildStompSubscribe('sub-team', `/topic/project/${projectId}/public`));
-              ws.send(buildStompSubscribe('sub-private', `/user/queue/project/${projectId}/messages`));
-              ws.send(buildStompSubscribe('sub-typing-team', `/topic/project/${projectId}/typing/team`));
-              ws.send(buildStompSubscribe('sub-presence', `/topic/project/${projectId}/presence`));
-              ws.send(buildStompSubscribe('sub-typing-private', `/user/queue/project/${projectId}/typing/private`));
-              ws.send(buildStompSubscribe('sub-unread', `/user/queue/project/${projectId}/unread-badge`));
-            } else if (frame.command === 'MESSAGE') {
-              handleSocketMessageRef.current?.(frame);
-            }
-          } catch (inner) {
-            console.error('[Chat] Failed to parse STOMP frame', inner, e.data);
+      ws.onmessage = async (e) => {
+        try {
+          let raw = e.data;
+          if (typeof raw !== 'string') {
+            raw = await new Promise<string>(res => {
+              const fr = new FileReader();
+              fr.onload = () => res(fr.result as string);
+              fr.readAsText(raw);
+            });
           }
-        };
+          const frame = parseFrame(raw);
+          if (frame.command === 'CONNECTED') {
+            console.info('[Chat] STOMP CONNECTED');
+            setIsSocketConnected(true);
+            setError('');
+            subscribedRoomsRef.current.clear();
 
-        ws.onclose = (ev) => {
-          console.warn('[Chat] WebSocket closed', ev);
-          setIsSocketConnected(false);
-          socketRef.current = null;
-          if (!reconnectTimeoutRef.current) {
-            reconnectTimeoutRef.current = setTimeout(() => {
-              reconnectTimeoutRef.current = null;
-              connectWebSocket();
-            }, 5000);
+            // Core subscriptions
+            ws.send(buildSubscribe('sub-public', `/topic/project/${projectId}/public`));
+            ws.send(buildSubscribe('sub-private', `/user/queue/project/${projectId}/messages`));
+            ws.send(buildSubscribe('sub-typing-team', `/topic/project/${projectId}/typing/team`));
+            ws.send(buildSubscribe('sub-typing-private', `/user/queue/project/${projectId}/typing/private`));
+            ws.send(buildSubscribe('sub-unread', `/user/queue/project/${projectId}/unread-badge`));
+            ws.send(buildSubscribe('sub-presence', `/topic/project/${projectId}/presence`));
+            ws.send(buildSubscribe('sub-rooms-events', `/topic/project/${projectId}/rooms`));
+
+            // Subscribe to all already-loaded rooms
+            roomsHook.rooms.forEach(r => subscribeRoom(ws, r.id));
+
+            // Send presence ping
+            ws.send(buildSend(`/app/project/${projectId}/presence.ping`, '{}'));
+          } else if (frame.command === 'MESSAGE') {
+            handleMessage(frame);
+          } else if (frame.command === 'ERROR') {
+            console.error('[Chat] STOMP ERROR', frame.body);
+            setError('Chat server error. Please reconnect.');
           }
-        };
+        } catch (err) {
+          console.error('[Chat] frame parse error', err);
+        }
+      };
 
-        ws.onerror = (e) => {
-          console.error('[Chat] WebSocket error', e);
-          setError('Connection error. Retrying...');
-        };
-      } catch (err) {
-        console.error('[Chat] Failed to construct WebSocket', err, 'wsUrl=', wsUrl);
-        const errMsg = err instanceof Error ? err.message : String(err);
-        setError(`Failed to connect to chat server (${wsUrl}): ${errMsg}`);
-      }
+      ws.onclose = () => {
+        console.warn('[Chat] WS closed');
+        setIsSocketConnected(false);
+        socketRef.current = null;
+        isConnectingRef.current = false;
+        if (!reconnectRef.current) {
+          reconnectRef.current = setTimeout(() => {
+            reconnectRef.current = null;
+            connectWebSocket();
+          }, 5000);
+        }
+      };
+
+      ws.onerror = (e) => {
+        console.error('[Chat] WS error', e);
+        setError('Connection error — retrying…');
+        isConnectingRef.current = false;
+      };
     } catch (err) {
+      console.error('[Chat] connect failed', err);
       setError('Failed to connect to chat server');
+      isConnectingRef.current = false;
     }
-  }, [projectId]);
+  }, [projectId, handleMessage, subscribeRoom, roomsHook.rooms]);
 
-  const handleSocketMessage = useCallback((frame: any) => {
-    const dest = frame.headers.destination;
-    try {
-      const body = JSON.parse(frame.body);
-      
-      // Team messages
-      if (dest.includes(`/topic/project/${projectId}/public`)) {
-        messagesHook.addMessage(body);
-        unreadHook.setTeamLastMessage(body);
-        if (body.sender && body.sender.toLowerCase() !== currentUser.toLowerCase()) {
-          unreadHook.setTeamUnseenCount(prev => prev + 1);
-        }
-      } 
-      // Room messages
-      else if (dest.includes(`/topic/project/${projectId}/room/`)) {
-        messagesHook.addMessage(body);
-        if (body.roomId) {
-          unreadHook.setRoomLastMessages(prev => ({ ...prev, [body.roomId]: body }));
-          if (body.sender && body.sender.toLowerCase() !== currentUser.toLowerCase() && body.roomId !== selectedRoomId) {
-            unreadHook.setRoomUnseenCounts(prev => ({ ...prev, [body.roomId]: (prev[body.roomId] || 0) + 1 }));
-          }
-        }
-      } 
-      // Private messages
-      else if (dest.includes(`/user/queue/project/${projectId}/messages`)) {
-        messagesHook.addMessage(body);
-        const partner = body.sender === currentUser ? body.recipient : body.sender;
-        if (partner) {
-          unreadHook.setPrivateLastMessages(prev => ({ ...prev, [partner]: body }));
-          if (body.sender && body.sender.toLowerCase() !== currentUser.toLowerCase() && partner !== selectedUser) {
-            unreadHook.setPrivateUnseenCounts(prev => ({ ...prev, [partner]: (prev[partner] || 0) + 1 }));
-          }
-        }
-      } 
-      // Team typing events
-      else if (dest.includes(`/topic/project/${projectId}/typing/team`)) {
-        presenceHook.handleTypingEvent(body);
-      } 
-      // Private typing events
-      else if (dest.includes(`/user/queue/project/${projectId}/typing/private`)) {
-        presenceHook.handleTypingEvent(body);
-      }
-      // Presence events
-      else if (dest.includes(`/topic/project/${projectId}/presence`)) {
-        presenceHook.handlePresenceEvent(body);
-      }
-      // Unread badge updates
-      else if (dest.includes(`/user/queue/project/${projectId}/unread-badge`)) {
-        unreadHook.loadSummaries();
-      }
-    } catch (parseErr) {
-      console.error('[Chat] Failed to parse message body:', parseErr);
-    }
-  }, [projectId, currentUser, selectedRoomId, selectedUser, messagesHook, unreadHook, presenceHook]);
-
-  // Update the ref whenever handleSocketMessage changes
+  // ── Subscribe to new rooms when they are loaded/created ───────────────────
   useEffect(() => {
-    handleSocketMessageRef.current = handleSocketMessage;
-  }, [handleSocketMessage]);
+    const ws = socketRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    rooms.forEach(r => subscribeRoom(ws, r.id));
+  }, [rooms, subscribeRoom]);
 
+  // ── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
+    let cancelled = false;
     const init = async () => {
       setIsLoading(true);
       try {
@@ -234,9 +316,12 @@ export function useChat(projectId: string) {
           chatService.fetchRooms(projectId),
           chatService.fetchFeatureFlags(projectId),
         ]);
+        if (cancelled) return;
+
+        currentUserRef.current = user.username.toLowerCase();
         setCurrentUser(user.username);
         setCurrentUserAliases(user.aliases || []);
-        setUsers(members);
+        setUsers(uniqueUsersByKey(members));
         setFeatureFlags(flags);
         roomsHook.setRooms(roomsData);
 
@@ -246,74 +331,106 @@ export function useChat(projectId: string) {
           presenceHook.loadPresence(),
         ]);
       } catch (err) {
-        console.error('[Chat] Init failed', err);
-        setError('Failed to initialize chat');
+        console.error('[Chat] init failed', err);
+        if (!cancelled) setError('Failed to initialize chat');
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
+
     init();
     connectWebSocket();
 
     return () => {
-      if (socketRef.current) socketRef.current.close();
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      cancelled = true;
+      socketRef.current?.close();
+      if (reconnectRef.current) clearTimeout(reconnectRef.current);
     };
   }, [projectId]);
 
-  // Actions
-  const selectPrivateUser = (user: string | null) => {
-    setSelectedUser(user);
-    if (user) {
-      selectRoom(null);
-      messagesHook.loadPrivateHistory(user);
-      chatService.markPrivateRead(projectId, user);
-      unreadHook.setPrivateUnseenCounts(prev => ({ ...prev, [user]: 0 }));
+  // ── Send helpers ──────────────────────────────────────────────────────────
+  const stompSend = useCallback((dest: string, body: string) => {
+    const ws = socketRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      setError('Not connected. Please wait…');
+      return;
     }
-  };
+    ws.send(buildSend(dest, body));
+  }, []);
 
-  const handleSelectRoom = (id: number | null) => {
-    selectRoom(id);
-    if (id && socketRef.current && isSocketConnected) {
-      setSelectedUser(null);
-      messagesHook.loadRoomHistory(id);
-      chatService.markRoomRead(projectId, id);
-      unreadHook.setRoomUnseenCounts(prev => ({ ...prev, [id]: 0 }));
-      // Subscribe to room topic dynamically
-      socketRef.current.send(buildStompSubscribe(`sub-room-${id}`, `/topic/project/${projectId}/room/${id}`));
+  const sendMessage = useCallback((content: string, recipient?: string | null) => {
+    const trimmed = content.trim();
+    if (!trimmed) return;
+    const localId = `loc-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    if (recipient) {
+      const msg: ChatMessage = {
+        localId, sender: currentUserRef.current, content: trimmed,
+        recipient, type: 'CHAT', formatType: 'PLAIN',
+        timestamp: new Date().toISOString(),
+      };
+      stompSend(`/app/project/${projectId}/chat.sendPrivateMessage`, JSON.stringify(msg));
+      // Optimistic update
+      messagesHook.addPrivateMessage(recipient, msg);
+      unreadHook.setPrivateLastMessages(prev => ({ ...prev, [dmKey(recipient)]: msg }));
     } else {
-      setSelectedUser(null);
-      messagesHook.loadRoomHistory(id!);
-      chatService.markRoomRead(projectId, id!);
-      unreadHook.setRoomUnseenCounts(prev => ({ ...prev, [id!]: 0 }));
+      const msg: ChatMessage = {
+        localId, sender: currentUserRef.current, content: trimmed,
+        type: 'CHAT', formatType: 'PLAIN',
+        timestamp: new Date().toISOString(),
+      };
+      stompSend(`/app/project/${projectId}/chat.sendMessage`, JSON.stringify(msg));
+      messagesHook.addTeamMessage(msg);
     }
-  };
+  }, [projectId, stompSend, messagesHook, unreadHook]);
 
-  const sendMessage = async (content: string, recipient?: string | null) => {
-    if (!socketRef.current || !isSocketConnected) return;
-    const body = JSON.stringify({ content, recipient, roomId: null });
-    const destination = recipient 
-      ? `/app/project/${projectId}/chat.sendPrivateMessage`
-      : `/app/project/${projectId}/chat.sendMessage`;
-    socketRef.current.send(buildStompSend(destination, body));
-  };
+  const sendRoomMessage = useCallback((content: string, roomId: number) => {
+    const trimmed = content.trim();
+    if (!trimmed) return;
+    const localId = `loc-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const msg: ChatMessage = {
+      localId, sender: currentUserRef.current, content: trimmed,
+      roomId, type: 'CHAT', formatType: 'PLAIN',
+      timestamp: new Date().toISOString(),
+    };
+    stompSend(`/app/project/${projectId}/room/${roomId}/send`, JSON.stringify(msg));
+    messagesHook.addRoomMessage(roomId, msg);
+  }, [projectId, stompSend, messagesHook]);
 
-  const sendRoomMessage = async (content: string, roomId: number) => {
-    if (!socketRef.current || !isSocketConnected) return;
-    const body = JSON.stringify({ content, roomId });
-    socketRef.current.send(buildStompSend(`/app/project/${projectId}/room/${roomId}/send`, body));
-  };
-
-  const sendTyping = (isTyping: boolean) => {
-    if (!socketRef.current || !isSocketConnected) return;
+  const sendTyping = useCallback((isTyping: boolean) => {
     const body = JSON.stringify({
       isTyping,
-      roomId: selectedRoomId,
-      recipient: selectedUser,
-      isPrivate: !!selectedUser
+      scope: selectedRoomIdRef.current !== null ? 'ROOM' : selectedUserRef.current ? 'PRIVATE' : 'TEAM',
+      roomId: selectedRoomIdRef.current ?? undefined,
+      recipient: selectedUserRef.current ?? undefined,
     });
-    socketRef.current.send(buildStompSend(`/app/project/${projectId}/typing`, body));
-  };
+    stompSend(`/app/project/${projectId}/typing`, body);
+  }, [projectId, stompSend]);
+
+  // ── Selection actions ─────────────────────────────────────────────────────
+  const selectPrivateUser = useCallback((user: string | null) => {
+    const displayUser = user ? usersRef.current.find(u => dmKey(u) === dmKey(user)) || user : null;
+    setSelectedUser(displayUser);
+    if (displayUser) {
+      selectRoom(null);
+      messagesHook.loadPrivateHistory(displayUser);
+      chatService.markPrivateRead(projectId, displayUser).catch(() => {});
+      unreadHook.setPrivateUnseenCounts(prev => ({ ...prev, [dmKey(displayUser)]: 0 }));
+    }
+  }, [projectId, selectRoom, messagesHook, unreadHook]);
+
+  const handleSelectRoom = useCallback((id: number | null) => {
+    selectRoom(id);
+    if (id !== null) {
+      setSelectedUser(null);
+      messagesHook.loadRoomHistory(id);
+      chatService.markRoomRead(projectId, id).catch(() => {});
+      unreadHook.setRoomUnseenCounts(prev => ({ ...prev, [id]: 0 }));
+      // Subscribe if we have an open socket
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
+        subscribeRoom(socketRef.current, id);
+      }
+    }
+  }, [projectId, selectRoom, messagesHook, unreadHook, subscribeRoom]);
 
   return {
     currentUser, currentUserAliases, users, userProfilePics,
@@ -340,13 +457,10 @@ export function useChat(projectId: string) {
     messageReactions: reactionsHook.messageReactions,
     activeThreadRoot: threadsHook.activeThreadRoot,
     threadMessages: threadsHook.threadMessages,
-    isLoading,
-    isSocketConnected,
-    error,
+    isLoading, isSocketConnected, error,
     selectPrivateUser,
     selectRoom: handleSelectRoom,
-    sendMessage,
-    sendRoomMessage,
+    sendMessage, sendRoomMessage,
     sendThreadReply: threadsHook.sendThreadReply,
     openThread: threadsHook.openThread,
     closeThread: threadsHook.closeThread,
