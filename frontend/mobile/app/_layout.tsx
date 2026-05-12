@@ -1,22 +1,30 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
+/**
+ * Root layout — declares all route groups.
+ *
+ * Auth flow:
+ *  ┌─ app/index.tsx       → Landing (checks token → redirects)
+ *  ├─ app/(auth)/*        → Login / Register / Forgot / Verify / Reset
+ *  └─ app/(tabs)/*        → Main app with floating bottom nav
+ *       ├─ index          → Dashboard (Home)
+ *       ├─ spaces         → My Spaces
+ *       ├─ inbox          → Inbox
+ *       └─ profile        → Profile
+ */
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="index"  options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal"  options={{ presentation: 'modal', title: 'Modal' }} />
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index"   options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)"  options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)"  options={{ headerShown: false }} />
+        <Stack.Screen name="summary/[projectId]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="modal"   options={{ presentation: 'modal' }} />
       </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+      <StatusBar style="dark" />
+    </>
   );
 }
