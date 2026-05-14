@@ -181,7 +181,7 @@ export const ChatMessages = ({
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 120,
     measureElement: el => el?.getBoundingClientRect().height ?? 120,
-    overscan: 10,
+    overscan: 3,
   });
 
   // Keep the stable ref in sync with the latest virtualizer instance.
@@ -257,7 +257,7 @@ export const ChatMessages = ({
   return (
     <div
       ref={scrollRef}
-      className="flex-1 min-h-0 overflow-y-auto px-2 sm:px-4 py-2.5 sm:py-4 space-y-0.5 scroll-smooth overscroll-y-contain touch-pan-y"
+      className="flex-1 min-h-0 overflow-y-auto px-2 sm:px-4 py-2.5 sm:py-4 space-y-0.5 overscroll-y-contain touch-pan-y"
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
       <div

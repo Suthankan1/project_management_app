@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import RecentProjectCard from './RecentProjectCard';
@@ -18,22 +18,22 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
     const [showLeftArrow, setShowLeftArrow] = useState(false); // State for left navigation arrow
     const [showRightArrow, setShowRightArrow] = useState(true); // State for right navigation arrow
 
-    // Check scroll position to hide/show navigation arrows
-    const handleScroll = () => {
-        if (scrollRef.current) {
-            const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-            setShowLeftArrow(scrollLeft > 10);
-            setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
-        }
-    };
+    // Stable reference so addEventListener/removeEventListener see the same function.
+    const handleScroll = useCallback(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const { scrollLeft, scrollWidth, clientWidth } = el;
+        setShowLeftArrow(scrollLeft > 10);
+        setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
+    }, []);
 
     // Initialize scroll listener and initial check
     useEffect(() => {
         const current = scrollRef.current;
         if (current) {
-            current.addEventListener('scroll', handleScroll);
+            current.addEventListener('scroll', handleScroll, { passive: true });
             handleScroll();
-            window.addEventListener('resize', handleScroll);
+            window.addEventListener('resize', handleScroll, { passive: true });
         }
         return () => {
             if (current) {
@@ -41,7 +41,7 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
             }
             window.removeEventListener('resize', handleScroll);
         };
-    }, [projects]);
+    }, [projects, handleScroll]);
 
     // Manual scroll using arrow buttons
     const scroll = (direction: 'left' | 'right') => {
@@ -106,8 +106,7 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
             {/* Scrollable card container */}
             <div
                 ref={scrollRef}
-                onScroll={handleScroll}
-                className="flex gap-4 overflow-x-auto pb-4 pt-2 px-1 md:px-0 hide-scrollbar scroll-smooth"
+                className="flex gap-4 overflow-x-auto pb-4 pt-2 px-1 md:px-0 hide-scrollbar"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', contentVisibility: 'auto', containIntrinsicSize: '0 160px' } as React.CSSProperties}
             >
                 <style jsx>{`

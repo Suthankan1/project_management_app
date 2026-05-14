@@ -258,7 +258,7 @@ export function TabBar({
 
   return (
     <div className="h-[44px] flex items-center relative">
-      <div className="flex-1 overflow-x-auto no-scrollbar scroll-smooth h-full" onScroll={() => dmsOpen && setDmsOpen(false)}>
+      <div className="flex-1 overflow-x-auto no-scrollbar h-full" onScroll={() => dmsOpen && setDmsOpen(false)}>
         <div className="flex items-center h-full gap-1">
           {visibleTabs.map(tab => renderTab(tab, false))}
         </div>
