@@ -1,7 +1,7 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { getToken, clearTokens, saveToken, saveRefreshToken } from '../auth/storage';
+import { clearTokens, getRefreshToken, getToken, saveRefreshToken, saveToken } from '../auth/storage';
 
 const API_PORT = '8080';
 
@@ -40,7 +40,7 @@ function resolveApiBaseUrl() {
   return configuredUrl;
 }
 
-const API_BASE_URL = resolveApiBaseUrl();
+export const API_BASE_URL = resolveApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -76,7 +76,13 @@ api.interceptors.response.use(
       req._retry = true;
       isRefreshing = true;
       try {
-        const { data } = await api.post('/api/auth/refresh');
+        const refreshToken = await getRefreshToken();
+        if (!refreshToken) {
+          await clearTokens();
+          return Promise.reject(error);
+        }
+
+        const { data } = await api.post('/api/auth/refresh', { refreshToken });
         await saveToken(data.token);
         if (data.refreshToken) await saveRefreshToken(data.refreshToken);
         failedQueue.forEach(({ resolve }) => resolve(data.token));

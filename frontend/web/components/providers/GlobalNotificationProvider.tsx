@@ -134,6 +134,8 @@ export function GlobalNotificationProvider({ children }: { children: React.React
   }, []);
 
   const connectRealtime = useCallback((token: string) => {
+    if (!backendUrl) return;
+
     const hasSameActiveConnection =
       stompClientRef.current?.connected && activeTokenRef.current === token;
 
