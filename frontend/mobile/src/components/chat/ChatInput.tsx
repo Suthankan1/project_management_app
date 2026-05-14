@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   TextInput,
@@ -6,11 +6,17 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  FlatList,
   Text,
-  Modal,
   ScrollView,
+  ActivityIndicator,
+  LayoutChangeEvent,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/src/constants/colors';
@@ -33,8 +39,14 @@ const COMMON_EMOJIS = [
   '👏', '💪', '🙏', '🤝', '🎈', '🎁', '📅', '📌',
   '💬', '🔔', '📢', '📁', '📄', '📎', '🔗', '🛠',
   '💻', '📱', '⌚', '📷', '🎨', '🎬', '🎧', '🎮',
-  '🌟', '🌙', '☀️', '🌈', '🔥', '🌊', '🍀', '🍎'
+  '🌟', '🌙', '☀️', '🌈', '🔥', '🌊', '🍀', '🍎',
 ];
+
+const AVATAR_COLORS = ['#155DFC', '#9810FA', '#16A34A', '#F59E0B', '#EF4444'];
+
+function getAvatarColor(name: string): string {
+  return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
+}
 
 export function ChatInput(props: ChatInputProps) {
   const insets = useSafeAreaInsets();
@@ -49,27 +61,46 @@ export function ChatInput(props: ChatInputProps) {
   } = props;
 
   const [input, setInput] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
-  const [inputHeight, setInputHeight] = useState(44);
+  const [uploading, setUploading] = useState(false);
+  const [containerHeight, setContainerHeight] = useState(0);
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const sendScale = useSharedValue(1);
+  const emojiTranslateY = useSharedValue(260);
+
+  useEffect(() => {
+    emojiTranslateY.value = withSpring(showEmojiPicker ? 0 : 260, {
+      damping: 20,
+      stiffness: 200,
+    });
+  }, [showEmojiPicker, emojiTranslateY]);
+
+  const animatedSendStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: sendScale.value }],
+  }));
+
+  const animatedEmojiStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: emojiTranslateY.value }],
+  }));
 
   const handleTextChange = (text: string) => {
     setInput(text);
 
-    // Mention detection
-    if (enableMentions) {
-      const match = text.match(/(^|\s)@([a-zA-Z0-9._-]*)$/);
-      if (match) {
-        setMentionQuery(match[2].toLowerCase());
-      } else {
-        setMentionQuery(null);
-      }
+    if (text.trim()) {
+      sendScale.value = withSequence(
+        withSpring(1.1, { damping: 10, stiffness: 300 }),
+        withSpring(1, { damping: 15 }),
+      );
     }
 
-    // Typing notification
+    if (enableMentions) {
+      const match = text.match(/(^|\s)@([a-zA-Z0-9._-]*)$/);
+      setMentionQuery(match ? match[2].toLowerCase() : null);
+    }
+
     if (onTypingChange) {
       onTypingChange(true);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -88,14 +119,23 @@ export function ChatInput(props: ChatInputProps) {
 
   const handleAttach = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+      });
       if (!result.canceled && result.assets?.[0]) {
         const asset = result.assets[0];
-        const url = await uploadChatDocument(projectId, asset);
-        onSendMessage(url);
+        setUploading(true);
+        try {
+          const url = await uploadChatDocument(projectId, asset);
+          onSendMessage(url);
+        } finally {
+          setUploading(false);
+        }
       }
     } catch (err) {
       console.error('File picker error:', err);
+      setUploading(false);
     }
   };
 
@@ -106,197 +146,296 @@ export function ChatInput(props: ChatInputProps) {
 
   const insertMention = (user: string) => {
     const lastAt = input.lastIndexOf('@');
-    const newVal = input.slice(0, lastAt) + '@' + user + ' ';
-    setInput(newVal);
+    setInput(input.slice(0, lastAt) + '@' + user + ' ');
     setMentionQuery(null);
   };
 
   const filteredMentions = mentionCandidates.filter(u =>
-    u.toLowerCase().includes(mentionQuery || '')
+    u.toLowerCase().includes(mentionQuery ?? '')
   );
 
-  return (
-    <>
-      {/* Mention suggestions float ABOVE the input, outside KeyboardAvoidingView */}
-      {mentionQuery !== null && filteredMentions.length > 0 && (
-        <View style={styles.mentionList}>
-          <FlatList
-            data={filteredMentions}
-            keyExtractor={item => item}
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.mentionItem} onPress={() => insertMention(item)}>
-                <View style={styles.mentionAvatar}>
-                  <Text style={styles.mentionAvatarText}>{item.charAt(0).toUpperCase()}</Text>
-                </View>
-                <Text style={styles.mentionName}>@{item}</Text>
-              </TouchableOpacity>
-            )}
-            style={{ maxHeight: 200 }}
-            keyboardShouldPersistTaps="always"
-          />
-        </View>
-      )}
+  const onContainerLayout = (e: LayoutChangeEvent) => {
+    setContainerHeight(e.nativeEvent.layout.height);
+  };
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+  return (
+    <View>
+      {/*
+       * Emoji sheet renders first (lowest z-order) so the input bar
+       * renders on top of it. translateY:260 parks it behind the input bar;
+       * translateY:0 reveals it above.
+       */}
+      <Animated.View
+        style={[styles.emojiSheet, animatedEmojiStyle, { bottom: containerHeight }]}
+        pointerEvents={showEmojiPicker ? 'auto' : 'none'}
       >
-        <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-          <View style={[styles.inputBar, isFocused && styles.focusedBar]}>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => setShowEmojiPicker(true)}>
+        <View style={styles.emojiHandle} />
+        <ScrollView
+          contentContainerStyle={styles.emojiGrid}
+          keyboardShouldPersistTaps="always"
+          showsVerticalScrollIndicator={false}
+        >
+          {COMMON_EMOJIS.map((emoji, idx) => (
+            <TouchableOpacity
+              key={idx}
+              style={styles.emojiBtn}
+              onPress={() => insertEmoji(emoji)}
+            >
+              <Text style={styles.emojiText}>{emoji}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </Animated.View>
+
+      {/* Input bar — renders after emoji sheet so it sits on top */}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <View
+          style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}
+          onLayout={onContainerLayout}
+        >
+          {uploading && (
+            <View style={styles.uploadBanner}>
+              <Ionicons name="cloud-upload-outline" size={16} color={Colors.bannerAmberText} />
+              <Text style={styles.uploadText}>Uploading…</Text>
+              <ActivityIndicator size="small" color={Colors.bannerAmberText} />
+              <TouchableOpacity style={styles.uploadDismiss} onPress={() => setUploading(false)}>
+                <Ionicons name="close" size={16} color={Colors.bannerAmberText} />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <View style={styles.inputRow}>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => setShowEmojiPicker(v => !v)}
+            >
               <Ionicons name="happy-outline" size={24} color={Colors.textSecondary} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.iconBtn} onPress={handleAttach}>
-              <Ionicons name="attach" size={24} color={Colors.textSecondary} />
-            </TouchableOpacity>
-
             <TextInput
-              style={[styles.input, { height: Math.max(44, Math.min(inputHeight, 120)) }]}
-              placeholder={placeholder || 'Type a message...'}
+              style={styles.textInput}
+              placeholder={placeholder ?? 'Type a message...'}
               placeholderTextColor={Colors.textMuted}
               value={input}
               onChangeText={handleTextChange}
+              onFocus={() => setShowEmojiPicker(false)}
               multiline
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              onContentSizeChange={e => setInputHeight(e.nativeEvent.contentSize.height + 20)}
               editable={!disabled}
             />
 
-            <TouchableOpacity
-              style={[styles.sendBtn, (!input.trim() || disabled) && styles.disabledSendBtn]}
-              onPress={handleSend}
-              disabled={!input.trim() || disabled}
-            >
-              <Ionicons name="send" size={18} color={Colors.white} />
-            </TouchableOpacity>
+            <View style={styles.rightIcons}>
+              <TouchableOpacity style={styles.iconBtn} onPress={handleAttach}>
+                <Ionicons name="attach-outline" size={24} color={Colors.textSecondary} />
+              </TouchableOpacity>
+
+              <Animated.View style={animatedSendStyle}>
+                <TouchableOpacity
+                  style={[
+                    styles.sendBtn,
+                    { backgroundColor: input.trim() ? Colors.primary : Colors.borderDefault },
+                  ]}
+                  onPress={handleSend}
+                  disabled={!input.trim() || !!disabled}
+                >
+                  <Ionicons name="send" size={18} color={Colors.white} />
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
 
-      {/* Emoji Picker Modal */}
-      <Modal visible={showEmojiPicker} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity style={styles.modalCloseArea} onPress={() => setShowEmojiPicker(false)} />
-          <View style={styles.emojiSheet}>
-            <View style={styles.emojiHeader}>
-              <Text style={styles.emojiTitle}>Emojis</Text>
-              <TouchableOpacity onPress={() => setShowEmojiPicker(false)}>
-                <Ionicons name="close" size={24} color={Colors.textPrimary} />
+      {/*
+       * Mention dropdown renders last so it sits above the input bar.
+       * bottom: containerHeight keeps it anchored just above the input area.
+       */}
+      {mentionQuery !== null && filteredMentions.length > 0 && (
+        <View style={[styles.mentionDropdown, { bottom: containerHeight }]}>
+          <ScrollView
+            keyboardShouldPersistTaps="always"
+            style={{ maxHeight: 168 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {filteredMentions.map(user => (
+              <TouchableOpacity
+                key={user}
+                style={styles.mentionRow}
+                onPress={() => insertMention(user)}
+              >
+                <View style={[styles.mentionAvatar, { backgroundColor: getAvatarColor(user) }]}>
+                  <Text style={styles.mentionAvatarText}>{user.charAt(0).toUpperCase()}</Text>
+                </View>
+                <View style={styles.mentionTextCol}>
+                  <Text style={styles.mentionName}>@{user}</Text>
+                  <Text style={styles.mentionSub}>Tap to mention</Text>
+                </View>
               </TouchableOpacity>
-            </View>
-            <ScrollView contentContainerStyle={styles.emojiGrid}>
-              {COMMON_EMOJIS.map((emoji, idx) => (
-                <TouchableOpacity key={idx} style={styles.emojiBtn} onPress={() => insertEmoji(emoji)}>
-                  <Text style={styles.emojiText}>{emoji}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+            ))}
+          </ScrollView>
         </View>
-      </Modal>
-    </>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.chatHeaderBg,
     borderTopWidth: 1,
     borderTopColor: Colors.chatDivider,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingTop: 8,
   },
-  inputBar: {
+
+  // ── Input row ────────────────────────────────────────────────────────────────
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: Colors.chatInputBg,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: Colors.borderDefault,
-    paddingHorizontal: 4,
-    paddingVertical: 4,
+    paddingBottom: 4,
   },
-  focusedBar: { borderColor: Colors.primary },
   iconBtn: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  input: {
+  textInput: {
     flex: 1,
+    maxHeight: 120,
     fontSize: 16,
     color: Colors.textPrimary,
-    paddingHorizontal: 8,
+    paddingHorizontal: 14,
     paddingTop: Platform.OS === 'ios' ? 10 : 8,
     paddingBottom: Platform.OS === 'ios' ? 10 : 8,
+    backgroundColor: Colors.chatInputBg,
+    borderRadius: 24,
+  },
+  rightIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   sendBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.primary,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
-    marginRight: 4,
   },
-  disabledSendBtn: { backgroundColor: Colors.textMuted },
-  mentionList: {
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    marginHorizontal: 12,
-    marginBottom: 4,
-    borderWidth: 1,
-    borderColor: Colors.chatDivider,
+
+  // ── Upload banner ─────────────────────────────────────────────────────────────
+  uploadBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.bannerAmberBg,
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 8,
+    gap: 6,
+  },
+  uploadText: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.bannerAmberText,
+  },
+  uploadDismiss: {
+    padding: 2,
+  },
+
+  // ── Emoji bottom sheet ────────────────────────────────────────────────────────
+  emojiSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 260,
+    backgroundColor: Colors.cardBg,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
     ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 4 },
-      android: { elevation: 4 },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: { elevation: 8 },
     }),
   },
-  mentionItem: {
+  emojiHandle: {
+    width: 32,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.borderDefault,
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  emojiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+  },
+  emojiBtn: {
+    width: '12.5%',
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emojiText: {
+    fontSize: 24,
+  },
+
+  // ── Mention dropdown ──────────────────────────────────────────────────────────
+  mentionDropdown: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    backgroundColor: Colors.cardBg,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.borderDefault,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+      },
+      android: { elevation: 8 },
+    }),
+  },
+  mentionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.chatDivider,
+    borderBottomColor: Colors.borderDefault,
   },
   mentionAvatar: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
-  mentionAvatarText: { color: Colors.white, fontSize: 12, fontWeight: 'bold' },
-  mentionName: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalCloseArea: { flex: 1 },
-  emojiSheet: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '40%',
-    padding: 16,
+  mentionAvatarText: {
+    color: Colors.white,
+    fontSize: 11,
+    fontWeight: 'bold',
   },
-  emojiHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+  mentionTextCol: {
+    flex: 1,
   },
-  emojiTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary },
-  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  emojiBtn: {
-    width: '12%',
-    aspectRatio: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
+  mentionName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textPrimary,
   },
-  emojiText: { fontSize: 24 },
+  mentionSub: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 1,
+  },
 });
