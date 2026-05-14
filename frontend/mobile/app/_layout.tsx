@@ -26,6 +26,7 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)"                 options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)"                 options={{ headerShown: false }} />
         <Stack.Screen name="summary/[projectId]"    options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="board/[projectId]"      options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="create-project/index"   options={{ headerShown: false, animation: 'slide_from_bottom' }} />
         <Stack.Screen name="create-project/setup"   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="create-project/invite"  options={{ headerShown: false, animation: 'slide_from_right' }} />
