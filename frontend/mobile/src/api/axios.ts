@@ -30,11 +30,11 @@ function resolveApiBaseUrl() {
   const devHost = getExpoDevHost();
 
   if (devHost && devHost !== 'localhost' && devHost !== '127.0.0.1') {
-    return configuredUrl.replace(/\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, `//${devHost}:${API_PORT}`);
+    return configuredUrl.replace(/:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, `://${devHost}:${API_PORT}`);
   }
 
   if (Platform.OS === 'android') {
-    return configuredUrl.replace(/\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, `//10.0.2.2:${API_PORT}`);
+    return configuredUrl.replace(/:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, `://10.0.2.2:${API_PORT}`);
   }
 
   return configuredUrl;
