@@ -7,7 +7,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Colors } from '../../constants/colors';
-import { isWeb } from '../../lib/platform';
+import { isWeb, shouldUseNativeDriver } from '../../lib/platform';
 
 type Props = {
   onPress: () => void;
@@ -27,11 +27,11 @@ export default function PrimaryButton({
   const pressAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
-    Animated.spring(pressAnim, { toValue: 0.97, useNativeDriver: true }).start();
+    Animated.spring(pressAnim, { toValue: 0.97, useNativeDriver: shouldUseNativeDriver }).start();
   };
 
   const handlePressOut = () => {
-    Animated.spring(pressAnim, { toValue: 1, useNativeDriver: true }).start();
+    Animated.spring(pressAnim, { toValue: 1, useNativeDriver: shouldUseNativeDriver }).start();
   };
 
   const isPrimary = variant === 'primary';

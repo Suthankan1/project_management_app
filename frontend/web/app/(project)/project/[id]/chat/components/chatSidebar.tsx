@@ -5,6 +5,7 @@ import { Search, Plus, Hash, MessageCircle, Users, X } from 'lucide-react';
 import { ChatMessage, ChatRoom } from './chat';
 import { isFileDocument } from './chatMessage';
 import { CreateChannelModal, EditChannelModal, ConfirmDeleteModal } from './chatModals';
+import { avatarColor } from '@/hooks/chat/chat-utils';
 
 interface ChatSidebarProps {
   currentUser: string;
@@ -34,21 +35,10 @@ interface ChatSidebarProps {
   isLoading?: boolean;
   roomMentionCounts?: Record<number, number>;
   teamMentionCount?: number;
+  onlineUsers: string[];
 }
 
-const AVATAR_COLORS = [
-  'from-blue-500 to-blue-600',
-  'from-emerald-500 to-teal-600',
-  'from-sky-400 to-blue-500',
-  'from-indigo-500 to-blue-600',
-  'from-teal-400 to-emerald-500',
-  'from-cyan-500 to-blue-600',
-  'from-blue-400 to-indigo-500',
-  'from-slate-400 to-slate-500',
-];
 
-const avatarColor = (name: string) =>
-  AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
 
 function formatTime(timestamp?: string | null): string {
   if (!timestamp) return '';
@@ -125,6 +115,7 @@ export const ChatSidebar = ({
   isLoading,
   roomMentionCounts = {},
   teamMentionCount = 0,
+  onlineUsers,
 }: ChatSidebarProps) => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editRoomData, setEditRoomData] = useState<ChatRoom | null>(null);
@@ -368,8 +359,7 @@ export const ChatSidebar = ({
                             {user.charAt(0).toUpperCase()}
                           </div>
                         )}
-                        {/* Online dot — always shows for simplicity; real implementation would check onlineUsers */}
-                        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white" />
+                        {onlineUsers.includes(user.toLowerCase()) && <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white" />}
                       </div>
 
                       <div className="flex-1 min-w-0 text-left">

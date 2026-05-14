@@ -39,6 +39,10 @@ export async function getToken(): Promise<string | null> {
   return store.get(TOKEN_KEY);
 }
 
+export async function getRefreshToken(): Promise<string | null> {
+  return store.get(REFRESH_KEY);
+}
+
 export async function clearTokens(): Promise<void> {
   await store.delete(TOKEN_KEY);
   await store.delete(REFRESH_KEY);
