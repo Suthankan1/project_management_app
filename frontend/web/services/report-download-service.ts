@@ -48,7 +48,9 @@ export async function downloadProjectReport(projectId: number, format: ReportDow
     responseType: 'arraybuffer',
   });
 
-  const contentType = response.headers['content-type'] || CONTENT_TYPE_BY_FORMAT[format];
+  // Ensure contentType is a string for Blob options — headers can be typed loosely by axios
+  const rawContentType = response.headers['content-type'] || CONTENT_TYPE_BY_FORMAT[format];
+  const contentType = typeof rawContentType === 'string' ? rawContentType : String(rawContentType ?? CONTENT_TYPE_BY_FORMAT[format]);
   const fileName = extractFileName(response.headers['content-disposition']) || fallbackFileName(format);
 
   const blob = new Blob([response.data], { type: contentType });

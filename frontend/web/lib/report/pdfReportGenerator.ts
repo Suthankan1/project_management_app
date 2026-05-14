@@ -1,6 +1,5 @@
-// ══════════════════════════════════════════════════════════════════════════════
-//  pdfReportGenerator.ts  ·  Comprehensive multi-page PDF with charts & tables
-// ══════════════════════════════════════════════════════════════════════════════
+
+// PDF generator: Converts report data into a downloadable PDF file
 import type { ReportData } from './reportUtils';
 
 // ── Page constants ────────────────────────────────────────────────────────────

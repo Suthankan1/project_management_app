@@ -309,13 +309,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     textAlign: 'center',
     padding: 0,
-    ...(isWeb ? {
-      outlineStyle: 'none',
-      lineHeight: '52px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    } : {}),
   },
   otpInputFilled: {
     borderColor: Colors.primary,

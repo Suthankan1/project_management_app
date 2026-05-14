@@ -1,9 +1,10 @@
+// Handles API requests for scheduling, listing, and managing report emails
 package com.planora.backend.controller;
 
 import com.planora.backend.dto.ScheduledReportRequestDTO;
 import com.planora.backend.dto.ScheduledReportResponseDTO;
 import com.planora.backend.model.UserPrincipal;
-import com.planora.backend.service.ScheduledReportService;
+import com.planora.backend.service.ReportScheduledService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,11 +24,11 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/scheduled-reports")
-public class ScheduledReportController {
+public class ReportScheduledController {
 
-    private final ScheduledReportService service;
+    private final ReportScheduledService service;
 
-    public ScheduledReportController(ScheduledReportService service) {
+    public ReportScheduledController(ReportScheduledService service) {
         this.service = service;
     }
 

@@ -1,35 +1,29 @@
-import { Tabs } from 'expo-router';
 import React from 'react';
+import { Tabs } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import FloatingTabBar from '@/src/components/navigation/FloatingTabBar';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
+/**
+ * (tabs) layout — Expo Router Tabs with a custom glassmorphism
+ * floating bottom navigation bar.
+ *
+ * Drawer/sidebar completely removed.
+ * 4 tabs: Home (Dashboard), Spaces, Inbox, Profile
+ */
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Tabs
+        tabBar={(props) => <FloatingTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
         }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen name="index"   options={{ title: 'Home'    }} />
+        <Tabs.Screen name="spaces"  options={{ title: 'Spaces'  }} />
+        <Tabs.Screen name="inbox"   options={{ title: 'Inbox'   }} />
+        <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      </Tabs>
+    </GestureHandlerRootView>
   );
 }

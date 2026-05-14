@@ -1,3 +1,4 @@
+// Builds the Excel report with multiple sheets (dashboard, tasks, etc.)
 package com.planora.backend.service;
 
 import com.planora.backend.model.Milestone;
@@ -20,7 +21,7 @@ import java.util.stream.Collectors;
  * Generates an Excel (.xlsx) project report attachment server-side using Apache POI.
  */
 @Component
-public class ExcelReportBuilder {
+public class ReportExcelBuilder {
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MMM d, yyyy");
 

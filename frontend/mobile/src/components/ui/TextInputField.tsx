@@ -3,9 +3,11 @@ import {
   View,
   Text,
   TextInput,
+  Pressable,
   StyleSheet,
   KeyboardTypeOptions,
   ReturnKeyTypeOptions,
+  TextInputProps,
 } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { isWeb } from '../../lib/platform';
@@ -20,12 +22,15 @@ type Props = {
   autoCorrect?: boolean;
   returnKeyType?: ReturnKeyTypeOptions;
   onSubmitEditing?: () => void;
+  blurOnSubmit?: boolean;
+  submitBehavior?: TextInputProps['submitBehavior'];
   editable?: boolean;
   errorText?: string;
   secureTextEntry?: boolean;
   textContentType?: string;
+  autoComplete?: TextInputProps['autoComplete'];
   right?: React.ReactNode;
-  inputRef?: React.RefObject<TextInput>;
+  inputRef?: React.RefObject<TextInput | null>;
 };
 
 export default function TextInputField({
@@ -38,14 +43,19 @@ export default function TextInputField({
   autoCorrect = false,
   returnKeyType,
   onSubmitEditing,
+  blurOnSubmit,
+  submitBehavior,
   editable = true,
   errorText,
   secureTextEntry = false,
   textContentType,
+  autoComplete,
   right,
   inputRef,
 }: Props) {
   const [isFocused, setIsFocused] = useState(false);
+  const localInputRef = React.useRef<TextInput>(null);
+  const resolvedInputRef = inputRef ?? localInputRef;
 
   const borderColor = errorText
     ? Colors.errorRed
@@ -56,7 +66,8 @@ export default function TextInputField({
   return (
     <View style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
-      <View
+      <Pressable
+        onPress={() => resolvedInputRef.current?.focus()}
         style={[
           styles.inputContainer,
           { borderColor },
@@ -64,7 +75,7 @@ export default function TextInputField({
         ]}
       >
         <TextInput
-          ref={inputRef}
+          ref={resolvedInputRef}
           style={[styles.input, isWeb && { height: undefined }]}
           value={value}
           onChangeText={onChangeText}
@@ -75,14 +86,18 @@ export default function TextInputField({
           autoCorrect={autoCorrect}
           returnKeyType={isWeb ? undefined : returnKeyType}
           onSubmitEditing={onSubmitEditing}
+          blurOnSubmit={blurOnSubmit}
+          submitBehavior={submitBehavior}
           editable={editable}
           secureTextEntry={secureTextEntry}
           textContentType={textContentType as never}
+          autoComplete={autoComplete}
+          showSoftInputOnFocus
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
         />
         {right}
-      </View>
+      </Pressable>
       {errorText ? <Text style={styles.errorText}>{errorText}</Text> : null}
     </View>
   );

@@ -1,4 +1,4 @@
-'use client';
+'use client'; // Entry point: Loads all project data for the report page
 
 import { useParams } from 'next/navigation';
 import useSWR from 'swr';
