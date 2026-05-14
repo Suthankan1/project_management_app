@@ -6,6 +6,7 @@ frontend/web/node_modules
 .DS_Store
 **/.DS_Store
 planora.pem
+frontend\mobile\.expo
 .claude/
 
 
