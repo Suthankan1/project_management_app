@@ -173,6 +173,23 @@ export function useProjectBoard(projectId: number) {
     } : current);
   }, [board?.kanbanId, columns.length]);
 
+  const deleteColumn = useCallback(async (columnId: number) => {
+    if (!columnId) return;
+
+    const previous = board;
+    setBoard((current) => current ? {
+      ...current,
+      columns: current.columns.filter((column) => column.id !== columnId),
+    } : current);
+
+    try {
+      await api.delete(`/api/kanban-columns/${columnId}`);
+    } catch (err) {
+      setBoard(previous);
+      throw err;
+    }
+  }, [board]);
+
   return {
     board,
     columns,
@@ -185,5 +202,6 @@ export function useProjectBoard(projectId: number) {
     createTask,
     deleteTask,
     createColumn,
+    deleteColumn,
   };
 }

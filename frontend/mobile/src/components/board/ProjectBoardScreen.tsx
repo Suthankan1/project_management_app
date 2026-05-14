@@ -95,6 +95,24 @@ function PlusIcon({ color = '#FFFFFF' }: { color?: string }) {
   );
 }
 
+function UserIcon({ active }: { active: boolean }) {
+  return (
+    <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={active ? T.primary : '#64748B'} strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx={12} cy={7} r={4} />
+      <Path d="M5 21v-2a7 7 0 0 1 14 0v2" />
+    </Svg>
+  );
+}
+
+function TagIcon({ active }: { active: boolean }) {
+  return (
+    <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={active ? T.primary : '#64748B'} strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M20 13 11 22l-9-9V4h9l9 9z" />
+      <Circle cx={7.5} cy={8.5} r={1.5} />
+    </Svg>
+  );
+}
+
 function TaskCard({
   task,
   onMove,
@@ -192,15 +210,18 @@ function BoardColumn({
   onMoveTask,
   onDeleteTask,
   onCreateTask,
+  onDeleteColumn,
 }: {
   column: KanbanBoardColumn;
   tasks: BoardTask[];
   onMoveTask: (task: BoardTask) => void;
   onDeleteTask: (task: BoardTask) => void;
   onCreateTask: (column: KanbanBoardColumn) => void;
+  onDeleteColumn: (column: KanbanBoardColumn) => void;
 }) {
   const accent = statusAccent(column.status, column.color);
   const wipExceeded = !!column.wipLimit && column.wipLimit > 0 && tasks.length > column.wipLimit;
+  const canDeleteColumn = tasks.length === 0;
 
   return (
     <View style={columnStyles.card}>
@@ -210,10 +231,24 @@ function BoardColumn({
           <View style={[columnStyles.statusDot, { backgroundColor: accent }]} />
           <Text style={columnStyles.title} numberOfLines={1}>{formatColumnName(column)}</Text>
         </View>
-        <View style={[wipExceeded ? columnStyles.wipPill : columnStyles.countPill, { borderColor: `${accent}30` }]}>
-          <Text style={[columnStyles.countText, wipExceeded ? columnStyles.wipText : { color: accent }]}>
-            {wipExceeded ? `${tasks.length}/${column.wipLimit}` : tasks.length}
-          </Text>
+        <View style={columnStyles.headerActions}>
+          <View style={wipExceeded ? columnStyles.wipPill : columnStyles.countPill}>
+            <Text style={[columnStyles.countText, wipExceeded && columnStyles.wipText]}>
+              {wipExceeded ? `${tasks.length}/${column.wipLimit}` : tasks.length}
+            </Text>
+          </View>
+          <TouchableOpacity
+            activeOpacity={canDeleteColumn ? 0.72 : 1}
+            disabled={!canDeleteColumn}
+            onPress={() => onDeleteColumn(column)}
+            style={[columnStyles.headerDeleteBtn, !canDeleteColumn && columnStyles.headerDeleteBtnDisabled]}
+          >
+            <Svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={canDeleteColumn ? '#DC2626' : '#64748B'} strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round">
+              <Path d="M3 6h18" />
+              <Path d="M8 6V4h8v2" />
+              <Path d="M19 6l-1 14H6L5 6" />
+            </Svg>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -231,8 +266,8 @@ function BoardColumn({
       </View>
 
       <TouchableOpacity activeOpacity={0.8} onPress={() => onCreateTask(column)} style={columnStyles.addTaskBtn}>
-        <PlusIcon color={accent} />
-        <Text style={[columnStyles.addTaskText, { color: accent }]}>Add task</Text>
+        <PlusIcon color={T.primary} />
+        <Text style={columnStyles.addTaskText}>Add task</Text>
       </TouchableOpacity>
     </View>
   );
@@ -260,9 +295,13 @@ export default function ProjectBoardScreen({
     createTask,
     deleteTask,
     createColumn,
+    deleteColumn,
   } = useProjectBoard(projectId);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedAssignee, setSelectedAssignee] = useState('ALL');
+  const [selectedPriority, setSelectedPriority] = useState('ALL');
+  const [filterSheet, setFilterSheet] = useState<'assignee' | 'priority' | null>(null);
   const [selectedTask, setSelectedTask] = useState<BoardTask | null>(null);
   const [taskTarget, setTaskTarget] = useState<KanbanBoardColumn | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -276,10 +315,23 @@ export default function ProjectBoardScreen({
     Animated.timing(fade, { toValue: 1, duration: 280, useNativeDriver: true }).start();
   }, [fade]);
 
+  const assigneeOptions = useMemo(() => {
+    const names = new Set<string>();
+    tasks.forEach((task) => {
+      if (task.assigneeName?.trim()) names.add(task.assigneeName.trim());
+    });
+    return ['ALL', ...Array.from(names).sort((a, b) => a.localeCompare(b))];
+  }, [tasks]);
+
+  const priorityOptions = useMemo(() => ['ALL', 'LOW', 'MEDIUM', 'HIGH', 'URGENT'], []);
+
   const visibleTasks = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    if (!term) return tasks;
     return tasks.filter((task) => {
+      if (selectedAssignee !== 'ALL' && (task.assigneeName || '').trim() !== selectedAssignee) return false;
+      if (selectedPriority !== 'ALL' && (task.priority || '').toUpperCase() !== selectedPriority) return false;
+      if (!term) return true;
+
       const labels = task.labels?.some((label) => label.name.toLowerCase().includes(term));
       return labels || [
         task.title,
@@ -290,7 +342,7 @@ export default function ProjectBoardScreen({
         `tsk-${task.projectTaskNumber ?? task.id}`,
       ].some((value) => value.toLowerCase().includes(term));
     });
-  }, [searchTerm, tasks]);
+  }, [searchTerm, selectedAssignee, selectedPriority, tasks]);
 
   const columnTasks = useMemo(() => {
     const grouped: Record<string, BoardTask[]> = {};
@@ -375,6 +427,30 @@ export default function ProjectBoardScreen({
     ]);
   };
 
+  const confirmDeleteColumn = (column: KanbanBoardColumn) => {
+    const tasksInColumn = columnTasks[column.status]?.length ?? 0;
+    if (tasksInColumn > 0) return;
+    if (column.id <= 0) {
+      Alert.alert('Column not ready', 'Refresh the board and try again.');
+      return;
+    }
+
+    Alert.alert('Delete column', `Delete "${formatColumnName(column)}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteColumn(column.id);
+          } catch {
+            Alert.alert('Delete failed', 'The column could not be deleted.');
+          }
+        },
+      },
+    ]);
+  };
+
   const columnWidth = Math.min(width * 0.84, 326);
 
   return (
@@ -418,15 +494,31 @@ export default function ProjectBoardScreen({
             <Metric label="Done" value={metrics.done} accent={T.statusDone.dot} />
           </View>
 
-          <View style={s.searchWrap}>
-            <SearchIcon />
-            <TextInput
-              style={s.searchInput}
-              placeholder="Search tasks, assignees, labels..."
-              placeholderTextColor="#94A3B8"
-              value={searchTerm}
-              onChangeText={setSearchTerm}
-            />
+          <View style={s.filterRow}>
+            <View style={s.searchWrap}>
+              <SearchIcon />
+              <TextInput
+                style={s.searchInput}
+                placeholder="Search tasks..."
+                placeholderTextColor="#94A3B8"
+                value={searchTerm}
+                onChangeText={setSearchTerm}
+              />
+            </View>
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={() => setFilterSheet('assignee')}
+              style={[s.filterBtn, selectedAssignee !== 'ALL' && s.filterBtnActive]}
+            >
+              <UserIcon active={selectedAssignee !== 'ALL'} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={() => setFilterSheet('priority')}
+              style={[s.filterBtn, selectedPriority !== 'ALL' && s.filterBtnActive]}
+            >
+              <TagIcon active={selectedPriority !== 'ALL'} />
+            </TouchableOpacity>
           </View>
 
           {!!error && (
@@ -458,6 +550,7 @@ export default function ProjectBoardScreen({
                   onMoveTask={setSelectedTask}
                   onDeleteTask={confirmDeleteTask}
                   onCreateTask={openCreateTask}
+                  onDeleteColumn={confirmDeleteColumn}
                 />
               </View>
             ))}
@@ -466,6 +559,47 @@ export default function ProjectBoardScreen({
 
         <View style={s.bottomPad} />
       </ScrollView>
+
+      <Modal visible={filterSheet !== null} transparent animationType="slide">
+        <SafeAreaView style={modal.safe}>
+          <View style={modal.sheet}>
+            <View style={modal.handle} />
+            <Text style={modal.title}>{filterSheet === 'assignee' ? 'Assignee' : 'Priority'}</Text>
+            <Text style={modal.subtitle}>Choose a filter</Text>
+            {(filterSheet === 'assignee' ? assigneeOptions : priorityOptions).map((option) => {
+              const active = filterSheet === 'assignee'
+                ? selectedAssignee === option
+                : selectedPriority === option;
+              const label = option === 'ALL'
+                ? 'All'
+                : option.charAt(0) + option.slice(1).toLowerCase().replace(/_/g, ' ');
+
+              return (
+                <TouchableOpacity
+                  key={option}
+                  activeOpacity={0.78}
+                  style={[modal.option, active && modal.optionActive]}
+                  onPress={() => {
+                    if (filterSheet === 'assignee') {
+                      setSelectedAssignee(option);
+                    } else {
+                      setSelectedPriority(option);
+                    }
+                    setFilterSheet(null);
+                  }}
+                >
+                  <View style={[modal.optionDot, { backgroundColor: active ? T.primary : '#CBD5E1' }]} />
+                  <Text style={modal.optionText}>{label}</Text>
+                  {active && <Text style={modal.currentText}>Selected</Text>}
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity activeOpacity={0.8} onPress={() => setFilterSheet(null)} style={modal.secondaryBtn}>
+              <Text style={modal.secondaryText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
 
       <Modal visible={!!selectedTask} transparent animationType="slide">
         <SafeAreaView style={modal.safe}>
@@ -613,7 +747,13 @@ const s = StyleSheet.create({
   },
   metricValue: { fontSize: 20, fontWeight: '900' },
   metricLabel: { fontSize: 10, fontWeight: '800', color: '#64748B', letterSpacing: 0.6, textTransform: 'uppercase' },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   searchWrap: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -625,6 +765,20 @@ const s = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   searchInput: { flex: 1, fontSize: 13, color: '#0F172A', paddingVertical: 0 },
+  filterBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  filterBtnActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+  },
   errorBox: {
     borderRadius: 12,
     borderWidth: 1,
@@ -659,14 +813,31 @@ const columnStyles = StyleSheet.create({
     paddingVertical: 12,
   },
   headerLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   title: { flex: 1, fontSize: 15, fontWeight: '900', color: '#0F172A' },
+  headerDeleteBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerDeleteBtnDisabled: {
+    borderColor: '#CBD5E1',
+    backgroundColor: '#E2E8F0',
+    opacity: 1,
+  },
   countPill: {
-    minWidth: 30,
-    height: 24,
-    paddingHorizontal: 8,
+    minWidth: 32,
+    height: 28,
+    paddingHorizontal: 9,
     borderRadius: 999,
     borderWidth: 1,
+    borderColor: '#CBD5E1',
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -682,7 +853,7 @@ const columnStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  countText: { fontSize: 12, fontWeight: '900' },
+  countText: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
   wipText: { color: '#DC2626' },
   body: { paddingHorizontal: 12, gap: 10 },
   emptyState: {
@@ -705,14 +876,14 @@ const columnStyles = StyleSheet.create({
     height: 42,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
-  addTaskText: { fontSize: 13, fontWeight: '900' },
+  addTaskText: { fontSize: 13, fontWeight: '900', color: T.primary },
 });
 
 const card = StyleSheet.create({
