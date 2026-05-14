@@ -245,7 +245,7 @@ export function ChatSidebar({
       {/* List */}
       <SectionList
         sections={sections}
-        keyExtractor={(item, i) => item.type + (item.id || item.username || i)}
+        keyExtractor={(item: any, index: number) => item?.id ? item.type + item.id : item?.username ? item.type + item.username : item.type + index}
         renderItem={renderItem}
         renderSectionHeader={({ section }) =>
           section.title ? <Text style={styles.sectionHeader}>{section.title}</Text> : null

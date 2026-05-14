@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useRef, useCallback, ChangeEvent } from 'react';
 import { Paperclip, Send, Smile, Loader2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { Theme } from 'emoji-picker-react';
 import { uploadChatDocument } from './uploadChatDocument';
 import { useParams } from 'next/navigation';
 

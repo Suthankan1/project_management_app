@@ -26,7 +26,7 @@ const StompContext = createContext<StompContextValue>({
   client: null,
   connected: false,
   subscribe: () => null,
-  send: () => {},
+  send: () => { },
 });
 
 export const useStomp = () => useContext(StompContext);
@@ -39,8 +39,10 @@ export function StompProvider({ token, children }: StompProviderProps) {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const stompClient = Stomp.client('ws://localhost:8080/ws-native');
-    stompClient.debug = () => {};
+    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+    const wsUrl = backendUrl.replace(/^http/, 'ws');
+    const stompClient = Stomp.client(`${wsUrl}/ws-native`);
+    stompClient.debug = () => { };
     stompClient.reconnect_delay = 5000;
 
     stompClient.connect(

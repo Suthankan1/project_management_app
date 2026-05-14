@@ -55,7 +55,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
   ]);
 
   // Sentinel for typing indicator - remove any existing typing sentinel
-  const cleanedMessages = messages.filter((m: any) => !m || !m.__typing);
+  const cleanedMessages = messages.filter((m: any) => !m.__typing);
   const displayData = typingUser
     ? [{ __typing: true, sender: typingUser }, ...cleanedMessages]
     : cleanedMessages;

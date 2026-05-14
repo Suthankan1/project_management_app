@@ -90,7 +90,7 @@ export function GlobalNotificationProvider({ children }: { children: React.React
   const stompClientRef = useRef<Client | null>(null);
   const activeTokenRef = useRef<string | null>(null);
   const isConnectingRef = useRef(false);
-  const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
   useEffect(() => {
     pathnameRef.current = pathname;

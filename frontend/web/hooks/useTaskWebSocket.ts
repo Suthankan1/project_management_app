@@ -40,9 +40,7 @@ export function useTaskWebSocket(
     const token = getValidToken();
     if (!token) return;
 
-    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-    if (!backendUrl) return;
-
+    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
     const wsUrl = backendUrl.replace(/^http/, 'ws');
     const stompClient = Stomp.client(`${wsUrl}/ws-native`);
     stompClient.debug = () => {};
