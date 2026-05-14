@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../api/axios';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -10,9 +10,13 @@ export interface Task {
   priority?: string;
   dueDate?: string;
   updatedAt?: string;
+  createdAt?: string;
+  completedAt?: string;
   assigneeName?: string;
   assigneePhotoUrl?: string;
   projectId?: number;
+  sprintId?: number;
+  storyPoint?: number;
 }
 
 export interface Sprint {
@@ -46,45 +50,94 @@ export interface SummaryData {
   isAgile: boolean;
 }
 
+interface CacheEntry {
+  data: SummaryData;
+  milestones: MilestoneItem[];
+  fetchedAt: number;
+}
+
+// ─── Module-level cache (survives re-renders, cleared on app restart) ──────────
+// TTL: 60 seconds — data is fresh enough, re-fetch in background if stale
+const CACHE: Map<number, CacheEntry> = new Map();
+const CACHE_TTL_MS = 60_000;
+
+function getCached(projectId: number): CacheEntry | null {
+  const entry = CACHE.get(projectId);
+  if (!entry) return null;
+  if (Date.now() - entry.fetchedAt > CACHE_TTL_MS) {
+    CACHE.delete(projectId);
+    return null;
+  }
+  return entry;
+}
+
 // ─── useProjectSummary Hook ────────────────────────────────────────────────────
 
+const AGILE_TYPES = ['AGILE', 'SCRUM'];
+
 export function useProjectSummary(projectId: number) {
-  const [data, setData] = useState<SummaryData | null>(null);
-  const [milestones, setMilestones] = useState<MilestoneItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Seed state from cache immediately — zero loading time on revisit
+  const cached = projectId ? getCached(projectId) : null;
+
+  const [data, setData] = useState<SummaryData | null>(cached?.data ?? null);
+  const [milestones, setMilestones] = useState<MilestoneItem[]>(cached?.milestones ?? []);
+  // If we have a valid cache hit, skip the loading state entirely
+  const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
+  const isMounted = useRef(true);
 
-  const AGILE_TYPES = ['AGILE', 'SCRUM'];
-
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (background = false) => {
     if (!projectId) return;
-    setLoading(true);
+    if (!background) setLoading(true);
     setError(null);
     try {
       const [summaryRes, milestonesRes] = await Promise.all([
-        api.get(`/api/projects/${projectId}/dashboard-summary`),
+        api.get(`/api/projects/${projectId}/dashboard-summary`, { timeout: 15000 }),
         api.get(`/api/projects/${projectId}/milestones`).catch(() => ({ data: [] })),
       ]);
+
+      if (!isMounted.current) return;
 
       const raw = summaryRes.data;
       const isAgile = AGILE_TYPES.includes(raw.projectDetails?.type?.toUpperCase() || '');
 
-      setData({
+      const newData: SummaryData = {
         tasks: raw.tasks || [],
         sprints: raw.sprints || [],
         metrics: raw.metrics || { totalTasks: 0, completedTasks: 0, overdueTasks: 0 },
         projectDetails: raw.projectDetails || null,
         isAgile,
-      });
-      setMilestones(milestonesRes.data || []);
+      };
+
+
+
+      const newMilestones: MilestoneItem[] = milestonesRes.data || [];
+
+      // Update cache
+      CACHE.set(projectId, { data: newData, milestones: newMilestones, fetchedAt: Date.now() });
+
+      setData(newData);
+      setMilestones(newMilestones);
     } catch (e) {
-      setError('Failed to load project summary. Pull down to retry.');
+      if (!isMounted.current) return;
+      if (!background) setError('Failed to load project summary. Pull down to retry.');
     } finally {
-      setLoading(false);
+      if (isMounted.current) setLoading(false);
     }
   }, [projectId]);
 
-  useEffect(() => { void fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    isMounted.current = true;
+    const cached = projectId ? getCached(projectId) : null;
+    if (cached) {
+      // Cache hit: show data immediately, re-fetch silently in background
+      void fetchAll(true);
+    } else {
+      // Cache miss: full load
+      void fetchAll(false);
+    }
+    return () => { isMounted.current = false; };
+  }, [fetchAll]);
 
-  return { data, milestones, loading, error, refresh: fetchAll };
+  return { data, milestones, loading, error, refresh: () => fetchAll(false) };
 }

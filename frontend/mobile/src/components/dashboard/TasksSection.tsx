@@ -541,7 +541,7 @@ export default function TasksSection({
       {/* ── Create new project button ── */}
       <TouchableOpacity
         style={outerStyles.createBtn}
-        onPress={() => router.push('/createProject' as never)}
+        onPress={() => router.push('/create-project' as never)}
         activeOpacity={0.85}
       >
         <Text style={outerStyles.createBtnText}>+ Create new project</Text>

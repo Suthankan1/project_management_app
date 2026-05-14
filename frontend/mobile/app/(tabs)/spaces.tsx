@@ -126,7 +126,7 @@ function GridCard({ project, onFav }: { project: SpaceProject; onFav: (id: numbe
 
   return (
     <Pressable
-      onPress={() => router.push(`/summary/${project.id}` as never)}
+      onPress={() => router.push({ pathname: '/summary/[projectId]', params: { projectId: project.id, projectName: project.name } } as never)}
       style={({ pressed }) => [gCard.card, pressed && gCard.pressed]}
     >
       <View style={[gCard.stripe, { backgroundColor: stripe }]} />
@@ -186,7 +186,7 @@ function ListRow({ project, onFav }: { project: SpaceProject; onFav: (id: number
 
   return (
     <Pressable
-      onPress={() => router.push(`/summary/${project.id}` as never)}
+      onPress={() => router.push({ pathname: '/summary/[projectId]', params: { projectId: project.id, projectName: project.name } } as never)}
       style={({ pressed }) => [lRow.row, pressed && lRow.pressed]}
     >
       <View style={[lRow.stripe, { backgroundColor: stripe }]} />
