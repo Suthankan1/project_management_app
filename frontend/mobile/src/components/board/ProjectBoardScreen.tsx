@@ -211,15 +211,15 @@ function TaskCard({
               <Text style={[card.priorityText, { color: priority.text }]}>{task.priority}</Text>
             </View>
           ) : <View />}
-
-          <TouchableOpacity hitSlop={10} onPress={() => onDelete(task)} style={card.iconBtn}>
-            <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-              <Path d="M3 6h18" />
-              <Path d="M8 6V4h8v2" />
-              <Path d="M19 6l-1 14H6L5 6" />
-            </Svg>
-          </TouchableOpacity>
         </View>
+
+        <TouchableOpacity hitSlop={10} onPress={() => onDelete(task)} style={card.iconBtn}>
+          <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M3 6h18" />
+            <Path d="M8 6V4h8v2" />
+            <Path d="M19 6l-1 14H6L5 6" />
+          </Svg>
+        </TouchableOpacity>
 
         <Text style={card.title} numberOfLines={3}>{task.title}</Text>
 
@@ -307,23 +307,25 @@ function BoardColumn({
           <Text style={columnStyles.title} numberOfLines={1}>{formatColumnName(column)}</Text>
         </View>
         <View style={columnStyles.headerActions}>
-          <View style={wipExceeded ? columnStyles.wipPill : columnStyles.countPill}>
-            <Text style={[columnStyles.countText, wipExceeded && columnStyles.wipText]}>
-              {wipExceeded ? `${tasks.length}/${column.wipLimit}` : tasks.length}
-            </Text>
-          </View>
-          <TouchableOpacity
-            activeOpacity={canDeleteColumn ? 0.72 : 1}
-            disabled={!canDeleteColumn}
-            onPress={() => onDeleteColumn(column)}
-            style={[columnStyles.headerDeleteBtn, !canDeleteColumn && columnStyles.headerDeleteBtnDisabled]}
-          >
-            <Svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={canDeleteColumn ? '#DC2626' : '#64748B'} strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round">
-              <Path d="M3 6h18" />
-              <Path d="M8 6V4h8v2" />
-              <Path d="M19 6l-1 14H6L5 6" />
-            </Svg>
-          </TouchableOpacity>
+          {canDeleteColumn ? (
+            <TouchableOpacity
+              activeOpacity={0.72}
+              onPress={() => onDeleteColumn(column)}
+              style={columnStyles.headerDeleteBtn}
+            >
+              <Svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round">
+                <Path d="M3 6h18" />
+                <Path d="M8 6V4h8v2" />
+                <Path d="M19 6l-1 14H6L5 6" />
+              </Svg>
+            </TouchableOpacity>
+          ) : (
+            <View style={wipExceeded ? columnStyles.wipPill : columnStyles.countPill}>
+              <Text style={[columnStyles.countText, wipExceeded && columnStyles.wipText]}>
+                {wipExceeded ? `${tasks.length}/${column.wipLimit}` : tasks.length}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -989,11 +991,6 @@ const columnStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerDeleteBtnDisabled: {
-    borderColor: '#CBD5E1',
-    backgroundColor: '#E2E8F0',
-    opacity: 1,
-  },
   countPill: {
     minWidth: 32,
     height: 28,
@@ -1056,6 +1053,7 @@ const card = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     padding: 13,
+    paddingTop: 14,
     gap: 10,
     zIndex: 1,
     ...shadow,
@@ -1069,7 +1067,7 @@ const card = StyleSheet.create({
       android: { elevation: 24 },
     }),
   },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 24 },
+  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 24, paddingRight: 34 },
   priority: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -1083,6 +1081,9 @@ const card = StyleSheet.create({
   priorityDot: { width: 6, height: 6, borderRadius: 3 },
   priorityText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
   iconBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
     width: 28,
     height: 28,
     borderRadius: 8,

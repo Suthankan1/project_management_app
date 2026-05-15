@@ -56,10 +56,7 @@ const DEFAULT_COLUMNS: Sprintcolumn[] = [
 
 function normalizeColumns(columns?: Sprintcolumn[]) {
   const existing = [...(columns || [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-  const byStatus = new Map(existing.map((column) => [column.columnStatus, column]));
-  const baseline = DEFAULT_COLUMNS.map((column) => byStatus.get(column.columnStatus) ?? column);
-  const extras = existing.filter((column) => !DEFAULT_COLUMNS.some((base) => base.columnStatus === column.columnStatus));
-  return [...baseline, ...extras];
+  return existing.length ? existing : DEFAULT_COLUMNS;
 }
 
 export function useProjectSprintBoard(projectId: number) {
@@ -145,6 +142,18 @@ export function useProjectSprintBoard(projectId: number) {
     await fetchBoard(true, selectedSprintId);
   }, [board?.id, fetchBoard, selectedSprintId]);
 
+  const deleteTask = useCallback(async (taskId: number) => {
+    if (!selectedSprintId) return;
+    await api.delete(`/api/tasks/${taskId}`);
+    await fetchBoard(true, selectedSprintId);
+  }, [fetchBoard, selectedSprintId]);
+
+  const deleteColumn = useCallback(async (columnId: number) => {
+    if (!board?.id || !columnId || !selectedSprintId) return;
+    await api.delete(`/api/sprintboards/${board.id}/columns/${columnId}`);
+    await fetchBoard(true, selectedSprintId);
+  }, [board?.id, fetchBoard, selectedSprintId]);
+
   return {
     sprints,
     selectedSprint,
@@ -157,5 +166,7 @@ export function useProjectSprintBoard(projectId: number) {
     selectSprint,
     createTask,
     addColumn,
+    deleteTask,
+    deleteColumn,
   };
 }
