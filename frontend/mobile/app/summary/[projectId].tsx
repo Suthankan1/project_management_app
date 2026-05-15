@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
@@ -11,6 +10,7 @@ import ProjectTopNav, {
 } from '../../src/components/navigation/ProjectTopNav';
 import SummaryScreen  from '../../src/components/summary/SummaryScreen';
 import ReportScreen   from '../../src/components/report/ReportScreen';
+import ProjectBoardScreen from '../../src/components/board/ProjectBoardScreen';
 import { useProjectSummary } from '../../src/hooks/useProjectSummary';
 
 /** Height of the nav bar = padding top (8) + title row (56) + tab row (48) + padding bottom (12) */
@@ -123,9 +123,11 @@ export default function ProjectRoute() {
         );
       case 'board':
         return (
-          <View style={{ flex: 1, paddingTop: navHeight }}>
-            <PlaceholderScreen label="Board" />
-          </View>
+          <ProjectBoardScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight + 16}
+          />
         );
       case 'chat':
         return (

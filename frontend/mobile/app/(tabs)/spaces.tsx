@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Pressable, Platform, Animated, FlatList,
+  StyleSheet, Pressable, Platform, Animated, FlatList, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -389,8 +389,9 @@ export default function SpacesScreen() {
         style={s.scroll}
         contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
-        onRefresh={() => fetchProjects(true)}
-        refreshing={refreshing}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => fetchProjects(true)} tintColor={T.primary} colors={[T.primary]} />
+        }
       >
         {loading ? (
           // Skeleton
