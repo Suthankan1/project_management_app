@@ -63,11 +63,38 @@ function ChevronIcon() {
   );
 }
 
+function SearchIcon() {
+  return (
+    <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx={11} cy={11} r={8} />
+      <Path d="m21 21-4.3-4.3" />
+    </Svg>
+  );
+}
+
 function PlusIcon({ color = T.primary }: { color?: string }) {
   return (
     <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
       <Path d="M12 5v14" />
       <Path d="M5 12h14" />
+    </Svg>
+  );
+}
+
+function UserIcon({ active }: { active: boolean }) {
+  return (
+    <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={active ? T.primary : '#64748B'} strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx={12} cy={7} r={4} />
+      <Path d="M5 21v-2a7 7 0 0 1 14 0v2" />
+    </Svg>
+  );
+}
+
+function TagIcon({ active }: { active: boolean }) {
+  return (
+    <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={active ? T.primary : '#64748B'} strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M20 13 11 22l-9-9V4h9l9 9z" />
+      <Circle cx={7.5} cy={8.5} r={1.5} />
     </Svg>
   );
 }
@@ -131,11 +158,13 @@ function TaskCard({ task, onDelete }: { task: SprintboardTask; onDelete: (task: 
 
 function SprintColumn({
   column,
+  tasks,
   onCreateTask,
   onDeleteTask,
   onDeleteColumn,
 }: {
   column: Sprintcolumn;
+  tasks: SprintboardTask[];
   onCreateTask: (column: Sprintcolumn) => void;
   onDeleteTask: (task: SprintboardTask) => void;
   onDeleteColumn: (column: Sprintcolumn) => void;
@@ -161,18 +190,18 @@ function SprintColumn({
             </TouchableOpacity>
           ) : (
             <View style={columnStyles.countPill}>
-              <Text style={columnStyles.countText}>{column.tasks.length}</Text>
+              <Text style={columnStyles.countText}>{tasks.length}</Text>
             </View>
           )}
         </View>
       </View>
       <View style={columnStyles.body}>
-        {column.tasks.length === 0 ? (
+        {tasks.length === 0 ? (
           <View style={columnStyles.emptyState}>
             <Text style={columnStyles.emptyTitle}>No sprint tasks</Text>
           </View>
         ) : (
-          column.tasks.map((task) => <TaskCard key={task.taskId} task={task} onDelete={onDeleteTask} />)
+          tasks.map((task) => <TaskCard key={task.taskId} task={task} onDelete={onDeleteTask} />)
         )}
       </View>
       <TouchableOpacity activeOpacity={0.8} onPress={() => onCreateTask(column)} style={columnStyles.addTaskBtn}>
@@ -200,15 +229,66 @@ export default function ProjectSprintBoardScreen({
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedAssignee, setSelectedAssignee] = useState('ALL');
+  const [selectedPriority, setSelectedPriority] = useState('ALL');
+  const [filterSheet, setFilterSheet] = useState<'assignee' | 'priority' | null>(null);
+
+  const allTasks = useMemo(
+    () => board?.columns?.flatMap((column) => column.tasks) ?? [],
+    [board?.columns]
+  );
+
+  const assigneeOptions = useMemo(() => {
+    const names = new Set<string>();
+    allTasks.forEach((task) => {
+      if (task.assigneeName?.trim()) names.add(task.assigneeName.trim());
+    });
+    return ['ALL', ...Array.from(names).sort((a, b) => a.localeCompare(b))];
+  }, [allTasks]);
+
+  const priorityOptions = useMemo(() => ['ALL', 'LOW', 'MEDIUM', 'HIGH', 'URGENT'], []);
+
+  const visibleTasksByStatus = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const grouped: Record<string, SprintboardTask[]> = {};
+    board?.columns?.forEach((column) => { grouped[column.columnStatus] = []; });
+
+    allTasks.forEach((task) => {
+      if (selectedAssignee !== 'ALL' && (task.assigneeName || '').trim() !== selectedAssignee) return;
+      if (selectedPriority !== 'ALL' && (task.priority || '').toUpperCase() !== selectedPriority) return;
+
+      if (term) {
+        const matches = [
+          task.title,
+          task.assigneeName || '',
+          task.priority || '',
+          task.status || '',
+          task.labelName || '',
+          `tsk-${task.projectTaskNumber ?? task.taskId}`,
+        ].some((value) => value.toLowerCase().includes(term));
+        if (!matches) return;
+      }
+
+      if (!grouped[task.status]) grouped[task.status] = [];
+      grouped[task.status].push(task);
+    });
+
+    return grouped;
+  }, [allTasks, board?.columns, searchTerm, selectedAssignee, selectedPriority]);
+
+  const visibleTasks = useMemo(
+    () => Object.values(visibleTasksByStatus).flat(),
+    [visibleTasksByStatus]
+  );
 
   const metrics = useMemo(() => {
-    const stats = board?.stats;
-    const total = stats?.totalTasks ?? board?.columns?.flatMap((column) => column.tasks).length ?? 0;
-    const done = stats?.doneTasks ?? board?.columns?.find((column) => column.columnStatus === 'DONE')?.tasks.length ?? 0;
-    const points = stats?.totalStoryPoints ?? 0;
+    const total = visibleTasks.length;
+    const done = visibleTasks.filter((task) => task.status === 'DONE').length;
+    const points = visibleTasks.reduce((sum, task) => sum + (task.storyPoint ?? 0), 0);
     const progress = total ? Math.round((done / total) * 100) : 0;
     return { total, done, points, progress };
-  }, [board]);
+  }, [visibleTasks]);
 
   const columnWidth = Math.min(width * 0.84, 326);
   const sprintName = board?.sprintName || sprints.find((sprint) => sprint.id === selectedSprintId)?.sprintName || sprints.find((sprint) => sprint.id === selectedSprintId)?.name || 'Sprint Board';
@@ -324,6 +404,33 @@ export default function ProjectSprintBoardScreen({
             <Metric label="Points" value={metrics.points} accent="#8B5CF6" />
           </View>
 
+          <View style={s.filterRow}>
+            <View style={s.searchWrap}>
+              <SearchIcon />
+              <TextInput
+                style={s.searchInput}
+                placeholder="Search tasks..."
+                placeholderTextColor="#94A3B8"
+                value={searchTerm}
+                onChangeText={setSearchTerm}
+              />
+            </View>
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={() => setFilterSheet('assignee')}
+              style={[s.filterBtn, selectedAssignee !== 'ALL' && s.filterBtnActive]}
+            >
+              <UserIcon active={selectedAssignee !== 'ALL'} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={() => setFilterSheet('priority')}
+              style={[s.filterBtn, selectedPriority !== 'ALL' && s.filterBtnActive]}
+            >
+              <TagIcon active={selectedPriority !== 'ALL'} />
+            </TouchableOpacity>
+          </View>
+
           {!!error && (
             <View style={s.errorBox}>
               <Text style={s.errorText}>{error}</Text>
@@ -347,6 +454,7 @@ export default function ProjectSprintBoardScreen({
               <View key={column.id} style={{ width: columnWidth }}>
                 <SprintColumn
                   column={column}
+                  tasks={visibleTasksByStatus[column.columnStatus] || []}
                   onCreateTask={openCreateTask}
                   onDeleteTask={confirmDeleteTask}
                   onDeleteColumn={confirmDeleteColumn}
@@ -365,6 +473,47 @@ export default function ProjectSprintBoardScreen({
         )}
         <View style={s.bottomPad} />
       </ScrollView>
+
+      <Modal visible={filterSheet !== null} transparent animationType="slide">
+        <SafeAreaView style={modal.safe}>
+          <View style={modal.sheet}>
+            <View style={modal.handle} />
+            <Text style={modal.title}>{filterSheet === 'assignee' ? 'Assignee' : 'Priority'}</Text>
+            <Text style={modal.subtitle}>Choose a filter</Text>
+            {(filterSheet === 'assignee' ? assigneeOptions : priorityOptions).map((option) => {
+              const active = filterSheet === 'assignee'
+                ? selectedAssignee === option
+                : selectedPriority === option;
+              const label = option === 'ALL'
+                ? 'All'
+                : option.charAt(0) + option.slice(1).toLowerCase().replace(/_/g, ' ');
+
+              return (
+                <TouchableOpacity
+                  key={option}
+                  activeOpacity={0.78}
+                  style={[modal.option, active && modal.optionActive]}
+                  onPress={() => {
+                    if (filterSheet === 'assignee') {
+                      setSelectedAssignee(option);
+                    } else {
+                      setSelectedPriority(option);
+                    }
+                    setFilterSheet(null);
+                  }}
+                >
+                  <View style={[modal.optionDot, { backgroundColor: active ? T.primary : '#CBD5E1' }]} />
+                  <Text style={modal.optionText}>{label}</Text>
+                  {active && <Text style={modal.currentText}>Selected</Text>}
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity activeOpacity={0.8} onPress={() => setFilterSheet(null)} style={modal.secondaryBtn}>
+              <Text style={modal.secondaryText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
 
       <Modal visible={showSprintModal} transparent animationType="slide">
         <SafeAreaView style={modal.safe}>
@@ -484,6 +633,11 @@ const s = StyleSheet.create({
   metric: { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 10, alignItems: 'center' },
   metricValue: { fontSize: 20, fontWeight: '900' },
   metricLabel: { fontSize: 10, fontWeight: '800', color: '#64748B', letterSpacing: 0.6, textTransform: 'uppercase' },
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  searchWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 14, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
+  searchInput: { flex: 1, fontSize: 13, color: '#0F172A', paddingVertical: 0 },
+  filterBtn: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
+  filterBtnActive: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   errorBox: { borderRadius: 12, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', paddingHorizontal: 12, paddingVertical: 10 },
   errorText: { fontSize: 12, color: '#991B1B', fontWeight: '700' },
   loadingWrap: { paddingVertical: 34, alignItems: 'center', gap: 10 },
