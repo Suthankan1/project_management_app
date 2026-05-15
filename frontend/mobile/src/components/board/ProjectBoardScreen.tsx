@@ -396,11 +396,46 @@ export default function ProjectBoardScreen({
   const boardScrollX = useRef(0);
   const boardViewportX = useRef(0);
   const columnFrames = useRef<Record<string, { x: number; width: number }>>({});
-  const lastAutoScrollAt = useRef(0);
+  const lastDragScreenX = useRef(-1);
+  const columnWidth = Math.min(width * 0.84, 326);
 
   useEffect(() => {
     Animated.timing(fade, { toValue: 1, duration: 280, useNativeDriver: true }).start();
   }, [fade]);
+
+  useEffect(() => {
+    if (!isCardDragging) {
+      lastDragScreenX.current = -1;
+      return;
+    }
+
+    const edgeSize = 82;
+    const maxScrollX = Math.max(0, ((columns.length + 1) * (columnWidth + 14)) + 24 - width);
+    const interval = setInterval(() => {
+      const screenX = lastDragScreenX.current;
+      if (screenX < 0) return;
+
+      const leftEdge = boardViewportX.current + edgeSize;
+      const rightEdge = width - edgeSize;
+      let delta = 0;
+
+      if (screenX > rightEdge) {
+        delta = 12 + Math.min(28, (screenX - rightEdge) * 0.32);
+      } else if (screenX < leftEdge) {
+        delta = -(12 + Math.min(28, (leftEdge - screenX) * 0.32));
+      }
+
+      if (!delta) return;
+
+      const nextX = Math.max(0, Math.min(maxScrollX, boardScrollX.current + delta));
+      if (nextX === boardScrollX.current) return;
+
+      boardScrollX.current = nextX;
+      boardRef.current?.scrollTo({ x: nextX, animated: false });
+    }, 16);
+
+    return () => clearInterval(interval);
+  }, [columnWidth, columns.length, isCardDragging, width]);
 
   const assigneeOptions = useMemo(() => {
     const names = new Set<string>();
@@ -525,28 +560,7 @@ export default function ProjectBoardScreen({
   };
 
   const handleDragMove = (screenX: number) => {
-    if (screenX < 0) return;
-
-    const now = Date.now();
-    if (now - lastAutoScrollAt.current < 32) return;
-
-    const edgeSize = 78;
-    const leftEdge = boardViewportX.current + edgeSize;
-    const rightEdge = width - edgeSize;
-    let nextX = boardScrollX.current;
-
-    if (screenX > rightEdge) {
-      nextX += 22 + Math.min(18, (screenX - rightEdge) * 0.28);
-    } else if (screenX < leftEdge) {
-      nextX -= 22 + Math.min(18, (leftEdge - screenX) * 0.28);
-    } else {
-      return;
-    }
-
-    lastAutoScrollAt.current = now;
-    nextX = Math.max(0, nextX);
-    boardScrollX.current = nextX;
-    boardRef.current?.scrollTo({ x: nextX, animated: true });
+    lastDragScreenX.current = screenX;
   };
 
   const confirmDeleteTask = (task: BoardTask) => {
@@ -589,8 +603,6 @@ export default function ProjectBoardScreen({
       },
     ]);
   };
-
-  const columnWidth = Math.min(width * 0.84, 326);
 
   return (
     <SafeAreaView style={s.safe} edges={topOffset ? ['left', 'right'] : ['top', 'left', 'right']}>
