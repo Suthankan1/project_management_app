@@ -1,12 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -61,6 +63,15 @@ function ChevronIcon() {
   );
 }
 
+function PlusIcon({ color = T.primary }: { color?: string }) {
+  return (
+    <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M12 5v14" />
+      <Path d="M5 12h14" />
+    </Svg>
+  );
+}
+
 function TaskCard({ task }: { task: SprintboardTask }) {
   const priority = task.priority ? PRIORITY_STYLES[task.priority.toUpperCase()] ?? PRIORITY_STYLES.LOW : null;
   const due = formatDate(task.dueDate);
@@ -103,7 +114,7 @@ function TaskCard({ task }: { task: SprintboardTask }) {
   );
 }
 
-function SprintColumn({ column }: { column: Sprintcolumn }) {
+function SprintColumn({ column, onCreateTask }: { column: Sprintcolumn; onCreateTask: (column: Sprintcolumn) => void }) {
   const accent = statusAccent(column.columnStatus);
   return (
     <View style={columnStyles.card}>
@@ -126,6 +137,10 @@ function SprintColumn({ column }: { column: Sprintcolumn }) {
           column.tasks.map((task) => <TaskCard key={task.taskId} task={task} />)
         )}
       </View>
+      <TouchableOpacity activeOpacity={0.8} onPress={() => onCreateTask(column)} style={columnStyles.addTaskBtn}>
+        <PlusIcon />
+        <Text style={columnStyles.addTaskText}>Add task</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -140,8 +155,13 @@ export default function ProjectSprintBoardScreen({
   topOffset?: number;
 }) {
   const { width } = useWindowDimensions();
-  const { sprints, selectedSprintId, board, loading, refreshing, error, refresh, selectSprint } = useProjectSprintBoard(projectId);
+  const { sprints, selectedSprintId, board, loading, refreshing, error, refresh, selectSprint, createTask, addColumn } = useProjectSprintBoard(projectId);
   const [showSprintModal, setShowSprintModal] = useState(false);
+  const [taskTarget, setTaskTarget] = useState<Sprintcolumn | null>(null);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [showColumnModal, setShowColumnModal] = useState(false);
+  const [newColumnName, setNewColumnName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const metrics = useMemo(() => {
     const stats = board?.stats;
@@ -154,6 +174,39 @@ export default function ProjectSprintBoardScreen({
 
   const columnWidth = Math.min(width * 0.84, 326);
   const sprintName = board?.sprintName || sprints.find((sprint) => sprint.id === selectedSprintId)?.sprintName || sprints.find((sprint) => sprint.id === selectedSprintId)?.name || 'Sprint Board';
+
+  const openCreateTask = (column: Sprintcolumn) => {
+    setTaskTarget(column);
+    setNewTaskTitle('');
+  };
+
+  const submitCreateTask = async () => {
+    if (!taskTarget || !newTaskTitle.trim()) return;
+    setSubmitting(true);
+    try {
+      await createTask(newTaskTitle, taskTarget.columnStatus);
+      setTaskTarget(null);
+      setNewTaskTitle('');
+    } catch {
+      Alert.alert('Task not created', 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitAddColumn = async () => {
+    if (!newColumnName.trim()) return;
+    setSubmitting(true);
+    try {
+      await addColumn(newColumnName);
+      setShowColumnModal(false);
+      setNewColumnName('');
+    } catch {
+      Alert.alert('Column not created', 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={s.safe} edges={topOffset ? ['left', 'right'] : ['top', 'left', 'right']}>
@@ -215,9 +268,17 @@ export default function ProjectSprintBoardScreen({
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.boardRow} decelerationRate="fast" snapToInterval={columnWidth + 14} snapToAlignment="start">
             {board.columns.map((column) => (
               <View key={column.id} style={{ width: columnWidth }}>
-                <SprintColumn column={column} />
+                <SprintColumn column={column} onCreateTask={openCreateTask} />
               </View>
             ))}
+            <View style={{ width: columnWidth }}>
+              <TouchableOpacity activeOpacity={0.82} onPress={() => setShowColumnModal(true)} style={s.addColumnCard}>
+                <View style={s.addColumnIcon}>
+                  <PlusIcon />
+                </View>
+                <Text style={s.addColumnText}>Add column</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         )}
         <View style={s.bottomPad} />
@@ -247,6 +308,56 @@ export default function ProjectSprintBoardScreen({
               );
             })}
             <TouchableOpacity activeOpacity={0.8} onPress={() => setShowSprintModal(false)} style={modal.secondaryBtn}>
+              <Text style={modal.secondaryText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={!!taskTarget} transparent animationType="slide">
+        <SafeAreaView style={modal.safe}>
+          <View style={modal.sheet}>
+            <View style={modal.handle} />
+            <Text style={modal.title}>New task</Text>
+            <Text style={modal.subtitle}>{taskTarget?.columnName}</Text>
+            <TextInput
+              style={modal.input}
+              value={newTaskTitle}
+              onChangeText={setNewTaskTitle}
+              placeholder="Task title"
+              placeholderTextColor="#94A3B8"
+              editable={!submitting}
+              autoFocus
+            />
+            <TouchableOpacity activeOpacity={0.85} disabled={submitting || !newTaskTitle.trim()} onPress={submitCreateTask} style={[modal.primaryBtn, (!newTaskTitle.trim() || submitting) && modal.disabled]}>
+              {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={modal.primaryText}>Create task</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => setTaskTarget(null)} style={modal.secondaryBtn}>
+              <Text style={modal.secondaryText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={showColumnModal} transparent animationType="slide">
+        <SafeAreaView style={modal.safe}>
+          <View style={modal.sheet}>
+            <View style={modal.handle} />
+            <Text style={modal.title}>New column</Text>
+            <Text style={modal.subtitle}>Add another sprint workflow stage</Text>
+            <TextInput
+              style={modal.input}
+              value={newColumnName}
+              onChangeText={setNewColumnName}
+              placeholder="Column name"
+              placeholderTextColor="#94A3B8"
+              editable={!submitting}
+              autoFocus
+            />
+            <TouchableOpacity activeOpacity={0.85} disabled={submitting || !newColumnName.trim()} onPress={submitAddColumn} style={[modal.primaryBtn, (!newColumnName.trim() || submitting) && modal.disabled]}>
+              {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={modal.primaryText}>Create column</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => setShowColumnModal(false)} style={modal.secondaryBtn}>
               <Text style={modal.secondaryText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -299,6 +410,9 @@ const s = StyleSheet.create({
   emptyBoardTitle: { fontSize: 16, fontWeight: '900', color: '#0F172A' },
   emptyBoardText: { fontSize: 12, fontWeight: '700', color: '#64748B', textAlign: 'center' },
   boardRow: { paddingHorizontal: 12, paddingTop: 14, gap: 14 },
+  addColumnCard: { minHeight: 360, borderRadius: 16, borderWidth: 2, borderStyle: 'dashed', borderColor: '#DDD6FE', backgroundColor: '#F5F3FF', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  addColumnIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DDD6FE', alignItems: 'center', justifyContent: 'center' },
+  addColumnText: { fontSize: 15, fontWeight: '900', color: T.primary },
   bottomPad: { height: 94 },
 });
 
@@ -314,6 +428,8 @@ const columnStyles = StyleSheet.create({
   body: { paddingHorizontal: 12, paddingBottom: 12, gap: 10 },
   emptyState: { minHeight: 128, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 13, fontWeight: '900', color: '#64748B' },
+  addTaskBtn: { marginHorizontal: 12, marginBottom: 12, height: 42, borderRadius: 12, borderWidth: 1, borderColor: '#BFDBFE', backgroundColor: '#EFF6FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  addTaskText: { fontSize: 13, fontWeight: '900', color: T.primary },
 });
 
 const taskStyles = StyleSheet.create({
@@ -339,11 +455,16 @@ const modal = StyleSheet.create({
   sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 22, gap: 10 },
   handle: { width: 40, height: 4, borderRadius: 999, backgroundColor: '#CBD5E1', alignSelf: 'center', marginBottom: 8 },
   title: { fontSize: 18, fontWeight: '900', color: '#0F172A' },
+  subtitle: { fontSize: 12, fontWeight: '700', color: '#64748B', marginTop: -4 },
   option: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
   optionActive: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   optionDot: { width: 11, height: 11, borderRadius: 6 },
   optionText: { flex: 1, fontSize: 14, fontWeight: '800', color: '#0F172A' },
   currentText: { fontSize: 11, fontWeight: '900', color: T.primary },
+  input: { minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC', paddingHorizontal: 14, fontSize: 14, color: '#0F172A' },
+  primaryBtn: { minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: T.primary },
+  disabled: { opacity: 0.55 },
+  primaryText: { fontSize: 14, fontWeight: '900', color: '#FFFFFF' },
   secondaryBtn: { minHeight: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF' },
   secondaryText: { fontSize: 14, fontWeight: '900', color: '#64748B' },
 });

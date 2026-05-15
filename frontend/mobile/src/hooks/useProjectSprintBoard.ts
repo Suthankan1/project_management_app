@@ -47,6 +47,21 @@ export interface Sprintboard {
   columns: Sprintcolumn[];
 }
 
+const DEFAULT_COLUMNS: Sprintcolumn[] = [
+  { id: 0, position: 0, columnName: 'To Do', columnStatus: 'TODO', tasks: [] },
+  { id: 0, position: 1, columnName: 'In Progress', columnStatus: 'IN_PROGRESS', tasks: [] },
+  { id: 0, position: 2, columnName: 'In Review', columnStatus: 'IN_REVIEW', tasks: [] },
+  { id: 0, position: 3, columnName: 'Done', columnStatus: 'DONE', tasks: [] },
+];
+
+function normalizeColumns(columns?: Sprintcolumn[]) {
+  const existing = [...(columns || [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  const byStatus = new Map(existing.map((column) => [column.columnStatus, column]));
+  const baseline = DEFAULT_COLUMNS.map((column) => byStatus.get(column.columnStatus) ?? column);
+  const extras = existing.filter((column) => !DEFAULT_COLUMNS.some((base) => base.columnStatus === column.columnStatus));
+  return [...baseline, ...extras];
+}
+
 export function useProjectSprintBoard(projectId: number) {
   const [sprints, setSprints] = useState<SprintSummary[]>([]);
   const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
@@ -84,7 +99,7 @@ export function useProjectSprintBoard(projectId: number) {
       const raw = boardRes.data as Sprintboard;
       setBoard({
         ...raw,
-        columns: [...(raw.columns || [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+        columns: normalizeColumns(raw.columns),
       });
     } catch {
       setError('Failed to load sprint board. Pull down to retry.');
@@ -104,6 +119,32 @@ export function useProjectSprintBoard(projectId: number) {
     void fetchBoard(false, sprintId);
   }, [fetchBoard]);
 
+  const createTask = useCallback(async (title: string, status: string) => {
+    const cleanTitle = title.trim();
+    if (!cleanTitle || !selectedSprintId) return;
+
+    await api.post('/api/tasks', {
+      projectId,
+      sprintId: selectedSprintId,
+      title: cleanTitle,
+      status,
+      priority: 'MEDIUM',
+    });
+    await fetchBoard(true, selectedSprintId);
+  }, [fetchBoard, projectId, selectedSprintId]);
+
+  const addColumn = useCallback(async (name: string) => {
+    const cleanName = name.trim();
+    if (!cleanName || !board?.id) return;
+    const status = cleanName.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '') || 'CUSTOM';
+
+    await api.post(`/api/sprintboards/${board.id}/columns`, {
+      name: cleanName,
+      status,
+    });
+    await fetchBoard(true, selectedSprintId);
+  }, [board?.id, fetchBoard, selectedSprintId]);
+
   return {
     sprints,
     selectedSprint,
@@ -114,5 +155,7 @@ export function useProjectSprintBoard(projectId: number) {
     error,
     refresh: () => fetchBoard(true),
     selectSprint,
+    createTask,
+    addColumn,
   };
 }
