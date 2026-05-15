@@ -4,6 +4,7 @@ import {
   Alert,
   Animated,
   Modal,
+  PanResponder,
   Platform,
   RefreshControl,
   ScrollView,
@@ -115,12 +116,16 @@ function TagIcon({ active }: { active: boolean }) {
 
 function TaskCard({
   task,
-  onMove,
   onDelete,
+  onDragEnd,
+  onDragStateChange,
+  onDragMove,
 }: {
   task: BoardTask;
-  onMove: (task: BoardTask) => void;
   onDelete: (task: BoardTask) => void;
+  onDragEnd: (task: BoardTask, dropX: number, translationX: number) => void;
+  onDragStateChange: (active: boolean) => void;
+  onDragMove: (screenX: number) => void;
 }) {
   const priority = task.priority ? PRIORITY_STYLES[task.priority.toUpperCase()] ?? PRIORITY_STYLES.LOW : null;
   const due = formatDate(task.dueDate);
@@ -128,10 +133,77 @@ function TaskCard({
   const labels = (task.labels || []).slice(0, 2);
   const completedSubtasks = task.subtasks?.filter((subtask) => subtask.status === 'DONE').length ?? 0;
   const totalSubtasks = task.subtasks?.length ?? 0;
+  const drag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragActiveRef = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const resetDragState = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    dragActiveRef.current = false;
+    setIsDragging(false);
+    onDragStateChange(false);
+  };
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        longPressTimer.current = setTimeout(() => {
+          dragActiveRef.current = true;
+          setIsDragging(true);
+          onDragStateChange(true);
+        }, 220);
+      },
+      onPanResponderMove: (_, gesture) => {
+        if (!dragActiveRef.current) {
+          if (Math.abs(gesture.dx) > 10 || Math.abs(gesture.dy) > 10) {
+            resetDragState();
+          }
+          return;
+        }
+        drag.setValue({ x: gesture.dx, y: gesture.dy });
+        onDragMove(gesture.moveX);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const shouldDrop = dragActiveRef.current;
+        resetDragState();
+        if (shouldDrop) {
+          onDragEnd(task, gesture.moveX, gesture.dx);
+        }
+        onDragMove(-1);
+        Animated.spring(drag, {
+          toValue: { x: 0, y: 0 },
+          useNativeDriver: true,
+          tension: 170,
+          friction: 18,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        resetDragState();
+        onDragMove(-1);
+        Animated.spring(drag, {
+          toValue: { x: 0, y: 0 },
+          useNativeDriver: true,
+          tension: 170,
+          friction: 18,
+        }).start();
+      },
+    })
+  ).current;
 
   return (
-    <TouchableOpacity activeOpacity={0.82} onLongPress={() => onMove(task)} onPress={() => onMove(task)}>
-      <View style={card.card}>
+    <Animated.View
+      {...panResponder.panHandlers}
+      style={[
+        card.card,
+        isDragging && card.cardDragging,
+        { transform: [...drag.getTranslateTransform(), { scale: isDragging ? 1.03 : 1 }] },
+      ]}
+    >
         <View style={card.topRow}>
           {priority && task.priority ? (
             <View style={[card.priority, { backgroundColor: priority.bg, borderColor: `${priority.dot}24` }]}>
@@ -199,25 +271,28 @@ function TaskCard({
             </View>
           )}
         </View>
-      </View>
-    </TouchableOpacity>
+    </Animated.View>
   );
 }
 
 function BoardColumn({
   column,
   tasks,
-  onMoveTask,
   onDeleteTask,
   onCreateTask,
   onDeleteColumn,
+  onDragTask,
+  onDragStateChange,
+  onDragMove,
 }: {
   column: KanbanBoardColumn;
   tasks: BoardTask[];
-  onMoveTask: (task: BoardTask) => void;
   onDeleteTask: (task: BoardTask) => void;
   onCreateTask: (column: KanbanBoardColumn) => void;
   onDeleteColumn: (column: KanbanBoardColumn) => void;
+  onDragTask: (task: BoardTask, column: KanbanBoardColumn, dropX: number, translationX: number) => void;
+  onDragStateChange: (active: boolean) => void;
+  onDragMove: (screenX: number) => void;
 }) {
   const accent = statusAccent(column.status, column.color);
   const wipExceeded = !!column.wipLimit && column.wipLimit > 0 && tasks.length > column.wipLimit;
@@ -260,7 +335,14 @@ function BoardColumn({
           </TouchableOpacity>
         ) : (
           tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onMove={onMoveTask} onDelete={onDeleteTask} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              onDelete={onDeleteTask}
+              onDragStateChange={onDragStateChange}
+              onDragMove={onDragMove}
+              onDragEnd={(draggedTask, dropX, translationX) => onDragTask(draggedTask, column, dropX, translationX)}
+            />
           ))
         )}
       </View>
@@ -302,14 +384,19 @@ export default function ProjectBoardScreen({
   const [selectedAssignee, setSelectedAssignee] = useState('ALL');
   const [selectedPriority, setSelectedPriority] = useState('ALL');
   const [filterSheet, setFilterSheet] = useState<'assignee' | 'priority' | null>(null);
-  const [selectedTask, setSelectedTask] = useState<BoardTask | null>(null);
   const [taskTarget, setTaskTarget] = useState<KanbanBoardColumn | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newColumnName, setNewColumnName] = useState('');
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [isCardDragging, setIsCardDragging] = useState(false);
   const fade = useRef(new Animated.Value(0)).current;
+  const boardRef = useRef<ScrollView | null>(null);
+  const boardScrollX = useRef(0);
+  const boardViewportX = useRef(0);
+  const columnFrames = useRef<Record<string, { x: number; width: number }>>({});
+  const lastAutoScrollAt = useRef(0);
 
   useEffect(() => {
     Animated.timing(fade, { toValue: 1, duration: 280, useNativeDriver: true }).start();
@@ -397,17 +484,69 @@ export default function ProjectBoardScreen({
     }
   };
 
-  const handleMoveTask = async (column: KanbanBoardColumn) => {
-    if (!selectedTask) return;
-    setSubmitting(true);
+  const handleDragTask = async (
+    task: BoardTask,
+    sourceColumn: KanbanBoardColumn,
+    dropX: number,
+    translationX: number
+  ) => {
+    const threshold = 32;
+    if (Math.abs(translationX) < threshold) return;
+
+    const sourceFrame = columnFrames.current[sourceColumn.status];
+    const fingerDropX = boardScrollX.current + dropX - boardViewportX.current;
+    const cardCenterDropX = sourceFrame
+      ? sourceFrame.x + (sourceFrame.width / 2) + translationX
+      : fingerDropX;
+
+    const findColumnAt = (x: number) => columns.find((column) => {
+      const frame = columnFrames.current[column.status];
+      return frame && x >= frame.x && x <= frame.x + frame.width;
+    });
+
+    let targetColumn = findColumnAt(cardCenterDropX) ?? findColumnAt(fingerDropX);
+
+    if (!targetColumn || targetColumn.status === task.status) {
+      const currentIndex = columns.findIndex((column) => column.status === sourceColumn.status);
+      const direction = translationX > 0 ? 1 : -1;
+      const draggedFarEnough = Math.abs(translationX) > columnWidth * 0.28;
+      if (draggedFarEnough) {
+        targetColumn = columns[currentIndex + direction];
+      }
+    }
+
+    if (!targetColumn || targetColumn.status === task.status) return;
+
     try {
-      await moveTask(selectedTask, column.status);
-      setSelectedTask(null);
+      await moveTask(task, targetColumn.status);
     } catch {
       Alert.alert('Move failed', 'The task could not be moved.');
-    } finally {
-      setSubmitting(false);
     }
+  };
+
+  const handleDragMove = (screenX: number) => {
+    if (screenX < 0) return;
+
+    const now = Date.now();
+    if (now - lastAutoScrollAt.current < 32) return;
+
+    const edgeSize = 78;
+    const leftEdge = boardViewportX.current + edgeSize;
+    const rightEdge = width - edgeSize;
+    let nextX = boardScrollX.current;
+
+    if (screenX > rightEdge) {
+      nextX += 22 + Math.min(18, (screenX - rightEdge) * 0.28);
+    } else if (screenX < leftEdge) {
+      nextX -= 22 + Math.min(18, (leftEdge - screenX) * 0.28);
+    } else {
+      return;
+    }
+
+    lastAutoScrollAt.current = now;
+    nextX = Math.max(0, nextX);
+    boardScrollX.current = nextX;
+    boardRef.current?.scrollTo({ x: nextX, animated: true });
   };
 
   const confirmDeleteTask = (task: BoardTask) => {
@@ -476,9 +615,6 @@ export default function ProjectBoardScreen({
               <Text style={s.eyebrow}>KANBAN BOARD</Text>
               <Text style={s.title} numberOfLines={1}>{projectName || board?.name || 'Board'}</Text>
             </View>
-            <TouchableOpacity activeOpacity={0.8} onPress={() => setShowColumnModal(true)} style={s.iconAction}>
-              <PlusIcon color={T.primary} />
-            </TouchableOpacity>
           </View>
 
           <View style={s.progressWrap}>
@@ -535,25 +671,58 @@ export default function ProjectBoardScreen({
           </View>
         ) : (
           <ScrollView
+            ref={boardRef}
             horizontal
+            removeClippedSubviews={false}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={s.boardRow}
             decelerationRate="fast"
             snapToInterval={columnWidth + 14}
             snapToAlignment="start"
+            scrollEnabled={!isCardDragging}
+            scrollEventThrottle={16}
+            onLayout={(event) => {
+              boardViewportX.current = event.nativeEvent.layout.x;
+            }}
+            onScroll={(event) => {
+              boardScrollX.current = event.nativeEvent.contentOffset.x;
+            }}
           >
             {columns.map((column) => (
-              <View key={column.status} style={{ width: columnWidth }}>
+              <View
+                key={column.status}
+                style={{ width: columnWidth, overflow: 'visible' }}
+                onLayout={(event) => {
+                  columnFrames.current[column.status] = {
+                    x: event.nativeEvent.layout.x,
+                    width: event.nativeEvent.layout.width,
+                  };
+                }}
+              >
                 <BoardColumn
                   column={column}
                   tasks={columnTasks[column.status] || []}
-                  onMoveTask={setSelectedTask}
                   onDeleteTask={confirmDeleteTask}
                   onCreateTask={openCreateTask}
                   onDeleteColumn={confirmDeleteColumn}
+                  onDragTask={handleDragTask}
+                  onDragStateChange={setIsCardDragging}
+                  onDragMove={handleDragMove}
                 />
               </View>
             ))}
+            <View style={{ width: columnWidth }}>
+              <TouchableOpacity
+                activeOpacity={0.82}
+                onPress={() => setShowColumnModal(true)}
+                style={s.addColumnCard}
+              >
+                <View style={s.addColumnIcon}>
+                  <PlusIcon color={T.primary} />
+                </View>
+                <Text style={s.addColumnText}>Add column</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         )}
 
@@ -595,36 +764,6 @@ export default function ProjectBoardScreen({
               );
             })}
             <TouchableOpacity activeOpacity={0.8} onPress={() => setFilterSheet(null)} style={modal.secondaryBtn}>
-              <Text style={modal.secondaryText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </Modal>
-
-      <Modal visible={!!selectedTask} transparent animationType="slide">
-        <SafeAreaView style={modal.safe}>
-          <View style={modal.sheet}>
-            <View style={modal.handle} />
-            <Text style={modal.title} numberOfLines={2}>{selectedTask?.title}</Text>
-            <Text style={modal.subtitle}>Move to column</Text>
-            {columns.map((column) => {
-              const accent = statusAccent(column.status, column.color);
-              const active = selectedTask?.status === column.status;
-              return (
-                <TouchableOpacity
-                  key={column.status}
-                  activeOpacity={0.78}
-                  disabled={active || submitting}
-                  style={[modal.option, active && modal.optionActive]}
-                  onPress={() => handleMoveTask(column)}
-                >
-                  <View style={[modal.optionDot, { backgroundColor: accent }]} />
-                  <Text style={modal.optionText}>{formatColumnName(column)}</Text>
-                  {active && <Text style={modal.currentText}>Current</Text>}
-                </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity activeOpacity={0.8} onPress={() => setSelectedTask(null)} style={modal.secondaryBtn}>
               <Text style={modal.secondaryText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -723,16 +862,6 @@ const s = StyleSheet.create({
   heroTitleWrap: { flex: 1, minWidth: 0 },
   eyebrow: { fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 1 },
   title: { fontSize: 20, fontWeight: '900', color: '#0F172A', marginTop: 2 },
-  iconAction: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-  },
   progressWrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   progressTrack: { flex: 1, height: 6, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 999, backgroundColor: '#22C55E' },
@@ -790,7 +919,29 @@ const s = StyleSheet.create({
   errorText: { fontSize: 12, color: '#991B1B', fontWeight: '700' },
   loadingWrap: { paddingVertical: 34, alignItems: 'center', gap: 10 },
   loadingText: { fontSize: 13, color: '#64748B', fontWeight: '700' },
-  boardRow: { paddingHorizontal: 12, paddingTop: 14, gap: 14 },
+  boardRow: { paddingHorizontal: 12, paddingTop: 14, gap: 14, overflow: 'visible' },
+  addColumnCard: {
+    minHeight: 360,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  addColumnIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addColumnText: { fontSize: 15, fontWeight: '900', color: T.primary },
   bottomPad: { height: 94 },
 });
 
@@ -800,7 +951,7 @@ const columnStyles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(226, 232, 240, 0.95)',
-    overflow: 'hidden',
+    overflow: 'visible',
     minHeight: 360,
   },
   accent: { height: 5 },
@@ -855,7 +1006,7 @@ const columnStyles = StyleSheet.create({
   },
   countText: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
   wipText: { color: '#DC2626' },
-  body: { paddingHorizontal: 12, gap: 10 },
+  body: { paddingHorizontal: 12, gap: 10, overflow: 'visible' },
   emptyState: {
     minHeight: 128,
     borderRadius: 14,
@@ -894,7 +1045,17 @@ const card = StyleSheet.create({
     borderColor: '#E2E8F0',
     padding: 13,
     gap: 10,
+    zIndex: 1,
     ...shadow,
+  },
+  cardDragging: {
+    borderColor: T.primary,
+    backgroundColor: '#F8FBFF',
+    zIndex: 999,
+    ...Platform.select({
+      ios: { shadowColor: T.primary, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.18, shadowRadius: 18 },
+      android: { elevation: 24 },
+    }),
   },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 24 },
   priority: {
