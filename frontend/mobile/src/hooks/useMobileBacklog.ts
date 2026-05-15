@@ -42,6 +42,7 @@ export interface MobileBacklogFilters {
   status: string;
   priority: string;
   assignee: string;
+  label: string;
   groupBy: BacklogGroupBy;
 }
 
@@ -50,6 +51,7 @@ const DEFAULT_FILTERS: MobileBacklogFilters = {
   status: 'ALL',
   priority: 'ALL',
   assignee: 'ALL',
+  label: 'ALL',
   groupBy: 'none',
 };
 
@@ -135,6 +137,16 @@ export function useMobileBacklog(projectId: number) {
     return Array.from(names).sort((a, b) => a.localeCompare(b));
   }, [tasks]);
 
+  const allLabels = useMemo(() => {
+    const byId = new Map<number, MobileLabel>();
+    tasks.forEach((task) => {
+      task.labels?.forEach((label) => {
+        byId.set(label.id, label);
+      });
+    });
+    return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [tasks]);
+
   const applyFilters = useCallback((source: MobileTask[]) => {
     const term = filters.search.trim().toLowerCase();
     return source.filter((task) => {
@@ -152,6 +164,7 @@ export function useMobileBacklog(projectId: number) {
       if (filters.status !== 'ALL' && (task.status || 'TODO') !== filters.status) return false;
       if (filters.priority !== 'ALL' && (task.priority || 'MEDIUM') !== filters.priority) return false;
       if (filters.assignee !== 'ALL' && (task.assigneeName || 'Unassigned') !== filters.assignee) return false;
+      if (filters.label !== 'ALL' && !task.labels?.some((label) => String(label.id) === filters.label)) return false;
       return true;
     });
   }, [filters]);
@@ -333,6 +346,7 @@ export function useMobileBacklog(projectId: number) {
     filteredProductTasks,
     groupedProductTasks,
     allAssigneeNames,
+    allLabels,
     currentUserRole,
     filters,
     setFilters,

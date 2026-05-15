@@ -31,7 +31,7 @@ const GROUPS: Array<{ value: BacklogGroupBy; label: string }> = [
   { value: 'assignee', label: 'Assignee' },
 ];
 
-function Icon({ name, color = T.primary, size = 18 }: { name: 'plus' | 'search' | 'filter' | 'trash' | 'check' | 'rocket' | 'box' | 'move' | 'chart'; color?: string; size?: number }) {
+function Icon({ name, color = T.primary, size = 18 }: { name: 'plus' | 'search' | 'filter' | 'trash' | 'check' | 'rocket' | 'box' | 'move' | 'chart' | 'user' | 'tag' | 'flag'; color?: string; size?: number }) {
   const p = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 2.25, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   if (name === 'search') return <Svg {...p}><Circle cx={11} cy={11} r={8} /><Path d="m21 21-4.3-4.3" /></Svg>;
   if (name === 'filter') return <Svg {...p}><Path d="M3 5h18" /><Path d="M7 12h10" /><Path d="M10 19h4" /></Svg>;
@@ -41,6 +41,9 @@ function Icon({ name, color = T.primary, size = 18 }: { name: 'plus' | 'search' 
   if (name === 'box') return <Svg {...p}><Rect x={4} y={4} width={16} height={16} rx={3} /><Path d="M8 9h8" /><Path d="M8 14h5" /></Svg>;
   if (name === 'move') return <Svg {...p}><Path d="M5 12h14" /><Path d="m13 6 6 6-6 6" /></Svg>;
   if (name === 'chart') return <Svg {...p}><Rect x={4} y={12} width={3} height={7} rx={1} /><Rect x={10.5} y={5} width={3} height={14} rx={1} /><Rect x={17} y={9} width={3} height={10} rx={1} /></Svg>;
+  if (name === 'user') return <Svg {...p}><Circle cx={12} cy={7} r={4} /><Path d="M5 21v-2a7 7 0 0 1 14 0v2" /></Svg>;
+  if (name === 'tag') return <Svg {...p}><Path d="M20 13 11 22l-9-9V4h9l9 9z" /><Circle cx={7.5} cy={8.5} r={1.5} /></Svg>;
+  if (name === 'flag') return <Svg {...p}><Path d="M4 22V4" /><Path d="M4 5h12l-1 5 1 5H4" /></Svg>;
   return <Svg {...p}><Path d="M12 5v14" /><Path d="M5 12h14" /></Svg>;
 }
 
@@ -181,6 +184,7 @@ function FilterSheet({
   value,
   options,
   title,
+  getLabel,
   onClose,
   onSelect,
 }: {
@@ -188,6 +192,7 @@ function FilterSheet({
   value: string;
   options: string[];
   title: string;
+  getLabel?: (option: string) => string;
   onClose: () => void;
   onSelect: (value: string) => void;
 }) {
@@ -199,7 +204,7 @@ function FilterSheet({
           <Text style={styles.sheetTitle}>{title}</Text>
           {options.map((option) => {
             const active = value === option;
-            const label = option === 'ALL' ? 'All' : option.replace(/_/g, ' ');
+            const label = getLabel ? getLabel(option) : option === 'ALL' ? 'All' : option.replace(/_/g, ' ');
             return (
               <TouchableOpacity key={option} activeOpacity={0.75} onPress={() => { onSelect(option); onClose(); }} style={[styles.sheetOption, active && styles.sheetOptionActive]}>
                 <View style={[styles.optionDot, active && styles.optionDotActive]} />
@@ -389,13 +394,15 @@ function BulkBar({
 function FilterBar({
   filters,
   assignees,
+  labels,
   setFilters,
 }: {
   filters: ReturnType<typeof useMobileBacklog>['filters'];
   assignees: string[];
+  labels: ReturnType<typeof useMobileBacklog>['allLabels'];
   setFilters: ReturnType<typeof useMobileBacklog>['setFilters'];
 }) {
-  const [sheet, setSheet] = useState<'status' | 'priority' | 'assignee' | null>(null);
+  const [sheet, setSheet] = useState<'status' | 'priority' | 'assignee' | 'label' | null>(null);
   return (
     <View style={styles.filters}>
       <View style={styles.searchWrap}>
@@ -412,10 +419,13 @@ function FilterBar({
         <Icon name="filter" color={filters.status !== 'ALL' ? T.primary : '#64748B'} />
       </TouchableOpacity>
       <TouchableOpacity activeOpacity={0.8} onPress={() => setSheet('priority')} style={[styles.filterBtn, filters.priority !== 'ALL' && styles.filterBtnActive]}>
-        <Text style={[styles.filterLetter, filters.priority !== 'ALL' && styles.filterLetterActive]}>P</Text>
+        <Icon name="flag" color={filters.priority !== 'ALL' ? T.primary : '#64748B'} />
       </TouchableOpacity>
       <TouchableOpacity activeOpacity={0.8} onPress={() => setSheet('assignee')} style={[styles.filterBtn, filters.assignee !== 'ALL' && styles.filterBtnActive]}>
-        <Text style={[styles.filterLetter, filters.assignee !== 'ALL' && styles.filterLetterActive]}>A</Text>
+        <Icon name="user" color={filters.assignee !== 'ALL' ? T.primary : '#64748B'} />
+      </TouchableOpacity>
+      <TouchableOpacity activeOpacity={0.8} onPress={() => setSheet('label')} style={[styles.filterBtn, filters.label !== 'ALL' && styles.filterBtnActive]}>
+        <Icon name="tag" color={filters.label !== 'ALL' ? T.primary : '#64748B'} />
       </TouchableOpacity>
 
       <FilterSheet
@@ -441,6 +451,15 @@ function FilterBar({
         title="Assignee"
         onClose={() => setSheet(null)}
         onSelect={(assignee) => setFilters((current) => ({ ...current, assignee }))}
+      />
+      <FilterSheet
+        visible={sheet === 'label'}
+        value={filters.label}
+        options={['ALL', ...labels.map((label) => String(label.id))]}
+        title="Label"
+        getLabel={(option) => option === 'ALL' ? 'All' : labels.find((label) => String(label.id) === option)?.name ?? option}
+        onClose={() => setSheet(null)}
+        onSelect={(label) => setFilters((current) => ({ ...current, label }))}
       />
     </View>
   );
@@ -509,14 +528,19 @@ export default function MobileBacklogScreen({
         refreshControl={<RefreshControl refreshing={backlog.refreshing} onRefresh={backlog.refresh} tintColor={T.primary} colors={[T.primary]} />}
         showsVerticalScrollIndicator={false}
       >
-        <Header
-          agile={isAgile}
-          stats={backlog.stats}
-          onCreateTask={() => openCreateTask(null)}
-          onCreateSprint={() => setCreateSprintOpen(true)}
-        />
+        {isAgile && (
+          <TouchableOpacity activeOpacity={0.84} onPress={() => setCreateSprintOpen(true)} style={styles.createSprintTopBtn}>
+            <Icon name="rocket" color="#FFFFFF" size={16} />
+            <Text style={styles.createSprintText}>Create sprint</Text>
+          </TouchableOpacity>
+        )}
 
-        <FilterBar filters={backlog.filters} assignees={backlog.allAssigneeNames} setFilters={backlog.setFilters} />
+        <FilterBar
+          filters={backlog.filters}
+          assignees={backlog.allAssigneeNames}
+          labels={backlog.allLabels}
+          setFilters={backlog.setFilters}
+        />
 
         {!isAgile && (
           <GroupControl
@@ -691,6 +715,7 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 20, fontWeight: '900' },
   statLabel: { fontSize: 10, fontWeight: '800', color: T.textSecondary, letterSpacing: 0.6, textTransform: 'uppercase' },
   createSprintBtn: { height: 42, borderRadius: 12, backgroundColor: T.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  createSprintTopBtn: { height: 46, borderRadius: 14, backgroundColor: T.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   createSprintText: { fontSize: 13, fontWeight: '900', color: '#FFFFFF' },
   filters: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   searchWrap: { flex: 1, minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
