@@ -100,6 +100,15 @@ public class SprintboardController {
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
+    @DeleteMapping("/{sprintboardId}/columns/{columnId}")
+    public ResponseEntity<Void> deleteColumn(
+            @PathVariable Long sprintboardId,
+            @PathVariable Long columnId,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        sprintboardService.deleteColumnFromSprintboard(sprintboardId, columnId, currentUser.getUserId());
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
     // MOVE task to different column
     @PutMapping("/tasks/{taskId}/move")
     public ResponseEntity<Void> moveTaskToColumn(

@@ -11,6 +11,8 @@ import ProjectTopNav, {
 import SummaryScreen  from '../../src/components/summary/SummaryScreen';
 import ReportScreen   from '../../src/components/report/ReportScreen';
 import ProjectBoardScreen from '../../src/components/board/ProjectBoardScreen';
+import ProjectSprintBoardScreen from '../../src/components/board/ProjectSprintBoardScreen';
+import MobileBacklogScreen from '../../src/components/backlog/MobileBacklogScreen';
 import { useProjectSummary } from '../../src/hooks/useProjectSummary';
 
 /** Height of the nav bar = padding top (8) + title row (56) + tab row (48) + padding bottom (12) */
@@ -117,12 +119,21 @@ export default function ProjectRoute() {
         );
       case 'backlog':
         return (
-          <View style={{ flex: 1, paddingTop: navHeight }}>
-            <PlaceholderScreen label="Backlog" />
-          </View>
+          <MobileBacklogScreen
+            projectId={numericId}
+            projectName={name}
+            isAgile={!!data?.isAgile}
+            topOffset={navHeight + 16}
+          />
         );
       case 'board':
-        return (
+        return data?.isAgile ? (
+          <ProjectSprintBoardScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight + 16}
+          />
+        ) : (
           <ProjectBoardScreen
             projectId={numericId}
             projectName={name}
