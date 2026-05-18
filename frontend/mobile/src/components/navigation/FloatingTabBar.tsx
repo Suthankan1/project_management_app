@@ -282,8 +282,7 @@ export default function FloatingTabBar({ state, descriptors, navigation }: Botto
       {/* Background dark gradient shade from bottom */}
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.02)', 'rgba(0,0,0,0.06)', 'rgba(0,0,0,0.12)']}
-        style={styles.gradientBg}
-        pointerEvents="none"
+        style={[styles.gradientBg, { pointerEvents: 'none' }]}
       />
 
       {Platform.OS === 'ios' ? (

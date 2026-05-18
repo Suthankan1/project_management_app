@@ -166,8 +166,7 @@ export function ChatInput(props: ChatInputProps) {
        * translateY:0 reveals it above.
        */}
       <Animated.View
-        style={[styles.emojiSheet, animatedEmojiStyle, { bottom: containerHeight }]}
-        pointerEvents={showEmojiPicker ? 'auto' : 'none'}
+        style={[styles.emojiSheet, animatedEmojiStyle, { bottom: containerHeight, pointerEvents: showEmojiPicker ? 'auto' : 'none' }]}
       >
         <View style={styles.emojiHandle} />
         <ScrollView

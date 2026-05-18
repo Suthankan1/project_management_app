@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Platform, Animated, Dimensions, Modal, TouchableWithoutFeedback,
+  Platform, Animated, Dimensions, Modal, Pressable,
 } from 'react-native';
 import Svg, { Path, Circle, Rect, Line, Polygon } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -356,14 +356,14 @@ export default function ProjectTopNav({
   return (
     <>
       {/* Animated Frosted Glass Background Overlay */}
-      <TouchableWithoutFeedback onPress={() => setMoreOpen(false)}>
-        <Animated.View
-          pointerEvents={moreOpen ? 'auto' : 'none'}
-          style={[StyleSheet.absoluteFill, { zIndex: 90, opacity: dropdownOp }]}
-        >
+      <Pressable
+        onPress={() => setMoreOpen(false)}
+        style={[StyleSheet.absoluteFill, { zIndex: 90, pointerEvents: moreOpen ? 'auto' : 'none' }]}
+      >
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: dropdownOp }]}>
           <BlurView intensity={50} tint="dark" experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
         </Animated.View>
-      </TouchableWithoutFeedback>
+      </Pressable>
 
       {/* The Main Top Navigation Bar Expanding Downwards */}
       <Animated.View style={[

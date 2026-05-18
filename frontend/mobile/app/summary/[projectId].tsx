@@ -11,6 +11,7 @@ import ProjectTopNav, {
 } from '../../src/components/navigation/ProjectTopNav';
 import SummaryScreen  from '../../src/components/summary/SummaryScreen';
 import ReportScreen   from '../../src/components/report/ReportScreen';
+import { ChatTabContent } from '../../src/components/chat/ChatTabContent';
 import { useProjectSummary } from '../../src/hooks/useProjectSummary';
 
 /** Height of the nav bar = padding top (8) + title row (56) + tab row (48) + padding bottom (12) */
@@ -129,9 +130,7 @@ export default function ProjectRoute() {
         );
       case 'chat':
         return (
-          <View style={{ flex: 1, paddingTop: navHeight }}>
-            <PlaceholderScreen label="Chat" />
-          </View>
+          <ChatTabContent projectId={String(numericId)} navHeight={navHeight} />
         );
       default:
         return null;

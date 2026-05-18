@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Platform } from 'react-native';
 import * as chatService from '../../services/chatService';
 import { API_BASE_URL } from '../../api/axios';
 import { ChatMessage, ChatFeatureFlags } from '../../types/chat';
@@ -13,14 +14,27 @@ import { getToken } from '@/src/auth/storage';
 
 // ── Minimal inline STOMP builder/parser ──────────────────────────────────────
 
+// Builders do NOT include the null-byte terminator — sendStompFrame appends it.
 function buildConnect(token: string) {
-  return `CONNECT\naccept-version:1.2\nheart-beat:0,0\nAuthorization:Bearer ${token}\n\n\0`;
+  return `CONNECT\naccept-version:1.2\nheart-beat:0,0\nAuthorization:Bearer ${token}\n\n`;
 }
 function buildSubscribe(id: string, dest: string) {
-  return `SUBSCRIBE\nid:${id}\ndestination:${dest}\n\n\0`;
+  return `SUBSCRIBE\nid:${id}\ndestination:${dest}\n\n`;
 }
 function buildSend(dest: string, body: string) {
-  return `SEND\ndestination:${dest}\ncontent-type:application/json\n\n${body}\0`;
+  return `SEND\ndestination:${dest}\ncontent-type:application/json\n\n${body}`;
+}
+
+// On React Native/Android, OkHttp's UTF-8 text-frame encoding can silently drop the
+// STOMP null-byte terminator (\0).  Sending as a binary frame (Uint8Array) guarantees
+// the 0x00 byte reaches the server exactly.  On web the browser handles it fine.
+function sendStompFrame(ws: WebSocket, frame: string) {
+  if (Platform.OS === 'web') {
+    ws.send(frame + '\0');
+  } else {
+    const bytes = new TextEncoder().encode(frame + '\0');
+    ws.send(bytes as unknown as string); // React Native WebSocket accepts ArrayBufferView
+  }
 }
 function parseFrame(raw: string): { command: string; headers: Record<string, string>; body: string } {
   const s = raw.replace(/\r\n/g, '\n');
@@ -99,8 +113,8 @@ export function useChat(projectId: string) {
   const subscribeRoom = useCallback((ws: WebSocket, roomId: number) => {
     if (subscribedRoomsRef.current.has(roomId)) return;
     subscribedRoomsRef.current.add(roomId);
-    ws.send(buildSubscribe(`sub-room-${roomId}`, `/topic/project/${projectId}/room/${roomId}`));
-    ws.send(buildSubscribe(`sub-room-typing-${roomId}`, `/topic/project/${projectId}/typing/room/${roomId}`));
+    sendStompFrame(ws, buildSubscribe(`sub-room-${roomId}`, `/topic/project/${projectId}/room/${roomId}`));
+    sendStompFrame(ws, buildSubscribe(`sub-room-typing-${roomId}`, `/topic/project/${projectId}/typing/room/${roomId}`));
   }, [projectId]);
 
   // ── Handle incoming STOMP MESSAGE frames ─────────────────────────────────────
@@ -226,11 +240,14 @@ export function useChat(projectId: string) {
       socketRef.current = ws;
 
       ws.onopen = () => {
+        if (socketRef.current !== ws) { ws.close(); return; }
+        isConnectingRef.current = false;
         console.info('[Chat] WS open — sending STOMP CONNECT');
-        ws.send(buildConnect(token));
+        sendStompFrame(ws, buildConnect(token));
       };
 
       ws.onmessage = async (e) => {
+        if (socketRef.current !== ws) return;
         try {
           let raw = e.data;
           if (typeof raw !== 'string') {
@@ -248,19 +265,19 @@ export function useChat(projectId: string) {
             subscribedRoomsRef.current.clear();
 
             // Core subscriptions
-            ws.send(buildSubscribe('sub-public', `/topic/project/${projectId}/public`));
-            ws.send(buildSubscribe('sub-private', `/user/queue/project/${projectId}/messages`));
-            ws.send(buildSubscribe('sub-typing-team', `/topic/project/${projectId}/typing/team`));
-            ws.send(buildSubscribe('sub-typing-private', `/user/queue/project/${projectId}/typing/private`));
-            ws.send(buildSubscribe('sub-unread', `/user/queue/project/${projectId}/unread-badge`));
-            ws.send(buildSubscribe('sub-presence', `/topic/project/${projectId}/presence`));
-            ws.send(buildSubscribe('sub-rooms-events', `/topic/project/${projectId}/rooms`));
+            sendStompFrame(ws, buildSubscribe('sub-public', `/topic/project/${projectId}/public`));
+            sendStompFrame(ws, buildSubscribe('sub-private', `/user/queue/project/${projectId}/messages`));
+            sendStompFrame(ws, buildSubscribe('sub-typing-team', `/topic/project/${projectId}/typing/team`));
+            sendStompFrame(ws, buildSubscribe('sub-typing-private', `/user/queue/project/${projectId}/typing/private`));
+            sendStompFrame(ws, buildSubscribe('sub-unread', `/user/queue/project/${projectId}/unread-badge`));
+            sendStompFrame(ws, buildSubscribe('sub-presence', `/topic/project/${projectId}/presence`));
+            sendStompFrame(ws, buildSubscribe('sub-rooms-events', `/topic/project/${projectId}/rooms`));
 
             // Subscribe to all already-loaded rooms
             roomsHook.rooms.forEach(r => subscribeRoom(ws, r.id));
 
             // Send presence ping
-            ws.send(buildSend(`/app/project/${projectId}/presence.ping`, '{}'));
+            sendStompFrame(ws, buildSend(`/app/project/${projectId}/presence.ping`, '{}'));
           } else if (frame.command === 'MESSAGE') {
             handleMessage(frame);
           } else if (frame.command === 'ERROR') {
@@ -272,8 +289,9 @@ export function useChat(projectId: string) {
         }
       };
 
-      ws.onclose = () => {
-        console.warn('[Chat] WS closed');
+      ws.onclose = (event) => {
+        if (socketRef.current !== ws) return;
+        console.warn(`[Chat] WS closed — code: ${event.code}, reason: "${event.reason || '(none)'}"`);
         setIsSocketConnected(false);
         socketRef.current = null;
         isConnectingRef.current = false;
@@ -286,6 +304,7 @@ export function useChat(projectId: string) {
       };
 
       ws.onerror = (e) => {
+        if (socketRef.current !== ws) return;
         console.error('[Chat] WS error', e);
         setError('Connection error — retrying…');
         isConnectingRef.current = false;
@@ -334,17 +353,23 @@ export function useChat(projectId: string) {
         console.error('[Chat] init failed', err);
         if (!cancelled) setError('Failed to initialize chat');
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+          // Connect after HTTP init so any token refresh has already completed.
+          connectWebSocket();
+        }
       }
     };
 
     init();
-    connectWebSocket();
 
     return () => {
       cancelled = true;
-      socketRef.current?.close();
-      if (reconnectRef.current) clearTimeout(reconnectRef.current);
+      isConnectingRef.current = false;
+      const dying = socketRef.current;
+      socketRef.current = null;
+      dying?.close();
+      if (reconnectRef.current) { clearTimeout(reconnectRef.current); reconnectRef.current = null; }
     };
   }, [projectId]);
 
@@ -355,7 +380,7 @@ export function useChat(projectId: string) {
       setError('Not connected. Please wait…');
       return;
     }
-    ws.send(buildSend(dest, body));
+    sendStompFrame(ws, buildSend(dest, body));
   }, []);
 
   const sendMessage = useCallback((content: string, recipient?: string | null) => {

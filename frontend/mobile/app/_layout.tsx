@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 /**
@@ -20,7 +21,7 @@ import 'react-native-reanimated';
  */
 export default function RootLayout() {
   return (
-    <>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index"                  options={{ headerShown: false }} />
         <Stack.Screen name="(auth)"                 options={{ headerShown: false }} />
@@ -32,6 +33,6 @@ export default function RootLayout() {
         <Stack.Screen name="modal"                  options={{ presentation: 'modal' }} />
       </Stack>
       <StatusBar style="dark" />
-    </>
+    </GestureHandlerRootView>
   );
 }

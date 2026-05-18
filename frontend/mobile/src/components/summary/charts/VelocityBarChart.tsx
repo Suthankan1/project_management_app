@@ -55,7 +55,7 @@ export function VelocityBarChart({ tasks, sprints }: { tasks: Task[]; sprints: S
             return <AnimRect key={`${d.name}-${i}`} x={cx} y={by} width={bw} height={bh} rx={6} fill="url(#bar)" />;
           })}
         </Svg>
-        <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+        <View style={[StyleSheet.absoluteFillObject, { pointerEvents: 'none' }]}>
           {ticks.map(v => (
             <Text key={`tick-${v}`} style={[st.axisY, { top: ty(v) - 7, left: 0, width: P.l - 3 }]}>{v}</Text>
           ))}
