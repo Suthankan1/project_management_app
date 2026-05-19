@@ -9,6 +9,7 @@ import {
   Platform,
   StyleSheet,
   Animated,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -22,6 +23,10 @@ import PasswordInput from '@/src/components/ui/PasswordInput';
 import PrimaryButton from '@/src/components/ui/PrimaryButton';
 import ErrorBanner from '@/src/components/ui/ErrorBanner';
 import { Colors } from '@/src/constants/colors';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// card marginHorizontal 20×2=40, card padding 24×2=48, tabContainer padding 5×2=10
+const TAB_WIDTH = (SCREEN_WIDTH - 40 - 48 - 10) / 2;
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -44,6 +49,16 @@ export default function LoginScreen() {
       delay: 80,
     }).start();
   }, [cardAnim]);
+
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: 0,
+      tension: 200,
+      friction: 20,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   const cardStyle = {
     opacity: cardAnim,
@@ -102,14 +117,24 @@ export default function LoginScreen() {
             <BlurView intensity={20} tint="light" style={styles.card}>
               {/* Tab Switcher */}
               <View style={styles.tabContainer}>
-                <View style={[styles.tab, styles.tabActive]}>
-                  <Text style={styles.tabActiveText}>Sign In</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.tab}
-                  onPress={() => router.replace('/(auth)/register')}
-                >
-                  <Text style={styles.tabInactiveText}>Register</Text>
+                <Animated.View
+                  style={[
+                    styles.tabPill,
+                    {
+                      transform: [{
+                        translateX: slideAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, TAB_WIDTH],
+                        }),
+                      }],
+                    },
+                  ]}
+                />
+                <TouchableOpacity style={styles.tab} onPress={() => router.replace('/(auth)/login')}>
+                  <Text style={[styles.tabText, styles.tabTextActive]}>Sign In</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.tab} onPress={() => router.replace('/(auth)/register')}>
+                  <Text style={styles.tabText}>Register</Text>
                 </TouchableOpacity>
               </View>
 
@@ -242,7 +267,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 12,
   },
-  tabActive: {
+  tabPill: {
+    position: 'absolute',
+    width: TAB_WIDTH,
+    height: 40,
+    top: 5,
+    left: 5,
+    borderRadius: 12,
     backgroundColor: Colors.white,
     ...Platform.select({
       web: { boxShadow: '0 1px 8px rgba(21, 93, 252, 0.10)' },
@@ -255,15 +286,14 @@ const styles = StyleSheet.create({
     }),
     elevation: 2,
   },
-  tabActiveText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  tabInactiveText: {
+  tabText: {
     fontSize: 14,
     fontWeight: '500',
     color: Colors.textMuted,
+  },
+  tabTextActive: {
+    fontWeight: '700',
+    color: Colors.primary,
   },
   formGap: {
     gap: 16,
