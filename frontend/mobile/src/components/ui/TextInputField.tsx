@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   Pressable,
+  Platform,
   StyleSheet,
   KeyboardTypeOptions,
   ReturnKeyTypeOptions,
   TextInputProps,
+  Animated,
 } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { isWeb } from '../../lib/platform';
@@ -54,33 +56,64 @@ export default function TextInputField({
   inputRef,
 }: Props) {
   const [isFocused, setIsFocused] = useState(false);
-  const localInputRef = React.useRef<TextInput>(null);
+  const localInputRef = useRef<TextInput>(null);
   const resolvedInputRef = inputRef ?? localInputRef;
+
+  const floatAnim = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(floatAnim, {
+      toValue: isFocused || !!value ? 1 : 0,
+      duration: 160,
+      useNativeDriver: false, // color interpolation requires false
+    }).start();
+  }, [isFocused, value]);
+
+  const labelTop = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [16, -10],
+  });
+  const labelFontSize = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [16, 12],
+  });
+  const labelColor = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [Colors.textMuted, isFocused ? Colors.primary : Colors.textSecondary],
+  });
 
   const borderColor = errorText
     ? Colors.errorRed
     : isFocused
     ? Colors.primary
-    : Colors.borderDefault;
+    : '#E0E7FF';
 
   return (
-    <View style={styles.wrapper}>
-      <Text style={styles.label}>{label}</Text>
+    <View style={[styles.wrapper, { position: 'relative' }]}>
+      <Animated.Text
+        style={[
+          styles.floatingLabel,
+          {
+            top: labelTop,
+            fontSize: labelFontSize,
+            color: labelColor,
+          },
+        ]}
+        pointerEvents="none"
+      >
+        {label}
+      </Animated.Text>
       <Pressable
         onPress={() => resolvedInputRef.current?.focus()}
-        style={[
-          styles.inputContainer,
-          { borderColor },
-          isFocused && styles.focusedShadow,
-        ]}
+        style={[styles.inputContainer, { borderColor }, isFocused && styles.focusedShadow]}
       >
         <TextInput
           ref={resolvedInputRef}
-          style={[styles.input, isWeb && { height: undefined }]}
+          style={[styles.input, isWeb && { height: undefined }, { paddingTop: 10 }]}
           value={value}
           onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={Colors.textMuted}
+          placeholder={isFocused || value ? '' : undefined}
+          placeholderTextColor="#B0B7C3"
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           autoCorrect={autoCorrect}
@@ -106,31 +139,35 @@ export default function TextInputField({
 const styles = StyleSheet.create({
   wrapper: {
     marginBottom: 0,
+    paddingTop: 10,
   },
-  label: {
-    fontSize: 12,
+  floatingLabel: {
+    position: 'absolute',
+    left: 16,
+    zIndex: 1,
+    backgroundColor: Colors.white,
+    paddingHorizontal: 4,
     fontWeight: '600',
-    color: Colors.textSecondary,
-    marginBottom: 6,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
+    height: 56,
     borderWidth: 1.5,
-    borderRadius: 14,
+    borderRadius: 16,
     paddingHorizontal: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.90)',
   },
   focusedShadow: {
-    ...(isWeb
-      ? { boxShadow: `0 0 6px ${Colors.primary}26` }
-      : {
-          shadowColor: Colors.primary,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.15,
-          shadowRadius: 6,
-        }),
+    ...Platform.select({
+      web: { boxShadow: `0 0 8px ${Colors.primary}1F` },
+      default: {
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+      },
+    }),
     elevation: 2,
   },
   input: {

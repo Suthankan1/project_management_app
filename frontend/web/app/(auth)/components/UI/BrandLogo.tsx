@@ -1,21 +1,23 @@
-export default function BrandLogo() {
-  /**
- * Centralized branding component.
- * Placed at the top of auth cards. If the marketing team decides 
- * to change the logo or the platform's tagline tomorrow, we only touch this file.
- */
+import PranoraLogo from "@/components/brand/PranoraLogo";
+
+interface BrandLogoProps {
+  title: string;
+  subtitle?: string;
+}
+
+export default function BrandLogo({ title, subtitle }: BrandLogoProps) {
   return (
-    <div className="mb-8 text-center">
-      {/* Container for the logo icon with a nice shadow and primary brand color */}
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg mb-4">
-        {/* Simple Clipboard Icon (SVG). Hardcoding SVGs is great for performance 
-            since it saves an HTTP request compared to an <img> tag. */}
-        <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-        </svg>
-      </div>
-      <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Planora</h1>
-      <p className="text-gray-500 text-sm mt-2">Project Management Platform</p>
+    <div className="flex flex-col items-center gap-3 mb-8">
+      <PranoraLogo
+        width={180}
+        style={{ filter: "drop-shadow(0 4px 16px rgba(152,16,250,0.18))" }}
+      />
+      <h1 className="text-[22px] font-bold text-gray-900 tracking-tight mt-1">
+        {title}
+      </h1>
+      {subtitle ? (
+        <p className="text-sm text-gray-400 text-center">{subtitle}</p>
+      ) : null}
     </div>
   );
 }
