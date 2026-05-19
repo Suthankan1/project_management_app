@@ -146,7 +146,7 @@ export default function LoginPage() {
                                 onChange={(e) => setRemember(e.target.checked)}
                                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
-                            <span className="text-gray-500 text-xs">Remember me for 7 days</span>
+                            <span className="text-gray-500 text-xs">Remember me for 30 days</span>
                         </label>
                         <Link href="/forgot-password" className="text-blue-600 hover:text-blue-700 font-semibold text-xs">
                             Forgot password?

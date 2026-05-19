@@ -177,12 +177,12 @@ export default function LoginScreen() {
                     onPress={() => setRemember(v => !v)}
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: remember }}
-                    accessibilityLabel="Remember me for 7 days"
+                    accessibilityLabel="Remember me for 30 days"
                   >
                     <Animated.View style={[styles.checkbox, remember && styles.checkboxChecked]}>
                       <Animated.Text style={styles.checkmark}>{remember ? '✓' : ''}</Animated.Text>
                     </Animated.View>
-                    <Text style={styles.rememberText}>Remember me for 7 days</Text>
+                    <Text style={styles.rememberText}>Remember me for 30 days</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
                     <Text style={styles.forgotText}>Forgot password?</Text>

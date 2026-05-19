@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import api from '../api/axios';
-import { getValidToken, saveToken, saveRefreshToken } from '../auth/storage';
+import { clearRefreshToken, getValidToken, saveRefreshToken, saveToken, setRememberMe } from '../auth/storage';
 import { EMAIL_REGEX } from '../lib/validation';
 
 export function useLoginForm() {
@@ -41,8 +41,11 @@ export function useLoginForm() {
 
       if (response.data.success) {
         await saveToken(response.data.token);
-        if (response.data.refreshToken) {
+        await setRememberMe(remember);
+        if (remember && response.data.refreshToken) {
           await saveRefreshToken(response.data.refreshToken);
+        } else {
+          await clearRefreshToken();
         }
         router.replace('/(tabs)');
       } else {
