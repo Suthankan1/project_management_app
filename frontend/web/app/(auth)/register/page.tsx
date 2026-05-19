@@ -35,7 +35,10 @@ export default function RegisterPage() {
         </Link>
       </div>
 
-      <BrandLogo />
+      <BrandLogo
+        title="Create your account"
+        subtitle="Start planning, tracking, and shipping with Planora."
+      />
 
       <AuthCard>
         {/* Tab Switcher */}

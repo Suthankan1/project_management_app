@@ -1,9 +1,13 @@
+import type { CSSProperties } from "react";
+
 type PranoraIconProps = {
   size?: number;
 };
 
 type PranoraLogoProps = {
   width?: number;
+  className?: string;
+  style?: CSSProperties;
 };
 
 export function PranoraIcon({ size = 32 }: PranoraIconProps) {
@@ -91,11 +95,18 @@ export function PranoraIcon({ size = 32 }: PranoraIconProps) {
   );
 }
 
-export function PranoraLogo({ width = 160 }: PranoraLogoProps) {
+export function PranoraLogo({ width = 160, className, style }: PranoraLogoProps) {
   const height = (width * 200) / 520;
 
   return (
-    <svg width={width} height={height} viewBox="0 0 520 200" xmlns="http://www.w3.org/2000/svg">
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 520 200"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      style={style}
+    >
       <defs>
         <linearGradient id="pranora-logo-a" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#155DFC" />
@@ -184,6 +195,8 @@ export function PranoraLogo({ width = 160 }: PranoraLogoProps) {
     </svg>
   );
 }
+
+export default PranoraLogo;
 
 export function PlanoraIconMark({ size = 32 }: PranoraIconProps) {
   return (
