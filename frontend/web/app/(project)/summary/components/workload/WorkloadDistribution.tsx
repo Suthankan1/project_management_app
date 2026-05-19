@@ -13,7 +13,7 @@ import { WorkloadPieChart } from './WorkloadPieChart';
 import { WorkloadMembersList } from './WorkloadMembersList';
 
 const COLORS = ['#0052CC', '#00875A', '#FF8B00', '#DE350B', '#FFC400', '#6554C0', '#36B37E', '#FF5630', '#2684FF', '#FF991F'];
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
 interface UserProfileItem {
   userId: number;
