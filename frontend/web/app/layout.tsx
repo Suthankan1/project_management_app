@@ -33,8 +33,18 @@ const arimo = Arimo({
 
 
 export const metadata: Metadata = {
-  title: "Planora",
-  description: "Manage projects with Planora",
+  title: 'Planora — Plan · Track · Ship',
+  description: 'Planora is a project management platform for modern teams.',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
+  openGraph: {
+    title: 'Planora',
+    description: 'Project management for modern teams.',
+    siteName: 'Planora',
+  },
 };
 
 export const viewport: Viewport = {
@@ -52,7 +62,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${outfit.variable} ${arimo.variable} antialiased font-inter bg-cu-bg-secondary`}>
         <NextTopLoader
-          color="#2563EB"
+          color="#9810FA"
           initialPosition={0.08}
           crawlSpeed={200}
           height={3}
