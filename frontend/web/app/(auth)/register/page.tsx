@@ -69,7 +69,7 @@ export default function RegisterPage() {
           <InputField
             id="reg-username"
             label="Username" type="text" value={username} required
-            onChange={(e) => setUsername(e.target.value)} placeholder="Pick a username"
+            onChange={(e) => setUsername(e.target.value.trim().toLowerCase())} placeholder="Pick a username"
             aria-describedby={error ? 'register-error' : undefined}
             autoComplete="username"
             autoCapitalize="off"

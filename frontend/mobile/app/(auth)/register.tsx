@@ -96,7 +96,7 @@ export default function RegisterScreen() {
                 <TextInputField
                   label="Username"
                   value={username}
-                  onChangeText={setUsername}
+                  onChangeText={t => setUsername(t.trim().toLowerCase())}
                   placeholder="Pick a username"
                   autoCapitalize="none"
                   autoCorrect={false}
