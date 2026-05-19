@@ -12,7 +12,13 @@ type PranoraLogoProps = {
 
 export function PranoraIcon({ size = 32 }: PranoraIconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 200 200"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ overflow: "visible" }}
+    >
       <defs>
         <linearGradient id="pranora-icon-a" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#155DFC" />
@@ -105,7 +111,7 @@ export function PranoraLogo({ width = 160, className, style }: PranoraLogoProps)
       viewBox="0 0 520 200"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
-      style={style}
+      style={{ overflow: "visible", ...style }}
     >
       <defs>
         <linearGradient id="pranora-logo-a" x1="0%" y1="0%" x2="100%" y2="100%">
