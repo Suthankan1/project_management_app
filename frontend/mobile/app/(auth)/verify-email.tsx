@@ -124,6 +124,23 @@ export default function VerifyEmailScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
+            {/* Back button */}
+            <TouchableOpacity
+              style={styles.backRow}
+              onPress={() => router.canGoBack() ? router.back() : router.replace('/(auth)/register')}
+            >
+              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M15 18l-6-6 6-6"
+                  stroke={Colors.primary}
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+              <Text style={styles.backText}>Back to register</Text>
+            </TouchableOpacity>
+
             {/* Brand */}
             <View style={styles.headerWrapper}>
               <BrandHeader
@@ -319,5 +336,18 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     textAlign: 'center',
     marginTop: 24,
+  },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 16,
+    marginLeft: 20,
+    alignSelf: 'flex-start',
+  },
+  backText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
   },
 });
