@@ -97,7 +97,7 @@ export default function ResetPasswordScreen() {
 
   const triggerScale = (index: number) =>
     Animated.sequence([
-      Animated.spring(scaleAnims[index], { toValue: 1.08, useNativeDriver: true, tension: 400, friction: 10 }),
+      Animated.spring(scaleAnims[index], { toValue: 1.05, useNativeDriver: true, tension: 400, friction: 10 }),
       Animated.spring(scaleAnims[index], { toValue: 1.0,  useNativeDriver: true, tension: 200, friction: 15 }),
     ]).start();
 
@@ -345,9 +345,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   otpInput: {
-    width: 50,
-    height: 58,
-    borderRadius: 16,
+    width: 48,
+    height: 56,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#E0E7FF',
     fontSize: 22,
@@ -363,12 +363,13 @@ const styles = StyleSheet.create({
   otpInputFocused: {
     borderColor: Colors.primary,
     ...Platform.select({
-      web: { boxShadow: `0 0 8px ${Colors.primary}33` },
+      web: { boxShadow: `0 0 8px ${Colors.primary}40` },
       default: {
         shadowColor: Colors.primary,
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.20,
+        shadowOpacity: 0.25,
         shadowRadius: 8,
+        elevation: 3,
       },
     }),
   },

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -67,23 +67,17 @@ export default function VerifyEmailScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    if (otp.length !== 6) return;
-    const timer = setTimeout(handleVerify, 150);
-    return () => clearTimeout(timer);
-  }, [otp]);
-
-  const triggerShake = () =>
+  const triggerShake = useCallback(() =>
     Animated.sequence([
       Animated.timing(shakeAnim, { toValue: 8,  duration: 60, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: 4,  duration: 60, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: 0,  duration: 60, useNativeDriver: true }),
-    ]).start();
+    ]).start(), [shakeAnim]);
 
   const triggerScale = (index: number) =>
     Animated.sequence([
-      Animated.spring(scaleAnims[index], { toValue: 1.08, useNativeDriver: true, tension: 400, friction: 10 }),
+      Animated.spring(scaleAnims[index], { toValue: 1.05, useNativeDriver: true, tension: 400, friction: 10 }),
       Animated.spring(scaleAnims[index], { toValue: 1.0,  useNativeDriver: true, tension: 200, friction: 15 }),
     ]).start();
 
@@ -124,7 +118,7 @@ export default function VerifyEmailScreen() {
     if (text) triggerScale(index);
   };
 
-  const handleVerify = async () => {
+  const handleVerify = useCallback(async () => {
     if (otp.length < 6) {
       setError('Enter the full 6-digit code.');
       return;
@@ -147,7 +141,13 @@ export default function VerifyEmailScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [otp, email, router, triggerShake]);
+
+  useEffect(() => {
+    if (otp.length !== 6) return;
+    const timer = setTimeout(handleVerify, 150);
+    return () => clearTimeout(timer);
+  }, [otp, handleVerify]);
 
   const handleResend = async () => {
     if (isResending || resendCountdown > 0) return;
@@ -387,9 +387,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   otpInput: {
-    width: 50,
-    height: 58,
-    borderRadius: 16,
+    width: 48,
+    height: 56,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#E0E7FF',
     fontSize: 22,
@@ -405,12 +405,13 @@ const styles = StyleSheet.create({
   otpInputFocused: {
     borderColor: Colors.primary,
     ...Platform.select({
-      web: { boxShadow: `0 0 8px ${Colors.primary}33` },
+      web: { boxShadow: `0 0 8px ${Colors.primary}40` },
       default: {
         shadowColor: Colors.primary,
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.20,
+        shadowOpacity: 0.25,
         shadowRadius: 8,
+        elevation: 3,
       },
     }),
   },
