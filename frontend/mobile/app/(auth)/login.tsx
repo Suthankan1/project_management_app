@@ -175,10 +175,13 @@ export default function LoginScreen() {
                   <TouchableOpacity
                     style={styles.rememberRow}
                     onPress={() => setRemember(v => !v)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: remember }}
+                    accessibilityLabel="Remember me for 7 days"
                   >
-                    <View style={[styles.checkbox, remember && styles.checkboxChecked]}>
-                      {remember && <Text style={styles.checkmark}>✓</Text>}
-                    </View>
+                    <Animated.View style={[styles.checkbox, remember && styles.checkboxChecked]}>
+                      <Animated.Text style={styles.checkmark}>{remember ? '✓' : ''}</Animated.Text>
+                    </Animated.View>
                     <Text style={styles.rememberText}>Remember me for 7 days</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
@@ -308,6 +311,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     minHeight: 44,
+    paddingVertical: 4,
   },
   checkbox: {
     width: 18,
