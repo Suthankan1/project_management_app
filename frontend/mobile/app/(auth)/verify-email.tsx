@@ -37,6 +37,27 @@ export default function VerifyEmailScreen() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const otpChars    = otp.padEnd(6, '').split('').slice(0, 6);
 
+  const cardAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(cardAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 60,
+      friction: 10,
+      delay: 80,
+    }).start();
+  }, [cardAnim]);
+
+  const cardStyle = {
+    opacity: cardAnim,
+    transform: [{
+      translateY: cardAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [24, 0],
+      }),
+    }],
+  };
+
   const scaleAnims = useRef([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(1))).current;
   const shakeAnim  = useRef(new Animated.Value(0)).current;
 
@@ -192,6 +213,7 @@ export default function VerifyEmailScreen() {
             </View>
 
             {/* Card */}
+            <Animated.View style={cardStyle}>
             <BlurView intensity={20} tint="light" style={styles.card}>
               {/* Email icon */}
               <View style={styles.emailIconWrapper}>
@@ -267,6 +289,7 @@ export default function VerifyEmailScreen() {
                 </View>
               </View>
             </BlurView>
+            </Animated.View>
 
             <Text style={styles.footer}>© 2026 Planora. All rights reserved.</Text>
           </ScrollView>

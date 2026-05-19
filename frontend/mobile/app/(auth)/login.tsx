@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -32,6 +33,27 @@ export default function LoginScreen() {
     isLoading, error,
     handleLogin,
   } = useLoginForm();
+
+  const cardAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(cardAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 60,
+      friction: 10,
+      delay: 80,
+    }).start();
+  }, [cardAnim]);
+
+  const cardStyle = {
+    opacity: cardAnim,
+    transform: [{
+      translateY: cardAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [24, 0],
+      }),
+    }],
+  };
 
   return (
     <LinearGradient
@@ -76,6 +98,7 @@ export default function LoginScreen() {
             </View>
 
             {/* Card */}
+            <Animated.View style={cardStyle}>
             <BlurView intensity={20} tint="light" style={styles.card}>
               {/* Tab Switcher */}
               <View style={styles.tabContainer}>
@@ -145,6 +168,7 @@ export default function LoginScreen() {
                 />
               </View>
             </BlurView>
+            </Animated.View>
 
             <Text style={styles.footer}>© 2026 Planora. All rights reserved.</Text>
           </ScrollView>

@@ -34,6 +34,27 @@ export default function ForgotPasswordScreen() {
     handleReset,
   } = useForgotPassword();
 
+  const cardAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(cardAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 60,
+      friction: 10,
+      delay: 80,
+    }).start();
+  }, [cardAnim]);
+
+  const cardStyle = {
+    opacity: cardAnim,
+    transform: [{
+      translateY: cardAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [24, 0],
+      }),
+    }],
+  };
+
   const scaleAnim = useRef(new Animated.Value(0.5)).current;
 
   useEffect(() => {
@@ -90,6 +111,7 @@ export default function ForgotPasswordScreen() {
             </View>
 
             {/* Card */}
+            <Animated.View style={cardStyle}>
             <BlurView intensity={20} tint="light" style={styles.card}>
               {!submitted ? (
                 /* Input State */
@@ -162,6 +184,7 @@ export default function ForgotPasswordScreen() {
                 </View>
               )}
             </BlurView>
+            </Animated.View>
 
             <Text style={styles.footer}>© 2026 Planora. All rights reserved.</Text>
           </ScrollView>
