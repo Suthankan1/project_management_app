@@ -59,12 +59,23 @@ export function useForgotPassword() {
     }
   };
 
+  const handleReset = () => {
+    setSubmitted(false);
+    setEmail('');
+    setCountdown(0);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+
   return {
     email, setEmail,
     isLoading,
-    submitted, setSubmitted,
+    submitted,
     error, setError,
     countdown,
     handleSubmit,
+    handleReset,
   };
 }

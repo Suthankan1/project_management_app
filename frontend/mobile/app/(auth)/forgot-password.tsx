@@ -23,10 +23,11 @@ export default function ForgotPasswordScreen() {
   const {
     email, setEmail,
     isLoading,
-    submitted, setSubmitted,
+    submitted,
     error,
     countdown,
     handleSubmit,
+    handleReset,
   } = useForgotPassword();
 
   return (
@@ -124,7 +125,7 @@ export default function ForgotPasswordScreen() {
                   ) : (
                     <TouchableOpacity
                       style={styles.resendButton}
-                      onPress={() => setSubmitted(false)}
+                      onPress={handleReset}
                     >
                       <Text style={styles.resendText}>Send to another email</Text>
                     </TouchableOpacity>
