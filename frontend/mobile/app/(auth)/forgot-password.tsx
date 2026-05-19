@@ -70,7 +70,7 @@ export default function ForgotPasswordScreen() {
 
   return (
     <LinearGradient
-      colors={['#EEF4FF', '#F8FAFC', '#FBF0FE']}
+      colors={['#F0F4FF', '#F8FAFC', '#FDF0FA']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
