@@ -49,32 +49,42 @@ export default function PrimaryButton({
         { transform: [{ scale: pressAnim }] },
       ]}
     >
-      <Pressable
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        disabled={isDisabled}
-        style={[
-          styles.base,
-          !isPrimary && styles.outline,
-        ]}
-      >
-        {isPrimary && (
-          <LinearGradient
-            colors={['#155DFC', '#7C3AED']}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-        )}
-        {loading ? (
-          <ActivityIndicator color={isPrimary ? Colors.white : Colors.primary} />
-        ) : (
-          <Text style={[styles.label, isPrimary ? styles.labelPrimary : styles.labelOutline]}>
-            {label}
-          </Text>
-        )}
-      </Pressable>
+      {isPrimary ? (
+        <LinearGradient
+          colors={[Colors.gradientStart, Colors.gradientMid]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.base}
+        >
+          <Pressable
+            onPress={onPress}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            disabled={isDisabled}
+            style={styles.pressableFill}
+          >
+            {loading ? (
+              <ActivityIndicator color={Colors.white} />
+            ) : (
+              <Text style={[styles.label, styles.labelPrimary]}>{label}</Text>
+            )}
+          </Pressable>
+        </LinearGradient>
+      ) : (
+        <Pressable
+          onPress={onPress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          disabled={isDisabled}
+          style={[styles.base, styles.outline]}
+        >
+          {loading ? (
+            <ActivityIndicator color={Colors.primary} />
+          ) : (
+            <Text style={[styles.label, styles.labelOutline]}>{label}</Text>
+          )}
+        </Pressable>
+      )}
     </Animated.View>
   );
 }
@@ -87,9 +97,9 @@ const styles = StyleSheet.create({
     ...Platform.select({
       web: {},
       default: {
-        shadowColor: '#7C3AED',
+        shadowColor: Colors.gradientMid,
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.35,
+        shadowOpacity: 0.40,
         shadowRadius: 16,
       },
     }),
@@ -101,9 +111,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
-      web: { boxShadow: '0 8px 16px rgba(124, 58, 237, 0.35)' },
+      web: { boxShadow: '0 8px 16px rgba(152, 16, 250, 0.40)' },
       default: {},
     }),
+  },
+  pressableFill: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   outline: {
     backgroundColor: 'transparent',
