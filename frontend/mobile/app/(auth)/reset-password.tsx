@@ -33,34 +33,21 @@ export default function ResetPasswordScreen() {
   } = useResetPassword();
 
   const inputRefs = useRef<TextInput[]>([]);
+  const prevOtp   = useRef(otp);
   const otpChars = otp.padEnd(6, '').split('').slice(0, 6);
 
   const handleOtpChange = (text: string, index: number) => {
     if (!/^\d?$/.test(text)) return;
+    const isDeleting = text === '' && prevOtp.current.length >= otp.length;
     setOtp(prev => {
       const chars = prev.padEnd(6, ' ').split('');
       chars[index] = text || ' ';
       const next = chars.join('').replace(/ /g, '');
-      if (text && index < 5) {
-        setTimeout(() => inputRefs.current[index + 1]?.focus(), 0);
-      }
+      prevOtp.current = next;
+      if (text && index < 5) setTimeout(() => inputRefs.current[index + 1]?.focus(), 0);
+      if (!text && isDeleting && index > 0) setTimeout(() => inputRefs.current[index - 1]?.focus(), 0);
       return next;
     });
-  };
-
-  const handleOtpKeyPress = (key: string, index: number) => {
-    if (key === 'Backspace') {
-      setOtp(prev => {
-        const current = prev.padEnd(6, ' ').split('');
-        if ((!current[index] || current[index] === ' ') && index > 0) {
-          inputRefs.current[index - 1]?.focus();
-          current[index - 1] = ' ';
-        } else {
-          current[index] = ' ';
-        }
-        return current.join('').replace(/\s/g, '');
-      });
-    }
   };
 
   const strength = getPasswordStrength(newPassword);
@@ -122,7 +109,6 @@ export default function ResetPasswordScreen() {
                           ]}
                           value={otpChars[i] || ''}
                           onChangeText={text => handleOtpChange(text, i)}
-                          onKeyPress={({ nativeEvent }) => handleOtpKeyPress(nativeEvent.key, i)}
                           maxLength={1}
                           keyboardType="number-pad"
                           inputMode="numeric"
