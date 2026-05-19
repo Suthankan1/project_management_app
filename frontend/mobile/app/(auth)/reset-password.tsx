@@ -20,7 +20,6 @@ import PrimaryButton from '@/src/components/ui/PrimaryButton';
 import ErrorBanner from '@/src/components/ui/ErrorBanner';
 import { getPasswordStrength } from '@/src/lib/validation';
 import { Colors } from '@/src/constants/colors';
-import { isWeb } from '@/src/lib/platform';
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
@@ -236,14 +235,15 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     backgroundColor: Colors.cardBg,
     padding: 24,
-    ...(isWeb
-      ? { boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)' }
-      : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.08,
-          shadowRadius: 16,
-        }),
+    ...Platform.select({
+      web: { boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)' },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+      },
+    }),
     elevation: 4,
   },
   formGap: {

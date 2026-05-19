@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   Pressable,
+  Platform,
   StyleSheet,
   KeyboardTypeOptions,
   ReturnKeyTypeOptions,
@@ -123,14 +124,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   focusedShadow: {
-    ...(isWeb
-      ? { boxShadow: `0 0 6px ${Colors.primary}26` }
-      : {
-          shadowColor: Colors.primary,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.15,
-          shadowRadius: 6,
-        }),
+    ...Platform.select({
+      web: { boxShadow: `0 0 6px ${Colors.primary}26` },
+      default: {
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+      },
+    }),
     elevation: 2,
   },
   input: {

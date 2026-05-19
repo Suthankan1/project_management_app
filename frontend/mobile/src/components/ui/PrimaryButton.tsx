@@ -4,10 +4,11 @@ import {
   Pressable,
   ActivityIndicator,
   Text,
+  Platform,
   StyleSheet,
 } from 'react-native';
 import { Colors } from '../../constants/colors';
-import { isWeb, shouldUseNativeDriver } from '../../lib/platform';
+import { shouldUseNativeDriver } from '../../lib/platform';
 
 type Props = {
   onPress: () => void;
@@ -68,14 +69,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    ...(isWeb
-      ? { boxShadow: `0 4px 8px ${Colors.primary}4D` }
-      : {
-          shadowColor: Colors.primary,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
-        }),
+    ...Platform.select({
+      web: { boxShadow: `0 4px 8px ${Colors.primary}4D` },
+      default: {
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+    }),
     elevation: 6,
   },
   primary: {
@@ -85,7 +87,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderWidth: 1.5,
     borderColor: Colors.primary,
-    ...(isWeb ? { boxShadow: 'none' } : { shadowOpacity: 0 }),
+    ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOpacity: 0 } }),
     elevation: 0,
   },
   disabled: {

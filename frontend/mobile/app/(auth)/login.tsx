@@ -19,7 +19,6 @@ import PasswordInput from '@/src/components/ui/PasswordInput';
 import PrimaryButton from '@/src/components/ui/PrimaryButton';
 import ErrorBanner from '@/src/components/ui/ErrorBanner';
 import { Colors } from '@/src/constants/colors';
-import { isWeb } from '@/src/lib/platform';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -181,14 +180,15 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     backgroundColor: Colors.cardBg,
     padding: 24,
-    ...(isWeb
-      ? { boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)' }
-      : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.08,
-          shadowRadius: 16,
-        }),
+    ...Platform.select({
+      web: { boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)' },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+      },
+    }),
     elevation: 4,
   },
   tabContainer: {
@@ -207,14 +207,15 @@ const styles = StyleSheet.create({
   },
   tabActive: {
     backgroundColor: Colors.white,
-    ...(isWeb
-      ? { boxShadow: '0 1px 4px rgba(0, 0, 0, 0.08)' }
-      : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.08,
-          shadowRadius: 4,
-        }),
+    ...Platform.select({
+      web: { boxShadow: '0 1px 4px rgba(0, 0, 0, 0.08)' },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+      },
+    }),
     elevation: 2,
   },
   tabActiveText: {
