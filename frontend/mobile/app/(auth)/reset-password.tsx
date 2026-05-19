@@ -107,6 +107,8 @@ export default function ResetPasswordScreen() {
             <View style={styles.card}>
               {!submitted ? (
                 <View style={styles.formGap}>
+                  <ErrorBanner message={error} visible={!!error} />
+
                   {/* OTP Input */}
                   <View>
                     <Text style={styles.otpLabel}>Reset Code</Text>
@@ -156,8 +158,6 @@ export default function ResetPasswordScreen() {
                     returnKeyType="done"
                     onSubmitEditing={handleSubmit}
                   />
-
-                  <ErrorBanner message={error} visible={!!error} />
 
                   <PrimaryButton
                     label="Reset Password"
