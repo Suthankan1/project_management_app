@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Rect } from 'react-native-svg';
-import { getValidToken } from '@/src/auth/storage';
 import { Colors } from '@/src/constants/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -87,14 +86,6 @@ const FEATURE_CARDS = [
 
 export default function LandingScreen() {
   const router = useRouter();
-
-  useEffect(() => {
-    (async () => {
-      const token = await getValidToken();
-      if (token) router.replace('/(tabs)');
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <LinearGradient
