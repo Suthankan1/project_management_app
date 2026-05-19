@@ -113,7 +113,7 @@ export default function LoginScreen() {
                   returnKeyType="done"
                   blurOnSubmit
                   submitBehavior="blurAndSubmit"
-                  onSubmitEditing={() => handleLogin(email, password)}
+                  onSubmitEditing={handleLogin}
                 />
 
                 {/* Utilities Row */}
@@ -135,7 +135,7 @@ export default function LoginScreen() {
                 <PrimaryButton
                   label="Sign In"
                   loading={isLoading}
-                  onPress={() => handleLogin(email, password)}
+                  onPress={handleLogin}
                 />
               </View>
             </View>
