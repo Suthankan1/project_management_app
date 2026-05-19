@@ -53,15 +53,15 @@ export default function VerifyEmailScreen() {
   };
 
   const handleOtpChange = (text: string, index: number) => {
-    const char = text.slice(-1);
+    if (!/^\d?$/.test(text)) return;
     setOtp(prev => {
-      const current = prev.padEnd(6, ' ').split('');
-      current[index] = char || ' ';
-      const newOtp = current.join('').replace(/\s/g, '');
-      if (char && index < 5) {
-        setTimeout(() => inputRefs.current[index + 1]?.focus(), 10);
+      const chars = prev.padEnd(6, ' ').split('');
+      chars[index] = text || ' ';
+      const next = chars.join('').replace(/ /g, '');
+      if (text && index < 5) {
+        setTimeout(() => inputRefs.current[index + 1]?.focus(), 0);
       }
-      return newOtp;
+      return next;
     });
   };
 
@@ -184,7 +184,7 @@ export default function VerifyEmailScreen() {
                         value={otpChars[i] || ''}
                         onChangeText={text => handleOtpChange(text, i)}
                         onKeyPress={({ nativeEvent }) => handleOtpKeyPress(nativeEvent.key, i)}
-                        maxLength={2}
+                        maxLength={1}
                         keyboardType="number-pad"
                         inputMode="numeric"
                         autoComplete="one-time-code"
