@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useMemo, useState, useRef, useCallback, ChangeEvent } from 'react';
-import { Paperclip, Send, Smile } from 'lucide-react';
-import EmojiPicker, { Theme } from 'emoji-picker-react';
+import { Paperclip, Send, Smile, Loader2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { Theme } from 'emoji-picker-react';
 import { uploadChatDocument } from './uploadChatDocument';
 import { useParams } from 'next/navigation';
 
@@ -14,6 +15,12 @@ interface ChatInputProps {
   enableMentions?: boolean;
   mentionCandidates?: string[];
 }
+const EmojiPicker = dynamic(() => import('emoji-picker-react'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-[320px] h-[400px] flex items-center justify-center"><Loader2 className="animate-spin text-gray-400" size={20} /></div>
+  ),
+});
 
 export const ChatInput = ({
   onSendMessage,

@@ -69,6 +69,12 @@ export function useRegisterForm() {
       return;
     }
 
+    if (!/^[a-z0-9_]{3,20}$/.test(username)) {
+      setError('Username must be 3–20 characters: letters, numbers, underscore only.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       await api.post('/api/auth/register', {
         username, fullName, email: email.toLowerCase(), password,

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
+import BrandLogo from '../components/UI/BrandLogo';
 import { useLoginForm } from './useLoginForm';
 
 /*
@@ -38,15 +39,7 @@ export default function LoginPage() {
             </div>
 
             {/* ── 2. Brand Header ── */}
-            <div className='mb-8 text-center'>
-                <div className='mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg mb-4' aria-hidden="true">
-                    <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                </div>
-                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Planora</h1>
-                <p className="text-gray-500 text-sm mt-2">Project Management Platform</p>
-            </div>
+            <BrandLogo title="Planora" subtitle="Project Management Platform" />
 
             {/* ── 3. Main Card Container ── */}
             <div className='w-full max-w-[420px] glass-panel rounded-[24px] shadow-xl p-4 sm:p-8'>
@@ -153,7 +146,7 @@ export default function LoginPage() {
                                 onChange={(e) => setRemember(e.target.checked)}
                                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
-                            <span className="text-gray-500 text-xs">Remember me for 7 days</span>
+                            <span className="text-gray-500 text-xs">Remember me for 30 days</span>
                         </label>
                         <Link href="/forgot-password" className="text-blue-600 hover:text-blue-700 font-semibold text-xs">
                             Forgot password?

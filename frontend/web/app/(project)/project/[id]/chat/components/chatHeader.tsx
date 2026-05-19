@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowLeft, Search, Users, X } from 'lucide-react';
+import { avatarColor } from '@/hooks/chat/chat-utils';
 
 interface ChatHeaderProps {
   selectedRoom: { name?: string | null; topic?: string | null } | null;
@@ -14,20 +15,7 @@ interface ChatHeaderProps {
   onShowSidebar: () => void;
 }
 
-const AVATAR_COLORS = [
-  'from-blue-500 to-blue-600',
-  'from-emerald-500 to-teal-600',
-  'from-sky-400 to-blue-500',
-  'from-indigo-500 to-blue-600',
-  'from-teal-400 to-emerald-500',
-  'from-cyan-500 to-blue-600',
-  'from-blue-400 to-indigo-500',
-  'from-slate-400 to-slate-500',
-];
 
-function avatarColor(name: string): string {
-  return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
-}
 
 export function ChatHeader({
   selectedRoom,

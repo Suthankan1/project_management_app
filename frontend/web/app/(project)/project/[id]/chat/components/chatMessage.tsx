@@ -7,6 +7,7 @@ import { ChatMessage, ChatReactionSummary } from './chat';
 import { EditMessageModal, ConfirmDeleteModal } from './chatModals';
 import { useVirtualizer, Virtualizer } from '@tanstack/react-virtual';
 import api from '@/lib/axios';
+import { avatarColor } from '@/hooks/chat/chat-utils';
 
 interface ChatMessagesProps {
   projectId: string;
@@ -39,19 +40,7 @@ export const isFileDocument = (content: string) => {
 
 const QUICK_REACTIONS = ['👍', '❤️', '🔥', '✅', '😂', '🎉'];
 
-const AVATAR_COLORS = [
-  'from-blue-500 to-blue-600',
-  'from-emerald-500 to-teal-600',
-  'from-sky-400 to-blue-500',
-  'from-indigo-500 to-blue-600',
-  'from-teal-400 to-emerald-500',
-  'from-cyan-500 to-blue-600',
-  'from-blue-400 to-indigo-500',
-  'from-slate-400 to-slate-500',
-];
 
-const avatarColor = (name: string) =>
-  AVATAR_COLORS[(name.charCodeAt(0) % AVATAR_COLORS.length)];
 
 function formatTime(timestamp?: string | null): string {
   if (!timestamp) return '';
@@ -190,8 +179,9 @@ export const ChatMessages = ({
   const rowVirtualizer = useVirtualizer({
     count: visibleMessages.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 80,
-    overscan: 10,
+    estimateSize: () => 120,
+    measureElement: el => el?.getBoundingClientRect().height ?? 120,
+    overscan: 3,
   });
 
   // Keep the stable ref in sync with the latest virtualizer instance.
@@ -228,7 +218,8 @@ export const ChatMessages = ({
     const virtualizer = virtualizerRef.current;
     if (!virtualizer || visibleMessages.length === 0) return;
     if (!isAtBottomRef.current) return;
-    virtualizer.scrollToIndex(visibleMessages.length - 1, { align: 'end' });
+    const t = setTimeout(() => virtualizer.scrollToIndex(visibleMessages.length - 1, { align: 'end' }), 50);
+    return () => clearTimeout(t);
   }, [visibleMessages.length]);
 
   const handleDocumentClick = async (
@@ -266,7 +257,7 @@ export const ChatMessages = ({
   return (
     <div
       ref={scrollRef}
-      className="flex-1 min-h-0 overflow-y-auto px-2 sm:px-4 py-2.5 sm:py-4 space-y-0.5 scroll-smooth overscroll-y-contain touch-pan-y"
+      className="flex-1 min-h-0 overflow-y-auto px-2 sm:px-4 py-2.5 sm:py-4 space-y-0.5 overscroll-y-contain touch-pan-y"
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
       <div

@@ -7,7 +7,10 @@ export default function VerifyEmailPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 font-sans">
 
-      <BrandLogo />
+      <BrandLogo
+        title="Verify your email"
+        subtitle="Confirm your account to continue into Planora."
+      />
 
       {/* FEATURE-5: Remind the user that their email is pending verification */}
       {/* fallback={null} because the banner is non-critical — silently hiding it during SSR is fine */}

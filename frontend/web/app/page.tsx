@@ -4,18 +4,11 @@ import Link from 'next/link';
 import { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { PranoraIcon, PranoraLogo } from '@/components/brand/PranoraLogo';
 import { getUserFromToken } from '@/lib/auth';
 import styles from './page.module.css';
 
 // --- ICONS ---
-
-function IconLogo() {
-  return (
-    <svg className="size-full" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-    </svg>
-  );
-}
 
 function IconSmart() {
   return (
@@ -138,11 +131,13 @@ function IconContainer({ children, variant = 'glass' }: IconContainerProps) {
 
 function LogoContainer() {
   return (
-    <div className="flex gap-2.5 items-center">
-        <IconContainer variant="solid">
-           <IconLogo />
-        </IconContainer>
-        <p className="font-sans font-bold text-lg md:text-xl text-white">Planora</p>
+    <div className="flex items-center">
+        <div className="hidden sm:block">
+          <PranoraLogo width={140} style={{ filter: 'drop-shadow(0 2px 8px rgba(21,93,252,0.15))' }} />
+        </div>
+        <div className="block sm:hidden">
+          <PranoraIcon size={28} />
+        </div>
     </div>
   );
 }

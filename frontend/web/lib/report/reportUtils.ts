@@ -1,6 +1,5 @@
-// ══════════════════════════════════════════════════════════════════════════════
-//  reportUtils.ts  ·  Data-processing helpers — Planora Project Management
-// ══════════════════════════════════════════════════════════════════════════════
+
+// Data helpers: Combines and formats all project data for the report
 import { Task, Sprint, ProjectMetrics, MilestoneResponse } from '@/types';
 
 // ── Colour palettes (used by UI charts + PDF/Excel) ──────────────────────────
