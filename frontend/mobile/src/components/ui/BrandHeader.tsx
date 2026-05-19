@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/colors';
+import { PlanoraIconMark, PlanoraWordmark } from './PlanoraLogoMark';
 
 type Props = {
   title: string;
@@ -12,24 +12,20 @@ type Props = {
 export default function BrandHeader({ title, subtitle }: Props) {
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.iconBox}
-      >
-        <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">
-          <Path
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-            stroke={Colors.white}
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </Svg>
-      </LinearGradient>
-      <Text style={styles.appName}>Planora</Text>
+      {/* Glowing icon mark */}
+      <View style={styles.iconGlow}>
+        <PlanoraIconMark size={72} />
+      </View>
+
+      {/* Wordmark */}
+      <View style={styles.wordmarkWrap}>
+        <PlanoraWordmark width={150} />
+      </View>
+
+      {/* Optional subtitle (page context, e.g. "Enter the reset code") */}
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+
+      {/* Page title (e.g. "Welcome Back", "Create Account") */}
       <Text style={styles.title}>{title}</Text>
     </View>
   );
@@ -38,38 +34,31 @@ export default function BrandHeader({ title, subtitle }: Props) {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
+    paddingVertical: 4,
   },
-  iconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Colors.gradientMid,
+  iconGlow: {
+    shadowColor: '#9810FA',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 0,
   },
-  appName: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-    marginTop: 16,
-    letterSpacing: -0.5,
+  wordmarkWrap: {
+    marginTop: 10,
   },
   subtitle: {
     fontSize: 13,
     color: Colors.textSecondary,
-    marginTop: 4,
+    marginTop: 8,
     textAlign: 'center',
-    letterSpacing: 0.2,
+    lineHeight: 18,
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
     color: Colors.textPrimary,
-    marginTop: 20,
+    marginTop: 6,
     textAlign: 'center',
+    letterSpacing: -0.3,
   },
 });
