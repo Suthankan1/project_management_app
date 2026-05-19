@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   KeyboardTypeOptions,
   ReturnKeyTypeOptions,
   TextInputProps,
+  Animated,
 } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { isWeb } from '../../lib/platform';
@@ -55,8 +56,31 @@ export default function TextInputField({
   inputRef,
 }: Props) {
   const [isFocused, setIsFocused] = useState(false);
-  const localInputRef = React.useRef<TextInput>(null);
+  const localInputRef = useRef<TextInput>(null);
   const resolvedInputRef = inputRef ?? localInputRef;
+
+  const floatAnim = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(floatAnim, {
+      toValue: isFocused || !!value ? 1 : 0,
+      duration: 160,
+      useNativeDriver: false, // color interpolation requires false
+    }).start();
+  }, [isFocused, value]);
+
+  const labelTop = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [16, -10],
+  });
+  const labelFontSize = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [16, 12],
+  });
+  const labelColor = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [Colors.textMuted, isFocused ? Colors.primary : Colors.textSecondary],
+  });
 
   const borderColor = errorText
     ? Colors.errorRed
@@ -65,22 +89,30 @@ export default function TextInputField({
     : '#E0E7FF';
 
   return (
-    <View style={styles.wrapper}>
-      <Text style={styles.label}>{label}</Text>
+    <View style={[styles.wrapper, { position: 'relative' }]}>
+      <Animated.Text
+        style={[
+          styles.floatingLabel,
+          {
+            top: labelTop,
+            fontSize: labelFontSize,
+            color: labelColor,
+          },
+        ]}
+        pointerEvents="none"
+      >
+        {label}
+      </Animated.Text>
       <Pressable
         onPress={() => resolvedInputRef.current?.focus()}
-        style={[
-          styles.inputContainer,
-          { borderColor },
-          isFocused && styles.focusedShadow,
-        ]}
+        style={[styles.inputContainer, { borderColor }, isFocused && styles.focusedShadow]}
       >
         <TextInput
           ref={resolvedInputRef}
-          style={[styles.input, isWeb && { height: undefined }]}
+          style={[styles.input, isWeb && { height: undefined }, { paddingTop: 10 }]}
           value={value}
           onChangeText={onChangeText}
-          placeholder={placeholder}
+          placeholder={isFocused || value ? '' : undefined}
           placeholderTextColor="#B0B7C3"
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
@@ -107,12 +139,15 @@ export default function TextInputField({
 const styles = StyleSheet.create({
   wrapper: {
     marginBottom: 0,
+    paddingTop: 10,
   },
-  label: {
-    fontSize: 12,
+  floatingLabel: {
+    position: 'absolute',
+    left: 16,
+    zIndex: 1,
+    backgroundColor: Colors.white,
+    paddingHorizontal: 4,
     fontWeight: '600',
-    color: '#6B7280',
-    marginBottom: 7,
   },
   inputContainer: {
     flexDirection: 'row',
