@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { PranoraIcon } from '@/components/brand/PranoraLogo';
 
 export function SidebarHeader({
   collapsed,
@@ -26,34 +27,20 @@ export function SidebarHeader({
         aria-label={collapsed ? 'Expand sidebar' : 'Sidebar'}
         title={collapsed ? 'Expand sidebar' : 'Planora'}
       >
-        {/* Logo Icon */}
-        <div className="w-8 h-8 flex-shrink-0 rounded-[10px] bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 flex items-center justify-center shadow-sm relative group overflow-hidden">
-          {/* Subtle inner glow */}
-          <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="relative z-10">
-            <path 
-                d="M12 2L20 7V17L12 22L4 17V7L12 2Z" 
-                fill="white" 
-                fillOpacity="0.95" 
-                className="drop-shadow-sm"
-            />
-            <path 
-                d="M12 6L16 8.5V13.5L12 16L8 13.5V8.5L12 6Z" 
-                fill="white" 
-                fillOpacity="0.4" 
-            />
-          </svg>
-        </div>
+        <PranoraIcon size={32} />
 
         {/* Wordmark (Website Name) */}
         {!collapsed && (
           <span
-            className="font-bold text-[18px] tracking-tight text-slate-800 whitespace-nowrap block ml-1"
+            className="font-extrabold text-[17px] tracking-tight whitespace-nowrap"
             style={{
-               fontFamily: 'Inter, sans-serif'
+              background: 'linear-gradient(90deg, #155DFC 0%, #9810FA 55%, #F6339A 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
             }}
           >
-            Planora
+            planora
           </span>
         )}
       </button>
