@@ -12,6 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Path, Rect } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import api from '@/src/api/axios';
 import BrandHeader from '@/src/components/ui/BrandHeader';
 import PrimaryButton from '@/src/components/ui/PrimaryButton';
@@ -27,6 +29,7 @@ export default function VerifyEmailScreen() {
   const [isResending,    setIsResending]    = useState(false);
   const [error,          setError]          = useState('');
   const [resendCountdown, setResendCountdown] = useState(0);
+  const [focusedIndex,   setFocusedIndex]   = useState<number | null>(null);
 
   const inputRefs  = useRef<TextInput[]>([]);
   const prevOtp    = useRef(otp);
@@ -113,7 +116,13 @@ export default function VerifyEmailScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <LinearGradient
+      colors={['#EEF4FF', '#F8FAFC', '#FBF0FE']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.gradient}
+    >
+      <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -126,19 +135,18 @@ export default function VerifyEmailScreen() {
           >
             {/* Back button */}
             <TouchableOpacity
-              style={styles.backRow}
+              style={styles.backButton}
               onPress={() => router.canGoBack() ? router.back() : router.replace('/(auth)/register')}
             >
-              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+              <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
                 <Path
                   d="M15 18l-6-6 6-6"
-                  stroke={Colors.primary}
-                  strokeWidth={2}
+                  stroke={Colors.textPrimary}
+                  strokeWidth={2.5}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
               </Svg>
-              <Text style={styles.backText}>Back to register</Text>
             </TouchableOpacity>
 
             {/* Brand */}
@@ -150,7 +158,7 @@ export default function VerifyEmailScreen() {
             </View>
 
             {/* Card */}
-            <View style={styles.card}>
+            <BlurView intensity={20} tint="light" style={styles.card}>
               {/* Email icon */}
               <View style={styles.emailIconWrapper}>
                 <View style={styles.emailIconBox}>
@@ -183,9 +191,12 @@ export default function VerifyEmailScreen() {
                         style={[
                           styles.otpInput,
                           otpChars[i] ? styles.otpInputFilled : null,
+                          focusedIndex === i && styles.otpInputFocused,
                         ]}
                         value={otpChars[i] || ''}
                         onChangeText={text => handleOtpChange(text, i)}
+                        onFocus={() => setFocusedIndex(i)}
+                        onBlur={() => setFocusedIndex(null)}
                         maxLength={1}
                         keyboardType="number-pad"
                         inputMode="numeric"
@@ -220,25 +231,41 @@ export default function VerifyEmailScreen() {
                   )}
                 </View>
               </View>
-            </View>
+            </BlurView>
 
             <Text style={styles.footer}>© 2026 Planora. All rights reserved.</Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.pageBg,
+    backgroundColor: 'transparent',
   },
   flex: {
     flex: 1,
   },
   scrollContent: {
     paddingBottom: 40,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    marginLeft: 20,
   },
   headerWrapper: {
     alignItems: 'center',
@@ -248,19 +275,21 @@ const styles = StyleSheet.create({
   card: {
     marginTop: 24,
     marginHorizontal: 20,
-    borderRadius: 24,
-    backgroundColor: Colors.cardBg,
+    borderRadius: 28,
+    backgroundColor: Platform.OS === 'ios' ? 'rgba(255, 255, 255, 0.82)' : 'rgba(255, 255, 255, 0.96)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
     padding: 24,
     ...Platform.select({
-      web: { boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)' },
+      web: { boxShadow: '0 12px 28px rgba(99, 102, 241, 0.12)' },
       default: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 16,
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.12,
+        shadowRadius: 28,
       },
     }),
-    elevation: 4,
+    elevation: 16,
   },
   emailIconWrapper: {
     alignItems: 'center',
@@ -279,7 +308,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 16,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   emailBold: {
     fontWeight: '700',
@@ -291,29 +320,41 @@ const styles = StyleSheet.create({
   otpLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: '#6B7280',
     marginBottom: 8,
   },
   otpRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
     justifyContent: 'center',
   },
   otpInput: {
-    width: 44,
-    height: 52,
-    borderRadius: 12,
+    width: 50,
+    height: 58,
+    borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: Colors.borderDefault,
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#000000', // Hardcoded black to rule out color issues
-    backgroundColor: Colors.white,
+    borderColor: '#E0E7FF',
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    backgroundColor: 'rgba(255, 255, 255, 0.90)',
     textAlign: 'center',
     padding: 0,
   },
   otpInputFilled: {
     borderColor: Colors.primary,
+  },
+  otpInputFocused: {
+    borderColor: Colors.primary,
+    ...Platform.select({
+      web: { boxShadow: `0 0 8px ${Colors.primary}33` },
+      default: {
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.20,
+        shadowRadius: 8,
+      },
+    }),
   },
   resendRow: {
     alignItems: 'center',
@@ -333,21 +374,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: '#C0C8D8',
     textAlign: 'center',
     marginTop: 24,
-  },
-  backRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 16,
-    marginLeft: 20,
-    alignSelf: 'flex-start',
-  },
-  backText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primary,
   },
 });

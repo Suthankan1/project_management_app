@@ -62,7 +62,7 @@ export default function TextInputField({
     ? Colors.errorRed
     : isFocused
     ? Colors.primary
-    : Colors.borderDefault;
+    : '#E0E7FF';
 
   return (
     <View style={styles.wrapper}>
@@ -81,7 +81,7 @@ export default function TextInputField({
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor="#B0B7C3"
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           autoCorrect={autoCorrect}
@@ -111,26 +111,26 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
-    marginBottom: 6,
+    color: '#6B7280',
+    marginBottom: 7,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
+    height: 56,
     borderWidth: 1.5,
-    borderRadius: 14,
+    borderRadius: 16,
     paddingHorizontal: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.90)',
   },
   focusedShadow: {
     ...Platform.select({
-      web: { boxShadow: `0 0 6px ${Colors.primary}26` },
+      web: { boxShadow: `0 0 8px ${Colors.primary}1F` },
       default: {
         shadowColor: Colors.primary,
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.15,
-        shadowRadius: 6,
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
       },
     }),
     elevation: 2,
