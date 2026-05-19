@@ -8,6 +8,7 @@ import {
   Platform,
   StyleSheet,
   TextInput,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -24,23 +25,46 @@ export default function VerifyEmailScreen() {
   const router = useRouter();
   const { email } = useLocalSearchParams<{ email: string }>();
 
-  const [otp,            setOtp]            = useState('');
-  const [isLoading,      setIsLoading]      = useState(false);
-  const [isResending,    setIsResending]    = useState(false);
-  const [error,          setError]          = useState('');
+  const [otp,             setOtp]            = useState('');
+  const [isLoading,       setIsLoading]      = useState(false);
+  const [isResending,     setIsResending]    = useState(false);
+  const [error,           setError]          = useState('');
   const [resendCountdown, setResendCountdown] = useState(0);
-  const [focusedIndex,   setFocusedIndex]   = useState<number | null>(null);
+  const [focusedIndex,    setFocusedIndex]   = useState<number | null>(null);
 
-  const inputRefs  = useRef<TextInput[]>([]);
-  const prevOtp    = useRef(otp);
+  const inputRefs   = useRef<TextInput[]>([]);
+  const prevOtp     = useRef(otp);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const otpChars   = otp.padEnd(6, '').split('').slice(0, 6);
+  const otpChars    = otp.padEnd(6, '').split('').slice(0, 6);
+
+  const scaleAnims = useRef([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(1))).current;
+  const shakeAnim  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (otp.length !== 6) return;
+    const timer = setTimeout(handleVerify, 150);
+    return () => clearTimeout(timer);
+  }, [otp]);
+
+  const triggerShake = () =>
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 8,  duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 4,  duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0,  duration: 60, useNativeDriver: true }),
+    ]).start();
+
+  const triggerScale = (index: number) =>
+    Animated.sequence([
+      Animated.spring(scaleAnims[index], { toValue: 1.08, useNativeDriver: true, tension: 400, friction: 10 }),
+      Animated.spring(scaleAnims[index], { toValue: 1.0,  useNativeDriver: true, tension: 200, friction: 15 }),
+    ]).start();
 
   const startCountdown = () => {
     setResendCountdown(60);
@@ -57,6 +81,13 @@ export default function VerifyEmailScreen() {
   };
 
   const handleOtpChange = (text: string, index: number) => {
+    if (index === 0 && text.length === 6 && /^\d{6}$/.test(text)) {
+      setOtp(text);
+      inputRefs.current[5]?.focus();
+      [0, 1, 2, 3, 4, 5].forEach(i => triggerScale(i));
+      return;
+    }
+
     if (!/^\d?$/.test(text)) return;
     const isDeleting = text === '' && prevOtp.current.length >= otp.length;
     setOtp(prev => {
@@ -68,6 +99,8 @@ export default function VerifyEmailScreen() {
       if (!text && isDeleting && index > 0) setTimeout(() => inputRefs.current[index - 1]?.focus(), 0);
       return next;
     });
+
+    if (text) triggerScale(index);
   };
 
   const handleVerify = async () => {
@@ -89,6 +122,7 @@ export default function VerifyEmailScreen() {
         msg = (errorData as { message: string }).message;
       }
       setError(msg);
+      triggerShake();
     } finally {
       setIsLoading(false);
     }
@@ -183,29 +217,30 @@ export default function VerifyEmailScreen() {
                 {/* OTP Input */}
                 <View>
                   <Text style={styles.otpLabel}>Verification Code</Text>
-                  <View style={styles.otpRow}>
+                  <Animated.View style={[styles.otpRow, { transform: [{ translateX: shakeAnim }] }]}>
                     {[0, 1, 2, 3, 4, 5].map(i => (
-                      <TextInput
-                        key={i}
-                        ref={ref => { if (ref) inputRefs.current[i] = ref; }}
-                        style={[
-                          styles.otpInput,
-                          otpChars[i] ? styles.otpInputFilled : null,
-                          focusedIndex === i && styles.otpInputFocused,
-                        ]}
-                        value={otpChars[i] || ''}
-                        onChangeText={text => handleOtpChange(text, i)}
-                        onFocus={() => setFocusedIndex(i)}
-                        onBlur={() => setFocusedIndex(null)}
-                        maxLength={1}
-                        keyboardType="number-pad"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        textAlign="center"
-                        selectTextOnFocus
-                      />
+                      <Animated.View key={i} style={{ transform: [{ scale: scaleAnims[i] }] }}>
+                        <TextInput
+                          ref={ref => { if (ref) inputRefs.current[i] = ref; }}
+                          style={[
+                            styles.otpInput,
+                            otpChars[i] ? styles.otpInputFilled : null,
+                            focusedIndex === i && styles.otpInputFocused,
+                          ]}
+                          value={otpChars[i] || ''}
+                          onChangeText={text => handleOtpChange(text, i)}
+                          onFocus={() => setFocusedIndex(i)}
+                          onBlur={() => setFocusedIndex(null)}
+                          maxLength={i === 0 ? 6 : 1}
+                          keyboardType="number-pad"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          textAlign="center"
+                          selectTextOnFocus
+                        />
+                      </Animated.View>
                     ))}
-                  </View>
+                  </Animated.View>
                 </View>
 
                 <ErrorBanner message={error} visible={!!error} />

@@ -42,6 +42,9 @@ export default function ResetPasswordScreen() {
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const scaleAnim  = useRef(new Animated.Value(0.5)).current;
 
+  const scaleAnims = useRef([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(1))).current;
+  const shakeAnim  = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     if (submitted) {
       Animated.spring(scaleAnim, {
@@ -53,7 +56,38 @@ export default function ResetPasswordScreen() {
     }
   }, [submitted]);
 
+  useEffect(() => {
+    if (otp.length !== 6) return;
+    const timer = setTimeout(handleSubmit, 150);
+    return () => clearTimeout(timer);
+  }, [otp]);
+
+  useEffect(() => {
+    if (error) triggerShake();
+  }, [error]);
+
+  const triggerShake = () =>
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 8,  duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 4,  duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0,  duration: 60, useNativeDriver: true }),
+    ]).start();
+
+  const triggerScale = (index: number) =>
+    Animated.sequence([
+      Animated.spring(scaleAnims[index], { toValue: 1.08, useNativeDriver: true, tension: 400, friction: 10 }),
+      Animated.spring(scaleAnims[index], { toValue: 1.0,  useNativeDriver: true, tension: 200, friction: 15 }),
+    ]).start();
+
   const handleOtpChange = (text: string, index: number) => {
+    if (index === 0 && text.length === 6 && /^\d{6}$/.test(text)) {
+      setOtp(text);
+      inputRefs.current[5]?.focus();
+      [0, 1, 2, 3, 4, 5].forEach(i => triggerScale(i));
+      return;
+    }
+
     if (!/^\d?$/.test(text)) return;
     const isDeleting = text === '' && prevOtp.current.length >= otp.length;
     setOtp(prev => {
@@ -65,6 +99,8 @@ export default function ResetPasswordScreen() {
       if (!text && isDeleting && index > 0) setTimeout(() => inputRefs.current[index - 1]?.focus(), 0);
       return next;
     });
+
+    if (text) triggerScale(index);
   };
 
   const strength = getPasswordStrength(newPassword);
@@ -120,29 +156,30 @@ export default function ResetPasswordScreen() {
                   {/* OTP Input */}
                   <View>
                     <Text style={styles.otpLabel}>Reset Code</Text>
-                    <View style={styles.otpRow}>
+                    <Animated.View style={[styles.otpRow, { transform: [{ translateX: shakeAnim }] }]}>
                       {[0, 1, 2, 3, 4, 5].map(i => (
-                        <TextInput
-                          key={i}
-                          ref={ref => { if (ref) inputRefs.current[i] = ref; }}
-                          style={[
-                            styles.otpInput,
-                            otpChars[i] ? styles.otpInputFilled : null,
-                            focusedIndex === i && styles.otpInputFocused,
-                          ]}
-                          value={otpChars[i] || ''}
-                          onChangeText={text => handleOtpChange(text, i)}
-                          onFocus={() => setFocusedIndex(i)}
-                          onBlur={() => setFocusedIndex(null)}
-                          maxLength={1}
-                          keyboardType="number-pad"
-                          inputMode="numeric"
-                          autoComplete="one-time-code"
-                          textAlign="center"
-                          selectTextOnFocus
-                        />
+                        <Animated.View key={i} style={{ transform: [{ scale: scaleAnims[i] }] }}>
+                          <TextInput
+                            ref={ref => { if (ref) inputRefs.current[i] = ref; }}
+                            style={[
+                              styles.otpInput,
+                              otpChars[i] ? styles.otpInputFilled : null,
+                              focusedIndex === i && styles.otpInputFocused,
+                            ]}
+                            value={otpChars[i] || ''}
+                            onChangeText={text => handleOtpChange(text, i)}
+                            onFocus={() => setFocusedIndex(i)}
+                            onBlur={() => setFocusedIndex(null)}
+                            maxLength={i === 0 ? 6 : 1}
+                            keyboardType="number-pad"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            textAlign="center"
+                            selectTextOnFocus
+                          />
+                        </Animated.View>
                       ))}
-                    </View>
+                    </Animated.View>
                   </View>
 
                   <View>
