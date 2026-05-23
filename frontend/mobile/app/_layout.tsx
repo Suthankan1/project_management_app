@@ -2,11 +2,14 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, LogBox } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { useRouter } from 'expo-router';
 import SplashAnimation from '@/src/components/SplashAnimation';
 import { getValidToken } from '@/src/auth/storage';
+
+// Silence Native Driver warnings on web platform
+LogBox.ignoreLogs(['Animated: `useNativeDriver` is not supported']);
 
 // Prevent the native splash from auto-hiding — we control it
 SplashScreen.preventAutoHideAsync();
