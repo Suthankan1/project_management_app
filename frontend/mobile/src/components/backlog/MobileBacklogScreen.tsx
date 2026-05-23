@@ -16,7 +16,6 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { T, STATUS_MAP, StatusKey } from '../../constants/tokens';
 import {
-  BacklogGroupBy,
   MobileSprint,
   MobileTask,
   useMobileBacklog,
@@ -24,13 +23,6 @@ import {
 
 const STATUSES = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
-const GROUPS: { value: BacklogGroupBy; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'status', label: 'Status' },
-  { value: 'priority', label: 'Priority' },
-  { value: 'assignee', label: 'Assignee' },
-];
-
 function Icon({ name, color = T.primary, size = 18 }: { name: 'plus' | 'search' | 'filter' | 'trash' | 'check' | 'rocket' | 'box' | 'move' | 'chart' | 'user' | 'tag' | 'flag'; color?: string; size?: number }) {
   const p = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 2.25, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   if (name === 'search') return <Svg {...p}><Circle cx={11} cy={11} r={8} /><Path d="m21 21-4.3-4.3" /></Svg>;
@@ -465,27 +457,6 @@ function FilterBar({
   );
 }
 
-function GroupControl({
-  value,
-  onChange,
-}: {
-  value: BacklogGroupBy;
-  onChange: (value: BacklogGroupBy) => void;
-}) {
-  return (
-    <View style={styles.groupRow}>
-      {GROUPS.map((group) => {
-        const active = value === group.value;
-        return (
-          <TouchableOpacity key={group.value} activeOpacity={0.78} onPress={() => onChange(group.value)} style={[styles.groupBtn, active && styles.groupBtnActive]}>
-            <Text style={[styles.groupText, active && styles.groupTextActive]}>{group.label}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
 export default function MobileBacklogScreen({
   projectId,
   isAgile,
@@ -554,13 +525,6 @@ export default function MobileBacklogScreen({
           labels={backlog.allLabels}
           setFilters={backlog.setFilters}
         />
-
-        {!isAgile && (
-          <GroupControl
-            value={backlog.filters.groupBy}
-            onChange={(groupBy) => backlog.setFilters((current) => ({ ...current, groupBy }))}
-          />
-        )}
 
         {!!backlog.error && (
           <View style={styles.errorBox}>
@@ -754,11 +718,6 @@ const styles = StyleSheet.create({
   filterBtnActive: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   filterLetter: { fontSize: 13, fontWeight: '900', color: '#64748B' },
   filterLetterActive: { color: T.primary },
-  groupRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 6, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.9)' },
-  groupBtn: { minHeight: 34, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  groupBtnActive: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
-  groupText: { fontSize: 12, fontWeight: '800', color: '#64748B' },
-  groupTextActive: { color: T.primary },
   errorBox: { borderRadius: 14, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', padding: 12 },
   errorTitle: { fontSize: 13, fontWeight: '900', color: '#991B1B' },
   errorText: { fontSize: 12, fontWeight: '700', color: '#B91C1C', marginTop: 2 },
