@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -30,6 +31,8 @@ public class DocumentService {
     private static final Logger logger = LoggerFactory.getLogger(DocumentService.class);
 
     private static final long MAX_FILE_SIZE_BYTES = 100L * 1024 * 1024;
+    private static final long VERSION_MIN_INTERVAL_MINUTES = 5;
+    private static final long VERSION_MIN_SIZE_DELTA_BYTES = 512;
 
     // Security: Presigned URLs are only valid for a short window. If the client doesn't
     // complete the upload/download in 15 minutes, they have to request a new URL.
@@ -241,6 +244,41 @@ public class DocumentService {
         }
 
         User uploader = getUser(userId);
+
+        // BUG-010 Fix: Deduplication - only create a new version if enough
+        // time has passed or content changed significantly.
+        Optional<DocumentVersion> latestVersion =
+                documentVersionRepository.findTopByDocumentIdOrderByVersionNumberDesc(documentId);
+
+        if (latestVersion.isPresent()) {
+            DocumentVersion latest = latestVersion.get();
+            boolean enoughTimePassed = latest.getCreatedAt() != null
+                    && Duration.between(latest.getCreatedAt(), LocalDateTime.now()).toMinutes() >= VERSION_MIN_INTERVAL_MINUTES;
+            boolean contentChanged = request.getFileSize() != null
+                    && latest.getFileSize() != null
+                    && Math.abs(request.getFileSize() - latest.getFileSize()) >= VERSION_MIN_SIZE_DELTA_BYTES;
+
+            if (!enoughTimePassed && !contentChanged) {
+                // Not enough time and not enough change - update the existing version
+                // rather than creating a new record. This collapses rapid autosave bursts.
+                latest.setObjectKey(request.getObjectKey());
+                latest.setContentType(request.getContentType());
+                latest.setFileSize(request.getFileSize());
+                latest.setUploadedBy(uploader);
+                documentVersionRepository.save(latest);
+
+                // Keep the parent document pointed at the latest content.
+                document.setLatestObjectKey(request.getObjectKey());
+                document.setContentType(request.getContentType());
+                document.setFileSize(request.getFileSize());
+                document.setUploadedBy(uploader);
+                documentRepository.save(document);
+
+                logger.debug("DocumentService: version dedup - updated existing version {} for doc {}",
+                        latest.getVersionNumber(), documentId);
+                return mapDocument(document, true);
+            }
+        }
 
         // Step 2: Calculate the next version number safely.
         int nextVersion = documentVersionRepository.findTopByDocumentIdOrderByVersionNumberDesc(documentId)
