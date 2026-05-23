@@ -833,7 +833,56 @@ public class TaskService {
             notifyTaskStakeholders(saved, currentUserId, message, "/taskcard?taskId=" + saved.getId());
         }
 
+        // BUG-006 Fix: check if all siblings are done when a subtask is updated
+        checkAndAutoCompleteParent(saved, currentUserId);
+
         return getTaskById(saved.getId());
+    }
+
+    /**
+     * If the just-updated task is a subtask, checks whether all siblings are DONE.
+     * If yes, auto-moves the parent to DONE and logs the activity.
+     */
+    private void checkAndAutoCompleteParent(Task updatedTask, Long actorUserId) {
+        // Only act if this task is a subtask (has a parent)
+        if (updatedTask.getParentTask() == null) return;
+
+        Task parent = updatedTask.getParentTask();
+
+        // Re-fetch subtasks fresh from DB to get current statuses
+        List<Task> siblings = taskRepository.findSubtasksByParentId(parent.getId());
+
+        // If any sibling is not DONE, stop; parent should not auto-complete
+        boolean allDone = siblings.stream()
+                .allMatch(s -> "DONE".equalsIgnoreCase(s.getStatus()));
+
+        if (!allDone) return;
+
+        // All subtasks are done; auto-complete parent if not already done
+        if ("DONE".equalsIgnoreCase(parent.getStatus())) return;
+
+        String oldParentStatus = parent.getStatus();
+        parent.setStatus("DONE");
+        parent.setCompletedAt(LocalDateTime.now());
+        parent.setLastModifiedBy(updatedTask.getLastModifiedBy());
+        taskRepository.save(parent);
+
+        // Log the auto-completion activity
+        taskActivityService.logActivity(
+                parent.getId(),
+                TaskActivityType.STATUS_CHANGED,
+                "System",
+                "Auto-completed: all subtasks are done (was: " + oldParentStatus + ")"
+        );
+
+        // Notify parent task stakeholders
+        String actorName = updatedTask.getLastModifiedBy() != null
+                ? updatedTask.getLastModifiedBy().getUsername()
+                : "System";
+        String message = "Task \"" + parent.getTitle()
+                + "\" was auto-completed — all subtasks are now done.";
+        notifyTaskStakeholders(parent, actorUserId, message,
+                "/taskcard?taskId=" + parent.getId());
     }
 
     //18. UNASSIGN TASK

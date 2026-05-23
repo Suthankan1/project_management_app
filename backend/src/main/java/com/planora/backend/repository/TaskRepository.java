@@ -57,6 +57,9 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("SELECT DISTINCT t FROM Task t LEFT JOIN FETCH t.assignees LEFT JOIN FETCH t.labels WHERE t.sprint.id = :sprintId AND t.status = :status")
     List<Task> findBySprintIdAndStatus(@Param("sprintId") Long sprintId, @Param("status") String status);
 
+    @Query("SELECT t FROM Task t WHERE t.parentTask.id = :parentId")
+    List<Task> findSubtasksByParentId(@Param("parentId") Long parentId);
+
     long countByAssigneeAndProject_TeamId(com.planora.backend.model.TeamMember assignee, Long teamId);
 
     @Query("""
