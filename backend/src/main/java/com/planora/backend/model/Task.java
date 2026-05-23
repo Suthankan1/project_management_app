@@ -2,6 +2,8 @@ package com.planora.backend.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 import org.hibernate.annotations.BatchSize;
 
@@ -21,7 +23,9 @@ public class Task {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 255)
+    @NotBlank(message = "Task title is required")
+    @Size(max = 255, message = "Task title must be 255 characters or fewer")
     private String title;
 
     @Column(name = "project_task_number")

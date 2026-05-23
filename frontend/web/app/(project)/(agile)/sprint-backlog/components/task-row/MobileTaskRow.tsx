@@ -64,19 +64,27 @@ export default function MobileTaskRow(props: TaskRowProps) {
             </span>
           </div>
           {renaming ? (
-            <input
-              type="text"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void commitRename();
-                if (e.key === 'Escape') setRenaming(false);
-              }}
-              onBlur={() => void commitRename()}
-              autoFocus
-              onClick={(e) => e.stopPropagation()}
-              className="w-full border-b-2 border-[#175CD3] bg-transparent text-[15px] font-bold text-[#101828] outline-none"
-            />
+            <div>
+              <input
+                type="text"
+                maxLength={255}
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void commitRename();
+                  if (e.key === 'Escape') setRenaming(false);
+                }}
+                onBlur={() => void commitRename()}
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+                className="w-full border-b-2 border-[#175CD3] bg-transparent text-[15px] font-bold text-[#101828] outline-none"
+              />
+              {renameValue.length > 200 && (
+                <p className="text-xs text-amber-500 mt-1">
+                  {255 - renameValue.length} characters remaining
+                </p>
+              )}
+            </div>
           ) : (
             <h3 
               onClick={(e) => {
