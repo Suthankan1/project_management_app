@@ -37,6 +37,18 @@ export default function EditSprintModal({ open, sprintName, loading, error, onCo
         className="relative w-full max-w-sm mx-4 rounded-2xl border border-[#E4E7EC] bg-white shadow-2xl"
         style={{ animation: 'confirmSlideIn 0.2s cubic-bezier(0.34,1.56,0.64,1) both' }}
       >
+        {error && (
+          <div className="absolute left-1/2 top-4 z-10 w-[calc(100%-32px)] -translate-x-1/2 rounded-[24px] border border-red-200 bg-red-50/95 px-4 py-4 shadow-[0_24px_60px_rgba(244,63,94,0.12)] backdrop-blur-sm">
+            <div className="flex items-start gap-3">
+              <AlertCircle size={22} className="mt-0.5 text-red-600" />
+              <div>
+                <p className="text-sm font-semibold text-[#b42318]">Sprint name already exists</p>
+                <p className="mt-1 text-sm leading-6 text-[#991b1b]">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <button
           onClick={onCancel}
           className="absolute right-4 top-4 rounded-lg p-1 text-[#98A2B3] hover:text-[#344054] hover:bg-[#F2F4F7] transition-all duration-150"
@@ -44,7 +56,7 @@ export default function EditSprintModal({ open, sprintName, loading, error, onCo
           <X size={16} />
         </button>
 
-        <div className="p-6">
+        <div className={`p-6 ${error ? 'pt-24' : ''}`}>
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-[#B2DDFF] bg-[#EFF8FF] text-[#175CD3]">
             <Pencil size={20} />
           </div>
@@ -60,17 +72,6 @@ export default function EditSprintModal({ open, sprintName, loading, error, onCo
             className={`w-full rounded-lg border ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20' : 'border-[#D0D5DD] focus:border-[#175CD3] focus:ring-[#175CD3]/20'} px-3 py-2.5 text-[14px] text-[#101828] outline-none focus:ring-2 transition-all duration-150`}
             placeholder="Sprint name..."
           />
-          {error && (
-            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 shadow-sm">
-              <div className="flex items-start gap-3">
-                <AlertCircle size={20} className="mt-0.5 text-red-600" />
-                <div>
-                  <p className="text-[14px] font-semibold text-[#b42318]">Sprint name already exists</p>
-                  <p className="mt-1 text-[13px] leading-5 text-[#991b1b]">{error}</p>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="flex items-center justify-end gap-2.5 border-t border-[#F2F4F7] px-6 py-4">
