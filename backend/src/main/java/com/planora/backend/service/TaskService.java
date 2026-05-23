@@ -359,6 +359,9 @@ public class TaskService {
         //validate user - OWNER or ADMIN only
         Long teamId = task.getProject().getTeam().getId();
         Long projectId = task.getProject().getId();
+        Integer deletedBacklogPos = task.getBacklogPosition();
+        Integer deletedSprintPos = task.getSprintPosition();
+        Long sprintId = task.getSprint() != null ? task.getSprint().getId() : null;
 
         // Step 1. Hard Security Check: Only Owners or Admins can destroy data.
         TeamMember member = requireMinimumRole(teamId, currentUserId, null);
@@ -392,7 +395,15 @@ public class TaskService {
         // Step 3. Delete the task so a failure here prevents ghost notifications.
         taskRepository.delete(task);
 
-        // Step 4. Send out the alerts.
+        // Step 4. Compact list positions after the deleted row is gone.
+        if (deletedBacklogPos != null && sprintId == null) {
+            taskRepository.compactBacklogPositions(projectId, deletedBacklogPos);
+        }
+        if (deletedSprintPos != null && sprintId != null) {
+            taskRepository.compactSprintPositions(sprintId, deletedSprintPos);
+        }
+
+        // Step 5. Send out the alerts.
         for (User recipient : recipients) {
             notificationService.createNotification(recipient, message, taskLink);
         }

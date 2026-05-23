@@ -223,6 +223,27 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("SELECT COALESCE(MAX(t.sprintPosition), -1) FROM Task t WHERE t.sprint.id = :sprintId")
     Integer findMaxSprintPositionBySprintId(@Param("sprintId") Long sprintId);
 
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Task t SET t.backlogPosition = t.backlogPosition - 1 " +
+           "WHERE t.project.id = :projectId " +
+           "AND t.sprint IS NULL " +
+           "AND t.backlogPosition > :deletedPosition " +
+           "AND t.backlogPosition IS NOT NULL")
+    void compactBacklogPositions(
+            @Param("projectId") Long projectId,
+            @Param("deletedPosition") Integer deletedPosition
+    );
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Task t SET t.sprintPosition = t.sprintPosition - 1 " +
+           "WHERE t.sprint.id = :sprintId " +
+           "AND t.sprintPosition > :deletedPosition " +
+           "AND t.sprintPosition IS NOT NULL")
+    void compactSprintPositions(
+            @Param("sprintId") Long sprintId,
+            @Param("deletedPosition") Integer deletedPosition
+    );
+
     @Query("SELECT DISTINCT t FROM Task t " +
            "LEFT JOIN FETCH t.project p " +
            "LEFT JOIN FETCH p.owner po " +
