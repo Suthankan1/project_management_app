@@ -20,6 +20,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
 
     const [tasks, setTasks] = useState<Task[]>([]);
     const [archivedTasks, setArchivedTasks] = useState<Task[]>([]);
+    const [archivedLoading, setArchivedLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -101,15 +102,23 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
     const fetchArchivedData = useCallback(async () => {
         if (!projectId || !showArchived) {
             setArchivedTasks([]);
+            setArchivedLoading(false);
             return;
         }
         const pid = parseInt(projectId, 10);
-        if (isNaN(pid)) return;
+        if (isNaN(pid)) {
+            setArchivedLoading(false);
+            return;
+        }
+        setArchivedLoading(true);
         try {
             const data = await getArchivedTasks(pid);
             setArchivedTasks(data as Task[]);
         } catch (err) {
             console.error('Error loading archived backlog tasks:', err);
+            toast('Failed to load archived tasks', 'error');
+        } finally {
+            setArchivedLoading(false);
         }
     }, [projectId, showArchived]);
 
@@ -119,10 +128,9 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         if (!projectId) return;
         void fetchStaticData();
         void fetchData({ showSpinner: true });
-        void fetchArchivedData();
         const id = setInterval(() => void fetchData({ showSpinner: false }), 30_000);
         return () => clearInterval(id);
-    }, [projectId, fetchStaticData, fetchData, fetchArchivedData]);
+    }, [projectId, fetchStaticData, fetchData]);
 
     useEffect(() => {
         void fetchArchivedData();
@@ -339,7 +347,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
     }, [filteredTasks, groupBy]);
 
     return {
-        tasks, archivedTasks, loading, error, collapsedGroups, toggleGroup,
+        tasks, archivedTasks, archivedLoading, loading, error, collapsedGroups, toggleGroup,
         selectedTask, setSelectedTask,
         selectedTaskIdForModal, setSelectedTaskIdForModal,
         showCreateModal, setShowCreateModal,

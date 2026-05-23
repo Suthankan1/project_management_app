@@ -4,10 +4,13 @@ import com.planora.backend.model.DocumentFolderPermission;
 import com.planora.backend.model.TeamRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface DocumentFolderPermissionRepository extends JpaRepository<DocumentFolderPermission, Long> {
     List<DocumentFolderPermission> findByFolderIdAndTeamRole(Long folderId, TeamRole role);
+
+    List<DocumentFolderPermission> findByFolderIdInAndTeamRole(Collection<Long> folderIds, TeamRole role);
 
     boolean existsByFolderIdAndTeamRoleAndPermission(Long folderId, TeamRole role, String permission);
 

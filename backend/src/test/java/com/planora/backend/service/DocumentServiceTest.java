@@ -7,6 +7,7 @@ import com.planora.backend.dto.DocumentUploadFinalizeRequestDTO;
 import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.Document;
 import com.planora.backend.model.DocumentFolder;
+import com.planora.backend.model.DocumentFolderPermission;
 import com.planora.backend.model.DocumentStatus;
 import com.planora.backend.model.DocumentVersion;
 import com.planora.backend.model.Project;
@@ -32,8 +33,10 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -313,6 +316,54 @@ class DocumentServiceTest {
     }
 
     @Test
+    void listDocuments_preloadsFolderPermissionsAndFiltersInMemory() {
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+
+        User uploader = new User();
+        uploader.setUserId(55L);
+        uploader.setUsername("alice");
+
+        DocumentFolder readableFolder = new DocumentFolder();
+        readableFolder.setId(100L);
+        readableFolder.setName("Readable");
+        readableFolder.setProject(project);
+
+        DocumentFolder deniedFolder = new DocumentFolder();
+        deniedFolder.setId(101L);
+        deniedFolder.setName("Denied");
+        deniedFolder.setProject(project);
+
+        Document rootDocument = document(1L, "root.pdf", null, uploader);
+        Document readableDocument = document(2L, "readable.pdf", readableFolder, uploader);
+        Document deniedDocument = document(3L, "denied.pdf", deniedFolder, uploader);
+
+        DocumentFolderPermission readPermission = DocumentFolderPermission.builder()
+                .folder(readableFolder)
+                .teamRole(TeamRole.MEMBER)
+                .permission("READ")
+                .grantedBy(uploader)
+                .build();
+
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(12L, 55L)).thenReturn(Optional.of(member));
+        when(documentRepository.findByProjectIdAndStatusOrderByCreatedAtDesc(5L, DocumentStatus.ACTIVE))
+                .thenReturn(List.of(rootDocument, readableDocument, deniedDocument));
+        when(folderPermissionRepository.findByFolderIdInAndTeamRole(any(), eq(TeamRole.MEMBER)))
+                .thenReturn(List.of(readPermission));
+
+        List<DocumentResponseDTO> result = documentService.listDocuments(5L, 55L, null, false);
+
+        assertEquals(List.of(1L, 2L), result.stream().map(DocumentResponseDTO::getId).toList());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Collection<Long>> folderIdsCaptor = ArgumentCaptor.forClass(Collection.class);
+        verify(folderPermissionRepository).findByFolderIdInAndTeamRole(folderIdsCaptor.capture(), eq(TeamRole.MEMBER));
+        assertEquals(Set.of(100L, 101L), Set.copyOf(folderIdsCaptor.getValue()));
+        verify(folderPermissionRepository, never()).findByFolderIdAndTeamRole(anyLong(), any());
+    }
+
+    @Test
     void finalizeNewVersionUpload_whenRecentAndSmallChange_updatesLatestVersionInsteadOfCreatingRow() {
         TeamMember member = new TeamMember();
         member.setRole(TeamRole.MEMBER);
@@ -465,5 +516,20 @@ class DocumentServiceTest {
         assertNotNull(result);
         // Verify the upload went through s3StorageService, not a raw S3Client
         verify(s3StorageService).putObject(any(), anyString(), eq("application/pdf"), any(), eq((long) content.length));
+    }
+
+    private Document document(Long id, String name, DocumentFolder folder, User uploader) {
+        Document document = new Document();
+        document.setId(id);
+        document.setName(name);
+        document.setContentType("application/pdf");
+        document.setFileSize(1024L);
+        document.setLatestVersionNumber(1);
+        document.setLatestObjectKey("project-5/root/" + id + "-" + name);
+        document.setStatus(DocumentStatus.ACTIVE);
+        document.setProject(project);
+        document.setFolder(folder);
+        document.setUploadedBy(uploader);
+        return document;
     }
 }

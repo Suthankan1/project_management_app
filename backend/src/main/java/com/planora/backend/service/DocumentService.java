@@ -20,9 +20,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * This service handles a highly scalable two-step upload process (Direct-to-S3),
@@ -338,8 +340,14 @@ public class DocumentService {
                     : documentRepository.findByProjectIdAndStatusOrderByCreatedAtDesc(projectId, DocumentStatus.ACTIVE);
         }
 
+        Set<Long> readableFolderIds = getFolderIdsWithPermission(documents.stream()
+                .map(Document::getFolder)
+                .filter(java.util.Objects::nonNull)
+                .map(DocumentFolder::getId)
+                .collect(java.util.stream.Collectors.toSet()), member, "READ");
+
         return documents.stream()
-                .filter(document -> hasDocumentFolderPermission(document, member, "READ"))
+                .filter(document -> document.getFolder() == null || readableFolderIds.contains(document.getFolder().getId()))
                 .limit(200)
                 .map(document -> mapDocument(document, false))
                 .toList();
@@ -508,9 +516,14 @@ public class DocumentService {
     public List<DocumentFolderResponseDTO> listFolders(Long projectId, Long userId) {
         TeamMember member = getProjectMember(projectId, userId);
         // Only return folders that haven't been soft-deleted.
-        return documentFolderRepository.findByProjectIdAndDeletedAtIsNullOrderByCreatedAtAsc(projectId)
+        List<DocumentFolder> folders = documentFolderRepository.findByProjectIdAndDeletedAtIsNullOrderByCreatedAtAsc(projectId);
+        Set<Long> readableFolderIds = getFolderIdsWithPermission(folders.stream()
+                .map(DocumentFolder::getId)
+                .toList(), member, "READ");
+
+        return folders
                 .stream()
-                .filter(folder -> hasFolderPermission(folder.getId(), member, "READ"))
+                .filter(folder -> readableFolderIds.contains(folder.getId()))
                 .map(this::mapFolder)
                 .toList();
     }
@@ -670,6 +683,33 @@ public class DocumentService {
                 .map(DocumentFolderPermission::getPermission)
                 .toList();
 
+        return hasRequiredPermission(grantedPermissions, requiredPermission);
+    }
+
+    private Set<Long> getFolderIdsWithPermission(Collection<Long> folderIds, TeamMember member, String requiredPermission) {
+        TeamRole role = member.getRole();
+        if (role == TeamRole.OWNER) {
+            return new HashSet<>(folderIds);
+        }
+
+        if (folderIds.isEmpty()) {
+            return Set.of();
+        }
+
+        Map<Long, List<String>> permissionsByFolderId = folderPermissionRepository
+                .findByFolderIdInAndTeamRole(folderIds, role)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        permission -> permission.getFolder().getId(),
+                        Collectors.mapping(DocumentFolderPermission::getPermission, Collectors.toList())
+                ));
+
+        return folderIds.stream()
+                .filter(folderId -> hasRequiredPermission(permissionsByFolderId.getOrDefault(folderId, List.of()), requiredPermission))
+                .collect(Collectors.toSet());
+    }
+
+    private boolean hasRequiredPermission(Collection<String> grantedPermissions, String requiredPermission) {
         return switch (requiredPermission) {
             case "READ" -> grantedPermissions.contains("READ")
                     || grantedPermissions.contains("WRITE")
