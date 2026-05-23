@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { T, STATUS_MAP, StatusKey } from '../../constants/tokens';
 import {
   MobileSprint,
@@ -37,6 +39,25 @@ function Icon({ name, color = T.primary, size = 18 }: { name: 'plus' | 'search' 
   if (name === 'tag') return <Svg {...p}><Path d="M20 13 11 22l-9-9V4h9l9 9z" /><Circle cx={7.5} cy={8.5} r={1.5} /></Svg>;
   if (name === 'flag') return <Svg {...p}><Path d="M4 22V4" /><Path d="M4 5h12l-1 5 1 5H4" /></Svg>;
   return <Svg {...p}><Path d="M12 5v14" /><Path d="M5 12h14" /></Svg>;
+}
+
+function BacklogBackdrop() {
+  return (
+    <View pointerEvents="none" style={styles.backdrop}>
+      <LinearGradient
+        colors={['rgba(21, 93, 252, 0.15)', 'rgba(34, 197, 94, 0.09)', 'rgba(247, 248, 250, 0)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.backdropTop}
+      />
+      <LinearGradient
+        colors={['rgba(245, 158, 11, 0.08)', 'rgba(139, 92, 246, 0.07)', 'rgba(247, 248, 250, 0)']}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.backdropBottom}
+      />
+    </View>
+  );
 }
 
 function statusStyle(status?: string | null) {
@@ -278,10 +299,19 @@ function Header({
   const completion = stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
   return (
     <View style={styles.hero}>
+      <View pointerEvents="none" style={styles.glassLayer}>
+        <BlurView intensity={28} tint="light" style={StyleSheet.absoluteFill} />
+        <View style={styles.glassWash} />
+      </View>
       <View style={styles.heroTop}>
-        <View style={[styles.heroIcon, agile && styles.heroIconAgile]}>
+        <LinearGradient
+          colors={agile ? ['#7C3AED', '#A855F7'] : [T.primary, '#4D8BFF']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroIcon}
+        >
           <Icon name={agile ? 'rocket' : 'box'} color="#FFFFFF" size={19} />
-        </View>
+        </LinearGradient>
         <View style={styles.heroTitleWrap}>
           <Text style={styles.eyebrow}>{agile ? 'AGILE BACKLOG' : 'KANBAN BACKLOG'}</Text>
           <Text style={styles.title}>{agile ? 'Sprint planning' : 'Product backlog'}</Text>
@@ -506,6 +536,7 @@ export default function MobileBacklogScreen({
 
   return (
     <View style={styles.safe}>
+      <BacklogBackdrop />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingTop: topOffset }]}
@@ -671,32 +702,60 @@ const shadow = Platform.select({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: T.bgSecondary },
-  scroll: { flex: 1 },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#F7F8FA',
+  },
+  backdropTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 340,
+  },
+  backdropBottom: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 280,
+  },
+  scroll: { flex: 1, backgroundColor: 'transparent' },
   content: { paddingHorizontal: 14, gap: 12 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: T.bgSecondary },
   loadingText: { fontSize: 13, fontWeight: '700', color: T.textSecondary },
   hero: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(226, 232, 240, 0.9)',
+    borderColor: 'rgba(255, 255, 255, 0.92)',
     padding: 14,
     gap: 12,
+    overflow: 'hidden',
     ...shadow,
   },
+  glassLayer: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  glassWash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.48)',
+  },
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  heroIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: T.primary, alignItems: 'center', justifyContent: 'center' },
-  heroIconAgile: { backgroundColor: '#8B5CF6' },
+  heroIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  heroIconAgile: {},
   heroTitleWrap: { flex: 1, minWidth: 0 },
   eyebrow: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 1 },
   title: { fontSize: 21, fontWeight: '900', color: '#0F172A', marginTop: 2, letterSpacing: -0.3 },
-  headerIconBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', alignItems: 'center', justifyContent: 'center' },
+  headerIconBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: 'rgba(239, 246, 255, 0.92)', borderWidth: 1, borderColor: 'rgba(191, 219, 254, 0.95)', alignItems: 'center', justifyContent: 'center' },
   progressWrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   progressTrack: { flex: 1, height: 6, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 999, backgroundColor: '#22C55E' },
   progressText: { fontSize: 11, fontWeight: '800', color: T.textSecondary },
   statRow: { flexDirection: 'row', gap: 10 },
-  stat: { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 10, alignItems: 'center' },
+  stat: { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.44)' },
   statValue: { fontSize: 20, fontWeight: '900' },
   statLabel: { fontSize: 10, fontWeight: '800', color: T.textSecondary, letterSpacing: 0.6, textTransform: 'uppercase' },
   createSprintBtn: { height: 42, borderRadius: 12, backgroundColor: T.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
@@ -705,16 +764,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
     borderRadius: 18,
     borderWidth: 1,
     borderColor: 'rgba(226, 232, 240, 0.9)',
     padding: 8,
     ...shadow,
   },
-  searchWrap: { flex: 1, minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  searchWrap: { flex: 1, minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.78)', backgroundColor: 'rgba(248, 250, 252, 0.82)', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
   searchInput: { flex: 1, fontSize: 13, color: '#0F172A', paddingVertical: 0 },
-  filterBtn: { width: 46, height: 46, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  filterBtn: { width: 46, height: 46, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.78)', backgroundColor: 'rgba(248, 250, 252, 0.82)', alignItems: 'center', justifyContent: 'center' },
   filterBtnActive: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   filterLetter: { fontSize: 13, fontWeight: '900', color: '#64748B' },
   filterLetterActive: { color: T.primary },
@@ -722,16 +781,16 @@ const styles = StyleSheet.create({
   errorTitle: { fontSize: 13, fontWeight: '900', color: '#991B1B' },
   errorText: { fontSize: 12, fontWeight: '700', color: '#B91C1C', marginTop: 2 },
   sections: { gap: 14 },
-  section: { backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.9)', padding: 12, gap: 10, ...shadow },
+  section: { backgroundColor: 'rgba(255, 255, 255, 0.88)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.9)', padding: 12, gap: 10, ...shadow },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   sectionTitle: { fontSize: 15, fontWeight: '900', color: '#0F172A' },
   sectionSub: { fontSize: 11, fontWeight: '700', color: '#94A3B8', marginTop: 2 },
-  smallPrimary: { width: 34, height: 34, borderRadius: 10, backgroundColor: T.primary, alignItems: 'center', justifyContent: 'center' },
+  smallPrimary: { width: 34, height: 34, borderRadius: 10, backgroundColor: T.primary, alignItems: 'center', justifyContent: 'center', ...Platform.select({ ios: { shadowColor: T.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8 }, android: { elevation: 3 } }) },
   mutedLine: { fontSize: 12, fontWeight: '700', color: '#94A3B8', textAlign: 'center', paddingVertical: 16 },
   emptyPanel: { minHeight: 150, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', padding: 18, gap: 8 },
   emptyTitle: { fontSize: 15, fontWeight: '900', color: '#64748B' },
   emptyText: { fontSize: 12, fontWeight: '700', color: '#94A3B8', textAlign: 'center' },
-  taskCard: { flexDirection: 'row', gap: 10, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.9)', backgroundColor: '#FFFFFF', padding: 11, ...shadow },
+  taskCard: { flexDirection: 'row', gap: 10, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.72)', backgroundColor: 'rgba(255, 255, 255, 0.96)', padding: 11, ...shadow },
   taskCardSelected: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   checkBox: { width: 24, height: 24, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginTop: 3 },
   checkBoxActive: { backgroundColor: T.primary, borderColor: T.primary },

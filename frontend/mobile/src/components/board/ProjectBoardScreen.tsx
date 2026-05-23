@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { T, STATUS_MAP, StatusKey } from '../../constants/tokens';
 import {
@@ -77,6 +78,25 @@ function labelStyle(label: BoardLabel) {
     borderColor: `${color}30`,
     color,
   };
+}
+
+function BoardBackdrop() {
+  return (
+    <View pointerEvents="none" style={s.backdrop}>
+      <LinearGradient
+        colors={['rgba(21, 93, 252, 0.16)', 'rgba(34, 197, 94, 0.08)', 'rgba(247, 248, 250, 0)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={s.backdropTop}
+      />
+      <LinearGradient
+        colors={['rgba(139, 92, 246, 0.10)', 'rgba(21, 93, 252, 0.04)', 'rgba(247, 248, 250, 0)']}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={s.backdropBottom}
+      />
+    </View>
+  );
 }
 
 function SearchIcon() {
@@ -612,6 +632,7 @@ export default function ProjectBoardScreen({
   return (
     <SafeAreaView style={s.safe} edges={topOffset ? ['left', 'right'] : ['top', 'left', 'right']}>
       <StatusBar style="dark" />
+      <BoardBackdrop />
 
       <ScrollView
         style={s.scroll}
@@ -620,6 +641,10 @@ export default function ProjectBoardScreen({
         showsVerticalScrollIndicator={false}
       >
         <Animated.View style={[s.hero, { opacity: fade }]}>
+          <View pointerEvents="none" style={s.glassLayer}>
+            <BlurView intensity={28} tint="light" style={StyleSheet.absoluteFill} />
+            <View style={s.glassWash} />
+          </View>
           <View style={s.heroTop}>
             <LinearGradient
               colors={[T.primary, '#4D8BFF']}
@@ -864,18 +889,46 @@ const shadow = Platform.select({
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: T.bgSecondary },
-  scroll: { flex: 1, backgroundColor: T.bgSecondary },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#F7F8FA',
+  },
+  backdropTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 330,
+  },
+  backdropBottom: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 260,
+  },
+  scroll: { flex: 1, backgroundColor: 'transparent' },
   scrollContent: { paddingTop: 4 },
   hero: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
     marginHorizontal: 14,
     marginTop: 2,
     padding: 14,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(226, 232, 240, 0.9)',
+    borderColor: 'rgba(255, 255, 255, 0.92)',
     gap: 12,
+    overflow: 'hidden',
     ...shadow,
+  },
+  glassLayer: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  glassWash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.48)',
   },
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   boardMark: {
@@ -892,9 +945,9 @@ const s = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 13,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: 'rgba(239, 246, 255, 0.92)',
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: 'rgba(191, 219, 254, 0.95)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -925,9 +978,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
     borderRadius: 14,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'rgba(248, 250, 252, 0.82)',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(226, 232, 240, 0.78)',
   },
   searchInput: { flex: 1, fontSize: 13, color: '#0F172A', paddingVertical: 0 },
   filterBtn: {
@@ -936,9 +989,9 @@ const s = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'rgba(248, 250, 252, 0.82)',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(226, 232, 240, 0.78)',
   },
   filterBtnActive: {
     backgroundColor: '#EFF6FF',
@@ -962,7 +1015,7 @@ const s = StyleSheet.create({
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: '#BFDBFE',
-    backgroundColor: '#F8FBFF',
+    backgroundColor: 'rgba(248, 251, 255, 0.74)',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
@@ -983,10 +1036,10 @@ const s = StyleSheet.create({
 
 const columnStyles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(226, 232, 240, 0.9)',
+    borderColor: 'rgba(255, 255, 255, 0.88)',
     overflow: 'visible',
     minHeight: 360,
     ...shadow,
@@ -1071,10 +1124,10 @@ const columnStyles = StyleSheet.create({
 
 const card = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(226, 232, 240, 0.9)',
+    borderColor: 'rgba(226, 232, 240, 0.72)',
     padding: 13,
     paddingTop: 14,
     zIndex: 1,
