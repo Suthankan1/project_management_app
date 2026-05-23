@@ -3,9 +3,12 @@ package com.planora.backend.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -485,10 +488,47 @@ public class TaskService {
             throw new IllegalArgumentException("A task cannot depend on itself");
         }
 
+        // Check: would adding (taskId -> blockerId) create a cycle?
+        // i.e., is taskId already reachable from blockerId through existing dependencies?
+        if (wouldCreateCycle(blockerId, taskId)) {
+            throw new IllegalArgumentException(
+                    "Adding this dependency would create a circular dependency chain."
+            );
+        }
+
         Task blocker = findTaskWithProjectTeam(blockerId);
         task.getDependencies().add(blocker);
         task.setLastModifiedBy(userRepository.findById(currentUserId).orElseThrow());
         taskRepository.save(task);
+    }
+
+    /**
+     * BFS traversal from startTaskId following dependency edges.
+     * Returns true if targetTaskId is reachable, meaning adding an edge from
+     * targetTaskId to startTaskId would create a cycle.
+     */
+    private boolean wouldCreateCycle(Long startTaskId, Long targetTaskId) {
+        Queue<Long> queue = new LinkedList<>();
+        Set<Long> visited = new HashSet<>();
+        queue.add(startTaskId);
+
+        while (!queue.isEmpty()) {
+            Long current = queue.poll();
+            if (current.equals(targetTaskId)) {
+                return true;
+            }
+
+            if (visited.contains(current)) {
+                continue;
+            }
+            visited.add(current);
+
+            taskRepository.findByIdWithDependencies(current).ifPresent(t ->
+                    t.getDependencies().forEach(dep -> queue.add(dep.getId()))
+            );
+        }
+
+        return false;
     }
 
     //8. REMOVE DEPENDENCY

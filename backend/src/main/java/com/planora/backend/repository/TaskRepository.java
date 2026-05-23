@@ -211,6 +211,9 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("SELECT t.id, d.id, d.title FROM Task t LEFT JOIN t.dependencies d WHERE t.id IN :taskIds")
     List<Object[]> findDependencyRowsByTaskIds(@Param("taskIds") List<Long> taskIds);
 
+    @Query("SELECT t FROM Task t LEFT JOIN FETCH t.dependencies WHERE t.id = :id")
+    java.util.Optional<Task> findByIdWithDependencies(@Param("id") Long id);
+
     @Query("SELECT COALESCE(MAX(t.projectTaskNumber), 0) FROM Task t WHERE t.project.id = :projectId")
     Long findMaxProjectTaskNumberByProjectId(@Param("projectId") Long projectId);
 
