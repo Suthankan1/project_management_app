@@ -198,13 +198,21 @@ function TaskCard({
 
   return (
     <Animated.View
-      {...panResponder.panHandlers}
       style={[
         card.card,
         isDragging && card.cardDragging,
         { transform: [...drag.getTranslateTransform(), { scale: isDragging ? 1.03 : 1 }] },
       ]}
     >
+      <TouchableOpacity hitSlop={10} onPress={() => onDelete(task)} style={card.iconBtn}>
+        <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M3 6h18" />
+          <Path d="M8 6V4h8v2" />
+          <Path d="M19 6l-1 14H6L5 6" />
+        </Svg>
+      </TouchableOpacity>
+
+      <View {...panResponder.panHandlers} style={card.dragSurface}>
         <View style={card.topRow}>
           {priority && task.priority ? (
             <View style={[card.priority, { backgroundColor: priority.bg, borderColor: `${priority.dot}24` }]}>
@@ -213,14 +221,6 @@ function TaskCard({
             </View>
           ) : <View />}
         </View>
-
-        <TouchableOpacity hitSlop={10} onPress={() => onDelete(task)} style={card.iconBtn}>
-          <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-            <Path d="M3 6h18" />
-            <Path d="M8 6V4h8v2" />
-            <Path d="M19 6l-1 14H6L5 6" />
-          </Svg>
-        </TouchableOpacity>
 
         <Text style={card.title} numberOfLines={3}>{task.title}</Text>
 
@@ -272,6 +272,8 @@ function TaskCard({
             </View>
           )}
         </View>
+
+      </View>
     </Animated.View>
   );
 }
@@ -1075,9 +1077,11 @@ const card = StyleSheet.create({
     borderColor: 'rgba(226, 232, 240, 0.9)',
     padding: 13,
     paddingTop: 14,
-    gap: 10,
     zIndex: 1,
     ...shadow,
+  },
+  dragSurface: {
+    gap: 10,
   },
   cardDragging: {
     borderColor: T.primary,
@@ -1110,7 +1114,10 @@ const card = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    zIndex: 10,
   },
   title: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 20 },
   description: { fontSize: 12, color: '#64748B', lineHeight: 17 },
