@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Label, DateFilter } from '../../kanban/types';
 import { TeamMemberOption } from '../../kanban/api';
 import DateRangeFilter from '../../kanban/components/DateRangeFilter';
-import { ChevronDown, Search, X, Layers, Tag, User, Filter } from 'lucide-react';
+import { Archive, ChevronDown, Search, X, Layers, Tag, User, Filter } from 'lucide-react';
 
 const STATUS_OPTIONS = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 
@@ -261,13 +261,14 @@ export default function BacklogFilterBar({
             </button>
 
             <button
-                onClick={() => setShowArchived(!showArchived)}
-                className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                onClick={() => setShowArchived(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border transition-colors ${
                     showArchived
-                        ? 'bg-amber-50 border-amber-300 text-amber-700'
-                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                        ? 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-400'
+                        : 'border-border text-muted-foreground hover:border-gray-400'
                 }`}
             >
+                <Archive className="w-3.5 h-3.5" />
                 {showArchived ? 'Hide Archived' : 'Show Archived'}
             </button>
         </div>

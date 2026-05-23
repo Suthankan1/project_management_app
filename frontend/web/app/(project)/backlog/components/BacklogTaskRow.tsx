@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Task } from '../../kanban/types';
 import {
     ChevronDown, ArrowUp, ArrowRight, ArrowDown, Minus,
-    MoreHorizontal
+    Archive, ArchiveRestore, MoreHorizontal
 } from 'lucide-react';
 import { hexToLabelStyle } from '@/components/shared/LabelPicker';
 import AssigneeAvatar from '../../(agile)/sprint-backlog/components/AssigneeAvatar';
@@ -36,8 +36,9 @@ interface BacklogTaskRowProps {
     onClick: (task: Task) => void;
     onStatusChange: (id: number, status: string) => void;
     onOpenModal: (id: number) => void;
-    onArchive?: (id: number) => void;
-    onUnarchive?: (id: number) => void;
+    onArchive?: (id: number) => void | Promise<void>;
+    onUnarchive?: (id: number) => void | Promise<void>;
+    isArchived?: boolean;
     selected?: boolean;
     onToggleSelect?: (id: number) => void;
     onDateChange?: (id: number, dueDate: string | null) => void;
@@ -196,17 +197,33 @@ export default function BacklogTaskRow({
                         >
                             Edit
                         </button>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setMenuOpen(false);
-                                if (task.archived) onUnarchive?.(task.id);
-                                else onArchive?.(task.id);
-                            }}
-                            className="w-full text-left px-3 py-1.5 text-[12px] text-[#374151] hover:bg-[#F9FAFB] transition-colors"
-                        >
-                            {task.archived ? 'Unarchive' : 'Archive task'}
-                        </button>
+                        {!task.parentTaskId && (
+                            !task.archived ? (
+                                <button
+                                    onClick={async (e) => {
+                                        e.stopPropagation();
+                                        setMenuOpen(false);
+                                        await onArchive?.(task.id);
+                                    }}
+                                    className="w-full flex items-center text-left px-3 py-1.5 text-[12px] text-amber-600 hover:bg-[#F9FAFB] transition-colors"
+                                >
+                                    <Archive className="w-4 h-4 mr-2" />
+                                    Archive task
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={async (e) => {
+                                        e.stopPropagation();
+                                        setMenuOpen(false);
+                                        await onUnarchive?.(task.id);
+                                    }}
+                                    className="w-full flex items-center text-left px-3 py-1.5 text-[12px] text-[#374151] hover:bg-[#F9FAFB] transition-colors"
+                                >
+                                    <ArchiveRestore className="w-4 h-4 mr-2" />
+                                    Unarchive task
+                                </button>
+                            )
+                        )}
                         <button
                             onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(task.id); }}
                             className="w-full text-left px-3 py-1.5 text-[12px] text-red-600 hover:bg-red-50 transition-colors"

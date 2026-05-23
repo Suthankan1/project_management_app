@@ -59,6 +59,7 @@ export interface Task {
   reporterName?: string;
   projectId?: number;
   sprintId?: number;
+  parentTaskId?: number | null;
   labels?: Label[];
   labelId?: number;        // single label ID (one label per task per SRS)
   milestoneId?: number;    // milestone ID (new feature — may be null)

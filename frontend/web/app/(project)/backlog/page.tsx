@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
     AlertCircle, Plus, ChevronDown, ChevronUp,
-    Check, Trash2, MoreHorizontal, X, CornerDownLeft
+    Archive, Check, Trash2, MoreHorizontal, X, CornerDownLeft
 } from 'lucide-react';
 import CreateTaskModal from '@/components/shared/CreateTaskModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,7 +15,8 @@ import BacklogTaskRow from './components/BacklogTaskRow';
 import BacklogFilterBar from './components/BacklogFilterBar';
 import BacklogTaskDetail from './components/BacklogTaskDetail';
 import { useBacklogData } from './hooks/useBacklogData';
-import { fetchProject } from '../kanban/api';
+import { fetchProject, getArchivedTasks, TaskResponseDTO, unarchiveTask } from '../kanban/api';
+import { toast } from '@/components/ui';
 export default function BacklogPage() {
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -51,8 +52,10 @@ export default function BacklogPage() {
     const [inlineTitle, setInlineTitle] = useState('');
     const [inlineTitleLength, setInlineTitleLength] = useState(0);
     const [showArchived, setShowArchived] = useState(false);
+    const [archivedTasks, setArchivedTasks] = useState<TaskResponseDTO[]>([]);
+    const [archivedLoading, setArchivedLoading] = useState(false);
     const {
-        tasks, archivedTasks, loading, error, collapsedGroups, toggleGroup,
+        tasks, loading, error, collapsedGroups, toggleGroup,
         selectedTask, setSelectedTask,
         selectedTaskIdForModal, setSelectedTaskIdForModal,
         showCreateModal, setShowCreateModal,
@@ -70,7 +73,41 @@ export default function BacklogPage() {
         handleStatusChange, handleBulkDelete, handleBulkDone,
         handleArchiveTask, handleUnarchiveTask,
         toggleSelect, loadTasks, handleDateChange
-    } = useBacklogData(projectId, showArchived);
+    } = useBacklogData(projectId);
+
+    const loadArchivedTasks = useCallback(async () => {
+        if (!showArchived || !projectId) return;
+        setArchivedLoading(true);
+        try {
+            const data = await getArchivedTasks(Number(projectId));
+            setArchivedTasks(data);
+        } catch {
+            toast('Failed to load archived tasks', 'error');
+        } finally {
+            setArchivedLoading(false);
+        }
+    }, [showArchived, projectId]);
+
+    useEffect(() => {
+        void loadArchivedTasks();
+    }, [loadArchivedTasks]);
+
+    const handleArchiveTaskFromRow = useCallback(async (id: number) => {
+        await handleArchiveTask(id);
+        if (showArchived) void loadArchivedTasks();
+    }, [handleArchiveTask, loadArchivedTasks, showArchived]);
+
+    const handleUnarchiveArchivedTask = useCallback(async (id: number) => {
+        const task = archivedTasks.find(t => t.id === id);
+        setArchivedTasks(prev => prev.filter(t => t.id !== id));
+        try {
+            await unarchiveTask(id);
+            await loadTasks({ showSpinner: false, forceNetwork: true });
+        } catch {
+            if (task) setArchivedTasks(prev => prev.some(t => t.id === id) ? prev : [...prev, task]);
+            toast('Failed to unarchive task', 'error');
+        }
+    }, [archivedTasks, loadTasks]);
 
     // Handle action triggers from TopBar (e.g. ?action=add-task)
     useEffect(() => {
@@ -222,7 +259,7 @@ export default function BacklogPage() {
                                             onClick={setSelectedTask}
                                             onStatusChange={handleStatusChange}
                                             onOpenModal={setSelectedTaskIdForModal}
-                                            onArchive={handleArchiveTask}
+                                            onArchive={handleArchiveTaskFromRow}
                                             onUnarchive={handleUnarchiveTask}
                                             selected={selectedIds.has(task.id)}
                                             onToggleSelect={toggleSelect}
@@ -303,32 +340,21 @@ export default function BacklogPage() {
             ))}
 
             {showArchived && (
-                <div className="bg-white rounded-2xl border border-amber-200 overflow-hidden mb-4 shadow-sm">
-                    <div className="sticky-section-header w-full flex items-center gap-3 px-4 py-3 border-b border-amber-100 bg-amber-50/60">
-                        <span className="text-[13px] font-semibold text-amber-800">Archived Tasks</span>
-                        <span className="text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                            {archivedTasks.length}
-                        </span>
+                <div className="mt-6">
+                    <div className="flex items-center gap-2 mb-3 px-2">
+                        <Archive className="w-4 h-4 text-amber-500" />
+                        <h3 className="text-sm font-medium text-muted-foreground">
+                            Archived Tasks ({archivedTasks.length})
+                        </h3>
                     </div>
-
-                    {archivedTasks.length === 0 ? (
-                        <EmptyState
-                            icon={<MoreHorizontal size={24} />}
-                            title="No archived tasks"
-                            subtitle="Archived tasks will appear here when you need them."
-                        />
+                    {archivedLoading ? (
+                        <div className="text-sm text-muted-foreground px-4 py-2">Loading...</div>
+                    ) : archivedTasks.length === 0 ? (
+                        <div className="text-sm text-muted-foreground px-4 py-8 text-center">
+                            No archived tasks
+                        </div>
                     ) : (
-                        <div className="flex flex-col gap-[5px] p-3 sm:p-4">
-                            <div className="hidden sm:grid grid-cols-[auto_1.5fr_140px_110px_130px_110px_120px_32px] items-center gap-x-2 px-3 sm:px-4 text-[10px] font-semibold uppercase tracking-wider text-[#9CA3AF] mb-1">
-                                <span className="w-3.5" />
-                                <span>Title</span>
-                                <span>Label</span>
-                                <span>Priority</span>
-                                <span>Status</span>
-                                <span>Assignee</span>
-                                <span>Due Date</span>
-                                <span />
-                            </div>
+                        <div className="opacity-60 flex flex-col gap-[5px]">
                             {archivedTasks.map(task => (
                                 <BacklogTaskRow
                                     key={task.id}
@@ -337,8 +363,9 @@ export default function BacklogPage() {
                                     onClick={setSelectedTask}
                                     onStatusChange={handleStatusChange}
                                     onOpenModal={setSelectedTaskIdForModal}
-                                    onArchive={handleArchiveTask}
-                                    onUnarchive={handleUnarchiveTask}
+                                    onArchive={handleArchiveTaskFromRow}
+                                    onUnarchive={handleUnarchiveArchivedTask}
+                                    isArchived
                                     selected={false}
                                     onDateChange={handleDateChange}
                                 />

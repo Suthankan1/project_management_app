@@ -1,10 +1,20 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Task, Label, DateFilter } from '../../kanban/types';
-import { fetchTasksByProject, fetchProjectLabels, fetchProject, fetchTeamMembers, TeamMemberOption } from '../../kanban/api';
+import {
+    archiveTask,
+    fetchTasksByProject,
+    fetchProjectLabels,
+    fetchProject,
+    fetchTeamMembers,
+    getArchivedTasks,
+    TeamMemberOption,
+    unarchiveTask,
+} from '../../kanban/api';
 import api from '@/lib/axios';
 import { useTaskWebSocket } from '@/hooks/useTaskWebSocket';
 import { type CreateTaskData } from '@/components/shared/CreateTaskModal';
 import { buildSessionCacheKey, getSessionCache, setSessionCache, removeSessionCache } from '@/lib/session-cache';
+import { toast } from '@/components/ui';
 
 export function useBacklogData(projectId: string | null, showArchived = false) {
 
@@ -96,8 +106,8 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         const pid = parseInt(projectId, 10);
         if (isNaN(pid)) return;
         try {
-            const res = await api.get(`/api/tasks/project/${pid}/archived`);
-            setArchivedTasks(res.data as Task[]);
+            const data = await getArchivedTasks(pid);
+            setArchivedTasks(data as Task[]);
         } catch (err) {
             console.error('Error loading archived backlog tasks:', err);
         }
@@ -228,14 +238,15 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         const archivedTask = tasks.find(t => t.id === id);
         setTasks(prev => prev.filter(t => t.id !== id));
         try {
-            const res = await api.patch(`/api/tasks/${id}/archive`);
+            const res = await archiveTask(id);
             if (showArchived) {
-                setArchivedTasks(prev => [...prev.filter(t => t.id !== id), res.data as Task]);
+                setArchivedTasks(prev => [...prev.filter(t => t.id !== id), res as Task]);
             }
             forceRefresh();
             void fetchArchivedData();
         } catch {
             if (archivedTask) setTasks(prev => prev.some(t => t.id === id) ? prev : [...prev, archivedTask]);
+            toast('Failed to archive task', 'error');
             forceRefresh();
         }
     }, [tasks, showArchived, forceRefresh, fetchArchivedData]);
@@ -244,12 +255,13 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         const task = archivedTasks.find(t => t.id === id);
         setArchivedTasks(prev => prev.filter(t => t.id !== id));
         try {
-            const res = await api.patch(`/api/tasks/${id}/unarchive`);
-            setTasks(prev => prev.some(t => t.id === id) ? prev : [...prev, res.data as Task]);
+            const res = await unarchiveTask(id);
+            setTasks(prev => prev.some(t => t.id === id) ? prev : [...prev, res as Task]);
             forceRefresh();
             void fetchArchivedData();
         } catch {
             if (task) setArchivedTasks(prev => prev.some(t => t.id === id) ? prev : [...prev, task]);
+            toast('Failed to unarchive task', 'error');
             forceRefresh();
         }
     }, [archivedTasks, forceRefresh, fetchArchivedData]);
