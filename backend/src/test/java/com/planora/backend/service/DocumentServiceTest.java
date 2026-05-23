@@ -15,6 +15,7 @@ import com.planora.backend.model.TeamMember;
 import com.planora.backend.model.TeamRole;
 import com.planora.backend.model.User;
 import com.planora.backend.repository.DocumentFolderRepository;
+import com.planora.backend.repository.DocumentFolderPermissionRepository;
 import com.planora.backend.repository.DocumentRepository;
 import com.planora.backend.repository.DocumentVersionRepository;
 import com.planora.backend.repository.ProjectRepository;
@@ -50,6 +51,8 @@ class DocumentServiceTest {
     private DocumentVersionRepository documentVersionRepository;
     @Mock
     private DocumentFolderRepository documentFolderRepository;
+    @Mock
+    private DocumentFolderPermissionRepository folderPermissionRepository;
     @Mock
     private ProjectRepository projectRepository;
     @Mock
