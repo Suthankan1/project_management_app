@@ -340,8 +340,9 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
       open={handlers.showEditSprintModal}
       sprintName={sprint.name}
       loading={handlers.editingSprintLoading}
+      error={handlers.editSprintError}
       onConfirm={handlers.confirmEditSprint}
-      onCancel={() => handlers.setShowEditSprintModal(false)}
+      onCancel={() => { handlers.setShowEditSprintModal(false); handlers.setEditSprintError(''); }}
     />
 
     {/* ── Delete Sprint Confirmation ── */}

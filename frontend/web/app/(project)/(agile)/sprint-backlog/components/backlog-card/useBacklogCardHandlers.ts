@@ -72,6 +72,7 @@ export function useBacklogCardHandlers({
 
   const [showEditSprintModal, setShowEditSprintModal] = useState(false);
   const [editingSprintLoading, setEditingSprintLoading] = useState(false);
+  const [editSprintError, setEditSprintError] = useState('');
 
   const [goalText, setGoalText] = useState(sprint.goal ?? '');
   const [editingGoal, setEditingGoal] = useState(false);
@@ -225,18 +226,27 @@ export function useBacklogCardHandlers({
     try {
       await api.put(`/api/sprints/${sprint.id}`, { name });
       sprint.name = name;
-    } catch { /* silent */ } finally {
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast(axiosErr?.response?.data?.message || 'Failed to rename sprint.', 'error');
+    } finally {
       setEditingSprintLoading(false);
     }
   };
 
   const confirmEditSprint = async (newName: string) => {
     setEditingSprintLoading(true);
+    setEditSprintError('');
     try {
       await api.put(`/api/sprints/${sprint.id}`, { name: newName });
       setShowEditSprintModal(false);
       sprint.name = newName;
-    } catch { /* silent */ } finally {
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      const msg = axiosErr?.response?.data?.message || 'Failed to edit sprint.';
+      setEditSprintError(msg);
+      toast(msg, 'error');
+    } finally {
       setEditingSprintLoading(false);
     }
   };
@@ -329,6 +339,7 @@ export function useBacklogCardHandlers({
     completingSprintLoading,
     showEditSprintModal, setShowEditSprintModal,
     editingSprintLoading,
+    editSprintError, setEditSprintError,
     goalText, setGoalText,
     editingGoal, setEditingGoal,
     savingGoal,

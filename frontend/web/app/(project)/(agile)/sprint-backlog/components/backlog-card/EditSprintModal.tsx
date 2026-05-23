@@ -9,13 +9,14 @@ interface EditSprintModalProps {
   open: boolean;
   sprintName: string;
   loading: boolean;
+  error?: string;
   onConfirm: (name: string) => void;
   onCancel: () => void;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function EditSprintModal({ open, sprintName, loading, onConfirm, onCancel }: EditSprintModalProps) {
+export default function EditSprintModal({ open, sprintName, loading, error, onConfirm, onCancel }: EditSprintModalProps) {
   const [name, setName] = useState(sprintName);
   const [prevName, setPrevName] = useState(sprintName);
 
@@ -56,9 +57,14 @@ export default function EditSprintModal({ open, sprintName, loading, onConfirm, 
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) onConfirm(name.trim()); }}
             autoFocus
-            className="w-full rounded-lg border border-[#D0D5DD] px-3 py-2.5 text-[14px] text-[#101828] outline-none focus:border-[#175CD3] focus:ring-2 focus:ring-[#175CD3]/20 transition-all duration-150"
+            className={`w-full rounded-lg border ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20' : 'border-[#D0D5DD] focus:border-[#175CD3] focus:ring-[#175CD3]/20'} px-3 py-2.5 text-[14px] text-[#101828] outline-none focus:ring-2 transition-all duration-150`}
             placeholder="Sprint name..."
           />
+          {error && (
+            <p className="mt-2 text-[13px] text-red-600 font-medium animate-in fade-in slide-in-from-top-1 duration-200">
+              {error}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-2.5 border-t border-[#F2F4F7] px-6 py-4">
