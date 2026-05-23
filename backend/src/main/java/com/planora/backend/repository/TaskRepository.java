@@ -238,6 +238,20 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            "AND t.archived = false")
     List<Task> findByIdInWithScalars(@Param("ids") List<Long> ids);
 
+    @Query("SELECT DISTINCT t FROM Task t " +
+           "LEFT JOIN FETCH t.project p " +
+           "LEFT JOIN FETCH p.team pt " +
+           "LEFT JOIN FETCH t.sprint s " +
+           "LEFT JOIN FETCH t.assignee a " +
+           "LEFT JOIN FETCH a.user au " +
+           "LEFT JOIN FETCH t.reporter r " +
+           "LEFT JOIN FETCH r.user ru " +
+           "LEFT JOIN FETCH t.milestone m " +
+           "LEFT JOIN FETCH t.lastModifiedBy " +
+           "WHERE t.id IN :ids " +
+           "AND t.archived = true")
+    List<Task> findArchivedByIdInWithScalars(@Param("ids") List<Long> ids);
+
     @Query("SELECT t.id FROM Task t " +
            "WHERE t.assignee.user.userId = :userId " +
            "AND t.archived = false " +
@@ -264,6 +278,13 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            WHERE t.id IN :taskIds
            """)
     List<Object[]> findDependencyRowsByTaskIds(@Param("taskIds") List<Long> taskIds);
+
+    @Query("""
+           SELECT t.id, d.id
+           FROM Task t
+           JOIN t.dependencies d
+           """)
+    List<Object[]> findAllDependencyRows();
 
     @Query("SELECT t FROM Task t LEFT JOIN FETCH t.dependencies WHERE t.id = :id")
     java.util.Optional<Task> findByIdWithDependencies(@Param("id") Long id);
@@ -313,8 +334,12 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            "AND t.dueDate <= :maxDueDate")
     List<Task> findOpenTasksDueOnOrBeforeWithReminderRelations(@Param("maxDueDate") LocalDate maxDueDate);
 
-    @Query("SELECT DISTINCT t FROM Task t " +
-           "LEFT JOIN FETCH t.assignees " +
+    @Query("SELECT t.id FROM Task t " +
+           "WHERE t.project.id = :projectId AND t.archived = true " +
+           "ORDER BY t.archivedAt DESC")
+    List<Long> findArchivedTaskIdsByProjectId(@Param("projectId") Long projectId);
+
+    @Query("SELECT t FROM Task t " +
            "WHERE t.project.id = :projectId AND t.archived = true " +
            "ORDER BY t.archivedAt DESC")
     List<Task> findArchivedByProjectId(@Param("projectId") Long projectId);

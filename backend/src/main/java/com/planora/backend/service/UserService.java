@@ -31,7 +31,7 @@ import com.planora.backend.model.VerificationToken;
 import com.planora.backend.repository.TokenRepository;
 import com.planora.backend.repository.UserRepository;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.LoadingCache;
+import com.github.benmanes.caffeine.cache.Cache;
 
 import jakarta.transaction.Transactional;
 import org.springframework.cache.annotation.CachePut;
@@ -79,13 +79,20 @@ public class UserService {
     private final Map<String, Object[]> presignedUrlCache = new ConcurrentHashMap<>();
     private static final Duration PRESIGN_TTL = Duration.ofMinutes(55);
 
-    private final LoadingCache<String, LoginAttemptRecord> loginAttemptCache = Caffeine.newBuilder()
+    private final Cache<String, LoginAttemptRecord> loginAttemptCache = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofMinutes(20))
-            .build(email -> new LoginAttemptRecord());
+            .build();
 
-    private static class LoginAttemptRecord {
-        int failedAttempts;
-        Instant lockedUntil;
+    private record LoginAttemptRecord(int failedAttempts, Instant lockedUntil) {
+        boolean isLocked(Instant now) {
+            return lockedUntil != null && now.isBefore(lockedUntil);
+        }
+
+        LoginAttemptRecord recordFailedAttempt(Instant now) {
+            int nextFailedAttempts = failedAttempts + 1;
+            Instant nextLockedUntil = nextFailedAttempts >= 5 ? now.plus(Duration.ofMinutes(15)) : lockedUntil;
+            return new LoginAttemptRecord(nextFailedAttempts, nextLockedUntil);
+        }
     }
 
     public UserService(UserRepository userRepository, JWTService jwtService, AuthenticationManager authenticationManager, TokenRepository tokenRepository, EmailService emailService, S3Client s3Client, S3Presigner s3Presigner) {
@@ -192,9 +199,9 @@ public class UserService {
     @Transactional
     public LoginResponse loginUser(User user) {
         String email = user.getEmail().toLowerCase();
-        LoginAttemptRecord loginAttemptRecord = loginAttemptCache.get(email);
+        LoginAttemptRecord loginAttemptRecord = loginAttemptCache.getIfPresent(email);
 
-        if (loginAttemptRecord.lockedUntil != null && Instant.now().isBefore(loginAttemptRecord.lockedUntil)) {
+        if (loginAttemptRecord != null && loginAttemptRecord.isLocked(Instant.now())) {
             LoginResponse response = new LoginResponse();
             response.setSuccess(false);
             response.setMessage("Account temporarily locked due to too many failed attempts. Try again later.");
@@ -247,9 +254,11 @@ public class UserService {
 
         } catch (AuthenticationException e) {
             // Exception caught: Password does not match hash.
-            loginAttemptRecord.failedAttempts++;
-            if (loginAttemptRecord.failedAttempts >= 5) {
-                loginAttemptRecord.lockedUntil = Instant.now().plus(Duration.ofMinutes(15));
+            LoginAttemptRecord updatedLoginAttemptRecord = loginAttemptCache.asMap().compute(email, (key, record) -> {
+                LoginAttemptRecord currentRecord = record == null ? new LoginAttemptRecord(0, null) : record;
+                return currentRecord.recordFailedAttempt(Instant.now());
+            });
+            if (updatedLoginAttemptRecord.failedAttempts() == 5) {
                 logger.warn("Account locked for email: {}", email);
             }
 

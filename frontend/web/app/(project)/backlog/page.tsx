@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
     AlertCircle, Plus, ChevronDown, ChevronUp,
@@ -15,8 +15,7 @@ import BacklogTaskRow from './components/BacklogTaskRow';
 import BacklogFilterBar from './components/BacklogFilterBar';
 import BacklogTaskDetail from './components/BacklogTaskDetail';
 import { useBacklogData } from './hooks/useBacklogData';
-import { fetchProject, getArchivedTasks, TaskResponseDTO, unarchiveTask } from '../kanban/api';
-import { toast } from '@/components/ui';
+import { fetchProject } from '../kanban/api';
 export default function BacklogPage() {
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -52,10 +51,8 @@ export default function BacklogPage() {
     const [inlineTitle, setInlineTitle] = useState('');
     const [inlineTitleLength, setInlineTitleLength] = useState(0);
     const [showArchived, setShowArchived] = useState(false);
-    const [archivedTasks, setArchivedTasks] = useState<TaskResponseDTO[]>([]);
-    const [archivedLoading, setArchivedLoading] = useState(false);
     const {
-        tasks, loading, error, collapsedGroups, toggleGroup,
+        tasks, archivedTasks, archivedLoading, loading, error, collapsedGroups, toggleGroup,
         selectedTask, setSelectedTask,
         selectedTaskIdForModal, setSelectedTaskIdForModal,
         showCreateModal, setShowCreateModal,
@@ -73,41 +70,7 @@ export default function BacklogPage() {
         handleStatusChange, handleBulkDelete, handleBulkDone,
         handleArchiveTask, handleUnarchiveTask,
         toggleSelect, loadTasks, handleDateChange
-    } = useBacklogData(projectId);
-
-    const loadArchivedTasks = useCallback(async () => {
-        if (!showArchived || !projectId) return;
-        setArchivedLoading(true);
-        try {
-            const data = await getArchivedTasks(Number(projectId));
-            setArchivedTasks(data);
-        } catch {
-            toast('Failed to load archived tasks', 'error');
-        } finally {
-            setArchivedLoading(false);
-        }
-    }, [showArchived, projectId]);
-
-    useEffect(() => {
-        void loadArchivedTasks();
-    }, [loadArchivedTasks]);
-
-    const handleArchiveTaskFromRow = useCallback(async (id: number) => {
-        await handleArchiveTask(id);
-        if (showArchived) void loadArchivedTasks();
-    }, [handleArchiveTask, loadArchivedTasks, showArchived]);
-
-    const handleUnarchiveArchivedTask = useCallback(async (id: number) => {
-        const task = archivedTasks.find(t => t.id === id);
-        setArchivedTasks(prev => prev.filter(t => t.id !== id));
-        try {
-            await unarchiveTask(id);
-            await loadTasks({ showSpinner: false, forceNetwork: true });
-        } catch {
-            if (task) setArchivedTasks(prev => prev.some(t => t.id === id) ? prev : [...prev, task]);
-            toast('Failed to unarchive task', 'error');
-        }
-    }, [archivedTasks, loadTasks]);
+    } = useBacklogData(projectId, showArchived);
 
     // Handle action triggers from TopBar (e.g. ?action=add-task)
     useEffect(() => {
@@ -259,7 +222,7 @@ export default function BacklogPage() {
                                             onClick={setSelectedTask}
                                             onStatusChange={handleStatusChange}
                                             onOpenModal={setSelectedTaskIdForModal}
-                                            onArchive={handleArchiveTaskFromRow}
+                                            onArchive={handleArchiveTask}
                                             onUnarchive={handleUnarchiveTask}
                                             selected={selectedIds.has(task.id)}
                                             onToggleSelect={toggleSelect}
@@ -363,8 +326,8 @@ export default function BacklogPage() {
                                     onClick={setSelectedTask}
                                     onStatusChange={handleStatusChange}
                                     onOpenModal={setSelectedTaskIdForModal}
-                                    onArchive={handleArchiveTaskFromRow}
-                                    onUnarchive={handleUnarchiveArchivedTask}
+                                    onArchive={handleArchiveTask}
+                                    onUnarchive={handleUnarchiveTask}
                                     isArchived
                                     selected={false}
                                     onDateChange={handleDateChange}

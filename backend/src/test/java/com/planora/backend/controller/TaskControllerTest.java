@@ -238,4 +238,51 @@ class TaskControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("My Template"));
     }
+
+    @Test
+    @WithMockUserPrincipal
+    void getArchivedTasks_returnsArchivedTasks() throws Exception {
+        when(service.getArchivedTasks(eq(10L), any())).thenReturn(List.of(sampleTask));
+
+        mockMvc.perform(get("/api/tasks/project/10/archived"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].title").value("Implement login"))
+                .andExpect(jsonPath("$[0].id").value(1));
+
+        verify(service).getArchivedTasks(eq(10L), any());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void archiveTask_archivesAndBroadcasts() throws Exception {
+        when(service.archiveTask(eq(1L), any())).thenReturn(sampleTask);
+
+        mockMvc.perform(patch("/api/tasks/1/archive").with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Implement login"))
+                .andExpect(jsonPath("$.id").value(1));
+
+        verify(service).archiveTask(eq(1L), any());
+        verify(messagingTemplate).convertAndSend(
+                eq("/topic/project/10/tasks"),
+                eq(Map.of("type", "TASK_UPDATED", "task", sampleTask))
+        );
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void unarchiveTask_unarchivesAndBroadcasts() throws Exception {
+        when(service.unarchiveTask(eq(1L), any())).thenReturn(sampleTask);
+
+        mockMvc.perform(patch("/api/tasks/1/unarchive").with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Implement login"))
+                .andExpect(jsonPath("$.id").value(1));
+
+        verify(service).unarchiveTask(eq(1L), any());
+        verify(messagingTemplate).convertAndSend(
+                eq("/topic/project/10/tasks"),
+                eq(Map.of("type", "TASK_UPDATED", "task", sampleTask))
+        );
+    }
 }
