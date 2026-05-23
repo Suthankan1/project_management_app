@@ -1,5 +1,5 @@
 import axios from "axios";
-import { clearTokens, getRefreshToken, getValidToken, getUserFromToken, refreshAccessToken, saveRefreshToken, saveToken } from "@/lib/auth";
+import { clearTokens, getRefreshToken, getValidToken, getUserFromToken, refreshAccessToken } from "@/lib/auth";
 
 const api = axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || '',
@@ -34,6 +34,12 @@ api.interceptors.request.use(async (config) => {
     const isAuthEndpoint = authEndpoints.some(endpoint => config.url?.includes(endpoint));
     if (!isAuthEndpoint && typeof window !== 'undefined') {
         try {
+            if (!getValidToken() && getRefreshToken()) {
+                const newToken = await refreshAccessToken();
+                config.headers['Authorization'] = `Bearer ${newToken}`;
+                return config;
+            }
+
             const user = getUserFromToken();
             if (user?.exp && (user.exp - Date.now() / 1000) < 60) {
                 const newToken = await refreshAccessToken();
@@ -96,10 +102,7 @@ api.interceptors.response.use(
             }
 
             try {
-                const refreshResponse = await api.post('/api/auth/refresh', { refreshToken });
-                const { token: newAccessToken, refreshToken: newRefreshToken } = refreshResponse.data;
-                saveToken(newAccessToken);
-                saveRefreshToken(newRefreshToken);
+                const newAccessToken = await refreshAccessToken();
                 processQueue(null, newAccessToken);
                 originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
                 return api(originalRequest);

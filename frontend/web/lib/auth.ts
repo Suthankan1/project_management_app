@@ -19,6 +19,8 @@ interface JwtPayload {
     exp?: number;
 }
 
+let refreshAccessTokenPromise: Promise<string> | null = null;
+
 function emitAuthTokenChanged(): void {
     if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event(AUTH_TOKEN_CHANGED_EVENT));
@@ -81,7 +83,6 @@ export function getUserFromToken(): User | null {
         }
 
         if (payload.exp && payload.exp * 1000 <= Date.now()) {
-            clearTokens();
             return null;
         }
 
@@ -196,7 +197,7 @@ export function getValidToken(): string | null {
  * access token (and refresh token if rotated), and returns the new access token.
  * On failure it clears all tokens and throws.
  */
-export async function refreshAccessToken(): Promise<string> {
+async function requestRefreshAccessToken(): Promise<string> {
     const rt = getRefreshToken();
     if (!rt) {
         clearTokens();
@@ -217,8 +218,33 @@ export async function refreshAccessToken(): Promise<string> {
     return data.token;
 }
 
+export function refreshAccessToken(): Promise<string> {
+    if (!refreshAccessTokenPromise) {
+        refreshAccessTokenPromise = requestRefreshAccessToken().finally(() => {
+            refreshAccessTokenPromise = null;
+        });
+    }
+    return refreshAccessTokenPromise;
+}
+
+/**
+ * Returns a usable access token, refreshing it first when the short-lived token
+ * has expired but the 30-day refresh token is still available.
+ */
+export async function ensureValidToken(): Promise<string | null> {
+    const token = getValidToken();
+    if (token) return token;
+
+    if (!getRefreshToken()) return null;
+
+    try {
+        return await refreshAccessToken();
+    } catch {
+        return null;
+    }
+}
+
 /** Alias for clearTokens — clears all auth state and planora: caches. */
 export function logout(): void {
     clearTokens();
 }
-
