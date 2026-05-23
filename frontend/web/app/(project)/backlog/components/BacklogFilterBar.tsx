@@ -23,6 +23,8 @@ interface BacklogFilterBarProps {
     setFilterDateRange: (v: DateFilter) => void;
     groupBy: 'none' | 'status' | 'priority' | 'assignee';
     setGroupBy: React.Dispatch<React.SetStateAction<'none' | 'status' | 'priority' | 'assignee'>>;
+    showArchived: boolean;
+    setShowArchived: React.Dispatch<React.SetStateAction<boolean>>;
     teamMembers: TeamMemberOption[];
     labels: Label[];
 }
@@ -35,6 +37,7 @@ export default function BacklogFilterBar({
     filterLabel, setFilterLabel,
     filterDateRange, setFilterDateRange,
     groupBy, setGroupBy,
+    showArchived, setShowArchived,
     teamMembers, labels,
 }: BacklogFilterBarProps) {
     const [filterOpen, setFilterOpen] = useState(false);
@@ -255,6 +258,17 @@ export default function BacklogFilterBar({
             >
                 <Layers size={13} />
                 {groupBy === 'none' ? 'Group by' : `By ${groupBy}`}
+            </button>
+
+            <button
+                onClick={() => setShowArchived(!showArchived)}
+                className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                    showArchived
+                        ? 'bg-amber-50 border-amber-300 text-amber-700'
+                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                }`}
+            >
+                {showArchived ? 'Hide Archived' : 'Show Archived'}
             </button>
         </div>
     );

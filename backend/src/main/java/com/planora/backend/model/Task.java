@@ -80,6 +80,12 @@ public class Task {
     private LocalDateTime updatedAt;
     private LocalDateTime completedAt;
 
+    @Column(nullable = false)
+    private boolean archived = false;
+
+    @Column(name = "archived_at")
+    private LocalDateTime archivedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reporter_id")
     @JsonIgnore

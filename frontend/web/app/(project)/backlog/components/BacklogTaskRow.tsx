@@ -36,6 +36,8 @@ interface BacklogTaskRowProps {
     onClick: (task: Task) => void;
     onStatusChange: (id: number, status: string) => void;
     onOpenModal: (id: number) => void;
+    onArchive?: (id: number) => void;
+    onUnarchive?: (id: number) => void;
     selected?: boolean;
     onToggleSelect?: (id: number) => void;
     onDateChange?: (id: number, dueDate: string | null) => void;
@@ -43,7 +45,7 @@ interface BacklogTaskRowProps {
 
 export default function BacklogTaskRow({
     task, onDelete, onClick, onStatusChange, onOpenModal,
-    selected, onToggleSelect, onDateChange,
+    onArchive, onUnarchive, selected, onToggleSelect, onDateChange,
 }: BacklogTaskRowProps) {
     const PriorityIcon = task.priority ? (PRIORITY_CONFIG[task.priority]?.icon ?? Minus) : Minus;
     const priorityColor = task.priority ? (PRIORITY_CONFIG[task.priority]?.color ?? '#9CA3AF') : '#9CA3AF';
@@ -193,6 +195,17 @@ export default function BacklogTaskRow({
                             className="w-full text-left px-3 py-1.5 text-[12px] text-[#374151] hover:bg-[#F9FAFB] transition-colors"
                         >
                             Edit
+                        </button>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setMenuOpen(false);
+                                if (task.archived) onUnarchive?.(task.id);
+                                else onArchive?.(task.id);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-[12px] text-[#374151] hover:bg-[#F9FAFB] transition-colors"
+                        >
+                            {task.archived ? 'Unarchive' : 'Archive task'}
                         </button>
                         <button
                             onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(task.id); }}

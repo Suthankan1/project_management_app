@@ -6,9 +6,10 @@ import { useTaskWebSocket } from '@/hooks/useTaskWebSocket';
 import { type CreateTaskData } from '@/components/shared/CreateTaskModal';
 import { buildSessionCacheKey, getSessionCache, setSessionCache, removeSessionCache } from '@/lib/session-cache';
 
-export function useBacklogData(projectId: string | null) {
+export function useBacklogData(projectId: string | null, showArchived = false) {
 
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [archivedTasks, setArchivedTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -87,15 +88,35 @@ export function useBacklogData(projectId: string | null) {
         }
     }, [projectId]);
 
+    const fetchArchivedData = useCallback(async () => {
+        if (!projectId || !showArchived) {
+            setArchivedTasks([]);
+            return;
+        }
+        const pid = parseInt(projectId, 10);
+        if (isNaN(pid)) return;
+        try {
+            const res = await api.get(`/api/tasks/project/${pid}/archived`);
+            setArchivedTasks(res.data as Task[]);
+        } catch (err) {
+            console.error('Error loading archived backlog tasks:', err);
+        }
+    }, [projectId, showArchived]);
+
     const forceRefresh = useCallback(() => void fetchData({ showSpinner: false, forceNetwork: true }), [fetchData]);
 
     useEffect(() => {
         if (!projectId) return;
         void fetchStaticData();
         void fetchData({ showSpinner: true });
+        void fetchArchivedData();
         const id = setInterval(() => void fetchData({ showSpinner: false }), 30_000);
         return () => clearInterval(id);
-    }, [projectId, fetchStaticData, fetchData]);
+    }, [projectId, fetchStaticData, fetchData, fetchArchivedData]);
+
+    useEffect(() => {
+        void fetchArchivedData();
+    }, [fetchArchivedData]);
 
     useEffect(() => {
         const onTaskUpdated = () => void fetchData({ showSpinner: false, forceNetwork: true });
@@ -105,13 +126,26 @@ export function useBacklogData(projectId: string | null) {
 
     useTaskWebSocket(projectId, useCallback((event) => {
         if (event.type === 'TASK_CREATED' && event.task) {
-            setTasks(prev => [...prev.filter(x => x.id !== event.task!.id), event.task as Task]);
+            if (!event.task.archived) {
+                setTasks(prev => [...prev.filter(x => x.id !== event.task!.id), event.task as Task]);
+            }
         } else if (event.type === 'TASK_UPDATED' && event.task) {
-            setTasks(prev => prev.map(x => x.id === event.task!.id ? { ...x, ...event.task } as Task : x));
+            if (event.task.archived) {
+                setTasks(prev => prev.filter(x => x.id !== event.task!.id));
+                if (showArchived) {
+                    setArchivedTasks(prev => [...prev.filter(x => x.id !== event.task!.id), event.task as Task]);
+                }
+            } else {
+                setTasks(prev => prev.some(x => x.id === event.task!.id)
+                    ? prev.map(x => x.id === event.task!.id ? { ...x, ...event.task } as Task : x)
+                    : [...prev, event.task as Task]);
+                setArchivedTasks(prev => prev.filter(x => x.id !== event.task!.id));
+            }
         } else if (event.type === 'TASK_DELETED' && event.taskId) {
             setTasks(prev => prev.filter(x => x.id !== event.taskId));
+            setArchivedTasks(prev => prev.filter(x => x.id !== event.taskId));
         }
-    }, []));
+    }, [showArchived]));
 
     const handleMarkDone = useCallback(async (id: number) => {
         const task = tasks.find(t => t.id === id);
@@ -190,6 +224,36 @@ export function useBacklogData(projectId: string | null) {
         }
     }, [tasks, projectId, forceRefresh]);
 
+    const handleArchiveTask = useCallback(async (id: number) => {
+        const archivedTask = tasks.find(t => t.id === id);
+        setTasks(prev => prev.filter(t => t.id !== id));
+        try {
+            const res = await api.patch(`/api/tasks/${id}/archive`);
+            if (showArchived) {
+                setArchivedTasks(prev => [...prev.filter(t => t.id !== id), res.data as Task]);
+            }
+            forceRefresh();
+            void fetchArchivedData();
+        } catch {
+            if (archivedTask) setTasks(prev => prev.some(t => t.id === id) ? prev : [...prev, archivedTask]);
+            forceRefresh();
+        }
+    }, [tasks, showArchived, forceRefresh, fetchArchivedData]);
+
+    const handleUnarchiveTask = useCallback(async (id: number) => {
+        const task = archivedTasks.find(t => t.id === id);
+        setArchivedTasks(prev => prev.filter(t => t.id !== id));
+        try {
+            const res = await api.patch(`/api/tasks/${id}/unarchive`);
+            setTasks(prev => prev.some(t => t.id === id) ? prev : [...prev, res.data as Task]);
+            forceRefresh();
+            void fetchArchivedData();
+        } catch {
+            if (task) setArchivedTasks(prev => prev.some(t => t.id === id) ? prev : [...prev, task]);
+            forceRefresh();
+        }
+    }, [archivedTasks, forceRefresh, fetchArchivedData]);
+
     const handleBulkDelete = useCallback(async () => {
         const ids = [...selectedIds];
         setTasks(prev => prev.filter(t => !ids.includes(t.id)));
@@ -263,7 +327,7 @@ export function useBacklogData(projectId: string | null) {
     }, [filteredTasks, groupBy]);
 
     return {
-        tasks, loading, error, collapsedGroups, toggleGroup,
+        tasks, archivedTasks, loading, error, collapsedGroups, toggleGroup,
         selectedTask, setSelectedTask,
         selectedTaskIdForModal, setSelectedTaskIdForModal,
         showCreateModal, setShowCreateModal,
@@ -279,6 +343,7 @@ export function useBacklogData(projectId: string | null) {
         filteredTasks, groupedTasks,
         handleMarkDone, handleDelete, handleAddTask,
         handleStatusChange, handleBulkDelete, handleBulkDone,
+        handleArchiveTask, handleUnarchiveTask,
         toggleSelect, loadTasks: fetchData, handleDateChange, forceRefresh,
     };
 }

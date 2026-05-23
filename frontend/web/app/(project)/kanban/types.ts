@@ -48,6 +48,8 @@ export interface Task {
   startDate?: string; // ISO date string
   createdAt?: string;
   updatedAt?: string;
+  archived?: boolean;
+  archivedAt?: string;
   assignee?: Assignee;
   assigneeId?: number;
   assigneeName?: string;
@@ -103,4 +105,3 @@ export interface DateFilter {
   startDate: Date | null;
   endDate: Date | null;
 }
-

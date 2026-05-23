@@ -460,6 +460,57 @@ public class TaskService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
+    public TaskResponseDTO archiveTask(Long taskId, Long currentUserId) {
+        Task task = findTaskWithProjectTeam(taskId);
+        requireMinimumRole(task.getProject().getTeam().getId(), currentUserId, TeamRole.MEMBER);
+        if (task.isArchived()) {
+            return getTaskById(taskId);
+        }
+
+        User actor = userRepository.findById(currentUserId).orElseThrow();
+        task.setArchived(true);
+        task.setArchivedAt(LocalDateTime.now());
+        task.setLastModifiedBy(actor);
+        taskRepository.save(task);
+
+        taskActivityService.logActivity(
+                taskId,
+                TaskActivityType.UPDATED,
+                actor.getUsername(),
+                "Task archived");
+        return getTaskById(taskId);
+    }
+
+    @Transactional
+    public TaskResponseDTO unarchiveTask(Long taskId, Long currentUserId) {
+        Task task = findTaskWithProjectTeam(taskId);
+        requireMinimumRole(task.getProject().getTeam().getId(), currentUserId, TeamRole.MEMBER);
+
+        User actor = userRepository.findById(currentUserId).orElseThrow();
+        task.setArchived(false);
+        task.setArchivedAt(null);
+        task.setLastModifiedBy(actor);
+        taskRepository.save(task);
+
+        taskActivityService.logActivity(
+                taskId,
+                TaskActivityType.UPDATED,
+                actor.getUsername(),
+                "Task unarchived");
+        return getTaskById(taskId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaskResponseDTO> getArchivedTasks(Long projectId, Long currentUserId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+        requireMinimumRole(project.getTeam().getId(), currentUserId, TeamRole.MEMBER);
+        return taskRepository.findArchivedByProjectId(projectId).stream()
+                .map(task -> getTaskById(task.getId()))
+                .collect(Collectors.toList());
+    }
+
     // ── 6. CREATE SUB TASK ──────────────────────────────────────────────────────
 
     @Transactional
@@ -1075,6 +1126,8 @@ public class TaskService {
         dto.setCreatedAt(task.getCreatedAt());
         dto.setUpdatedAt(task.getUpdatedAt());
         dto.setCompletedAt(task.getCompletedAt());
+        dto.setArchived(task.isArchived());
+        dto.setArchivedAt(task.getArchivedAt());
 
         if(task.getSprint() != null){
             dto.setSprintId(task.getSprint().getId());

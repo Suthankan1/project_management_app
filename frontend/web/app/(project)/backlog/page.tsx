@@ -50,8 +50,9 @@ export default function BacklogPage() {
     ] = useState(false);
     const [inlineTitle, setInlineTitle] = useState('');
     const [inlineTitleLength, setInlineTitleLength] = useState(0);
+    const [showArchived, setShowArchived] = useState(false);
     const {
-        tasks, loading, error, collapsedGroups, toggleGroup,
+        tasks, archivedTasks, loading, error, collapsedGroups, toggleGroup,
         selectedTask, setSelectedTask,
         selectedTaskIdForModal, setSelectedTaskIdForModal,
         showCreateModal, setShowCreateModal,
@@ -67,8 +68,9 @@ export default function BacklogPage() {
         groupedTasks,
         handleMarkDone, handleDelete, handleAddTask,
         handleStatusChange, handleBulkDelete, handleBulkDone,
+        handleArchiveTask, handleUnarchiveTask,
         toggleSelect, loadTasks, handleDateChange
-    } = useBacklogData(projectId);
+    } = useBacklogData(projectId, showArchived);
 
     // Handle action triggers from TopBar (e.g. ?action=add-task)
     useEffect(() => {
@@ -153,6 +155,7 @@ export default function BacklogPage() {
                 filterLabel={filterLabel} setFilterLabel={setFilterLabel}
                 filterDateRange={filterDateRange} setFilterDateRange={setFilterDateRange}
                 groupBy={groupBy} setGroupBy={setGroupBy}
+                showArchived={showArchived} setShowArchived={setShowArchived}
                 teamMembers={teamMembers} labels={labels}
             />
 
@@ -219,6 +222,8 @@ export default function BacklogPage() {
                                             onClick={setSelectedTask}
                                             onStatusChange={handleStatusChange}
                                             onOpenModal={setSelectedTaskIdForModal}
+                                            onArchive={handleArchiveTask}
+                                            onUnarchive={handleUnarchiveTask}
                                             selected={selectedIds.has(task.id)}
                                             onToggleSelect={toggleSelect}
                                             onDateChange={handleDateChange}
@@ -296,6 +301,52 @@ export default function BacklogPage() {
                 </AnimatePresence>
               </div>
             ))}
+
+            {showArchived && (
+                <div className="bg-white rounded-2xl border border-amber-200 overflow-hidden mb-4 shadow-sm">
+                    <div className="sticky-section-header w-full flex items-center gap-3 px-4 py-3 border-b border-amber-100 bg-amber-50/60">
+                        <span className="text-[13px] font-semibold text-amber-800">Archived Tasks</span>
+                        <span className="text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                            {archivedTasks.length}
+                        </span>
+                    </div>
+
+                    {archivedTasks.length === 0 ? (
+                        <EmptyState
+                            icon={<MoreHorizontal size={24} />}
+                            title="No archived tasks"
+                            subtitle="Archived tasks will appear here when you need them."
+                        />
+                    ) : (
+                        <div className="flex flex-col gap-[5px] p-3 sm:p-4">
+                            <div className="hidden sm:grid grid-cols-[auto_1.5fr_140px_110px_130px_110px_120px_32px] items-center gap-x-2 px-3 sm:px-4 text-[10px] font-semibold uppercase tracking-wider text-[#9CA3AF] mb-1">
+                                <span className="w-3.5" />
+                                <span>Title</span>
+                                <span>Label</span>
+                                <span>Priority</span>
+                                <span>Status</span>
+                                <span>Assignee</span>
+                                <span>Due Date</span>
+                                <span />
+                            </div>
+                            {archivedTasks.map(task => (
+                                <BacklogTaskRow
+                                    key={task.id}
+                                    task={{ ...task, archived: true }}
+                                    onDelete={handleDelete}
+                                    onClick={setSelectedTask}
+                                    onStatusChange={handleStatusChange}
+                                    onOpenModal={setSelectedTaskIdForModal}
+                                    onArchive={handleArchiveTask}
+                                    onUnarchive={handleUnarchiveTask}
+                                    selected={false}
+                                    onDateChange={handleDateChange}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* ── Bulk action floating bar ── */}
             {selectedIds.size > 0 && (
