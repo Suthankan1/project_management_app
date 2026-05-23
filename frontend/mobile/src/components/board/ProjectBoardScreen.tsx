@@ -22,6 +22,7 @@ import { BlurView } from 'expo-blur';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { T, STATUS_MAP, StatusKey } from '../../constants/tokens';
 import {
+  BoardMember,
   BoardLabel,
   BoardTask,
   KanbanBoardColumn,
@@ -436,6 +437,9 @@ function buildCalendarCells(monthDate: Date) {
 function DatePickerModal({
   visible,
   task,
+  titleText = 'Due date',
+  subtitleText,
+  selectedDate,
   monthDate,
   saving,
   onChangeMonth,
@@ -445,6 +449,9 @@ function DatePickerModal({
 }: {
   visible: boolean;
   task: BoardTask | null;
+  titleText?: string;
+  subtitleText?: string;
+  selectedDate?: string | null;
   monthDate: Date;
   saving: boolean;
   onChangeMonth: (date: Date) => void;
@@ -452,7 +459,7 @@ function DatePickerModal({
   onSelect: (date: string) => void;
   onClear: () => void;
 }) {
-  const selectedDate = task?.dueDate?.slice(0, 10) ?? null;
+  const activeDate = selectedDate ?? task?.dueDate?.slice(0, 10) ?? null;
   const today = formatDateInput(new Date());
   const monthLabel = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const cells = buildCalendarCells(monthDate);
@@ -467,8 +474,8 @@ function DatePickerModal({
               <CalendarIcon color="#FFFFFF" />
             </View>
             <View style={dateModal.headerText}>
-              <Text style={dateModal.title}>Due date</Text>
-              <Text style={dateModal.subtitle} numberOfLines={1}>{task?.title || 'Task'}</Text>
+              <Text style={dateModal.title}>{titleText}</Text>
+              <Text style={dateModal.subtitle} numberOfLines={1}>{subtitleText || task?.title || 'Task'}</Text>
             </View>
           </View>
 
@@ -499,7 +506,7 @@ function DatePickerModal({
           <View style={dateModal.dayGrid}>
             {cells.map((date, index) => {
               const value = date ? formatDateInput(date) : '';
-              const isSelected = value && value === selectedDate;
+              const isSelected = value && value === activeDate;
               const isToday = value && value === today;
               return (
                 <TouchableOpacity
@@ -540,6 +547,76 @@ function DatePickerModal({
   );
 }
 
+function AssigneePickerModal({
+  visible,
+  members,
+  selectedId,
+  onClose,
+  onSelect,
+}: {
+  visible: boolean;
+  members: BoardMember[];
+  selectedId: number | null;
+  onClose: () => void;
+  onSelect: (id: number | null) => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={modal.safe}>
+        <View style={modal.sheet}>
+          <View style={modal.handle} />
+          <Text style={modal.title}>Assignee</Text>
+          <Text style={modal.subtitle}>Choose who owns this task</Text>
+
+          <TouchableOpacity
+            activeOpacity={0.78}
+            style={[modal.option, selectedId === null && modal.optionActive]}
+            onPress={() => {
+              onSelect(null);
+              onClose();
+            }}
+          >
+            <View style={[modal.optionDot, { backgroundColor: selectedId === null ? T.primary : '#CBD5E1' }]} />
+            <Text style={modal.optionText}>Unassigned</Text>
+            {selectedId === null && <Text style={modal.currentText}>Selected</Text>}
+          </TouchableOpacity>
+
+          {members.map((member) => {
+            const active = selectedId === member.userId;
+            return (
+              <TouchableOpacity
+                key={member.userId}
+                activeOpacity={0.78}
+                style={[modal.option, active && modal.optionActive]}
+                onPress={() => {
+                  onSelect(member.userId);
+                  onClose();
+                }}
+              >
+                <View style={[modal.assigneeAvatar, active && modal.assigneeAvatarActive]}>
+                  <Text style={[modal.assigneeAvatarText, active && modal.assigneeAvatarTextActive]}>{initialsFromName(member.name)}</Text>
+                </View>
+                <Text style={modal.optionText} numberOfLines={1}>{member.name}</Text>
+                {active && <Text style={modal.currentText}>Selected</Text>}
+              </TouchableOpacity>
+            );
+          })}
+
+          {members.length === 0 && (
+            <View style={modal.emptyOption}>
+              <Text style={modal.emptyOptionText}>No members found</Text>
+            </View>
+          )}
+
+          <TouchableOpacity activeOpacity={0.8} onPress={onClose} style={modal.secondaryBtn}>
+            <Text style={modal.secondaryText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
 export default function ProjectBoardScreen({
   projectId,
   projectName,
@@ -554,6 +631,7 @@ export default function ProjectBoardScreen({
     board,
     columns,
     tasks,
+    members,
     loading,
     refreshing,
     error,
@@ -572,9 +650,13 @@ export default function ProjectBoardScreen({
   const [filterSheet, setFilterSheet] = useState<'assignee' | 'priority' | null>(null);
   const [taskTarget, setTaskTarget] = useState<KanbanBoardColumn | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDueDate, setNewTaskDueDate] = useState<string | null>(null);
+  const [newTaskAssigneeId, setNewTaskAssigneeId] = useState<number | null>(null);
   const [newColumnName, setNewColumnName] = useState('');
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showColumnModal, setShowColumnModal] = useState(false);
+  const [showCreateDatePicker, setShowCreateDatePicker] = useState(false);
+  const [showAssigneePicker, setShowAssigneePicker] = useState(false);
   const [dateTask, setDateTask] = useState<BoardTask | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [savingDate, setSavingDate] = useState(false);
@@ -676,6 +758,8 @@ export default function ProjectBoardScreen({
   const openCreateTask = (column: KanbanBoardColumn) => {
     setTaskTarget(column);
     setNewTaskTitle('');
+    setNewTaskDueDate(null);
+    setNewTaskAssigneeId(null);
     setShowTaskModal(true);
   };
 
@@ -702,16 +786,25 @@ export default function ProjectBoardScreen({
     if (!taskTarget || !newTaskTitle.trim()) return;
     setSubmitting(true);
     try {
-      await createTask(newTaskTitle, taskTarget.status);
+      await createTask({
+        title: newTaskTitle,
+        status: taskTarget.status,
+        dueDate: newTaskDueDate,
+        assigneeId: newTaskAssigneeId,
+      });
       setShowTaskModal(false);
       setTaskTarget(null);
       setNewTaskTitle('');
+      setNewTaskDueDate(null);
+      setNewTaskAssigneeId(null);
     } catch {
       Alert.alert('Task not created', 'Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
+
+  const selectedNewTaskAssignee = members.find((member) => member.userId === newTaskAssigneeId);
 
   const submitCreateColumn = async () => {
     if (!newColumnName.trim()) return;
@@ -1015,6 +1108,34 @@ export default function ProjectBoardScreen({
         onClear={() => changeTaskDueDate(null)}
       />
 
+      <DatePickerModal
+        visible={showCreateDatePicker}
+        task={null}
+        titleText="Task due date"
+        subtitleText={newTaskTitle.trim() || 'New task'}
+        selectedDate={newTaskDueDate}
+        monthDate={calendarMonth}
+        saving={false}
+        onChangeMonth={setCalendarMonth}
+        onClose={() => setShowCreateDatePicker(false)}
+        onSelect={(date) => {
+          setNewTaskDueDate(date);
+          setShowCreateDatePicker(false);
+        }}
+        onClear={() => {
+          setNewTaskDueDate(null);
+          setShowCreateDatePicker(false);
+        }}
+      />
+
+      <AssigneePickerModal
+        visible={showAssigneePicker}
+        members={members}
+        selectedId={newTaskAssigneeId}
+        onClose={() => setShowAssigneePicker(false)}
+        onSelect={setNewTaskAssigneeId}
+      />
+
       <Modal visible={showTaskModal} transparent animationType="slide">
         <SafeAreaView style={modal.safe}>
           <View style={modal.sheet}>
@@ -1030,6 +1151,37 @@ export default function ProjectBoardScreen({
               editable={!submitting}
               autoFocus
             />
+            <View style={modal.formRow}>
+              <TouchableOpacity
+                activeOpacity={0.78}
+                onPress={() => {
+                  setCalendarMonth(parseDateInput(newTaskDueDate) || new Date());
+                  setShowCreateDatePicker(true);
+                }}
+                style={modal.formPicker}
+              >
+                <CalendarIcon color={newTaskDueDate ? T.primary : '#64748B'} />
+                <View style={modal.formPickerTextWrap}>
+                  <Text style={modal.formPickerLabel}>Due date</Text>
+                  <Text style={[modal.formPickerValue, newTaskDueDate && modal.formPickerValueActive]}>
+                    {newTaskDueDate ? formatDate(newTaskDueDate) : 'Select date'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.78}
+                onPress={() => setShowAssigneePicker(true)}
+                style={modal.formPicker}
+              >
+                <UserIcon active={!!newTaskAssigneeId} />
+                <View style={modal.formPickerTextWrap}>
+                  <Text style={modal.formPickerLabel}>Assignee</Text>
+                  <Text style={[modal.formPickerValue, selectedNewTaskAssignee && modal.formPickerValueActive]} numberOfLines={1}>
+                    {selectedNewTaskAssignee?.name || 'Unassigned'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity activeOpacity={0.85} disabled={submitting || !newTaskTitle.trim()} onPress={submitCreateTask} style={[modal.primaryBtn, (!newTaskTitle.trim() || submitting) && modal.disabled]}>
               {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={modal.primaryText}>Create task</Text>}
             </TouchableOpacity>
@@ -1463,6 +1615,30 @@ const modal = StyleSheet.create({
   optionDot: { width: 11, height: 11, borderRadius: 6 },
   optionText: { flex: 1, fontSize: 14, fontWeight: '800', color: '#0F172A' },
   currentText: { fontSize: 11, fontWeight: '900', color: T.primary },
+  assigneeAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  assigneeAvatarActive: {
+    backgroundColor: T.primary,
+  },
+  assigneeAvatarText: { fontSize: 10, fontWeight: '900', color: '#64748B' },
+  assigneeAvatarTextActive: { color: '#FFFFFF' },
+  emptyOption: {
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyOptionText: { fontSize: 13, fontWeight: '800', color: '#94A3B8' },
   input: {
     minHeight: 48,
     borderRadius: 12,
@@ -1473,6 +1649,22 @@ const modal = StyleSheet.create({
     fontSize: 14,
     color: '#0F172A',
   },
+  formRow: { gap: 10 },
+  formPicker: {
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  formPickerTextWrap: { flex: 1, minWidth: 0 },
+  formPickerLabel: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 0.7, textTransform: 'uppercase' },
+  formPickerValue: { fontSize: 13, fontWeight: '900', color: '#64748B', marginTop: 2 },
+  formPickerValueActive: { color: '#0F172A' },
   primaryBtn: {
     minHeight: 48,
     borderRadius: 12,
