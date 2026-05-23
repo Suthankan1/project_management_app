@@ -121,6 +121,7 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
         onDeleteSprint={() => handlers.setConfirmDeleteSprint(true)}
         onViewReport={() => handlers.setShowReportModal(true)}
         onNameSave={handlers.handleNameSave}
+        existingSprintNames={existingSprintNames}
         editingSprintLoading={handlers.editingSprintLoading}
       />
 
