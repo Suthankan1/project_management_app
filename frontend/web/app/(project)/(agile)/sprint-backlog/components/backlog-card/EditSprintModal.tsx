@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Pencil, X } from 'lucide-react';
+import { Pencil, X, AlertCircle } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,9 +61,15 @@ export default function EditSprintModal({ open, sprintName, loading, error, onCo
             placeholder="Sprint name..."
           />
           {error && (
-            <p className="mt-2 text-[13px] text-red-600 font-medium animate-in fade-in slide-in-from-top-1 duration-200">
-              {error}
-            </p>
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <AlertCircle size={20} className="mt-0.5 text-red-600" />
+                <div>
+                  <p className="text-[14px] font-semibold text-[#b42318]">Sprint name already exists</p>
+                  <p className="mt-1 text-[13px] leading-5 text-[#991b1b]">{error}</p>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 

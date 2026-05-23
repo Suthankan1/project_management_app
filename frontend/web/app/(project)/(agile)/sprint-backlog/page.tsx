@@ -863,6 +863,7 @@ export default function SprintBacklogPage() {
                           onCreateLabel={handleCreateLabel}
                           onDueDateChange={handleTaskDueDateChange}
                           extraStatuses={sprint.status === 'ACTIVE' ? activeBoardStatuses : []}
+                          existingSprintNames={sprints.map((s) => s.name)}
                         />
                       </motion.div>
                     ))

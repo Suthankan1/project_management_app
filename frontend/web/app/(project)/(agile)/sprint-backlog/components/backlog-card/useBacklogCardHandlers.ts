@@ -38,6 +38,7 @@ interface UseBacklogCardHandlersArgs {
   onRenameTask?: (taskId: number, title: string) => void;
   onDueDateChange?: (taskId: number, dueDate: string) => Promise<void>;
   projectLabels: Array<{ id: number; name: string; color?: string }>;
+  existingSprintNames?: string[];
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -52,6 +53,7 @@ export function useBacklogCardHandlers({
   onRenameTask,
   onDueDateChange,
   projectLabels,
+  existingSprintNames = [],
 }: UseBacklogCardHandlersArgs) {
   const [teamMembers, setTeamMembers] = useState<TeamMemberInfo[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
@@ -235,12 +237,24 @@ export function useBacklogCardHandlers({
   };
 
   const confirmEditSprint = async (newName: string) => {
+    const trimmedName = newName.trim();
+    const currentSprintName = sprint.name.trim().toLowerCase();
+    const hasDuplicateName = existingSprintNames.some((name) => {
+      const normalized = name.trim().toLowerCase();
+      return normalized === trimmedName.toLowerCase() && normalized !== currentSprintName;
+    });
+
+    if (hasDuplicateName) {
+      setEditSprintError('Sprint name already exists.');
+      return;
+    }
+
     setEditingSprintLoading(true);
     setEditSprintError('');
     try {
-      await api.put(`/api/sprints/${sprint.id}`, { name: newName });
+      await api.put(`/api/sprints/${sprint.id}`, { name: trimmedName });
       setShowEditSprintModal(false);
-      sprint.name = newName;
+      sprint.name = trimmedName;
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
       const msg = axiosErr?.response?.data?.message || 'Failed to edit sprint.';
