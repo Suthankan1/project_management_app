@@ -128,6 +128,20 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            "WHERE t.id = :taskId")
     java.util.Optional<Task> findByIdWithDetails(@Param("taskId") Long taskId);
 
+    @Query("SELECT DISTINCT t FROM Task t " +
+           "LEFT JOIN FETCH t.assignees a " +
+           "LEFT JOIN FETCH a.user " +
+           "LEFT JOIN FETCH t.labels " +
+           "LEFT JOIN FETCH t.dependencies " +
+           "LEFT JOIN FETCH t.subTasks st " +
+           "LEFT JOIN FETCH t.reporter rep " +
+           "LEFT JOIN FETCH rep.user " +
+           "LEFT JOIN FETCH t.sprint " +
+           "LEFT JOIN FETCH t.project proj " +
+           "LEFT JOIN FETCH proj.team " +
+           "WHERE t.id = :id")
+    java.util.Optional<Task> findByIdFullyFetched(@Param("id") Long id);
+
     // Server-side filtered tasks for a project
     @Query("SELECT t FROM Task t " +
            "LEFT JOIN FETCH t.project p " +

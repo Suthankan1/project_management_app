@@ -207,7 +207,7 @@ public class TaskService {
     @Transactional(readOnly = true)
     public TaskResponseDTO getTaskById(Long taskId) {
         // Uses a custom @Query to eagerly fetch details and prevent N+1 query performance issues.
-        Task task = taskRepository.findByIdWithDetails(taskId)
+        Task task = taskRepository.findByIdFullyFetched(taskId)
                 .orElseThrow(()-> new ResourceNotFoundException("Task not found"));
         return mapToDTO(task);
     }
