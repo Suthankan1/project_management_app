@@ -27,6 +27,8 @@ import com.planora.backend.model.User;
 import com.planora.backend.model.VerificationToken;
 import com.planora.backend.repository.TokenRepository;
 import com.planora.backend.repository.UserRepository;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 
 import jakarta.transaction.Transactional;
 import org.springframework.cache.annotation.CachePut;
@@ -73,6 +75,15 @@ public class UserService {
      */
     private final Map<String, Object[]> presignedUrlCache = new ConcurrentHashMap<>();
     private static final Duration PRESIGN_TTL = Duration.ofMinutes(55);
+
+    private final LoadingCache<String, LoginAttemptRecord> loginAttemptCache = Caffeine.newBuilder()
+            .expireAfterWrite(Duration.ofMinutes(20))
+            .build(email -> new LoginAttemptRecord());
+
+    private static class LoginAttemptRecord {
+        int failedAttempts;
+        Instant lockedUntil;
+    }
 
     public UserService(UserRepository userRepository, JWTService jwtService, AuthenticationManager authenticationManager, TokenRepository tokenRepository, EmailService emailService, S3Client s3Client, S3Presigner s3Presigner) {
         this.userRepository = userRepository;
@@ -177,20 +188,32 @@ public class UserService {
     // Authenticates a user and issue JWT tokens.
     @Transactional
     public LoginResponse loginUser(User user) {
+        String email = user.getEmail().toLowerCase();
+        LoginAttemptRecord loginAttemptRecord = loginAttemptCache.get(email);
+
+        if (loginAttemptRecord.lockedUntil != null && Instant.now().isBefore(loginAttemptRecord.lockedUntil)) {
+            LoginResponse response = new LoginResponse();
+            response.setSuccess(false);
+            response.setMessage("Account temporarily locked due to too many failed attempts. Try again later.");
+            response.setErrorCode("ACCOUNT_LOCKED");
+            return response;
+        }
+
         try {
             // Step 1: Delegate password checking to Spring Security's AuthenticationManager.
             Authentication authentication =
                     authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(
-                            user.getEmail().toLowerCase(),
+                            email,
                             user.getPassword()));
 
             // Step 2. If auth succeeds, generate JWT.
             if (authentication.isAuthenticated()) {
-                User authenticatedUser = userRepository.findFirstByEmailIgnoreCase(user.getEmail().toLowerCase()).orElse(null);
+                loginAttemptCache.invalidate(email);
+                User authenticatedUser = userRepository.findFirstByEmailIgnoreCase(email).orElse(null);
 
                 // Create short-lived access token and long-lived refresh token.
-                String accessToken  = jwtService.generateToken(user.getEmail().toLowerCase(), authenticatedUser.getUsername(), authenticatedUser.getUserId());
-                String refreshToken = jwtService.generateRefreshToken(user.getEmail().toLowerCase());
+                String accessToken  = jwtService.generateToken(email, authenticatedUser.getUsername(), authenticatedUser.getUserId());
+                String refreshToken = jwtService.generateRefreshToken(email);
 
                 // Store the JTI of the new refresh token for rotation tracking
                 storeRefreshTokenJti(authenticatedUser, refreshToken);
@@ -221,6 +244,12 @@ public class UserService {
 
         } catch (AuthenticationException e) {
             // Exception caught: Password does not match hash.
+            loginAttemptRecord.failedAttempts++;
+            if (loginAttemptRecord.failedAttempts >= 5) {
+                loginAttemptRecord.lockedUntil = Instant.now().plus(Duration.ofMinutes(15));
+                logger.warn("Account locked for email: {}", email);
+            }
+
             LoginResponse response = new LoginResponse();
             response.setSuccess(false);
             response.setMessage("Incorrect username or password");
@@ -753,5 +782,4 @@ public class UserService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }
-
 
