@@ -18,6 +18,8 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../api/axios';
 import { T } from '../../constants/tokens';
+import SpringTouchable from '../ui/SpringTouchable';
+import FadeIn from '../ui/FadeIn';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 

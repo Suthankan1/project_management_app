@@ -19,6 +19,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import api from '../../api/axios';
 import { T } from '../../constants/tokens';
+import SpringTouchable from '../ui/SpringTouchable';
+import FadeIn from '../ui/FadeIn';
+import { getFileIcon } from '../ui/FileIcon';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -50,96 +53,11 @@ function formatBytes(bytes?: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function getFileIcon(contentType?: string): { emoji: string; color: string } {
-  if (!contentType) return { emoji: '📄', color: '#64748B' };
-  if (contentType.includes('pdf')) return { emoji: '📕', color: '#EF4444' };
-  if (contentType.includes('word') || contentType.includes('document'))
-    return { emoji: '📘', color: '#3B82F6' };
-  if (contentType.includes('sheet') || contentType.includes('excel'))
-    return { emoji: '📗', color: '#10B981' };
-  if (contentType.includes('image')) return { emoji: '🖼️', color: '#8B5CF6' };
-  if (contentType.includes('video')) return { emoji: '🎬', color: '#F59E0B' };
-  if (contentType.includes('audio')) return { emoji: '🎵', color: '#EC4899' };
-  if (contentType.includes('zip') || contentType.includes('archive'))
-    return { emoji: '🗜️', color: '#6366F1' };
-  if (contentType.includes('text')) return { emoji: '📝', color: '#155DFC' };
-  return { emoji: '📄', color: '#64748B' };
-}
 
 // ── Micro-animations ──────────────────────────────────────────────────────────
 
-function SpringTouchable({
-  onPress,
-  children,
-  style,
-}: {
-  onPress: () => void;
-  children: React.ReactNode;
-  style?: any;
-}) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const pressIn = () =>
-    Animated.spring(scale, {
-      toValue: 0.96,
-      tension: 600,
-      friction: 12,
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
-  const pressOut = () =>
-    Animated.spring(scale, {
-      toValue: 1,
-      tension: 400,
-      friction: 15,
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
 
-  return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <TouchableOpacity
-        onPress={onPress}
-        onPressIn={pressIn}
-        onPressOut={pressOut}
-        activeOpacity={1}
-        style={style}
-      >
-        {children}
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
 
-function FadeIn({
-  children,
-  delay = 0,
-}: {
-  children: React.ReactNode;
-  delay?: number;
-}) {
-  const op = useRef(new Animated.Value(0)).current;
-  const ty = useRef(new Animated.Value(10)).current;
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(op, {
-        toValue: 1,
-        duration: 300,
-        delay,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      Animated.spring(ty, {
-        toValue: 0,
-        delay,
-        useNativeDriver: Platform.OS !== 'web',
-        tension: 220,
-        friction: 18,
-      }),
-    ]).start();
-  }, [delay]);
-  return (
-    <Animated.View style={{ opacity: op, transform: [{ translateY: ty }] }}>
-      {children}
-    </Animated.View>
-  );
-}
 
 // ── Glass Card ────────────────────────────────────────────────────────────────
 
