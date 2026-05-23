@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
     AlertCircle, Plus, ChevronDown, ChevronUp,
-    Check, Trash2, MoreHorizontal, X, CornerDownLeft
+    Archive, Check, Trash2, MoreHorizontal, X, CornerDownLeft
 } from 'lucide-react';
 import CreateTaskModal from '@/components/shared/CreateTaskModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,7 +15,8 @@ import BacklogTaskRow from './components/BacklogTaskRow';
 import BacklogFilterBar from './components/BacklogFilterBar';
 import BacklogTaskDetail from './components/BacklogTaskDetail';
 import { useBacklogData } from './hooks/useBacklogData';
-import { fetchProject } from '../kanban/api';
+import { fetchProject, getArchivedTasks, TaskResponseDTO, unarchiveTask } from '../kanban/api';
+import { toast } from '@/components/ui';
 export default function BacklogPage() {
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -49,6 +50,10 @@ export default function BacklogPage() {
         showInlineCreate, setShowInlineCreate
     ] = useState(false);
     const [inlineTitle, setInlineTitle] = useState('');
+    const [inlineTitleLength, setInlineTitleLength] = useState(0);
+    const [showArchived, setShowArchived] = useState(false);
+    const [archivedTasks, setArchivedTasks] = useState<TaskResponseDTO[]>([]);
+    const [archivedLoading, setArchivedLoading] = useState(false);
     const {
         tasks, loading, error, collapsedGroups, toggleGroup,
         selectedTask, setSelectedTask,
@@ -66,8 +71,43 @@ export default function BacklogPage() {
         groupedTasks,
         handleMarkDone, handleDelete, handleAddTask,
         handleStatusChange, handleBulkDelete, handleBulkDone,
+        handleArchiveTask, handleUnarchiveTask,
         toggleSelect, loadTasks, handleDateChange
     } = useBacklogData(projectId);
+
+    const loadArchivedTasks = useCallback(async () => {
+        if (!showArchived || !projectId) return;
+        setArchivedLoading(true);
+        try {
+            const data = await getArchivedTasks(Number(projectId));
+            setArchivedTasks(data);
+        } catch {
+            toast('Failed to load archived tasks', 'error');
+        } finally {
+            setArchivedLoading(false);
+        }
+    }, [showArchived, projectId]);
+
+    useEffect(() => {
+        void loadArchivedTasks();
+    }, [loadArchivedTasks]);
+
+    const handleArchiveTaskFromRow = useCallback(async (id: number) => {
+        await handleArchiveTask(id);
+        if (showArchived) void loadArchivedTasks();
+    }, [handleArchiveTask, loadArchivedTasks, showArchived]);
+
+    const handleUnarchiveArchivedTask = useCallback(async (id: number) => {
+        const task = archivedTasks.find(t => t.id === id);
+        setArchivedTasks(prev => prev.filter(t => t.id !== id));
+        try {
+            await unarchiveTask(id);
+            await loadTasks({ showSpinner: false, forceNetwork: true });
+        } catch {
+            if (task) setArchivedTasks(prev => prev.some(t => t.id === id) ? prev : [...prev, task]);
+            toast('Failed to unarchive task', 'error');
+        }
+    }, [archivedTasks, loadTasks]);
 
     // Handle action triggers from TopBar (e.g. ?action=add-task)
     useEffect(() => {
@@ -152,6 +192,7 @@ export default function BacklogPage() {
                 filterLabel={filterLabel} setFilterLabel={setFilterLabel}
                 filterDateRange={filterDateRange} setFilterDateRange={setFilterDateRange}
                 groupBy={groupBy} setGroupBy={setGroupBy}
+                showArchived={showArchived} setShowArchived={setShowArchived}
                 teamMembers={teamMembers} labels={labels}
             />
 
@@ -218,6 +259,8 @@ export default function BacklogPage() {
                                             onClick={setSelectedTask}
                                             onStatusChange={handleStatusChange}
                                             onOpenModal={setSelectedTaskIdForModal}
+                                            onArchive={handleArchiveTaskFromRow}
+                                            onUnarchive={handleUnarchiveTask}
                                             selected={selectedIds.has(task.id)}
                                             onToggleSelect={toggleSelect}
                                             onDateChange={handleDateChange}
@@ -228,29 +271,43 @@ export default function BacklogPage() {
                             <div className="px-3 py-2">
                                 {showInlineCreate ? (
                                     <div className="flex items-center gap-1.5">
-                                        <input
-                                            autoFocus
-                                            type="text"
-                                            value={inlineTitle}
-                                            onChange={e => setInlineTitle(e.target.value)}
-                                            onKeyDown={async e => {
-                                                if (e.key === 'Enter' && inlineTitle.trim()) {
-                                                    await handleAddTask({ title: inlineTitle.trim(), priority: 'MEDIUM', labelIds: [], storyPoint: 0 });
-                                                    setInlineTitle('');
-                                                    setShowInlineCreate(false);
-                                                } else if (e.key === 'Escape') {
-                                                    setInlineTitle('');
-                                                    setShowInlineCreate(false);
-                                                }
-                                            }}
-                                            placeholder="Task title…"
-                                            className="flex-1 text-[13px] px-3 py-1.5 border border-[#D1D5DB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#155DFC]"
-                                        />
+                                        <div className="flex-1">
+                                            <input
+                                                autoFocus
+                                                type="text"
+                                                maxLength={255}
+                                                value={inlineTitle}
+                                                onChange={e => {
+                                                    setInlineTitle(e.target.value);
+                                                    setInlineTitleLength(e.target.value.length);
+                                                }}
+                                                onKeyDown={async e => {
+                                                    if (e.key === 'Enter' && inlineTitle.trim()) {
+                                                        await handleAddTask({ title: inlineTitle.trim(), priority: 'MEDIUM', labelIds: [], storyPoint: 0 });
+                                                        setInlineTitle('');
+                                                        setInlineTitleLength(0);
+                                                        setShowInlineCreate(false);
+                                                    } else if (e.key === 'Escape') {
+                                                        setInlineTitle('');
+                                                        setInlineTitleLength(0);
+                                                        setShowInlineCreate(false);
+                                                    }
+                                                }}
+                                                placeholder="Task title…"
+                                                className="w-full text-[13px] px-3 py-1.5 border border-[#D1D5DB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#155DFC]"
+                                            />
+                                            {inlineTitleLength > 200 && (
+                                                <p className="text-xs text-amber-500 mt-1">
+                                                    {255 - inlineTitleLength} characters remaining
+                                                </p>
+                                            )}
+                                        </div>
                                         <button
                                             onClick={async () => {
                                                 if (inlineTitle.trim()) {
                                                     await handleAddTask({ title: inlineTitle.trim(), priority: 'MEDIUM', labelIds: [], storyPoint: 0 });
                                                     setInlineTitle('');
+                                                    setInlineTitleLength(0);
                                                 }
                                                 setShowInlineCreate(false);
                                             }}
@@ -260,7 +317,7 @@ export default function BacklogPage() {
                                             <CornerDownLeft size={14} />
                                         </button>
                                         <button
-                                            onClick={() => { setInlineTitle(''); setShowInlineCreate(false); }}
+                                            onClick={() => { setInlineTitle(''); setInlineTitleLength(0); setShowInlineCreate(false); }}
                                             className="p-1.5 rounded-lg text-[#6A7282] hover:bg-[#F3F4F6] transition-colors"
                                         >
                                             <X size={14} />
@@ -281,6 +338,42 @@ export default function BacklogPage() {
                 </AnimatePresence>
               </div>
             ))}
+
+            {showArchived && (
+                <div className="mt-6">
+                    <div className="flex items-center gap-2 mb-3 px-2">
+                        <Archive className="w-4 h-4 text-amber-500" />
+                        <h3 className="text-sm font-medium text-muted-foreground">
+                            Archived Tasks ({archivedTasks.length})
+                        </h3>
+                    </div>
+                    {archivedLoading ? (
+                        <div className="text-sm text-muted-foreground px-4 py-2">Loading...</div>
+                    ) : archivedTasks.length === 0 ? (
+                        <div className="text-sm text-muted-foreground px-4 py-8 text-center">
+                            No archived tasks
+                        </div>
+                    ) : (
+                        <div className="opacity-60 flex flex-col gap-[5px]">
+                            {archivedTasks.map(task => (
+                                <BacklogTaskRow
+                                    key={task.id}
+                                    task={{ ...task, archived: true }}
+                                    onDelete={handleDelete}
+                                    onClick={setSelectedTask}
+                                    onStatusChange={handleStatusChange}
+                                    onOpenModal={setSelectedTaskIdForModal}
+                                    onArchive={handleArchiveTaskFromRow}
+                                    onUnarchive={handleUnarchiveArchivedTask}
+                                    isArchived
+                                    selected={false}
+                                    onDateChange={handleDateChange}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* ── Bulk action floating bar ── */}
             {selectedIds.size > 0 && (
@@ -347,4 +440,3 @@ export default function BacklogPage() {
         </div>
     );
 }
-

@@ -138,9 +138,14 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
   if (isEditing) {
     return (
       <div ref={setNodeRef} style={style} className="rounded-lg bg-white border-2 border-blue-400 shadow-lg p-3">
-        <input ref={titleInputRef} type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)}
+        <input ref={titleInputRef} type="text" maxLength={255} value={editTitle} onChange={e => setEditTitle(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') void handleSaveInline(); if (e.key === 'Escape') handleCancelEdit(); }}
           className="w-full text-[13px] font-medium text-gray-800 border-0 border-b border-gray-200 pb-1.5 mb-2 focus:outline-none focus:border-blue-400 bg-transparent" placeholder="Task title..." />
+        {editTitle.length > 200 && (
+          <p className="text-xs text-amber-500 mt-1">
+            {255 - editTitle.length} characters remaining
+          </p>
+        )}
         <div className="mb-2">
           <p className="text-[10px] text-gray-500 font-medium mb-1">Priority</p>
           <div className="flex gap-1">

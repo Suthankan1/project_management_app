@@ -23,6 +23,7 @@ export default function EditTaskModal({
   loading = false,
 }: EditTaskModalProps) {
   const [title, setTitle] = useState('');
+  const [titleLength, setTitleLength] = useState(0);
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [dueDate, setDueDate] = useState<Date | null>(null);
@@ -55,6 +56,7 @@ export default function EditTaskModal({
   useEffect(() => {
     if (task && isOpen) {
       setTitle(task.title || '');
+      setTitleLength((task.title || '').length);
       setDescription(task.description || '');
       setStartDate(task.startDate ? new Date(task.startDate) : null);
       setDueDate(task.dueDate ? new Date(task.dueDate) : null);
@@ -165,12 +167,21 @@ export default function EditTaskModal({
             </label>
             <input
               type="text"
+              maxLength={255}
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setTitleLength(e.target.value.length);
+              }}
               placeholder="What needs to be done?"
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm transition-all duration-200"
               disabled={loading}
             />
+            {titleLength > 200 && (
+              <p className="text-xs text-amber-500 mt-1">
+                {255 - titleLength} characters remaining
+              </p>
+            )}
             {error && (
               <p className="text-red-600 text-xs flex items-center gap-1">
                 <span className="w-4 h-4 bg-red-100 rounded-full flex items-center justify-center">

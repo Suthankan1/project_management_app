@@ -3,9 +3,12 @@ package com.planora.backend.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -356,6 +359,9 @@ public class TaskService {
         //validate user - OWNER or ADMIN only
         Long teamId = task.getProject().getTeam().getId();
         Long projectId = task.getProject().getId();
+        Integer deletedBacklogPos = task.getBacklogPosition();
+        Integer deletedSprintPos = task.getSprintPosition();
+        Long sprintId = task.getSprint() != null ? task.getSprint().getId() : null;
 
         // Step 1. Hard Security Check: Only Owners or Admins can destroy data.
         TeamMember member = requireMinimumRole(teamId, currentUserId, null);
@@ -389,7 +395,15 @@ public class TaskService {
         // Step 3. Delete the task so a failure here prevents ghost notifications.
         taskRepository.delete(task);
 
-        // Step 4. Send out the alerts.
+        // Step 4. Compact list positions after the deleted row is gone.
+        if (deletedBacklogPos != null && sprintId == null) {
+            taskRepository.compactBacklogPositions(projectId, deletedBacklogPos);
+        }
+        if (deletedSprintPos != null && sprintId != null) {
+            taskRepository.compactSprintPositions(sprintId, deletedSprintPos);
+        }
+
+        // Step 5. Send out the alerts.
         for (User recipient : recipients) {
             notificationService.createNotification(recipient, message, taskLink);
         }
@@ -446,6 +460,57 @@ public class TaskService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
+    public TaskResponseDTO archiveTask(Long taskId, Long currentUserId) {
+        Task task = findTaskWithProjectTeam(taskId);
+        requireMinimumRole(task.getProject().getTeam().getId(), currentUserId, TeamRole.MEMBER);
+        if (task.isArchived()) {
+            return getTaskById(taskId);
+        }
+
+        User actor = userRepository.findById(currentUserId).orElseThrow();
+        task.setArchived(true);
+        task.setArchivedAt(LocalDateTime.now());
+        task.setLastModifiedBy(actor);
+        taskRepository.save(task);
+
+        taskActivityService.logActivity(
+                taskId,
+                TaskActivityType.UPDATED,
+                actor.getUsername(),
+                "Task archived");
+        return getTaskById(taskId);
+    }
+
+    @Transactional
+    public TaskResponseDTO unarchiveTask(Long taskId, Long currentUserId) {
+        Task task = findTaskWithProjectTeam(taskId);
+        requireMinimumRole(task.getProject().getTeam().getId(), currentUserId, TeamRole.MEMBER);
+
+        User actor = userRepository.findById(currentUserId).orElseThrow();
+        task.setArchived(false);
+        task.setArchivedAt(null);
+        task.setLastModifiedBy(actor);
+        taskRepository.save(task);
+
+        taskActivityService.logActivity(
+                taskId,
+                TaskActivityType.UPDATED,
+                actor.getUsername(),
+                "Task unarchived");
+        return getTaskById(taskId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaskResponseDTO> getArchivedTasks(Long projectId, Long currentUserId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+        requireMinimumRole(project.getTeam().getId(), currentUserId, TeamRole.MEMBER);
+        return taskRepository.findArchivedByProjectId(projectId).stream()
+                .map(task -> getTaskById(task.getId()))
+                .collect(Collectors.toList());
+    }
+
     // ── 6. CREATE SUB TASK ──────────────────────────────────────────────────────
 
     @Transactional
@@ -485,10 +550,47 @@ public class TaskService {
             throw new IllegalArgumentException("A task cannot depend on itself");
         }
 
+        // Check: would adding (taskId -> blockerId) create a cycle?
+        // i.e., is taskId already reachable from blockerId through existing dependencies?
+        if (wouldCreateCycle(blockerId, taskId)) {
+            throw new IllegalArgumentException(
+                    "Adding this dependency would create a circular dependency chain."
+            );
+        }
+
         Task blocker = findTaskWithProjectTeam(blockerId);
         task.getDependencies().add(blocker);
         task.setLastModifiedBy(userRepository.findById(currentUserId).orElseThrow());
         taskRepository.save(task);
+    }
+
+    /**
+     * BFS traversal from startTaskId following dependency edges.
+     * Returns true if targetTaskId is reachable, meaning adding an edge from
+     * targetTaskId to startTaskId would create a cycle.
+     */
+    private boolean wouldCreateCycle(Long startTaskId, Long targetTaskId) {
+        Queue<Long> queue = new LinkedList<>();
+        Set<Long> visited = new HashSet<>();
+        queue.add(startTaskId);
+
+        while (!queue.isEmpty()) {
+            Long current = queue.poll();
+            if (current.equals(targetTaskId)) {
+                return true;
+            }
+
+            if (visited.contains(current)) {
+                continue;
+            }
+            visited.add(current);
+
+            taskRepository.findByIdWithDependencies(current).ifPresent(t ->
+                    t.getDependencies().forEach(dep -> queue.add(dep.getId()))
+            );
+        }
+
+        return false;
     }
 
     //8. REMOVE DEPENDENCY
@@ -782,7 +884,56 @@ public class TaskService {
             notifyTaskStakeholders(saved, currentUserId, message, "/taskcard?taskId=" + saved.getId());
         }
 
+        // BUG-006 Fix: check if all siblings are done when a subtask is updated
+        checkAndAutoCompleteParent(saved, currentUserId);
+
         return getTaskById(saved.getId());
+    }
+
+    /**
+     * If the just-updated task is a subtask, checks whether all siblings are DONE.
+     * If yes, auto-moves the parent to DONE and logs the activity.
+     */
+    private void checkAndAutoCompleteParent(Task updatedTask, Long actorUserId) {
+        // Only act if this task is a subtask (has a parent)
+        if (updatedTask.getParentTask() == null) return;
+
+        Task parent = updatedTask.getParentTask();
+
+        // Re-fetch subtasks fresh from DB to get current statuses
+        List<Task> siblings = taskRepository.findSubtasksByParentId(parent.getId());
+
+        // If any sibling is not DONE, stop; parent should not auto-complete
+        boolean allDone = siblings.stream()
+                .allMatch(s -> "DONE".equalsIgnoreCase(s.getStatus()));
+
+        if (!allDone) return;
+
+        // All subtasks are done; auto-complete parent if not already done
+        if ("DONE".equalsIgnoreCase(parent.getStatus())) return;
+
+        String oldParentStatus = parent.getStatus();
+        parent.setStatus("DONE");
+        parent.setCompletedAt(LocalDateTime.now());
+        parent.setLastModifiedBy(updatedTask.getLastModifiedBy());
+        taskRepository.save(parent);
+
+        // Log the auto-completion activity
+        taskActivityService.logActivity(
+                parent.getId(),
+                TaskActivityType.STATUS_CHANGED,
+                "System",
+                "Auto-completed: all subtasks are done (was: " + oldParentStatus + ")"
+        );
+
+        // Notify parent task stakeholders
+        String actorName = updatedTask.getLastModifiedBy() != null
+                ? updatedTask.getLastModifiedBy().getUsername()
+                : "System";
+        String message = "Task \"" + parent.getTitle()
+                + "\" was auto-completed — all subtasks are now done.";
+        notifyTaskStakeholders(parent, actorUserId, message,
+                "/taskcard?taskId=" + parent.getId());
     }
 
     //18. UNASSIGN TASK
@@ -975,6 +1126,8 @@ public class TaskService {
         dto.setCreatedAt(task.getCreatedAt());
         dto.setUpdatedAt(task.getUpdatedAt());
         dto.setCompletedAt(task.getCompletedAt());
+        dto.setArchived(task.isArchived());
+        dto.setArchivedAt(task.getArchivedAt());
 
         if(task.getSprint() != null){
             dto.setSprintId(task.getSprint().getId());

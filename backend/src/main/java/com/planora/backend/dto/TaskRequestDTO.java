@@ -21,7 +21,7 @@ public class TaskRequestDTO {
     public interface OnCreate {}
 
     @NotBlank(message = "Task title is required", groups = OnCreate.class)
-    @Size(max = 500, message = "Task title must not exceed 500 characters")
+    @Size(max = 255, message = "Task title must be 255 characters or fewer")
     private String title;
 
     private String description;

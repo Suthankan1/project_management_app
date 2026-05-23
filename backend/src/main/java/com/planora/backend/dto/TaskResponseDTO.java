@@ -22,6 +22,8 @@ public class TaskResponseDTO {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime completedAt;
+    private boolean archived;
+    private LocalDateTime archivedAt;
 
     private Long projectId;
     private String projectName;

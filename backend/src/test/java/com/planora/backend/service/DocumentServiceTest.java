@@ -15,6 +15,7 @@ import com.planora.backend.model.TeamMember;
 import com.planora.backend.model.TeamRole;
 import com.planora.backend.model.User;
 import com.planora.backend.repository.DocumentFolderRepository;
+import com.planora.backend.repository.DocumentFolderPermissionRepository;
 import com.planora.backend.repository.DocumentRepository;
 import com.planora.backend.repository.DocumentVersionRepository;
 import com.planora.backend.repository.ProjectRepository;
@@ -23,6 +24,7 @@ import com.planora.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -49,6 +51,8 @@ class DocumentServiceTest {
     private DocumentVersionRepository documentVersionRepository;
     @Mock
     private DocumentFolderRepository documentFolderRepository;
+    @Mock
+    private DocumentFolderPermissionRepository folderPermissionRepository;
     @Mock
     private ProjectRepository projectRepository;
     @Mock
@@ -306,6 +310,126 @@ class DocumentServiceTest {
         assertTrue(ex.getMessage().contains("no longer available in storage"),
                 "Should return a user-friendly message about the missing file");
         verify(s3StorageService, never()).generatePresignedDownloadUrl(any(), any(), any());
+    }
+
+    @Test
+    void finalizeNewVersionUpload_whenRecentAndSmallChange_updatesLatestVersionInsteadOfCreatingRow() {
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+
+        User uploader = new User();
+        uploader.setUserId(55L);
+        uploader.setUsername("alice");
+
+        Document doc = new Document();
+        doc.setId(10L);
+        doc.setName("notes.txt");
+        doc.setContentType("text/plain");
+        doc.setFileSize(1024L);
+        doc.setLatestVersionNumber(2);
+        doc.setLatestObjectKey("project-5/root/v2-notes.txt");
+        doc.setStatus(DocumentStatus.ACTIVE);
+        doc.setProject(project);
+        doc.setUploadedBy(uploader);
+
+        DocumentVersion latest = new DocumentVersion();
+        latest.setId(99L);
+        latest.setDocument(doc);
+        latest.setVersionNumber(2);
+        latest.setObjectKey("project-5/root/v2-notes.txt");
+        latest.setContentType("text/plain");
+        latest.setFileSize(1024L);
+        latest.setUploadedBy(uploader);
+        latest.setCreatedAt(LocalDateTime.now().minusMinutes(1));
+
+        DocumentUploadFinalizeRequestDTO request = new DocumentUploadFinalizeRequestDTO();
+        request.setFileName("notes.txt");
+        request.setContentType("text/plain");
+        request.setFileSize(1200L);
+        request.setObjectKey("project-5/root/v2b-notes.txt");
+
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(12L, 55L)).thenReturn(Optional.of(member));
+        when(documentRepository.findByIdAndProjectId(10L, 5L)).thenReturn(Optional.of(doc));
+        doNothing().when(s3StorageService).validateFileRequest(any(), any(), any(), anyLong(), any());
+        doNothing().when(s3StorageService).verifyObjectExists(any(), anyString());
+        when(documentVersionRepository.findByObjectKey("project-5/root/v2b-notes.txt")).thenReturn(Optional.empty());
+        when(userRepository.findById(55L)).thenReturn(Optional.of(uploader));
+        when(documentVersionRepository.findTopByDocumentIdOrderByVersionNumberDesc(10L)).thenReturn(Optional.of(latest));
+        when(documentVersionRepository.save(any(DocumentVersion.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(documentRepository.save(any(Document.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(s3StorageService.generatePresignedDownloadUrl(any(), anyString(), any())).thenReturn("https://download");
+
+        DocumentResponseDTO result = documentService.finalizeNewVersionUpload(5L, 10L, 55L, request);
+
+        assertEquals(2, result.getLatestVersionNumber());
+        assertEquals("project-5/root/v2b-notes.txt", doc.getLatestObjectKey());
+        assertEquals("project-5/root/v2b-notes.txt", latest.getObjectKey());
+        assertEquals(1200L, latest.getFileSize());
+        verify(documentVersionRepository).save(latest);
+        verify(documentRepository).save(doc);
+        verify(documentVersionRepository, times(1)).save(any(DocumentVersion.class));
+    }
+
+    @Test
+    void finalizeNewVersionUpload_whenContentSizeChangesSignificantly_createsNewVersion() {
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+
+        User uploader = new User();
+        uploader.setUserId(55L);
+        uploader.setUsername("alice");
+
+        Document doc = new Document();
+        doc.setId(10L);
+        doc.setName("notes.txt");
+        doc.setContentType("text/plain");
+        doc.setFileSize(1024L);
+        doc.setLatestVersionNumber(2);
+        doc.setLatestObjectKey("project-5/root/v2-notes.txt");
+        doc.setStatus(DocumentStatus.ACTIVE);
+        doc.setProject(project);
+        doc.setUploadedBy(uploader);
+
+        DocumentVersion latest = new DocumentVersion();
+        latest.setId(99L);
+        latest.setDocument(doc);
+        latest.setVersionNumber(2);
+        latest.setObjectKey("project-5/root/v2-notes.txt");
+        latest.setContentType("text/plain");
+        latest.setFileSize(1024L);
+        latest.setUploadedBy(uploader);
+        latest.setCreatedAt(LocalDateTime.now().minusMinutes(1));
+
+        DocumentUploadFinalizeRequestDTO request = new DocumentUploadFinalizeRequestDTO();
+        request.setFileName("notes.txt");
+        request.setContentType("text/plain");
+        request.setFileSize(1600L);
+        request.setObjectKey("project-5/root/v3-notes.txt");
+
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(12L, 55L)).thenReturn(Optional.of(member));
+        when(documentRepository.findByIdAndProjectId(10L, 5L)).thenReturn(Optional.of(doc));
+        doNothing().when(s3StorageService).validateFileRequest(any(), any(), any(), anyLong(), any());
+        doNothing().when(s3StorageService).verifyObjectExists(any(), anyString());
+        when(documentVersionRepository.findByObjectKey("project-5/root/v3-notes.txt")).thenReturn(Optional.empty());
+        when(userRepository.findById(55L)).thenReturn(Optional.of(uploader));
+        when(documentVersionRepository.findTopByDocumentIdOrderByVersionNumberDesc(10L)).thenReturn(Optional.of(latest));
+        when(documentVersionRepository.save(any(DocumentVersion.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(documentRepository.save(any(Document.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(s3StorageService.generatePresignedDownloadUrl(any(), anyString(), any())).thenReturn("https://download");
+
+        DocumentResponseDTO result = documentService.finalizeNewVersionUpload(5L, 10L, 55L, request);
+
+        ArgumentCaptor<DocumentVersion> versionCaptor = ArgumentCaptor.forClass(DocumentVersion.class);
+        verify(documentVersionRepository).save(versionCaptor.capture());
+        DocumentVersion savedVersion = versionCaptor.getValue();
+
+        assertEquals(3, result.getLatestVersionNumber());
+        assertEquals(3, savedVersion.getVersionNumber());
+        assertEquals("project-5/root/v3-notes.txt", savedVersion.getObjectKey());
+        assertEquals("project-5/root/v3-notes.txt", doc.getLatestObjectKey());
+        verify(documentRepository).save(doc);
     }
 
     @Test

@@ -47,6 +47,7 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
   const [isOpen, setIsOpen] = useState(true);
   const [showCreateTaskBox, setShowCreateTaskBox] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
+  const [newTaskNameLength, setNewTaskNameLength] = useState(0);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const createTaskRef = useRef<HTMLFormElement | null>(null);
 
@@ -244,6 +245,7 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
                 if (!newTaskName.trim()) { setShowCreateTaskBox(false); return; }
                 onCreateTask(newTaskName.trim(), sprint.id);
                 setNewTaskName('');
+                setNewTaskNameLength(0);
                 setShowCreateTaskBox(false);
               }}
               className="mt-2 group relative flex items-center gap-3 rounded-lg border-2 border-[#175CD3] bg-white px-3 py-1.5 transition-all duration-200"
@@ -251,20 +253,32 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
               <div className="h-5 w-5 flex-shrink-0 rounded border-2 border-[#D0D5DD] opacity-50" />
               <ChevronDown size={16} className="text-[#98A2B3] opacity-50" />
 
-              <input
-                type="text"
-                value={newTaskName}
-                onChange={(e) => setNewTaskName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    setShowCreateTaskBox(false);
-                    setNewTaskName('');
-                  }
-                }}
-                placeholder="Task name"
-                autoFocus
-                className="flex-1 min-w-0 bg-transparent text-[12px] font-medium text-[#101828] outline-none placeholder-[#98A2B3]"
-              />
+              <div className="flex-1 min-w-0">
+                <input
+                  type="text"
+                  maxLength={255}
+                  value={newTaskName}
+                  onChange={(e) => {
+                    setNewTaskName(e.target.value);
+                    setNewTaskNameLength(e.target.value.length);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setShowCreateTaskBox(false);
+                      setNewTaskName('');
+                      setNewTaskNameLength(0);
+                    }
+                  }}
+                  placeholder="Task name"
+                  autoFocus
+                  className="w-full bg-transparent text-[12px] font-medium text-[#101828] outline-none placeholder-[#98A2B3]"
+                />
+                {newTaskNameLength > 200 && (
+                  <p className="text-xs text-amber-500 mt-1">
+                    {255 - newTaskNameLength} characters remaining
+                  </p>
+                )}
+              </div>
               
               <button
                 type="submit"

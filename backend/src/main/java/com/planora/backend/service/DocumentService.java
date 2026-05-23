@@ -1,6 +1,7 @@
 package com.planora.backend.service;
 
 import com.planora.backend.dto.*;
+import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.*;
 import com.planora.backend.repository.*;
@@ -15,7 +16,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -30,6 +35,8 @@ public class DocumentService {
     private static final Logger logger = LoggerFactory.getLogger(DocumentService.class);
 
     private static final long MAX_FILE_SIZE_BYTES = 100L * 1024 * 1024;
+    private static final long VERSION_MIN_INTERVAL_MINUTES = 5;
+    private static final long VERSION_MIN_SIZE_DELTA_BYTES = 512;
 
     // Security: Presigned URLs are only valid for a short window. If the client doesn't
     // complete the upload/download in 15 minutes, they have to request a new URL.
@@ -53,6 +60,7 @@ public class DocumentService {
     private final DocumentRepository documentRepository;
     private final DocumentVersionRepository documentVersionRepository;
     private final DocumentFolderRepository documentFolderRepository;
+    private final DocumentFolderPermissionRepository folderPermissionRepository;
     private final ProjectRepository projectRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
@@ -77,7 +85,8 @@ public class DocumentService {
         // Step 3: Validate the target folder exists and isn't deleted.
         Long folderId = request.getFolderId();
         if (folderId != null) {
-            resolveFolder(projectId, folderId);
+            DocumentFolder folder = resolveFolder(projectId, folderId);
+            requireFolderPermission(folder.getId(), member, "WRITE");
         }
 
         // Step 4: Generate a collision-free path in our S3 bucket.
@@ -112,6 +121,7 @@ public class DocumentService {
         // request twice, we just return the existing document instead of crashing.
         DocumentVersion existingVersion = documentVersionRepository.findByObjectKey(request.getObjectKey()).orElse(null);
         if (existingVersion != null) {
+            requireDocumentFolderPermission(existingVersion.getDocument(), member, "WRITE");
             return mapDocument(existingVersion.getDocument(), true);
         }
 
@@ -119,6 +129,9 @@ public class DocumentService {
         Project project = getProject(projectId);
         User uploader = getUser(userId);
         DocumentFolder folder = resolveFolder(projectId, request.getFolderId());
+        if (folder != null) {
+            requireFolderPermission(folder.getId(), member, "WRITE");
+        }
 
         // Step 6: Create the parent Document record.
         Document document = new Document();
@@ -167,7 +180,8 @@ public class DocumentService {
         validateFileRequest(fileName, resolvedContentType, file.getSize());
 
         if (folderId != null) {
-            resolveFolder(projectId, folderId);
+            DocumentFolder folder = resolveFolder(projectId, folderId);
+            requireFolderPermission(folder.getId(), member, "WRITE");
         }
 
         String objectKey = buildObjectKey(projectId, folderId, fileName);
@@ -202,6 +216,7 @@ public class DocumentService {
         if (document.getStatus() == DocumentStatus.SOFT_DELETED) {
             throw new RuntimeException("Cannot upload new version for a deleted document");
         }
+        requireDocumentFolderPermission(document, member, "WRITE");
 
         validateFileRequest(request.getFileName(), request.getContentType(), request.getFileSize());
 
@@ -225,6 +240,7 @@ public class DocumentService {
         if (document.getStatus() == DocumentStatus.SOFT_DELETED) {
             throw new RuntimeException("Cannot create new version for a deleted document");
         }
+        requireDocumentFolderPermission(document, member, "WRITE");
 
         validateFileRequest(request.getFileName(), request.getContentType(), request.getFileSize());
         validateObjectKeyOwnership(projectId, request.getObjectKey());
@@ -241,6 +257,41 @@ public class DocumentService {
         }
 
         User uploader = getUser(userId);
+
+        // BUG-010 Fix: Deduplication - only create a new version if enough
+        // time has passed or content changed significantly.
+        Optional<DocumentVersion> latestVersion =
+                documentVersionRepository.findTopByDocumentIdOrderByVersionNumberDesc(documentId);
+
+        if (latestVersion.isPresent()) {
+            DocumentVersion latest = latestVersion.get();
+            boolean enoughTimePassed = latest.getCreatedAt() != null
+                    && Duration.between(latest.getCreatedAt(), LocalDateTime.now()).toMinutes() >= VERSION_MIN_INTERVAL_MINUTES;
+            boolean contentChanged = request.getFileSize() != null
+                    && latest.getFileSize() != null
+                    && Math.abs(request.getFileSize() - latest.getFileSize()) >= VERSION_MIN_SIZE_DELTA_BYTES;
+
+            if (!enoughTimePassed && !contentChanged) {
+                // Not enough time and not enough change - update the existing version
+                // rather than creating a new record. This collapses rapid autosave bursts.
+                latest.setObjectKey(request.getObjectKey());
+                latest.setContentType(request.getContentType());
+                latest.setFileSize(request.getFileSize());
+                latest.setUploadedBy(uploader);
+                documentVersionRepository.save(latest);
+
+                // Keep the parent document pointed at the latest content.
+                document.setLatestObjectKey(request.getObjectKey());
+                document.setContentType(request.getContentType());
+                document.setFileSize(request.getFileSize());
+                document.setUploadedBy(uploader);
+                documentRepository.save(document);
+
+                logger.debug("DocumentService: version dedup - updated existing version {} for doc {}",
+                        latest.getVersionNumber(), documentId);
+                return mapDocument(document, true);
+            }
+        }
 
         // Step 2: Calculate the next version number safely.
         int nextVersion = documentVersionRepository.findTopByDocumentIdOrderByVersionNumberDesc(documentId)
@@ -270,11 +321,12 @@ public class DocumentService {
 
     @Transactional(readOnly = true)
     public List<DocumentResponseDTO> listDocuments(Long projectId, Long userId, Long folderId, boolean includeDeleted) {
-        getProjectMember(projectId, userId);
+        TeamMember member = getProjectMember(projectId, userId);
 
         List<Document> documents;
         if (folderId != null) {
-            resolveFolder(projectId, folderId);
+            DocumentFolder folder = resolveFolder(projectId, folderId);
+            requireFolderPermission(folder.getId(), member, "READ");
             // If they want trash included, don't filter by status. Otherwise, only get ACTIVE.
             documents = includeDeleted
                     ? documentRepository.findByProjectIdAndFolderIdOrderByCreatedAtDesc(projectId, folderId)
@@ -286,24 +338,31 @@ public class DocumentService {
                     : documentRepository.findByProjectIdAndStatusOrderByCreatedAtDesc(projectId, DocumentStatus.ACTIVE);
         }
 
-        return documents.stream().limit(200).map(document -> mapDocument(document, false)).toList();
+        return documents.stream()
+                .filter(document -> hasDocumentFolderPermission(document, member, "READ"))
+                .limit(200)
+                .map(document -> mapDocument(document, false))
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public DocumentResponseDTO getDocumentById(Long projectId, Long documentId, Long userId) {
-        getProjectMember(projectId, userId);
-        return mapDocument(getDocument(projectId, documentId), true);
+        TeamMember member = getProjectMember(projectId, userId);
+        Document document = getDocument(projectId, documentId);
+        requireDocumentFolderPermission(document, member, "READ");
+        return mapDocument(document, true);
     }
 
     // Generates a temporary, secure URL for the user to download the file directly from S3.
     @Transactional(readOnly = true)
     public String getDownloadUrl(Long projectId, Long documentId, Long userId) {
-        getProjectMember(projectId, userId);
+        TeamMember member = getProjectMember(projectId, userId);
 
         Document document = getDocument(projectId, documentId);
         if (document.getStatus() == DocumentStatus.SOFT_DELETED) {
             throw new ResourceNotFoundException("Document is deleted");
         }
+        requireDocumentFolderPermission(document, member, "READ");
 
         // Safety check: Ensure the file wasn't manually deleted in the AWS console by an admin.
         try {
@@ -316,8 +375,9 @@ public class DocumentService {
 
     @Transactional(readOnly = true)
     public List<DocumentVersionResponseDTO> getVersions(Long projectId, Long documentId, Long userId) {
-        getProjectMember(projectId, userId);
-        getDocument(projectId, documentId);
+        TeamMember member = getProjectMember(projectId, userId);
+        Document document = getDocument(projectId, documentId);
+        requireDocumentFolderPermission(document, member, "READ");
 
         return documentVersionRepository.findByDocumentIdOrderByVersionNumberDesc(documentId)
                 .stream()
@@ -335,6 +395,7 @@ public class DocumentService {
         if (document.getStatus() == DocumentStatus.SOFT_DELETED) {
             throw new RuntimeException("Cannot update deleted document");
         }
+        requireDocumentFolderPermission(document, member, "WRITE");
 
         if (request.getName() != null && !request.getName().isBlank()) {
             document.setName(normalizeFileName(request.getName()));
@@ -343,6 +404,7 @@ public class DocumentService {
         // Moving the document to a new folder
         if (request.getFolderId() != null) {
             DocumentFolder folder = resolveFolder(projectId, request.getFolderId());
+            requireFolderPermission(folder.getId(), member, "WRITE");
             document.setFolder(folder);
         }
 
@@ -376,9 +438,11 @@ public class DocumentService {
         Document document = getDocument(projectId, documentId);
         document.setStatus(DocumentStatus.ACTIVE);
         document.setDeletedAt(null);
-        documentRepository.save(document);
+        document.setUpdatedAt(LocalDateTime.now());
+        Document saved = documentRepository.saveAndFlush(document);
 
-        return mapDocument(document, true);
+        logger.info("Document id={} restored to ACTIVE by userId={}", documentId, userId);
+        return mapDocument(saved, true);
     }
 
     // Hard Delete: Completely wipes the document
@@ -414,6 +478,9 @@ public class DocumentService {
         Project project = getProject(projectId);
         User user = getUser(userId);
         DocumentFolder parent = resolveFolder(projectId, request.getParentFolderId());
+        if (parent != null) {
+            requireFolderPermission(parent.getId(), member, "WRITE");
+        }
         String normalizedName = normalizeFolderName(request.getName());
 
         // Prevent users from making two folders named "Financials" in the exact same directory.
@@ -432,15 +499,18 @@ public class DocumentService {
         folder.setParentFolder(parent);
         folder.setCreatedBy(user);
 
-        return mapFolder(documentFolderRepository.save(folder));
+        DocumentFolder savedFolder = documentFolderRepository.save(folder);
+        seedDefaultFolderPermissions(savedFolder, user);
+        return mapFolder(savedFolder);
     }
 
     @Transactional(readOnly = true)
     public List<DocumentFolderResponseDTO> listFolders(Long projectId, Long userId) {
-        getProjectMember(projectId, userId);
+        TeamMember member = getProjectMember(projectId, userId);
         // Only return folders that haven't been soft-deleted.
         return documentFolderRepository.findByProjectIdAndDeletedAtIsNullOrderByCreatedAtAsc(projectId)
                 .stream()
+                .filter(folder -> hasFolderPermission(folder.getId(), member, "READ"))
                 .map(this::mapFolder)
                 .toList();
     }
@@ -451,11 +521,13 @@ public class DocumentService {
         requireNotViewer(member);
 
         DocumentFolder folder = resolveFolder(projectId, folderId);
+        requireFolderPermission(folder.getId(), member, "MANAGE");
         String normalizedName = normalizeFolderName(request.getName());
 
         DocumentFolder parent = null;
         if (request.getParentFolderId() != null) {
             parent = resolveFolder(projectId, request.getParentFolderId());
+            requireFolderPermission(parent.getId(), member, "WRITE");
             // Infinite loop prevention: A folder cannot be placed inside itself.
             if (parent.getId().equals(folderId)) {
                 throw new RuntimeException("Folder cannot be its own parent");
@@ -488,6 +560,38 @@ public class DocumentService {
 
         DocumentFolder folder = resolveFolder(projectId, folderId);
         softDeleteFolderRecursive(folder);
+    }
+
+    @Transactional
+    public void updateFolderPermissions(Long projectId, Long folderId, Long userId, List<FolderPermissionRequest> permissions) {
+        TeamMember member = getProjectMember(projectId, userId);
+        requireOwnerOrAdmin(member);
+
+        DocumentFolder folder = resolveFolder(projectId, folderId);
+        User grantedBy = getUser(userId);
+
+        if (permissions == null) {
+            throw new RuntimeException("permissions are required");
+        }
+
+        for (FolderPermissionRequest request : permissions) {
+            TeamRole role = parseTeamRole(request.teamRole());
+            if (role == TeamRole.OWNER) {
+                continue;
+            }
+
+            folderPermissionRepository.deleteByFolderIdAndTeamRole(folder.getId(), role);
+
+            for (String permission : normalizePermissions(request.permissions())) {
+                folderPermissionRepository.save(DocumentFolderPermission.builder()
+                        .folder(folder)
+                        .teamRole(role)
+                        .permission(permission)
+                        .grantedBy(grantedBy)
+                        .grantedAt(LocalDateTime.now())
+                        .build());
+            }
+        }
     }
 
     // Recursive helper: Digs through the tree structure and soft-deletes every child folder
@@ -530,6 +634,105 @@ public class DocumentService {
         if (member.getRole() != TeamRole.OWNER && member.getRole() != TeamRole.ADMIN) {
             throw new AccessDeniedException("Only OWNER or ADMIN can perform this action");
         }
+    }
+
+    /**
+     * Throws ForbiddenException if the given team member does not have
+     * the required permission on the specified folder.
+     * MANAGE implies WRITE which implies READ.
+     */
+    private void requireFolderPermission(Long folderId, TeamMember member, String requiredPermission) {
+        if (!hasFolderPermission(folderId, member, requiredPermission)) {
+            throw new ForbiddenException("You do not have " + requiredPermission + " access to this folder.");
+        }
+    }
+
+    private void requireDocumentFolderPermission(Document document, TeamMember member, String requiredPermission) {
+        if (document.getFolder() != null) {
+            requireFolderPermission(document.getFolder().getId(), member, requiredPermission);
+        }
+    }
+
+    private boolean hasDocumentFolderPermission(Document document, TeamMember member, String requiredPermission) {
+        return document.getFolder() == null || hasFolderPermission(document.getFolder().getId(), member, requiredPermission);
+    }
+
+    private boolean hasFolderPermission(Long folderId, TeamMember member, String requiredPermission) {
+        TeamRole role = member.getRole();
+        // OWNER always has all permissions.
+        if (role == TeamRole.OWNER) {
+            return true;
+        }
+
+        List<String> grantedPermissions = folderPermissionRepository
+                .findByFolderIdAndTeamRole(folderId, role)
+                .stream()
+                .map(DocumentFolderPermission::getPermission)
+                .toList();
+
+        return switch (requiredPermission) {
+            case "READ" -> grantedPermissions.contains("READ")
+                    || grantedPermissions.contains("WRITE")
+                    || grantedPermissions.contains("MANAGE");
+            case "WRITE" -> grantedPermissions.contains("WRITE")
+                    || grantedPermissions.contains("MANAGE");
+            case "MANAGE" -> grantedPermissions.contains("MANAGE");
+            default -> false;
+        };
+    }
+
+    private void seedDefaultFolderPermissions(DocumentFolder folder, User grantedBy) {
+        List<DocumentFolderPermission> permissions = new ArrayList<>();
+        addFolderPermission(permissions, folder, TeamRole.ADMIN, "MANAGE", grantedBy);
+        addFolderPermission(permissions, folder, TeamRole.MEMBER, "READ", grantedBy);
+        addFolderPermission(permissions, folder, TeamRole.MEMBER, "WRITE", grantedBy);
+        addFolderPermission(permissions, folder, TeamRole.VIEWER, "READ", grantedBy);
+        folderPermissionRepository.saveAll(permissions);
+    }
+
+    private void addFolderPermission(
+            List<DocumentFolderPermission> permissions,
+            DocumentFolder folder,
+            TeamRole role,
+            String permission,
+            User grantedBy
+    ) {
+        permissions.add(DocumentFolderPermission.builder()
+                .folder(folder)
+                .teamRole(role)
+                .permission(permission)
+                .grantedBy(grantedBy)
+                .grantedAt(LocalDateTime.now())
+                .build());
+    }
+
+    private TeamRole parseTeamRole(String teamRole) {
+        if (teamRole == null || teamRole.isBlank()) {
+            throw new RuntimeException("teamRole is required");
+        }
+
+        try {
+            return TeamRole.valueOf(teamRole.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new RuntimeException("Invalid teamRole: " + teamRole);
+        }
+    }
+
+    private Set<String> normalizePermissions(Collection<String> permissions) {
+        Set<String> normalizedPermissions = new HashSet<>();
+        if (permissions == null) {
+            return normalizedPermissions;
+        }
+
+        for (String permission : permissions) {
+            String normalized = permission == null ? "" : permission.trim().toUpperCase();
+            if (!Set.of("READ", "WRITE", "MANAGE").contains(normalized)) {
+                throw new RuntimeException("Invalid folder permission: " + permission);
+            }
+            normalizedPermissions.add(normalized);
+        }
+
+        return normalizedPermissions;
     }
 
     private void validateFileRequest(String fileName, String contentType, Long fileSize) {
