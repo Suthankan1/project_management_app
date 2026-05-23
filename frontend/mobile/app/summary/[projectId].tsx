@@ -14,6 +14,8 @@ import ProjectBoardScreen from '../../src/components/board/ProjectBoardScreen';
 import ProjectSprintBoardScreen from '../../src/components/board/ProjectSprintBoardScreen';
 import MobileBacklogScreen from '../../src/components/backlog/MobileBacklogScreen';
 import { useProjectSummary } from '../../src/hooks/useProjectSummary';
+import MobilePagesScreen from '../../src/components/pages/MobilePagesScreen';
+import MobileDocsScreen from '../../src/components/docs/MobileDocsScreen';
 
 /** Height of the nav bar = padding top (8) + title row (56) + tab row (48) + padding bottom (12) */
 const NAV_INNER_HEIGHT = 124; // matches ProjectTopNav.tsx exactly
@@ -82,6 +84,24 @@ export default function ProjectRoute() {
             projectId={numericId}
             projectName={name}
             topOffset={navHeight + 16}
+          />
+        );
+      }
+      if (activeMoreTab === 'pages') {
+        return (
+          <MobilePagesScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight}
+          />
+        );
+      }
+      if (activeMoreTab === 'docs') {
+        return (
+          <MobileDocsScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight}
           />
         );
       }
