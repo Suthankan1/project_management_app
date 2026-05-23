@@ -35,6 +35,7 @@ interface BacklogCardProps {
   projectLabels?: Array<{ id: number; name: string; color?: string }>;
   onCreateLabel?: (name: string) => Promise<{ id: number; name: string; color?: string }>;
   extraStatuses?: Array<{ value: string; label: string }>;
+  existingSprintNames?: string[];
 }
 
 type SprintStatus = 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
@@ -43,7 +44,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTask, onCreateTask, onDeleteTask, onToggleTask, onSprintDeleted, onStatusChange, onStoryPointsChange, onAssignTask, onRenameTask, onDueDateChange, projectLabels = [], onCreateLabel, extraStatuses = [] }: BacklogCardProps) {
+function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTask, onCreateTask, onDeleteTask, onToggleTask, onSprintDeleted, onStatusChange, onStoryPointsChange, onAssignTask, onRenameTask, onDueDateChange, projectLabels = [], onCreateLabel, extraStatuses = [], existingSprintNames = [] }: BacklogCardProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [showCreateTaskBox, setShowCreateTaskBox] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
@@ -65,6 +66,7 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
     onRenameTask,
     onDueDateChange,
     projectLabels,
+    existingSprintNames,
   });
 
   const totals = useMemo(() => {
@@ -120,6 +122,7 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
         onDeleteSprint={() => handlers.setConfirmDeleteSprint(true)}
         onViewReport={() => handlers.setShowReportModal(true)}
         onNameSave={handlers.handleNameSave}
+        existingSprintNames={existingSprintNames}
         editingSprintLoading={handlers.editingSprintLoading}
       />
 
@@ -340,8 +343,9 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
       open={handlers.showEditSprintModal}
       sprintName={sprint.name}
       loading={handlers.editingSprintLoading}
+      error={handlers.editSprintError}
       onConfirm={handlers.confirmEditSprint}
-      onCancel={() => handlers.setShowEditSprintModal(false)}
+      onCancel={() => { handlers.setShowEditSprintModal(false); handlers.setEditSprintError(''); }}
     />
 
     {/* ── Delete Sprint Confirmation ── */}

@@ -1,37 +1,54 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+/**
+ * Mobile documents explorer with dark navy glassmorphism and liquid-glass cards.
+ * Design: gradient backdrop, aurora blobs, blurred controls, SVG icons, and staggered rows.
+ * Performance: parallel initial fetch, memoized filters, callback-stable actions, skeleton loading.
+ * CI/CD note: scoped to this file only; no token, API, navigation, test, or workflow changes.
+ */
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleProp,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Platform,
-  Animated,
-  Linking,
+  View,
+  ViewStyle,
 } from 'react-native';
-import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle, Path } from 'react-native-svg';
 import api from '../../api/axios';
 import { T } from '../../constants/tokens';
 
 const { width: SW } = Dimensions.get('window');
+const GLASS = {
+  border: 'rgba(255,255,255,0.20)',
+  text: 'rgba(255,255,255,0.88)',
+  secondary: 'rgba(255,255,255,0.38)',
+  muted: 'rgba(255,255,255,0.25)',
+  placeholder: 'rgba(255,255,255,0.28)',
+};
+const BG_GRADIENT = ['#080C24', '#0C1530', '#080C24'] as const;
+const GRADIENT_START = { x: 0, y: 0 } as const;
+const GRADIENT_END = { x: 1, y: 1 } as const;
+const useNativeDriver = Platform.OS !== 'web';
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
-interface DocFolder {
+export interface DocFolder {
   id: number;
   name: string;
   parentFolderId?: number | null;
   documentCount?: number;
 }
 
-interface DocItem {
+export interface DocItem {
   id: number;
   name: string;
   contentType?: string;
@@ -41,1253 +58,789 @@ interface DocItem {
   folderId?: number | null;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+interface MobileDocsScreenProps {
+  projectId: number;
+  projectName?: string;
+  topOffset?: number;
+}
 
-function formatBytes(bytes?: number): string {
-  if (!bytes) return '—';
+interface GlassIconButtonProps {
+  icon: React.ReactNode;
+  onPress: () => void;
+  accent?: boolean;
+  label?: string;
+  disabled?: boolean;
+  accessibilityLabel: string;
+  style?: StyleProp<ViewStyle>;
+}
+
+export function formatBytes(bytes?: number): string {
+  if (bytes === undefined) return '-';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function getFileIcon(contentType?: string): { emoji: string; color: string } {
-  if (!contentType) return { emoji: '📄', color: '#64748B' };
-  if (contentType.includes('pdf')) return { emoji: '📕', color: '#EF4444' };
-  if (contentType.includes('word') || contentType.includes('document'))
-    return { emoji: '📘', color: '#3B82F6' };
-  if (contentType.includes('sheet') || contentType.includes('excel'))
-    return { emoji: '📗', color: '#10B981' };
-  if (contentType.includes('image')) return { emoji: '🖼️', color: '#8B5CF6' };
-  if (contentType.includes('video')) return { emoji: '🎬', color: '#F59E0B' };
-  if (contentType.includes('audio')) return { emoji: '🎵', color: '#EC4899' };
-  if (contentType.includes('zip') || contentType.includes('archive'))
-    return { emoji: '🗜️', color: '#6366F1' };
-  if (contentType.includes('text')) return { emoji: '📝', color: '#155DFC' };
-  return { emoji: '📄', color: '#64748B' };
+export function getFileIcon(contentType?: string): { emoji: string; color: string } {
+  const type = (contentType ?? '').toLowerCase();
+  if (type.includes('pdf')) return { emoji: '📕', color: '#F87171' };
+  if (type.includes('sheet') || type.includes('excel') || type.includes('spreadsheet')) return { emoji: '📊', color: '#34D399' };
+  if (type.includes('word') || type.includes('document')) return { emoji: '📝', color: '#60A5FA' };
+  if (type.includes('image') || type.includes('png') || type.includes('jpg') || type.includes('jpeg')) return { emoji: '🖼️', color: '#A78BFA' };
+  return { emoji: '📄', color: '#94A3B8' };
 }
 
-// ── Micro-animations ──────────────────────────────────────────────────────────
+const getErrorMessage = (err: unknown, fallback: string): string =>
+  (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback;
 
-function SpringTouchable({
+const SpringTouchable = memo(function SpringTouchable({
   onPress,
   children,
   style,
+  disabled = false,
 }: {
   onPress: () => void;
   children: React.ReactNode;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
+  disabled?: boolean;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
-  const pressIn = () =>
-    Animated.spring(scale, {
-      toValue: 0.96,
-      tension: 600,
-      friction: 12,
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
-  const pressOut = () =>
-    Animated.spring(scale, {
-      toValue: 1,
-      tension: 400,
-      friction: 15,
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
+  const handlePressIn = useCallback(() => {
+    Animated.spring(scale, { toValue: 0.96, tension: 500, friction: 10, useNativeDriver }).start();
+  }, [scale]);
+  const handlePressOut = useCallback(() => {
+    Animated.spring(scale, { toValue: 1, tension: 350, friction: 14, useNativeDriver }).start();
+  }, [scale]);
 
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
+    <Animated.View style={[styles.springScale, { transform: [{ scale }] }]}>
       <TouchableOpacity
-        onPress={onPress}
-        onPressIn={pressIn}
-        onPressOut={pressOut}
         activeOpacity={1}
+        disabled={disabled}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
         style={style}
       >
         {children}
       </TouchableOpacity>
     </Animated.View>
   );
-}
-
-function FadeIn({
-  children,
-  delay = 0,
-}: {
-  children: React.ReactNode;
-  delay?: number;
-}) {
-  const op = useRef(new Animated.Value(0)).current;
-  const ty = useRef(new Animated.Value(10)).current;
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(op, {
-        toValue: 1,
-        duration: 300,
-        delay,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      Animated.spring(ty, {
-        toValue: 0,
-        delay,
-        useNativeDriver: Platform.OS !== 'web',
-        tension: 220,
-        friction: 18,
-      }),
-    ]).start();
-  }, [delay]);
-  return (
-    <Animated.View style={{ opacity: op, transform: [{ translateY: ty }] }}>
-      {children}
-    </Animated.View>
-  );
-}
-
-// ── Glass Card ────────────────────────────────────────────────────────────────
-
-function GlassCard({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  style?: any;
-}) {
-  return (
-    <View style={[gs.card, style]}>
-      <View style={gs.glassClip}>
-        <BlurView intensity={25} tint="light" style={StyleSheet.absoluteFill} />
-        <LinearGradient
-          colors={['rgba(255,255,255,0.75)', 'rgba(255,255,255,0.35)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-      </View>
-      <View style={gs.cardContent}>{children}</View>
-    </View>
-  );
-}
-
-const gs = StyleSheet.create({
-  card: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.7)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#155DFC',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.04,
-        shadowRadius: 16,
-      },
-      android: { elevation: 2 },
-    }),
-  },
-  glassClip: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  cardContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-  },
 });
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
+const FadeInUp = memo(function FadeInUp({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(18)).current;
 
-function SearchIcon() {
-  return (
-    <Svg
-      width={15}
-      height={15}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#94A3B8"
-      strokeWidth={2.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <Circle cx={11} cy={11} r={8} />
-      <Path d="m21 21-4.3-4.3" />
-    </Svg>
-  );
-}
+  useEffect(() => {
+    const anim = Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 280, delay, useNativeDriver }),
+      Animated.spring(translateY, { toValue: 0, delay, tension: 200, friction: 20, useNativeDriver }),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [delay, opacity, translateY]);
 
-function UploadIcon() {
-  return (
-    <Svg
-      width={16}
-      height={16}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={T.primary}
-      strokeWidth={2.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <Path d="m17 8-5-5-5 5" />
-      <Path d="M12 3v12" />
-    </Svg>
-  );
-}
+  return <Animated.View style={{ opacity, transform: [{ translateY }] }}>{children}</Animated.View>;
+});
 
-function FolderIcon({ color = '#F59E0B' }: { color?: string }) {
-  return (
-    <Svg
-      width={20}
-      height={20}
-      viewBox="0 0 24 24"
-      fill={color + '30'}
-      stroke={color}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <Path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-    </Svg>
-  );
-}
-
-function BackIcon() {
-  return (
-    <Svg
-      width={18}
-      height={18}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#0F172A"
-      strokeWidth={2.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <Path d="M19 12H5M12 5l-7 7 7 7" />
-    </Svg>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <Svg
-      width={16}
-      height={16}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={T.primary}
-      strokeWidth={3}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <Path d="M5 12h14M12 5v14" />
-    </Svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <Svg
-      width={18}
-      height={18}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#EF4444"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <Path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
-    </Svg>
-  );
-}
-
-function DownloadIcon() {
-  return (
-    <Svg
-      width={18}
-      height={18}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={T.primary}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <Path d="m7 10 5 5 5-5" />
-      <Path d="M12 15V3" />
-    </Svg>
-  );
-}
-
-function ChevronRightIcon() {
-  return (
-    <Svg
-      width={16}
-      height={16}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#CBD5E1"
-      strokeWidth={2.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <Path d="m9 18 6-6-6-6" />
-    </Svg>
-  );
-}
-
-function NewFolderIcon() {
-  return (
-    <Svg
-      width={16}
-      height={16}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={T.primary}
-      strokeWidth={2.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <Path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-      <Path d="M12 11v6M9 14h6" />
-    </Svg>
-  );
-}
-
-// ── Main Component ────────────────────────────────────────────────────────────
-
-export default function MobileDocsScreen({
-  projectId,
-  projectName,
-  topOffset = 0,
+const LiquidGlassCard = memo(function LiquidGlassCard({
+  children,
+  style,
+  intensity = 28,
 }: {
-  projectId: number;
-  projectName?: string;
-  topOffset?: number;
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+  intensity?: number;
 }) {
-  // View state
-  const [view, setView] = useState<'explorer' | 'create_folder'>('explorer');
+  return (
+    <View style={[styles.card, style]}>
+      <BlurView intensity={intensity} tint="dark" style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={['rgba(255,255,255,0.13)', 'rgba(255,255,255,0.03)']}
+        start={GRADIENT_START}
+        end={GRADIENT_END}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <View style={styles.topShine} />
+      <View style={styles.cardContent}>{children}</View>
+    </View>
+  );
+});
 
-  // Data
+const SkeletonPulse = memo(function SkeletonPulse({
+  width,
+  height,
+  borderRadius = 8,
+  style,
+}: {
+  width: number;
+  height: number;
+  borderRadius?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const shimmer = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, { toValue: 1, duration: 850, useNativeDriver: true }),
+        Animated.timing(shimmer, { toValue: 0, duration: 850, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [shimmer]);
+
+  const opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.5] });
+  return <Animated.View style={[styles.skeletonPulse, { width, height, borderRadius, opacity }, style]} />;
+});
+
+export const DocsSkeleton = memo(function DocsSkeleton() {
+  const folderRows = [0, 1, 2];
+  const fileRows = [0, 1, 2, 3];
+
+  return (
+    <ScrollView pointerEvents="none" contentContainerStyle={styles.docsSkeletonContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.skeletonSectionHeader}>
+        <SkeletonPulse width={60} height={10} />
+        <SkeletonPulse width={24} height={18} borderRadius={9} />
+      </View>
+      <LiquidGlassCard style={styles.sectionCard}>
+        {folderRows.map((row) => (
+          <View key={row} style={[styles.skeletonRow, row < folderRows.length - 1 && styles.rowDivider]}>
+            <SkeletonPulse width={40} height={40} borderRadius={12} />
+            <View style={styles.skeletonTextStack}>
+              <SkeletonPulse width={SW * 0.4} height={12} />
+              <SkeletonPulse width={SW * 0.22} height={10} />
+            </View>
+            <SkeletonPulse width={28} height={28} borderRadius={14} />
+          </View>
+        ))}
+      </LiquidGlassCard>
+      <View style={styles.skeletonSectionHeader}>
+        <SkeletonPulse width={60} height={10} />
+        <SkeletonPulse width={24} height={18} borderRadius={9} />
+      </View>
+      <LiquidGlassCard style={styles.sectionCard}>
+        {fileRows.map((row) => (
+          <View key={row} style={[styles.skeletonRow, row < fileRows.length - 1 && styles.rowDivider]}>
+            <SkeletonPulse width={40} height={40} borderRadius={12} />
+            <View style={styles.skeletonTextStack}>
+              <SkeletonPulse width={SW * 0.4} height={12} />
+              <SkeletonPulse width={SW * 0.22} height={10} />
+            </View>
+            <View style={styles.skeletonActions}>
+              <SkeletonPulse width={28} height={28} borderRadius={14} />
+              <SkeletonPulse width={28} height={28} borderRadius={14} />
+            </View>
+          </View>
+        ))}
+      </LiquidGlassCard>
+    </ScrollView>
+  );
+});
+
+const IconSearch = memo(function IconSearch() {
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+      <Circle cx={11} cy={11} r={8} stroke="rgba(255,255,255,0.35)" strokeWidth={2.5} />
+      <Path d="m21 21-4.3-4.3" stroke="rgba(255,255,255,0.35)" strokeWidth={2.5} strokeLinecap="round" />
+    </Svg>
+  );
+});
+
+const IconBack = memo(function IconBack() {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path d="M19 12H5M12 5l-7 7 7 7" stroke="rgba(255,255,255,0.9)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+});
+
+export const IconPlus = memo(function IconPlus() {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path d="M5 12h14M12 5v14" stroke="rgba(255,255,255,0.9)" strokeWidth={3} strokeLinecap="round" />
+    </Svg>
+  );
+});
+
+const IconTrash = memo(function IconTrash() {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" stroke="#F87171" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+});
+
+const IconDownload = memo(function IconDownload() {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke={T.primary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+});
+
+const IconUpload = memo(function IconUpload() {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke={T.primary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+});
+
+const IconFolder = memo(function IconFolder({ color = '#F59E0B' }: { color?: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill={color + '30'}>
+      <Path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+});
+
+const IconChevronRight = memo(function IconChevronRight() {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path d="m9 18 6-6-6-6" stroke="rgba(255,255,255,0.25)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+});
+
+const IconNewFolder = memo(function IconNewFolder() {
+  return (
+    <Svg width={21} height={21} viewBox="0 0 24 24" fill="none">
+      <Path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2zM12 11v6M9 14h6" stroke="rgba(255,255,255,0.9)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+});
+
+export const IconFile = memo(function IconFile() {
+  return (
+    <Svg width={21} height={21} viewBox="0 0 24 24" fill="none">
+      <Path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6" stroke="#60A5FA" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+});
+
+export const IconStar = memo(function IconStar({ filled, color = '#F59E0B' }: { filled: boolean; color?: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill={filled ? color : 'none'}>
+      <Path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+});
+
+export const IconCheck = memo(function IconCheck() {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path d="M20 6L9 17l-5-5" stroke="#34D399" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+});
+
+const GlassIconButton = memo(function GlassIconButton({
+  icon,
+  onPress,
+  accent = false,
+  label,
+  disabled = false,
+  accessibilityLabel,
+  style,
+}: GlassIconButtonProps) {
+  return (
+    <SpringTouchable
+      onPress={onPress}
+      disabled={disabled}
+      style={[styles.glassIconButton, label ? styles.glassIconWithLabel : styles.glassIconSquare, accent && styles.glassIconAccent, style]}
+    >
+      <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={accent ? ['rgba(21,93,252,0.35)', 'rgba(21,93,252,0.15)'] : ['rgba(255,255,255,0.14)', 'rgba(255,255,255,0.05)']}
+        start={GRADIENT_START}
+        end={GRADIENT_END}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <View accessibilityLabel={accessibilityLabel} style={styles.glassIconContent}>
+        {icon}
+        {label ? <Text style={styles.glassIconLabel}>{label}</Text> : null}
+      </View>
+    </SpringTouchable>
+  );
+});
+
+const SectionHeader = memo(function SectionHeader({ label, count }: { label: string; count: number }) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      <View style={styles.sectionBadge}>
+        <Text style={styles.sectionBadgeText}>{count}</Text>
+      </View>
+    </View>
+  );
+});
+
+const EmptyState = memo(function EmptyState({
+  inFolder,
+  searchQuery,
+  onCreateFolder,
+  onUpload,
+}: {
+  inFolder: boolean;
+  searchQuery: string;
+  onCreateFolder: () => void;
+  onUpload: () => void;
+}) {
+  const hasSearch = searchQuery.trim().length > 0;
+  return (
+    <View style={styles.emptyState}>
+      <Text style={styles.emptyEmoji}>{inFolder ? '📂' : hasSearch ? '🔎' : '🗂️'}</Text>
+      <Text style={styles.emptyTitle}>{hasSearch ? 'No matches found' : inFolder ? 'This folder is empty' : 'No documents yet'}</Text>
+      <Text style={styles.emptySubtitle}>
+        {hasSearch ? 'Try a different search term.' : inFolder ? 'Upload files into this folder.' : 'Create folders or upload files for this project.'}
+      </Text>
+      {!hasSearch ? (
+        <View style={styles.emptyButtons}>
+          {!inFolder ? (
+            <GlassIconButton accessibilityLabel="Create folder" icon={<IconNewFolder />} label="New Folder" onPress={onCreateFolder} />
+          ) : null}
+          <GlassIconButton accessibilityLabel="Upload file" accent icon={<IconUpload />} label="Upload File" onPress={onUpload} />
+        </View>
+      ) : null}
+    </View>
+  );
+});
+
+export default function MobileDocsScreen({ projectId, projectName, topOffset = 0 }: MobileDocsScreenProps) {
+  const [view, setView] = useState<'explorer' | 'create_folder'>('explorer');
   const [folders, setFolders] = useState<DocFolder[]>([]);
   const [documents, setDocuments] = useState<DocItem[]>([]);
   const [activeFolderId, setActiveFolderId] = useState<number | null>(null);
-  const [activeFolderName, setActiveFolderName] = useState<string>('');
-
-  // UI State
+  const [activeFolderName, setActiveFolderName] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'folders'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [loadingFolders, setLoadingFolders] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Create folder form
   const [newFolderName, setNewFolderName] = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);
 
-  // ── Data fetching ──────────────────────────────────────────────────────────
+  const inFolder = activeFolderId !== null;
+  const headerTitle = inFolder ? activeFolderName : projectName ? `${projectName} Docs` : 'Documents';
+  const isSkeleton = initialLoading || loadingDocs;
 
-  const fetchFolders = useCallback(async () => {
-    setLoadingFolders(true);
-    try {
-      const res = await api.get(`/api/projects/${projectId}/folders`);
-      setFolders(res.data || []);
-    } catch {
-      setError('Failed to load folders.');
-    } finally {
-      setLoadingFolders(false);
-    }
+  const fetchFolders = useCallback(async (): Promise<DocFolder[]> => {
+    const res = await api.get<DocFolder[]>(`/api/projects/${projectId}/folders`);
+    return res.data ?? [];
   }, [projectId]);
 
-  const fetchDocuments = useCallback(
-    async (folderId: number | null) => {
-      setLoadingDocs(true);
-      setError(null);
-      try {
-        const params: any = {};
-        if (folderId !== null) params.folderId = folderId;
-        const res = await api.get(`/api/projects/${projectId}/documents`, { params });
-        setDocuments(res.data || []);
-      } catch {
-        setError('Failed to load documents.');
-      } finally {
-        setLoadingDocs(false);
-      }
-    },
-    [projectId]
-  );
+  const fetchDocuments = useCallback(async (folderId: number | null): Promise<DocItem[]> => {
+    const params: { folderId?: number } = {};
+    if (folderId !== null) params.folderId = folderId;
+    const res = await api.get<DocItem[]>(`/api/projects/${projectId}/documents`, { params });
+    return res.data ?? [];
+  }, [projectId]);
 
   useEffect(() => {
-    fetchFolders();
-    fetchDocuments(null);
+    let cancelled = false;
+    setInitialLoading(true);
+    setError(null);
+    Promise.all([fetchFolders(), fetchDocuments(null)])
+      .then(([nextFolders, nextDocuments]) => {
+        if (cancelled) return;
+        setFolders(nextFolders);
+        setDocuments(nextDocuments);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(getErrorMessage(err, 'Failed to load documents.'));
+      })
+      .finally(() => {
+        if (!cancelled) setInitialLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [fetchFolders, fetchDocuments]);
 
-  // ── Actions ───────────────────────────────────────────────────────────────
+  const filteredFolders = useMemo(
+    () => folders.filter((f) => f.name.toLowerCase().includes(searchQuery.toLowerCase())),
+    [folders, searchQuery]
+  );
+  const filteredDocs = useMemo(
+    () => documents.filter((d) => d.name.toLowerCase().includes(searchQuery.toLowerCase())),
+    [documents, searchQuery]
+  );
 
-  const handleOpenFolder = (folder: DocFolder) => {
+  const handleOpenFolder = useCallback(async (folder: DocFolder) => {
     setActiveFolderId(folder.id);
     setActiveFolderName(folder.name);
     setSearchQuery('');
-    fetchDocuments(folder.id);
-  };
+    setLoadingDocs(true);
+    setError(null);
+    try {
+      setDocuments(await fetchDocuments(folder.id));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to load folder documents.'));
+    } finally {
+      setLoadingDocs(false);
+    }
+  }, [fetchDocuments]);
 
-  const handleBackToRoot = () => {
+  const handleBackToRoot = useCallback(async () => {
     setActiveFolderId(null);
     setActiveFolderName('');
     setSearchQuery('');
-    fetchDocuments(null);
-  };
+    setLoadingDocs(true);
+    setError(null);
+    try {
+      setDocuments(await fetchDocuments(null));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to load documents.'));
+    } finally {
+      setLoadingDocs(false);
+    }
+  }, [fetchDocuments]);
 
-  const handleCreateFolder = async () => {
-    if (!newFolderName.trim()) {
+  const handleCreateFolder = useCallback(async () => {
+    const trimmedName = newFolderName.trim();
+    if (!trimmedName) {
       Alert.alert('Validation', 'Please enter a folder name.');
       return;
     }
     setCreatingFolder(true);
+    setError(null);
     try {
-      await api.post(`/api/projects/${projectId}/folders`, {
-        name: newFolderName.trim(),
-        parentFolderId: null,
-      });
+      await api.post<DocFolder>(`/api/projects/${projectId}/folders`, { name: trimmedName, parentFolderId: null });
+      setFolders(await fetchFolders());
       setNewFolderName('');
       setView('explorer');
-      await fetchFolders();
-    } catch {
-      Alert.alert('Error', 'Failed to create folder.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to create folder.'));
+      Alert.alert('Error', getErrorMessage(err, 'Failed to create folder.'));
     } finally {
       setCreatingFolder(false);
     }
-  };
+  }, [fetchFolders, newFolderName, projectId]);
 
-  const handleDeleteFolder = (folder: DocFolder) => {
-    Alert.alert(
-      'Delete Folder',
-      `Delete "${folder.name}" and all its contents?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await api.delete(`/api/projects/${projectId}/folders/${folder.id}`);
-              await fetchFolders();
-              if (activeFolderId === folder.id) {
-                handleBackToRoot();
-              }
-            } catch {
-              Alert.alert('Error', 'Failed to delete folder.');
+  const handleDeleteFolder = useCallback((folder: DocFolder) => {
+    Alert.alert('Delete Folder', `Delete "${folder.name}" and all its contents?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete<void>(`/api/projects/${projectId}/folders/${folder.id}`);
+            setFolders(await fetchFolders());
+            if (activeFolderId === folder.id) {
+              await handleBackToRoot();
             }
-          },
+          } catch (err: unknown) {
+            Alert.alert('Error', getErrorMessage(err, 'Failed to delete folder.'));
+          }
         },
-      ]
-    );
-  };
+      },
+    ]);
+  }, [activeFolderId, fetchFolders, handleBackToRoot, projectId]);
 
-  const handleUploadDocument = async () => {
+  const handleUploadDocument = useCallback(async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-
-      if (result.canceled || !result.assets?.length) return;
-
+      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
+      if ((result as { canceled?: boolean }).canceled || !result.assets?.length) return;
       const asset = result.assets[0];
       setUploading(true);
-
+      setError(null);
       const formData = new FormData();
       formData.append('file', {
         uri: asset.uri,
         name: asset.name,
-        type: asset.mimeType || 'application/octet-stream',
-      } as any);
-
-      if (activeFolderId !== null) {
-        formData.append('folderId', String(activeFolderId));
-      }
-
-      await api.post(`/api/projects/${projectId}/documents/upload`, formData, {
+        type: asset.mimeType ?? 'application/octet-stream',
+      } as unknown as Blob);
+      if (activeFolderId !== null) formData.append('folderId', String(activeFolderId));
+      await api.post<{ id: number; title: string; content?: string }>(`/api/projects/${projectId}/documents/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-
-      await fetchDocuments(activeFolderId);
-    } catch (err: any) {
-      if (!err?.canceled) {
-        Alert.alert('Upload Failed', 'Could not upload the file. Please try again.');
-      }
+      setDocuments(await fetchDocuments(activeFolderId));
+    } catch (err: unknown) {
+      if ((err as { canceled?: boolean })?.canceled) return;
+      setError(getErrorMessage(err, 'Failed to upload document.'));
     } finally {
       setUploading(false);
     }
-  };
+  }, [activeFolderId, fetchDocuments, projectId]);
 
-  const handleDownloadDocument = async (doc: DocItem) => {
+  const handleDownloadDocument = useCallback(async (doc: DocItem) => {
     try {
-      const res = await api.get(
-        `/api/projects/${projectId}/documents/${doc.id}/download-url`
-      );
-      const url = res.data?.downloadUrl;
-      if (url) {
-        await Linking.openURL(url);
-      }
-    } catch {
-      Alert.alert('Error', 'Could not get the download link.');
+      const res = await api.get<{ downloadUrl?: string }>(`/api/projects/${projectId}/documents/${doc.id}/download-url`);
+      if (res.data.downloadUrl) await Linking.openURL(res.data.downloadUrl);
+    } catch (err: unknown) {
+      Alert.alert('Error', getErrorMessage(err, 'Failed to download document.'));
     }
-  };
+  }, [projectId]);
 
-  const handleDeleteDocument = (doc: DocItem) => {
-    Alert.alert(
-      'Delete File',
-      `Move "${doc.name}" to trash?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await api.delete(`/api/projects/${projectId}/documents/${doc.id}`);
-              setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
-            } catch {
-              Alert.alert('Error', 'Failed to delete file.');
-            }
-          },
+  const handleDeleteDocument = useCallback((doc: DocItem) => {
+    Alert.alert('Delete Document', `Delete "${doc.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete<void>(`/api/projects/${projectId}/documents/${doc.id}`);
+            setDocuments(await fetchDocuments(activeFolderId));
+          } catch (err: unknown) {
+            Alert.alert('Error', getErrorMessage(err, 'Failed to delete document.'));
+          }
         },
-      ]
-    );
-  };
+      },
+    ]);
+  }, [activeFolderId, fetchDocuments, projectId]);
 
-  // ── Filter ────────────────────────────────────────────────────────────────
-
-  const filteredFolders = folders.filter((f) =>
-    f.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredDocs = documents.filter((d) =>
-    d.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const isLoading = loadingFolders || loadingDocs;
-
-  // ── Render: Create Folder View ────────────────────────────────────────────
-
-  const renderCreateFolderView = () => (
-    <View style={s.fullFlex}>
-      <View style={s.editorHeader}>
-        <SpringTouchable
-          style={s.headerBackBtn}
-          onPress={() => {
-            setView('explorer');
-            setNewFolderName('');
-          }}
-        >
-          <BackIcon />
-        </SpringTouchable>
-        <Text style={s.editorHeaderTitle}>New Folder</Text>
-        <View style={s.headerBackBtnPlaceholder} />
-      </View>
-
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={[s.scrollContent, { paddingTop: 24 }]}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={s.inputLabel}>Folder Name</Text>
-        <GlassCard style={{ marginBottom: 24 }}>
-          <TextInput
-            style={s.folderInput}
-            placeholder="e.g. Design Assets, Release Notes..."
-            placeholderTextColor="#94A3B8"
-            value={newFolderName}
-            onChangeText={setNewFolderName}
-            autoFocus
-            maxLength={60}
-            returnKeyType="done"
-            onSubmitEditing={handleCreateFolder}
-          />
-        </GlassCard>
-
-        <SpringTouchable
-          style={[s.createFolderBtn, creatingFolder && { opacity: 0.6 }]}
-          onPress={handleCreateFolder}
-        >
-          {creatingFolder ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={s.createFolderBtnText}>Create Folder</Text>
-          )}
-        </SpringTouchable>
-      </ScrollView>
+  const renderTabs = () => (
+    <View style={styles.tabRow}>
+      {(['all', 'folders'] as const).map((tab) => {
+        const active = activeTab === tab;
+        return (
+          <SpringTouchable key={tab} onPress={() => setActiveTab(tab)} style={[styles.tabButton, active && styles.tabButtonActive]}>
+            {active ? <LinearGradient colors={['rgba(21,93,252,0.45)', 'rgba(21,93,252,0.20)']} style={StyleSheet.absoluteFillObject} /> : null}
+            <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab === 'all' ? 'All' : 'Folders'}</Text>
+          </SpringTouchable>
+        );
+      })}
     </View>
   );
 
-  // ── Render: Main Explorer View ────────────────────────────────────────────
-
   const renderExplorerView = () => {
-    const inFolder = activeFolderId !== null;
+    const empty = (!inFolder && activeTab !== 'folders' && filteredFolders.length === 0 && filteredDocs.length === 0)
+      || (!inFolder && activeTab === 'folders' && filteredFolders.length === 0)
+      || (inFolder && filteredDocs.length === 0);
 
     return (
-      <View style={s.fullFlex}>
-        {/* Header: Breadcrumb + Actions */}
-        <View style={s.explorerHeader}>
-          <View style={s.breadcrumb}>
-            {inFolder ? (
-              <SpringTouchable style={s.breadcrumbBack} onPress={handleBackToRoot}>
-                <BackIcon />
-              </SpringTouchable>
-            ) : null}
-            <Text style={s.breadcrumbTitle} numberOfLines={1}>
-              {inFolder ? activeFolderName : 'Documents'}
-            </Text>
+      <View style={styles.fullFlex}>
+        <View style={styles.headerRow}>
+          <View style={styles.headerLeft}>
+            {inFolder ? <GlassIconButton accessibilityLabel="Back to root" icon={<IconBack />} onPress={handleBackToRoot} /> : null}
+            <Text style={styles.headerTitle} numberOfLines={1}>{headerTitle}</Text>
           </View>
-
-          <View style={s.headerActions}>
-            {!inFolder && (
-              <SpringTouchable
-                style={s.iconBtn}
-                onPress={() => setView('create_folder')}
-              >
-                <NewFolderIcon />
-              </SpringTouchable>
-            )}
-            <SpringTouchable
-              style={[s.iconBtn, s.uploadBtn]}
+          <View style={styles.headerActions}>
+            {!inFolder ? <GlassIconButton accessibilityLabel="New folder" icon={<IconNewFolder />} onPress={() => setView('create_folder')} /> : null}
+            <GlassIconButton
+              accessibilityLabel="Upload document"
+              accent
+              disabled={uploading}
+              icon={uploading ? <ActivityIndicator color={T.primary} size="small" /> : <IconUpload />}
               onPress={handleUploadDocument}
-            >
-              {uploading ? (
-                <ActivityIndicator size="small" color={T.primary} />
-              ) : (
-                <UploadIcon />
-              )}
-            </SpringTouchable>
-          </View>
-        </View>
-
-        {/* Search Bar */}
-        <View style={s.searchContainer}>
-          <View style={s.searchWrapper}>
-            <SearchIcon />
-            <TextInput
-              style={s.searchInput}
-              placeholder={inFolder ? 'Search files...' : 'Search documents & folders...'}
-              placeholderTextColor="#94A3B8"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              clearButtonMode="while-editing"
             />
           </View>
         </View>
 
-        {/* Tab row (only shown at root) */}
-        {!inFolder && (
-          <View style={s.tabRow}>
-            <SpringTouchable
-              style={[s.tabBtn, activeTab === 'all' && s.tabBtnActive]}
-              onPress={() => setActiveTab('all')}
-            >
-              <Text style={[s.tabText, activeTab === 'all' && s.tabTextActive]}>
-                All
-              </Text>
-            </SpringTouchable>
-            <SpringTouchable
-              style={[s.tabBtn, activeTab === 'folders' && s.tabBtnActive]}
-              onPress={() => setActiveTab('folders')}
-            >
-              <Text
-                style={[s.tabText, activeTab === 'folders' && s.tabTextActive]}
-              >
-                Folders
-              </Text>
-            </SpringTouchable>
-          </View>
-        )}
+        <View style={styles.searchBar}>
+          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['rgba(255,255,255,0.14)', 'rgba(255,255,255,0.05)']} style={StyleSheet.absoluteFillObject} />
+          <IconSearch />
+          <TextInput
+            clearButtonMode="while-editing"
+            onChangeText={setSearchQuery}
+            placeholder={inFolder ? 'Search files...' : 'Search documents & folders...'}
+            placeholderTextColor={GLASS.placeholder}
+            style={styles.searchInput}
+            value={searchQuery}
+          />
+        </View>
 
-        {/* Content */}
-        {isLoading ? (
-          <View style={s.center}>
-            <ActivityIndicator size="large" color={T.primary} />
-            <Text style={s.loadingText}>Loading...</Text>
-          </View>
+        {!inFolder ? renderTabs() : null}
+
+        {isSkeleton ? (
+          <DocsSkeleton />
         ) : (
-          <ScrollView
-            style={s.scroll}
-            contentContainerStyle={s.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Folders section (root only, 'all' or 'folders' tab) */}
-            {!inFolder && (activeTab === 'all' || activeTab === 'folders') && (
-              <>
-                {filteredFolders.length > 0 && (
-                  <FadeIn delay={0}>
-                    <View style={s.sectionHeader}>
-                      <Text style={s.sectionLabel}>FOLDERS</Text>
-                      <Text style={s.sectionCount}>{filteredFolders.length}</Text>
-                    </View>
-                    <GlassCard style={{ marginBottom: 16 }}>
-                      {filteredFolders.map((folder, idx) => {
-                        const isLast = idx === filteredFolders.length - 1;
-                        return (
-                          <FadeIn key={folder.id} delay={idx * 30}>
-                            <View style={[s.rowItem, !isLast && s.borderBottom]}>
-                              <SpringTouchable
-                                style={s.rowLeft}
-                                onPress={() => handleOpenFolder(folder)}
-                              >
-                                <View style={s.folderIconWrap}>
-                                  <FolderIcon color="#F59E0B" />
-                                </View>
-                                <View>
-                                  <Text style={s.rowTitle} numberOfLines={1}>
-                                    {folder.name}
-                                  </Text>
-                                </View>
-                              </SpringTouchable>
-                              <View style={s.rowRight}>
-                                <SpringTouchable
-                                  style={s.rowActionBtn}
-                                  onPress={() => handleDeleteFolder(folder)}
-                                >
-                                  <TrashIcon />
-                                </SpringTouchable>
-                                <ChevronRightIcon />
-                              </View>
-                            </View>
-                          </FadeIn>
-                        );
-                      })}
-                    </GlassCard>
-                  </FadeIn>
-                )}
-              </>
-            )}
-
-            {/* Files section */}
-            {activeTab !== 'folders' && (
-              <>
-                {filteredDocs.length > 0 && (
-                  <>
-                    {!inFolder && (
-                      <View style={s.sectionHeader}>
-                        <Text style={s.sectionLabel}>FILES</Text>
-                        <Text style={s.sectionCount}>{filteredDocs.length}</Text>
-                      </View>
-                    )}
-                    <GlassCard style={{ marginBottom: 16 }}>
-                      {filteredDocs.map((doc, idx) => {
-                        const isLast = idx === filteredDocs.length - 1;
-                        const { emoji, color } = getFileIcon(doc.contentType);
-                        return (
-                          <FadeIn
-                            key={doc.id}
-                            delay={(inFolder ? 0 : filteredFolders.length * 30) + idx * 30}
-                          >
-                            <View style={[s.rowItem, !isLast && s.borderBottom]}>
-                              <View style={s.rowLeft}>
-                                <View
-                                  style={[
-                                    s.fileEmojiWrap,
-                                    { backgroundColor: color + '18' },
-                                  ]}
-                                >
-                                  <Text style={s.fileEmoji}>{emoji}</Text>
-                                </View>
-                                <View style={s.fileInfo}>
-                                  <Text style={s.rowTitle} numberOfLines={1}>
-                                    {doc.name}
-                                  </Text>
-                                  <Text style={s.rowMeta}>
-                                    {formatBytes(doc.fileSizeBytes)}
-                                  </Text>
-                                </View>
-                              </View>
-                              <View style={s.rowRight}>
-                                <SpringTouchable
-                                  style={s.rowActionBtn}
-                                  onPress={() => handleDownloadDocument(doc)}
-                                >
-                                  <DownloadIcon />
-                                </SpringTouchable>
-                                <SpringTouchable
-                                  style={s.rowActionBtn}
-                                  onPress={() => handleDeleteDocument(doc)}
-                                >
-                                  <TrashIcon />
-                                </SpringTouchable>
-                              </View>
-                            </View>
-                          </FadeIn>
-                        );
-                      })}
-                    </GlassCard>
-                  </>
-                )}
-              </>
-            )}
-
-            {/* Empty state */}
-            {filteredFolders.length === 0 && filteredDocs.length === 0 && (
-              <FadeIn delay={0}>
-                <View style={s.emptyContainer}>
-                  <Text style={s.emptyEmoji}>
-                    {inFolder ? '📂' : searchQuery ? '🔍' : '🗂️'}
-                  </Text>
-                  <Text style={s.emptyTitle}>
-                    {searchQuery
-                      ? 'No matches found'
-                      : inFolder
-                      ? 'This folder is empty'
-                      : 'No documents yet'}
-                  </Text>
-                  <Text style={s.emptySub}>
-                    {searchQuery
-                      ? 'Try different search keywords.'
-                      : inFolder
-                      ? 'Upload files to this folder using the upload button above.'
-                      : 'Create folders or upload files to keep your project documents organized.'}
-                  </Text>
-                  {!searchQuery && (
-                    <View style={s.emptyActions}>
-                      {!inFolder && (
-                        <SpringTouchable
-                          style={s.emptyBtn}
-                          onPress={() => setView('create_folder')}
-                        >
-                          <Text style={s.emptyBtnText}>New Folder</Text>
+          <ScrollView contentContainerStyle={styles.contentScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {!inFolder && (activeTab === 'all' || activeTab === 'folders') && filteredFolders.length > 0 ? (
+              <FadeInUp>
+                <SectionHeader label="FOLDERS" count={filteredFolders.length} />
+                <LiquidGlassCard style={styles.sectionCard}>
+                  {filteredFolders.map((folder, idx) => (
+                    <FadeInUp key={folder.id} delay={idx * 25}>
+                      <View style={[styles.row, idx < filteredFolders.length - 1 && styles.rowDivider]}>
+                        <SpringTouchable onPress={() => handleOpenFolder(folder)} style={styles.rowLeft}>
+                          <View style={styles.folderIconWrap}><IconFolder /></View>
+                          <View style={styles.rowTextWrap}>
+                            <Text style={styles.rowTitle} numberOfLines={1}>{folder.name}</Text>
+                            {folder.documentCount !== undefined ? <Text style={styles.rowMeta}>{folder.documentCount} documents</Text> : null}
+                          </View>
                         </SpringTouchable>
-                      )}
-                      <SpringTouchable
-                        style={[s.emptyBtn, s.emptyBtnPrimary]}
-                        onPress={handleUploadDocument}
-                      >
-                        <Text style={s.emptyBtnPrimaryText}>Upload File</Text>
-                      </SpringTouchable>
-                    </View>
-                  )}
-                </View>
-              </FadeIn>
-            )}
+                        <View style={styles.rowActions}>
+                          <GlassIconButton accessibilityLabel={`Delete ${folder.name}`} icon={<IconTrash />} onPress={() => handleDeleteFolder(folder)} />
+                          <IconChevronRight />
+                        </View>
+                      </View>
+                    </FadeInUp>
+                  ))}
+                </LiquidGlassCard>
+              </FadeInUp>
+            ) : null}
 
-            {/* Upload status pill */}
-            {uploading && (
-              <View style={s.uploadingBanner}>
-                <ActivityIndicator size="small" color={T.primary} />
-                <Text style={s.uploadingText}>Uploading file...</Text>
-              </View>
-            )}
+            {activeTab !== 'folders' && filteredDocs.length > 0 ? (
+              <FadeInUp delay={inFolder ? 0 : 80}>
+                {!inFolder ? <SectionHeader label="FILES" count={filteredDocs.length} /> : null}
+                <LiquidGlassCard style={styles.sectionCard}>
+                  {filteredDocs.map((doc, idx) => {
+                    const fileIcon = getFileIcon(doc.contentType);
+                    return (
+                      <FadeInUp key={doc.id} delay={idx * 25}>
+                        <View style={[styles.row, idx < filteredDocs.length - 1 && styles.rowDivider]}>
+                          <View style={styles.rowLeft}>
+                            <View style={[styles.fileIconWrap, { backgroundColor: fileIcon.color + '22' }]}>
+                              <Text style={[styles.fileEmoji, { color: fileIcon.color }]}>{fileIcon.emoji}</Text>
+                            </View>
+                            <View style={styles.rowTextWrap}>
+                              <Text style={styles.rowTitle} numberOfLines={1}>{doc.name}</Text>
+                              <Text style={styles.rowMeta}>{formatBytes(doc.fileSizeBytes)}</Text>
+                            </View>
+                          </View>
+                          <View style={styles.rowActions}>
+                            <GlassIconButton accessibilityLabel={`Download ${doc.name}`} icon={<IconDownload />} onPress={() => handleDownloadDocument(doc)} />
+                            <GlassIconButton accessibilityLabel={`Delete ${doc.name}`} icon={<IconTrash />} onPress={() => handleDeleteDocument(doc)} />
+                          </View>
+                        </View>
+                      </FadeInUp>
+                    );
+                  })}
+                </LiquidGlassCard>
+              </FadeInUp>
+            ) : null}
 
-            {error && (
-              <View style={s.errorBanner}>
-                <Text style={s.errorText}>{error}</Text>
+            {empty ? <EmptyState inFolder={inFolder} searchQuery={searchQuery} onCreateFolder={() => setView('create_folder')} onUpload={handleUploadDocument} /> : null}
+            {uploading ? (
+              <View style={styles.uploadPill}>
+                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                <LinearGradient colors={['rgba(255,255,255,0.14)', 'rgba(255,255,255,0.05)']} style={StyleSheet.absoluteFillObject} />
+                <ActivityIndicator color={T.primary} size="small" />
+                <Text style={styles.uploadText}>Uploading file...</Text>
               </View>
-            )}
+            ) : null}
+            {error ? <View style={styles.errorBanner}><Text style={styles.errorText}>{error}</Text></View> : null}
           </ScrollView>
         )}
       </View>
     );
   };
 
-  // ── Root Render ───────────────────────────────────────────────────────────
+  const renderCreateFolderView = () => (
+    <View style={styles.fullFlex}>
+      <View style={styles.createHeader}>
+        <GlassIconButton accessibilityLabel="Back to documents" icon={<IconBack />} onPress={() => setView('explorer')} />
+        <Text style={styles.createHeaderTitle}>New Folder</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+      <View style={styles.createBody}>
+        <Text style={styles.inputLabel}>FOLDER NAME</Text>
+        <LiquidGlassCard>
+          <TextInput
+            autoFocus
+            onChangeText={setNewFolderName}
+            onSubmitEditing={handleCreateFolder}
+            placeholder="Design files, specs, assets..."
+            placeholderTextColor={GLASS.placeholder}
+            returnKeyType="done"
+            style={styles.folderInput}
+            value={newFolderName}
+          />
+        </LiquidGlassCard>
+        <SpringTouchable disabled={creatingFolder} onPress={handleCreateFolder} style={styles.createButton}>
+          <LinearGradient colors={['rgba(21,93,252,0.85)', 'rgba(8,50,180,0.95)']} style={StyleSheet.absoluteFillObject} />
+          {creatingFolder ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.createButtonText}>Create Folder</Text>}
+        </SpringTouchable>
+      </View>
+    </View>
+  );
 
   return (
-    <View
-      style={[
-        s.container,
-        { paddingTop: topOffset, backgroundColor: T.bgSecondary },
-      ]}
-    >
+    <LinearGradient colors={BG_GRADIENT} style={[styles.container, { paddingTop: topOffset }]}>
+      <View pointerEvents="none" style={styles.blobOne} />
+      <View pointerEvents="none" style={styles.blobTwo} />
       {view === 'create_folder' ? renderCreateFolderView() : renderExplorerView()}
-    </View>
+    </LinearGradient>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const s = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  fullFlex: {
-    flex: 1,
-  },
-
-  // ── Explorer Header
-  explorerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  breadcrumb: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  breadcrumbBack: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
-  },
-  breadcrumbTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: T.textPrimary,
-    letterSpacing: -0.5,
-    flex: 1,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  iconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  uploadBtn: {
-    backgroundColor: T.primaryLight,
-    borderColor: T.primary + '30',
-  },
-
-  // ── Search
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    paddingTop: 4,
-  },
-  searchWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.75)',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 6,
-      },
-      android: { elevation: 1 },
-    }),
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: T.textPrimary,
-    fontWeight: '500',
-  },
-
-  // ── Tab Row
-  tabRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 12,
-  },
-  tabBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  fullFlex: { flex: 1 },
+  springScale: { alignSelf: 'auto' },
+  blobOne: { position: 'absolute', width: 340, height: 340, borderRadius: 170, backgroundColor: 'rgba(21,93,252,0.07)', top: -100, right: -80 },
+  blobTwo: { position: 'absolute', width: 260, height: 260, borderRadius: 130, backgroundColor: 'rgba(139,92,246,0.05)', bottom: 60, left: -70 },
+  card: {
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: 'rgba(255,255,255,0.20)',
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    ...Platform.select({ ios: { shadowColor: '#155DFC', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.2, shadowRadius: 24 }, android: { elevation: 6 } }),
   },
-  tabBtnActive: {
-    backgroundColor: T.primary,
-    borderColor: T.primary,
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: T.textSecondary,
-    letterSpacing: 0.2,
-  },
-  tabTextActive: {
-    color: '#fff',
-  },
-
-  // ── Section Headers
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 20,
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: T.textSecondary,
-    letterSpacing: 1.4,
-  },
-  sectionCount: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: T.textMuted,
-    backgroundColor: T.bgTertiary,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 8,
-  },
-
-  // ── Row Items
-  rowItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    minHeight: 62,
-  },
-  borderBottom: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
-  },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  rowRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  rowTitle: {
-    fontSize: 14.5,
-    fontWeight: '700',
-    color: T.textPrimary,
-    letterSpacing: -0.2,
-    maxWidth: SW * 0.45,
-  },
-  rowMeta: {
-    fontSize: 12,
-    color: T.textMuted,
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  rowActionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  topShine: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.45)' },
+  cardContent: { paddingHorizontal: 16, paddingVertical: 4 },
+  skeletonPulse: { backgroundColor: 'rgba(255,255,255,0.3)' },
+  docsSkeletonContent: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 40 },
+  skeletonSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4, marginBottom: 8, marginTop: 8 },
+  skeletonRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 12 },
+  skeletonTextStack: { flex: 1, gap: 6 },
+  skeletonActions: { flexDirection: 'row', gap: 6 },
+  glassIconButton: { borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.20)' },
+  glassIconSquare: { width: 40, height: 40 },
+  glassIconWithLabel: { minHeight: 40, paddingHorizontal: 12 },
+  glassIconAccent: { borderColor: 'rgba(21,93,252,0.50)' },
+  glassIconContent: { flex: 1, minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  glassIconLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.8)' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4, marginBottom: 8 },
+  sectionLabel: { color: 'rgba(255,255,255,0.35)', fontSize: 10, letterSpacing: 1.8, fontWeight: '800' },
+  sectionBadge: { backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  sectionBadgeText: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.45)' },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12 },
+  headerLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerTitle: { flex: 1, fontSize: 22, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.5 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  searchBar: { marginHorizontal: 16, marginBottom: 12, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.20)', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  searchInput: { flex: 1, color: 'rgba(255,255,255,0.85)', padding: 0, fontSize: 14, fontWeight: '600' },
+  tabRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 12 },
+  tabButton: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', paddingHorizontal: 16, paddingVertical: 9 },
+  tabButtonActive: { borderColor: 'rgba(255,255,255,0.28)' },
+  tabText: { fontSize: 12, fontWeight: '800', color: 'rgba(255,255,255,0.40)' },
+  tabTextActive: { color: '#FFFFFF' },
+  contentScroll: { paddingHorizontal: 16, paddingBottom: 40 },
+  sectionCard: { marginBottom: 16 },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: 64, paddingVertical: 14 },
+  rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.07)' },
+  rowLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rowTextWrap: { flex: 1 },
+  rowTitle: { fontSize: 14, fontWeight: '700', color: GLASS.text },
+  rowMeta: { marginTop: 3, fontSize: 12, color: GLASS.secondary },
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  folderIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F59E0B18', alignItems: 'center', justifyContent: 'center' },
+  fileIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  fileEmoji: { fontSize: 20 },
+  emptyState: { alignItems: 'center', paddingTop: 64, paddingHorizontal: 40, gap: 8 },
+  emptyEmoji: { fontSize: 52 },
+  emptyTitle: { fontSize: 18, fontWeight: '800', color: 'rgba(255,255,255,0.85)', textAlign: 'center' },
+  emptySubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.35)', textAlign: 'center', lineHeight: 19 },
+  emptyButtons: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
+  uploadPill: { marginTop: 8, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  uploadText: { color: 'rgba(255,255,255,0.75)', fontWeight: '700', fontSize: 13 },
+  errorBanner: { backgroundColor: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.28)', borderWidth: 1, borderRadius: 14, padding: 12, marginTop: 10 },
+  errorText: { color: '#F87171', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  createHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 },
+  createHeaderTitle: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
+  headerSpacer: { width: 40 },
+  createBody: { paddingHorizontal: 20, paddingTop: 32 },
+  inputLabel: { color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: '800', letterSpacing: 1.8, marginBottom: 8 },
+  folderInput: { fontSize: 15, color: 'rgba(255,255,255,0.9)', paddingVertical: 14, paddingHorizontal: 0 },
+  createButton: {
+    height: 52,
+    borderRadius: 16,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-
-  // ── Folder & File Icons
-  folderIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#F59E0B18',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fileEmojiWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fileEmoji: {
-    fontSize: 20,
-  },
-  fileInfo: {
-    flex: 1,
-  },
-
-  // ── Scroll
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 40,
-  },
-
-  // ── States
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 13,
-    color: T.textSecondary,
-    fontWeight: '500',
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 32,
-    gap: 8,
-  },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: T.textPrimary,
-    letterSpacing: -0.3,
-    textAlign: 'center',
-  },
-  emptySub: {
-    fontSize: 13,
-    color: T.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  emptyActions: {
-    flexDirection: 'row',
-    gap: 10,
     marginTop: 16,
+    ...Platform.select({ ios: { shadowColor: '#155DFC', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16 }, android: { elevation: 5 } }),
   },
-  emptyBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    borderWidth: 1.5,
-    borderColor: T.primary + '40',
-  },
-  emptyBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: T.primary,
-  },
-  emptyBtnPrimary: {
-    backgroundColor: T.primary,
-    borderColor: T.primary,
-  },
-  emptyBtnPrimaryText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#fff',
-  },
-
-  // ── Create Folder view
-  editorHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
-  },
-  editorHeaderTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: T.textPrimary,
-    letterSpacing: -0.2,
-  },
-  headerBackBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
-  },
-  headerBackBtnPlaceholder: {
-    width: 40,
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: T.textSecondary,
-    letterSpacing: 1,
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  folderInput: {
-    fontSize: 15,
-    color: T.textPrimary,
-    fontWeight: '500',
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-  },
-  createFolderBtn: {
-    backgroundColor: T.primary,
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: T.primary,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-      },
-      android: { elevation: 4 },
-    }),
-  },
-  createFolderBtnText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: 0.2,
-  },
-
-  // ── Banners
-  uploadingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: T.primaryLight,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: T.primary + '30',
-  },
-  uploadingText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: T.primary,
-  },
-  errorBanner: {
-    backgroundColor: '#FEF2F2',
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  errorText: {
-    fontSize: 13,
-    color: '#DC2626',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
+  createButtonText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
 });
