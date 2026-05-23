@@ -52,6 +52,19 @@ function formatDate(dateString?: string | null) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateInput(dateString?: string | null) {
+  if (!dateString) return null;
+  const date = new Date(`${dateString.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function isOverdue(task: BoardTask) {
   if (!task.dueDate || task.status === 'DONE') return false;
   const due = new Date(task.dueDate);
@@ -135,15 +148,28 @@ function TagIcon({ active }: { active: boolean }) {
   );
 }
 
+function CalendarIcon({ color = '#64748B' }: { color?: string }) {
+  return (
+    <Svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M8 2v4" />
+      <Path d="M16 2v4" />
+      <Path d="M3 10h18" />
+      <Path d="M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+    </Svg>
+  );
+}
+
 function TaskCard({
   task,
   onDelete,
+  onDueDatePress,
   onDragEnd,
   onDragStateChange,
   onDragMove,
 }: {
   task: BoardTask;
   onDelete: (task: BoardTask) => void;
+  onDueDatePress: (task: BoardTask) => void;
   onDragEnd: (task: BoardTask, dropX: number, translationX: number) => void;
   onDragStateChange: (active: boolean) => void;
   onDragMove: (screenX: number) => void;
@@ -232,8 +258,8 @@ function TaskCard({
         </Svg>
       </TouchableOpacity>
 
-      <View {...panResponder.panHandlers} style={card.dragSurface}>
-        <View style={card.topRow}>
+      <View style={card.dragSurface}>
+        <View {...panResponder.panHandlers} style={card.topRow}>
           {priority && task.priority ? (
             <View style={[card.priority, { backgroundColor: priority.bg, borderColor: `${priority.dot}24` }]}>
               <View style={[card.priorityDot, { backgroundColor: priority.dot }]} />
@@ -259,7 +285,16 @@ function TaskCard({
               <Text style={card.codeText}>{task.storyPoint} pts</Text>
             </View>
           )}
-          {due && <Text style={[card.dueDate, overdue && card.overdue]}>{due}</Text>}
+          <TouchableOpacity
+            activeOpacity={0.78}
+            onPress={() => onDueDatePress(task)}
+            style={[card.duePill, overdue && card.duePillOverdue, !due && card.duePillEmpty]}
+          >
+            <CalendarIcon color={overdue ? '#DC2626' : due ? '#64748B' : T.primary} />
+            <Text style={[card.dueDate, overdue && card.overdue, !due && card.dueDateEmpty]}>
+              {overdue ? 'Overdue' : due || 'Set date'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {labels.length > 0 && (
@@ -302,6 +337,7 @@ function BoardColumn({
   column,
   tasks,
   onDeleteTask,
+  onDueDatePress,
   onCreateTask,
   onDeleteColumn,
   onDragTask,
@@ -311,6 +347,7 @@ function BoardColumn({
   column: KanbanBoardColumn;
   tasks: BoardTask[];
   onDeleteTask: (task: BoardTask) => void;
+  onDueDatePress: (task: BoardTask) => void;
   onCreateTask: (column: KanbanBoardColumn) => void;
   onDeleteColumn: (column: KanbanBoardColumn) => void;
   onDragTask: (task: BoardTask, column: KanbanBoardColumn, dropX: number, translationX: number) => void;
@@ -364,6 +401,7 @@ function BoardColumn({
               key={task.id}
               task={task}
               onDelete={onDeleteTask}
+              onDueDatePress={onDueDatePress}
               onDragStateChange={onDragStateChange}
               onDragMove={onDragMove}
               onDragEnd={(draggedTask, dropX, translationX) => onDragTask(draggedTask, column, dropX, translationX)}
@@ -377,6 +415,128 @@ function BoardColumn({
         <Text style={columnStyles.addTaskText}>Add task</Text>
       </TouchableOpacity>
     </View>
+  );
+}
+
+const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+function buildCalendarCells(monthDate: Date) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  const cells: (Date | null)[] = [];
+
+  for (let index = 0; index < firstDay; index += 1) cells.push(null);
+  for (let day = 1; day <= totalDays; day += 1) cells.push(new Date(year, month, day));
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+function DatePickerModal({
+  visible,
+  task,
+  monthDate,
+  saving,
+  onChangeMonth,
+  onClose,
+  onSelect,
+  onClear,
+}: {
+  visible: boolean;
+  task: BoardTask | null;
+  monthDate: Date;
+  saving: boolean;
+  onChangeMonth: (date: Date) => void;
+  onClose: () => void;
+  onSelect: (date: string) => void;
+  onClear: () => void;
+}) {
+  const selectedDate = task?.dueDate?.slice(0, 10) ?? null;
+  const today = formatDateInput(new Date());
+  const monthLabel = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const cells = buildCalendarCells(monthDate);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={dateModal.safe}>
+        <View style={dateModal.sheet}>
+          <View style={dateModal.handle} />
+          <View style={dateModal.header}>
+            <View style={dateModal.headerIcon}>
+              <CalendarIcon color="#FFFFFF" />
+            </View>
+            <View style={dateModal.headerText}>
+              <Text style={dateModal.title}>Due date</Text>
+              <Text style={dateModal.subtitle} numberOfLines={1}>{task?.title || 'Task'}</Text>
+            </View>
+          </View>
+
+          <View style={dateModal.monthRow}>
+            <TouchableOpacity
+              activeOpacity={0.78}
+              onPress={() => onChangeMonth(new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1))}
+              style={dateModal.monthBtn}
+            >
+              <Text style={dateModal.monthBtnText}>{'<'}</Text>
+            </TouchableOpacity>
+            <Text style={dateModal.monthTitle}>{monthLabel}</Text>
+            <TouchableOpacity
+              activeOpacity={0.78}
+              onPress={() => onChangeMonth(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1))}
+              style={dateModal.monthBtn}
+            >
+              <Text style={dateModal.monthBtnText}>{'>'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={dateModal.weekRow}>
+            {WEEKDAYS.map((day, index) => (
+              <Text key={`${day}-${index}`} style={dateModal.weekText}>{day}</Text>
+            ))}
+          </View>
+
+          <View style={dateModal.dayGrid}>
+            {cells.map((date, index) => {
+              const value = date ? formatDateInput(date) : '';
+              const isSelected = value && value === selectedDate;
+              const isToday = value && value === today;
+              return (
+                <TouchableOpacity
+                  key={`${value}-${index}`}
+                  activeOpacity={date ? 0.76 : 1}
+                  disabled={!date || saving}
+                  onPress={() => date && onSelect(value)}
+                  style={[
+                    dateModal.dayCell,
+                    isToday && dateModal.dayToday,
+                    isSelected && dateModal.daySelected,
+                    !date && dateModal.dayEmpty,
+                  ]}
+                >
+                  <Text style={[
+                    dateModal.dayText,
+                    isToday && dateModal.dayTodayText,
+                    isSelected && dateModal.daySelectedText,
+                  ]}>
+                    {date ? date.getDate() : ''}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={dateModal.actions}>
+            <TouchableOpacity activeOpacity={0.78} disabled={saving} onPress={onClear} style={dateModal.clearBtn}>
+              <Text style={dateModal.clearText}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.78} disabled={saving} onPress={onClose} style={dateModal.doneBtn}>
+              <Text style={dateModal.doneText}>{saving ? 'Saving...' : 'Done'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    </Modal>
   );
 }
 
@@ -401,6 +561,7 @@ export default function ProjectBoardScreen({
     moveTask,
     createTask,
     deleteTask,
+    updateTaskDueDate,
     createColumn,
     deleteColumn,
   } = useProjectBoard(projectId);
@@ -414,6 +575,9 @@ export default function ProjectBoardScreen({
   const [newColumnName, setNewColumnName] = useState('');
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showColumnModal, setShowColumnModal] = useState(false);
+  const [dateTask, setDateTask] = useState<BoardTask | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [savingDate, setSavingDate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isCardDragging, setIsCardDragging] = useState(false);
   const fade = useRef(new Animated.Value(0)).current;
@@ -513,6 +677,25 @@ export default function ProjectBoardScreen({
     setTaskTarget(column);
     setNewTaskTitle('');
     setShowTaskModal(true);
+  };
+
+  const openDatePicker = (task: BoardTask) => {
+    const parsed = parseDateInput(task.dueDate);
+    setDateTask(task);
+    setCalendarMonth(parsed || new Date());
+  };
+
+  const changeTaskDueDate = async (dueDate: string | null) => {
+    if (!dateTask) return;
+    setSavingDate(true);
+    try {
+      await updateTaskDueDate(dateTask.id, dueDate);
+      setDateTask(null);
+    } catch {
+      Alert.alert('Date not updated', 'The due date could not be changed.');
+    } finally {
+      setSavingDate(false);
+    }
   };
 
   const submitCreateTask = async () => {
@@ -753,6 +936,7 @@ export default function ProjectBoardScreen({
                   column={column}
                   tasks={columnTasks[column.status] || []}
                   onDeleteTask={confirmDeleteTask}
+                  onDueDatePress={openDatePicker}
                   onCreateTask={openCreateTask}
                   onDeleteColumn={confirmDeleteColumn}
                   onDragTask={handleDragTask}
@@ -819,6 +1003,17 @@ export default function ProjectBoardScreen({
           </View>
         </SafeAreaView>
       </Modal>
+
+      <DatePickerModal
+        visible={!!dateTask}
+        task={dateTask}
+        monthDate={calendarMonth}
+        saving={savingDate}
+        onChangeMonth={setCalendarMonth}
+        onClose={() => setDateTask(null)}
+        onSelect={changeTaskDueDate}
+        onClear={() => changeTaskDueDate(null)}
+      />
 
       <Modal visible={showTaskModal} transparent animationType="slide">
         <SafeAreaView style={modal.safe}>
@@ -1182,7 +1377,28 @@ const card = StyleSheet.create({
     backgroundColor: '#EEF2FF',
   },
   codeText: { fontSize: 10, fontWeight: '900', color: '#4338CA' },
+  duePill: {
+    minHeight: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  duePillOverdue: {
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+  },
+  duePillEmpty: {
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+  },
   dueDate: { fontSize: 11, fontWeight: '800', color: '#64748B' },
+  dueDateEmpty: { color: T.primary },
   overdue: { color: '#DC2626' },
   labelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   labelPill: {
@@ -1276,4 +1492,108 @@ const modal = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   secondaryText: { fontSize: 14, fontWeight: '900', color: '#64748B' },
+});
+
+const dateModal = StyleSheet.create({
+  safe: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15, 23, 42, 0.38)' },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 22,
+    gap: 14,
+  },
+  handle: {
+    width: 42,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginBottom: 2,
+  },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: T.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerText: { flex: 1, minWidth: 0 },
+  title: { fontSize: 18, fontWeight: '900', color: '#0F172A' },
+  subtitle: { fontSize: 12, fontWeight: '700', color: '#64748B', marginTop: 2 },
+  monthRow: {
+    minHeight: 44,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  monthBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  monthBtnText: { fontSize: 18, fontWeight: '900', color: '#64748B' },
+  monthTitle: { flex: 1, textAlign: 'center', fontSize: 15, fontWeight: '900', color: '#0F172A' },
+  weekRow: { flexDirection: 'row', gap: 6 },
+  weekText: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '900', color: '#94A3B8' },
+  dayGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  dayCell: {
+    width: '13.45%',
+    aspectRatio: 1,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  dayEmpty: {
+    opacity: 0,
+  },
+  dayToday: {
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+  },
+  daySelected: {
+    borderColor: T.primary,
+    backgroundColor: T.primary,
+  },
+  dayText: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
+  dayTodayText: { color: T.primary },
+  daySelectedText: { color: '#FFFFFF' },
+  actions: { flexDirection: 'row', gap: 10 },
+  clearBtn: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearText: { fontSize: 14, fontWeight: '900', color: '#64748B' },
+  doneBtn: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    backgroundColor: T.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doneText: { fontSize: 14, fontWeight: '900', color: '#FFFFFF' },
 });

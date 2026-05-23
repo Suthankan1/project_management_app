@@ -154,6 +154,20 @@ export function useProjectBoard(projectId: number) {
     }
   }, [tasks]);
 
+  const updateTaskDueDate = useCallback(async (taskId: number, dueDate: string | null) => {
+    const previous = tasks;
+    setTasks((current) => current.map((task) => (
+      task.id === taskId ? { ...task, dueDate } : task
+    )));
+
+    try {
+      await api.patch(`/api/tasks/${taskId}/dates`, { dueDate });
+    } catch (err) {
+      setTasks(previous);
+      throw err;
+    }
+  }, [tasks]);
+
   const createColumn = useCallback(async (name: string) => {
     const cleanName = name.trim();
     if (!cleanName) return;
@@ -201,6 +215,7 @@ export function useProjectBoard(projectId: number) {
     moveTask,
     createTask,
     deleteTask,
+    updateTaskDueDate,
     createColumn,
     deleteColumn,
   };
