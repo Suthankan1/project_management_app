@@ -376,9 +376,11 @@ public class DocumentService {
         Document document = getDocument(projectId, documentId);
         document.setStatus(DocumentStatus.ACTIVE);
         document.setDeletedAt(null);
-        documentRepository.save(document);
+        document.setUpdatedAt(LocalDateTime.now());
+        Document saved = documentRepository.saveAndFlush(document);
 
-        return mapDocument(document, true);
+        logger.info("Document id={} restored to ACTIVE by userId={}", documentId, userId);
+        return mapDocument(saved, true);
     }
 
     // Hard Delete: Completely wipes the document

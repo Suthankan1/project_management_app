@@ -73,14 +73,18 @@ class DocumentRepositoryTest {
     }
 
     @Test
-    void findByStatusAndDeletedAtBefore_returnsExpiredSoftDeletedDocs() {
+    void findExpiredSoftDeleted_returnsOnlyExpiredSoftDeletedDocsWithDeletedAt() {
         Document old = buildDocument("old.pdf", DocumentStatus.SOFT_DELETED, LocalDateTime.now().minusDays(31));
         Document recent = buildDocument("recent.pdf", DocumentStatus.SOFT_DELETED, LocalDateTime.now().minusDays(5));
+        Document activeWithStaleDeletedAt = buildDocument("active.pdf", DocumentStatus.ACTIVE, LocalDateTime.now().minusDays(31));
+        Document softDeletedWithoutDeletedAt = buildDocument("missing-deleted-at.pdf", DocumentStatus.SOFT_DELETED, null);
         entityManager.persist(old);
         entityManager.persist(recent);
+        entityManager.persist(activeWithStaleDeletedAt);
+        entityManager.persist(softDeletedWithoutDeletedAt);
         entityManager.flush();
 
-        List<Document> result = documentRepository.findByStatusAndDeletedAtBefore(
+        List<Document> result = documentRepository.findExpiredSoftDeleted(
                 DocumentStatus.SOFT_DELETED, LocalDateTime.now().minusDays(30));
 
         assertEquals(1, result.size());
