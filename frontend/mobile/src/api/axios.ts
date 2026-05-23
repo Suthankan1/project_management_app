@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { clearTokens, getRefreshToken, getToken, saveRefreshToken, saveToken } from '../auth/storage';
+import { clearTokens, getRefreshToken, getValidToken, saveRefreshToken, saveToken } from '../auth/storage';
 import { API_BASE_URL } from './baseUrl';
 
 export { API_BASE_URL };
@@ -11,7 +11,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
-  const token = await getToken();
+  const token = await getValidToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
