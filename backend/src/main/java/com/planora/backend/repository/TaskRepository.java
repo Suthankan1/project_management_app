@@ -14,50 +14,69 @@ import com.planora.backend.model.Task;
 
 @Repository
 public interface TaskRepository extends JpaRepository<Task, Long> {
-    @Query("SELECT t FROM Task t " +
-           "LEFT JOIN FETCH t.project p " +
-           "LEFT JOIN FETCH p.team pt " +
-           "LEFT JOIN FETCH t.sprint " +
-           "LEFT JOIN FETCH t.assignee a " +
-           "LEFT JOIN FETCH a.user " +
-           "LEFT JOIN FETCH t.reporter r " +
-           "LEFT JOIN FETCH r.user " +
-           "LEFT JOIN FETCH t.milestone " +
-           "LEFT JOIN FETCH t.lastModifiedBy " +
-           "WHERE t.project.id = :projectId " +
-           "AND t.archived = false " +
-           "ORDER BY " +
-           "CASE WHEN t.sprint IS NULL THEN 0 ELSE 1 END, " +
-           "CASE WHEN t.sprint IS NULL THEN t.backlogPosition ELSE t.sprintPosition END, " +
-           "t.id")
+    @Query("""
+           SELECT t FROM Task t
+           LEFT JOIN FETCH t.project p
+           LEFT JOIN FETCH p.team
+           LEFT JOIN FETCH t.sprint
+           LEFT JOIN FETCH t.assignee a
+           LEFT JOIN FETCH a.user
+           LEFT JOIN FETCH t.reporter r
+           LEFT JOIN FETCH r.user
+           LEFT JOIN FETCH t.milestone
+           LEFT JOIN FETCH t.lastModifiedBy
+           WHERE t.project.id = :projectId
+             AND t.archived = false
+           ORDER BY
+             CASE WHEN t.sprint IS NULL THEN 0 ELSE 1 END,
+             CASE WHEN t.sprint IS NULL THEN t.backlogPosition ELSE t.sprintPosition END,
+             t.id
+           """)
     List<Task> findByProjectIdWithScalars(@Param("projectId") Long projectId);
 
     @EntityGraph(attributePaths = {"labels", "assignees", "assignees.user", "assignee", "assignee.user", "reporter", "reporter.user", "subTasks", "attachments"})
     @Query("SELECT DISTINCT t FROM Task t WHERE t.id IN :ids")
     List<Task> findByIdInWithCollections(@Param("ids") List<Long> ids);
 
-    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN FETCH t.assignees LEFT JOIN FETCH t.labels WHERE t.project.id = :projectId AND t.archived = false")
+    @Query("""
+           SELECT t FROM Task t
+           WHERE t.project.id = :projectId
+             AND t.archived = false
+           """)
     List<Task> findByProjectId(@Param("projectId") Long projectId);
 
-    @Query("SELECT DISTINCT t FROM Task t " +
-           "LEFT JOIN FETCH t.project p " +
-           "LEFT JOIN FETCH p.team pt " +
-           "LEFT JOIN FETCH t.sprint " +
-           "LEFT JOIN FETCH t.assignee a " +
-           "LEFT JOIN FETCH a.user " +
-           "LEFT JOIN FETCH t.reporter r " +
-           "LEFT JOIN FETCH r.user " +
-           "LEFT JOIN FETCH t.milestone " +
-           "LEFT JOIN FETCH t.lastModifiedBy " +
-           "WHERE t.sprint.id = :sprintId " +
-           "AND t.archived = false")
+    @Query("""
+           SELECT DISTINCT t FROM Task t
+           LEFT JOIN FETCH t.project p
+           LEFT JOIN FETCH p.team
+           LEFT JOIN FETCH t.sprint
+           LEFT JOIN FETCH t.assignee a
+           LEFT JOIN FETCH a.user
+           LEFT JOIN FETCH t.reporter r
+           LEFT JOIN FETCH r.user
+           LEFT JOIN FETCH t.milestone
+           LEFT JOIN FETCH t.lastModifiedBy
+           WHERE t.sprint.id = :sprintId
+             AND t.archived = false
+           """)
     List<Task> findBySprintIdWithScalars(@Param("sprintId") Long sprintId);
 
-    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN FETCH t.assignees LEFT JOIN FETCH t.labels WHERE t.sprint.id = :sprintId AND t.archived = false")
+    @Query("""
+           SELECT t FROM Task t
+           WHERE t.sprint.id = :sprintId
+             AND t.archived = false
+           """)
     List<Task> findBySprintId(@Param("sprintId") Long sprintId);
 
-    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN FETCH t.assignees LEFT JOIN FETCH t.labels WHERE t.sprint.id = :sprintId AND t.status = :status AND t.archived = false")
+    @Query("""
+           SELECT t FROM Task t
+           WHERE t.sprint.id = :sprintId
+             AND t.status = :status
+             AND t.archived = false
+           """)
     List<Task> findBySprintIdAndStatus(@Param("sprintId") Long sprintId, @Param("status") String status);
+
+    boolean existsBySprint_IdAndStatusAndArchivedFalse(Long sprintId, String status);
 
     @Query("SELECT t FROM Task t WHERE t.parentTask.id = :parentId AND t.archived = false")
     List<Task> findSubtasksByParentId(@Param("parentId") Long parentId);
@@ -113,33 +132,34 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            "WHERE t.id = :taskId")
     java.util.Optional<Task> findByIdWithProjectTeam(@Param("taskId") Long taskId);
 
-    @Query("SELECT DISTINCT t FROM Task t " +
-           "LEFT JOIN FETCH t.project p " +
-           "LEFT JOIN FETCH p.team pt " +
-           "LEFT JOIN FETCH t.sprint s " +
-           "LEFT JOIN FETCH t.assignee a " +
-           "LEFT JOIN FETCH a.user au " +
-           "LEFT JOIN FETCH t.reporter r " +
-           "LEFT JOIN FETCH r.user ru " +
-           "LEFT JOIN FETCH t.milestone m " +
-           "LEFT JOIN FETCH t.kanbanColumn kc " +
-           "LEFT JOIN FETCH t.assignees " +
-           "LEFT JOIN FETCH t.labels " +
-           "WHERE t.id = :taskId")
+    @Query("""
+           SELECT DISTINCT t FROM Task t
+           LEFT JOIN FETCH t.project p
+           LEFT JOIN FETCH p.team
+           LEFT JOIN FETCH t.sprint
+           LEFT JOIN FETCH t.assignee a
+           LEFT JOIN FETCH a.user
+           LEFT JOIN FETCH t.reporter r
+           LEFT JOIN FETCH r.user
+           LEFT JOIN FETCH t.milestone
+           LEFT JOIN FETCH t.kanbanColumn
+           LEFT JOIN FETCH t.labels
+           WHERE t.id = :taskId
+           """)
     java.util.Optional<Task> findByIdWithDetails(@Param("taskId") Long taskId);
 
-    @Query("SELECT DISTINCT t FROM Task t " +
-           "LEFT JOIN FETCH t.assignees a " +
-           "LEFT JOIN FETCH a.user " +
-           "LEFT JOIN FETCH t.labels " +
-           "LEFT JOIN FETCH t.dependencies " +
-           "LEFT JOIN FETCH t.subTasks st " +
-           "LEFT JOIN FETCH t.reporter rep " +
-           "LEFT JOIN FETCH rep.user " +
-           "LEFT JOIN FETCH t.sprint " +
-           "LEFT JOIN FETCH t.project proj " +
-           "LEFT JOIN FETCH proj.team " +
-           "WHERE t.id = :id")
+    @Query("""
+           SELECT t FROM Task t
+           LEFT JOIN FETCH t.assignee primaryAssignee
+           LEFT JOIN FETCH primaryAssignee.user
+           LEFT JOIN FETCH t.reporter rep
+           LEFT JOIN FETCH rep.user
+           LEFT JOIN FETCH t.sprint
+           LEFT JOIN FETCH t.milestone
+           LEFT JOIN FETCH t.project proj
+           LEFT JOIN FETCH proj.team
+           WHERE t.id = :id
+           """)
     java.util.Optional<Task> findByIdFullyFetched(@Param("id") Long id);
 
     // Server-side filtered tasks for a project
@@ -237,7 +257,12 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            "FROM Task t WHERE t.sprint.id IN :sprintIds AND t.archived = false GROUP BY t.sprint.id")
     List<Object[]> aggregateVelocityBySprintIds(@Param("sprintIds") List<Long> sprintIds);
 
-    @Query("SELECT t.id, d.id, d.title FROM Task t LEFT JOIN t.dependencies d WHERE t.id IN :taskIds")
+    @Query("""
+           SELECT t.id, d.id, d.title
+           FROM Task t
+           LEFT JOIN t.dependencies d
+           WHERE t.id IN :taskIds
+           """)
     List<Object[]> findDependencyRowsByTaskIds(@Param("taskIds") List<Long> taskIds);
 
     @Query("SELECT t FROM Task t LEFT JOIN FETCH t.dependencies WHERE t.id = :id")

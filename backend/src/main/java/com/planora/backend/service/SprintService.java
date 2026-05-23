@@ -186,7 +186,7 @@ public class SprintService {
 
         requireConfigureBoard(existing.getProId(), currentUserId);
 
-        List<Task> sprintTasks = taskRepository.findBySprintId(id);
+        List<Task> sprintTasks = taskRepository.findBySprintIdWithScalars(id);
         if (!sprintTasks.isEmpty()) {
             sprintTasks.forEach(task -> task.setSprint(null));
             taskRepository.saveAll(sprintTasks);
@@ -245,7 +245,7 @@ public class SprintService {
         sprint.setStatus(SprintStatus.COMPLETED);
         sprintRepository.save(sprint);
 
-        List<Task> incomplete = taskRepository.findBySprintId(id)
+        List<Task> incomplete = taskRepository.findBySprintIdWithScalars(id)
                 .stream()
                 .filter(t -> !"DONE".equalsIgnoreCase(t.getStatus()))
                 .collect(Collectors.toList());

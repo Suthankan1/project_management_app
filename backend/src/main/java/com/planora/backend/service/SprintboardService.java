@@ -375,8 +375,7 @@ public class SprintboardService {
             throw new RuntimeException("Sprint column does not belong to this sprintboard");
         }
 
-        List<Task> tasksInColumn = taskRepository.findBySprintIdAndStatus(sprint.getId(), column.getColumnStatus());
-        if (!tasksInColumn.isEmpty()) {
+        if (taskRepository.existsBySprint_IdAndStatusAndArchivedFalse(sprint.getId(), column.getColumnStatus())) {
             throw new RuntimeException("Cannot delete a column that contains tasks");
         }
 

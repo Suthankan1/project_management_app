@@ -209,7 +209,7 @@ public class TaskService {
         // Uses a custom @Query to eagerly fetch details and prevent N+1 query performance issues.
         Task task = taskRepository.findByIdFullyFetched(taskId)
                 .orElseThrow(()-> new ResourceNotFoundException("Task not found"));
-        return mapToDTO(task);
+        return mapToDTO(task, buildDependencyMap(List.of(taskId)));
     }
 
     // ── 3. UPDATE TASK ──────────────────────────────────────────────────────────
@@ -1219,7 +1219,11 @@ public class TaskService {
             return java.util.Map.of();
         }
         java.util.Map<Long, List<DependencyDTO>> map = new java.util.HashMap<>();
-        for (Object[] row : taskRepository.findDependencyRowsByTaskIds(taskIds)) {
+        List<Object[]> rows = taskRepository.findDependencyRowsByTaskIds(taskIds);
+        if (rows == null) {
+            return map;
+        }
+        for (Object[] row : rows) {
             Long blockedTaskId = (Long) row[0];
             Long blockerTaskId = (Long) row[1];
             String blockerTitle = (String) row[2];
