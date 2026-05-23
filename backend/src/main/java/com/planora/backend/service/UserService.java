@@ -1,14 +1,17 @@
 package com.planora.backend.service;
 
+import java.io.IOException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.tika.Tika;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -675,6 +678,24 @@ public class UserService {
     }
 
     /**
+     * Validates a MultipartFile is a genuine image by reading its magic bytes.
+     * Rejects files whose actual content does not match an allowed image format,
+     * regardless of what Content-Type the client claimed.
+     */
+    public boolean isValidImageByMagicBytes(MultipartFile file) throws IOException {
+        // Use Apache Tika to detect the REAL media type from the byte stream
+        Tika tika = new Tika();
+        String detectedType = tika.detect(file.getInputStream());
+        // Allow only these four safe image formats
+        return detectedType != null && List.of(
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif"
+        ).contains(detectedType.toLowerCase());
+    }
+
+    /**
      * Resolves the S3 object key from the stored value.
      * Handles both legacy full-URL values and new key-only values for backward compatibility.
      */
@@ -782,4 +803,3 @@ public class UserService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }
-
