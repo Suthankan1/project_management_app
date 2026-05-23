@@ -24,7 +24,7 @@ import {
 
 const STATUSES = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
-const GROUPS: Array<{ value: BacklogGroupBy; label: string }> = [
+const GROUPS: { value: BacklogGroupBy; label: string }[] = [
   { value: 'none', label: 'None' },
   { value: 'status', label: 'Status' },
   { value: 'priority', label: 'Priority' },
@@ -511,6 +511,19 @@ export default function MobileBacklogScreen({
     setCreateTaskOpen(true);
   };
 
+  const stats = useMemo(() => {
+    const visibleTasks = isAgile
+      ? [
+          ...backlog.filteredSprints.flatMap((sprint) => sprint.tasks),
+          ...backlog.filteredProductTasks,
+        ]
+      : backlog.groupedProductTasks.flatMap((group) => group.tasks);
+    const total = visibleTasks.length;
+    const done = visibleTasks.filter((task) => task.status === 'DONE').length;
+    const points = visibleTasks.reduce((sum, task) => sum + (task.storyPoint ?? 0), 0);
+    return { total, done, points, sprints: backlog.filteredSprints.length };
+  }, [backlog.filteredProductTasks, backlog.filteredSprints, backlog.groupedProductTasks, isAgile]);
+
   if (backlog.loading) {
     return (
       <View style={[styles.loading, { paddingTop: topOffset }]}>
@@ -528,12 +541,12 @@ export default function MobileBacklogScreen({
         refreshControl={<RefreshControl refreshing={backlog.refreshing} onRefresh={backlog.refresh} tintColor={T.primary} colors={[T.primary]} />}
         showsVerticalScrollIndicator={false}
       >
-        {isAgile && (
-          <TouchableOpacity activeOpacity={0.84} onPress={() => setCreateSprintOpen(true)} style={styles.createSprintTopBtn}>
-            <Icon name="rocket" color="#FFFFFF" size={16} />
-            <Text style={styles.createSprintText}>Create sprint</Text>
-          </TouchableOpacity>
-        )}
+        <Header
+          agile={isAgile}
+          stats={stats}
+          onCreateTask={() => openCreateTask(null)}
+          onCreateSprint={isAgile ? () => setCreateSprintOpen(true) : undefined}
+        />
 
         <FilterBar
           filters={backlog.filters}
@@ -698,13 +711,21 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 14, gap: 12 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: T.bgSecondary },
   loadingText: { fontSize: 13, fontWeight: '700', color: T.textSecondary },
-  hero: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', padding: 14, gap: 12, ...shadow },
+  hero: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.9)',
+    padding: 14,
+    gap: 12,
+    ...shadow,
+  },
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   heroIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: T.primary, alignItems: 'center', justifyContent: 'center' },
   heroIconAgile: { backgroundColor: '#8B5CF6' },
   heroTitleWrap: { flex: 1, minWidth: 0 },
   eyebrow: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 1 },
-  title: { fontSize: 20, fontWeight: '900', color: '#0F172A', marginTop: 2 },
+  title: { fontSize: 21, fontWeight: '900', color: '#0F172A', marginTop: 2, letterSpacing: -0.3 },
   headerIconBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', alignItems: 'center', justifyContent: 'center' },
   progressWrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   progressTrack: { flex: 1, height: 6, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
@@ -715,16 +736,25 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 20, fontWeight: '900' },
   statLabel: { fontSize: 10, fontWeight: '800', color: T.textSecondary, letterSpacing: 0.6, textTransform: 'uppercase' },
   createSprintBtn: { height: 42, borderRadius: 12, backgroundColor: T.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  createSprintTopBtn: { height: 46, borderRadius: 14, backgroundColor: T.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   createSprintText: { fontSize: 13, fontWeight: '900', color: '#FFFFFF' },
-  filters: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  filters: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.9)',
+    padding: 8,
+    ...shadow,
+  },
   searchWrap: { flex: 1, minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
   searchInput: { flex: 1, fontSize: 13, color: '#0F172A', paddingVertical: 0 },
   filterBtn: { width: 46, height: 46, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   filterBtnActive: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   filterLetter: { fontSize: 13, fontWeight: '900', color: '#64748B' },
   filterLetterActive: { color: T.primary },
-  groupRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  groupRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 6, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.9)' },
   groupBtn: { minHeight: 34, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   groupBtnActive: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   groupText: { fontSize: 12, fontWeight: '800', color: '#64748B' },
@@ -733,7 +763,7 @@ const styles = StyleSheet.create({
   errorTitle: { fontSize: 13, fontWeight: '900', color: '#991B1B' },
   errorText: { fontSize: 12, fontWeight: '700', color: '#B91C1C', marginTop: 2 },
   sections: { gap: 14 },
-  section: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', padding: 12, gap: 10 },
+  section: { backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.9)', padding: 12, gap: 10, ...shadow },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   sectionTitle: { fontSize: 15, fontWeight: '900', color: '#0F172A' },
   sectionSub: { fontSize: 11, fontWeight: '700', color: '#94A3B8', marginTop: 2 },
@@ -742,7 +772,7 @@ const styles = StyleSheet.create({
   emptyPanel: { minHeight: 150, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', padding: 18, gap: 8 },
   emptyTitle: { fontSize: 15, fontWeight: '900', color: '#64748B' },
   emptyText: { fontSize: 12, fontWeight: '700', color: '#94A3B8', textAlign: 'center' },
-  taskCard: { flexDirection: 'row', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', padding: 11, ...shadow },
+  taskCard: { flexDirection: 'row', gap: 10, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.9)', backgroundColor: '#FFFFFF', padding: 11, ...shadow },
   taskCardSelected: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   checkBox: { width: 24, height: 24, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginTop: 3 },
   checkBoxActive: { backgroundColor: T.primary, borderColor: T.primary },

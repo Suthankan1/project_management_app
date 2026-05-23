@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { T, STATUS_MAP, StatusKey } from '../../constants/tokens';
 import {
@@ -618,17 +619,25 @@ export default function ProjectBoardScreen({
       >
         <Animated.View style={[s.hero, { opacity: fade }]}>
           <View style={s.heroTop}>
-            <View style={s.boardMark}>
+            <LinearGradient
+              colors={[T.primary, '#4D8BFF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.boardMark}
+            >
               <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
                 <Path d="M4 4h5v16H4z" />
                 <Path d="M10.5 4h4.5v11h-4.5z" />
                 <Path d="M16.5 4H20v14h-3.5z" />
               </Svg>
-            </View>
+            </LinearGradient>
             <View style={s.heroTitleWrap}>
               <Text style={s.eyebrow}>KANBAN BOARD</Text>
               <Text style={s.title} numberOfLines={1}>{projectName || board?.name || 'Board'}</Text>
             </View>
+            <TouchableOpacity activeOpacity={0.84} onPress={() => setShowColumnModal(true)} style={s.heroActionBtn}>
+              <PlusIcon color={T.primary} />
+            </TouchableOpacity>
           </View>
 
           <View style={s.progressWrap}>
@@ -857,25 +866,36 @@ const s = StyleSheet.create({
   scrollContent: { paddingTop: 4 },
   hero: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    marginHorizontal: 14,
+    marginTop: 2,
+    padding: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.9)',
     gap: 12,
+    ...shadow,
   },
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   boardMark: {
     width: 42,
     height: 42,
     borderRadius: 12,
-    backgroundColor: T.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroTitleWrap: { flex: 1, minWidth: 0 },
-  eyebrow: { fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 1 },
-  title: { fontSize: 20, fontWeight: '900', color: '#0F172A', marginTop: 2 },
+  eyebrow: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 1 },
+  title: { fontSize: 21, fontWeight: '900', color: '#0F172A', marginTop: 2, letterSpacing: -0.3 },
+  heroActionBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   progressWrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   progressTrack: { flex: 1, height: 6, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 999, backgroundColor: '#22C55E' },
@@ -933,14 +953,14 @@ const s = StyleSheet.create({
   errorText: { fontSize: 12, color: '#991B1B', fontWeight: '700' },
   loadingWrap: { paddingVertical: 34, alignItems: 'center', gap: 10 },
   loadingText: { fontSize: 13, color: '#64748B', fontWeight: '700' },
-  boardRow: { paddingHorizontal: 12, paddingTop: 14, gap: 14, overflow: 'visible' },
+  boardRow: { paddingHorizontal: 14, paddingTop: 14, gap: 14, overflow: 'visible' },
   addColumnCard: {
     minHeight: 360,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: '#BFDBFE',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F8FBFF',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
@@ -961,14 +981,15 @@ const s = StyleSheet.create({
 
 const columnStyles = StyleSheet.create({
   card: {
-    backgroundColor: '#F8F9FB',
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(226, 232, 240, 0.95)',
+    borderColor: 'rgba(226, 232, 240, 0.9)',
     overflow: 'visible',
     minHeight: 360,
+    ...shadow,
   },
-  accent: { height: 5 },
+  accent: { height: 5, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1022,7 +1043,7 @@ const columnStyles = StyleSheet.create({
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: '#CBD5E1',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,
@@ -1049,9 +1070,9 @@ const columnStyles = StyleSheet.create({
 const card = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(226, 232, 240, 0.9)',
     padding: 13,
     paddingTop: 14,
     gap: 10,

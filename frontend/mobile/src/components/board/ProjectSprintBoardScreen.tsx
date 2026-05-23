@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { T, STATUS_MAP, StatusKey } from '../../constants/tokens';
 import { SprintboardTask, Sprintcolumn, SprintSummary, useProjectSprintBoard } from '../../hooks/useProjectSprintBoard';
@@ -376,11 +377,21 @@ export default function ProjectSprintBoardScreen({
       >
         <View style={s.hero}>
           <View style={s.heroTop}>
-            <View style={s.boardMark}><SprintIcon /></View>
+            <LinearGradient
+              colors={['#7C3AED', '#A855F7']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.boardMark}
+            >
+              <SprintIcon />
+            </LinearGradient>
             <View style={s.heroTitleWrap}>
               <Text style={s.eyebrow}>SPRINT BOARD</Text>
               <Text style={s.title} numberOfLines={1}>{projectName || 'Agile project'}</Text>
             </View>
+            <TouchableOpacity activeOpacity={0.84} onPress={() => setShowColumnModal(true)} style={s.heroActionBtn}>
+              <PlusIcon />
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity activeOpacity={0.82} onPress={() => setShowSprintModal(true)} style={s.sprintSelect}>
@@ -616,12 +627,23 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: T.bgSecondary },
   scroll: { flex: 1, backgroundColor: T.bgSecondary },
   scrollContent: { paddingTop: 4 },
-  hero: { backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', gap: 12 },
+  hero: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 14,
+    marginTop: 2,
+    padding: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.9)',
+    gap: 12,
+    ...shadow,
+  },
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  boardMark: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#8B5CF6', alignItems: 'center', justifyContent: 'center' },
+  boardMark: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   heroTitleWrap: { flex: 1, minWidth: 0 },
-  eyebrow: { fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 1 },
-  title: { fontSize: 20, fontWeight: '900', color: '#0F172A', marginTop: 2 },
+  eyebrow: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 1 },
+  title: { fontSize: 21, fontWeight: '900', color: '#0F172A', marginTop: 2, letterSpacing: -0.3 },
+  heroActionBtn: { width: 42, height: 42, borderRadius: 13, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', alignItems: 'center', justifyContent: 'center' },
   sprintSelect: { minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC', paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sprintLabel: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 0.8 },
   sprintName: { fontSize: 15, fontWeight: '900', color: '#0F172A', marginTop: 2 },
@@ -645,16 +667,16 @@ const s = StyleSheet.create({
   emptyBoard: { margin: 16, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', padding: 24, alignItems: 'center', gap: 6 },
   emptyBoardTitle: { fontSize: 16, fontWeight: '900', color: '#0F172A' },
   emptyBoardText: { fontSize: 12, fontWeight: '700', color: '#64748B', textAlign: 'center' },
-  boardRow: { paddingHorizontal: 12, paddingTop: 14, gap: 14 },
-  addColumnCard: { minHeight: 360, borderRadius: 16, borderWidth: 2, borderStyle: 'dashed', borderColor: '#DDD6FE', backgroundColor: '#F5F3FF', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  boardRow: { paddingHorizontal: 14, paddingTop: 14, gap: 14 },
+  addColumnCard: { minHeight: 360, borderRadius: 20, borderWidth: 2, borderStyle: 'dashed', borderColor: '#DDD6FE', backgroundColor: '#FAF5FF', alignItems: 'center', justifyContent: 'center', gap: 10 },
   addColumnIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DDD6FE', alignItems: 'center', justifyContent: 'center' },
   addColumnText: { fontSize: 15, fontWeight: '900', color: T.primary },
   bottomPad: { height: 94 },
 });
 
 const columnStyles = StyleSheet.create({
-  card: { backgroundColor: '#F8F9FB', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.95)', overflow: 'hidden', minHeight: 360 },
-  accent: { height: 5 },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.9)', overflow: 'hidden', minHeight: 360, ...shadow },
+  accent: { height: 5, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
   headerLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -664,14 +686,14 @@ const columnStyles = StyleSheet.create({
   countText: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
   headerDeleteBtn: { width: 28, height: 28, borderRadius: 9, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },
   body: { paddingHorizontal: 12, paddingBottom: 12, gap: 10 },
-  emptyState: { minHeight: 128, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  emptyState: { minHeight: 128, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 13, fontWeight: '900', color: '#64748B' },
   addTaskBtn: { marginHorizontal: 12, marginBottom: 12, height: 42, borderRadius: 12, borderWidth: 1, borderColor: '#BFDBFE', backgroundColor: '#EFF6FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   addTaskText: { fontSize: 13, fontWeight: '900', color: T.primary },
 });
 
 const taskStyles = StyleSheet.create({
-  card: { backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', padding: 13, paddingTop: 14, gap: 10, ...shadow },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.9)', padding: 13, paddingTop: 14, gap: 10, ...shadow },
   topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 28, paddingRight: 36 },
   deleteBtn: { position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
   priority: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
