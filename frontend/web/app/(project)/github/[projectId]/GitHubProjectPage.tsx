@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   GitBranch, Globe, Lock, RefreshCw, Search, X, Check, Link2,
-  LogOut, User, ExternalLink, GitPullRequest, ChevronDown, AlertCircle,
+  LogOut, User, ExternalLink, GitPullRequest, ChevronDown, AlertCircle, GitCommit,
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -17,8 +17,10 @@ import {
   fetchRepositoriesWithToken,
   fetchGitHubUser,
   fetchPullRequests,
+  fetchCommits,
   type GitHubRepository,
   type GitHubPullRequest,
+  type GitHubCommit,
   type GitHubUser,
   type ProjectGitHubConnection,
 } from '@/services/githubService';
@@ -169,6 +171,55 @@ function PRCard({ pr }: { pr: GitHubPullRequest }) {
             {label.name}
           </span>
         ))}
+      </div>
+    </motion.a>
+  );
+}
+
+// ── Commit Card ───────────────────────────────────────────────────────────────
+function CommitCard({ commit }: { commit: GitHubCommit }) {
+  const firstLine = commit.commit.message.split('\n')[0];
+  const shortSha = commit.sha.slice(0, 7);
+  const authorName = commit.author?.login ?? commit.commit.author.name;
+  const avatarUrl = commit.author?.avatar_url ?? null;
+
+  return (
+    <motion.a
+      href={commit.html_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -2, boxShadow: '0 8px 28px rgba(0,0,0,0.10)' }}
+      transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+      className="flex flex-col gap-3 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-slate-300 transition-colors group"
+    >
+      {/* SHA + date */}
+      <div className="flex items-center gap-2">
+        <span className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">
+          <GitCommit size={11} />
+          {shortSha}
+        </span>
+        <span className="ml-auto text-[11px] text-slate-400 font-outfit shrink-0">
+          {timeAgo(commit.commit.author.date)}
+        </span>
+      </div>
+
+      {/* Message */}
+      <p className="text-sm font-outfit font-semibold text-slate-800 leading-snug line-clamp-2 group-hover:text-blue-600 transition-colors">
+        {firstLine}
+      </p>
+
+      {/* Author */}
+      <div className="flex items-center gap-1.5">
+        {avatarUrl ? (
+          <Image src={avatarUrl} alt={authorName} width={18} height={18} className="rounded-full" unoptimized />
+        ) : (
+          <div className="w-[18px] h-[18px] rounded-full bg-slate-200 flex items-center justify-center shrink-0">
+            <User size={10} className="text-slate-400" />
+          </div>
+        )}
+        <span className="text-[11px] text-slate-500 font-outfit">@{authorName}</span>
       </div>
     </motion.a>
   );
@@ -382,23 +433,38 @@ function RepoModal({
   );
 }
 
-// ── Connected dashboard (PR grid + top-right controls) ────────────────────────
+// ── Shared skeleton loader ────────────────────────────────────────────────────
+function SkeletonList() {
+  return (
+    <div className="flex flex-col gap-3">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="h-[120px] rounded-2xl bg-slate-100 animate-pulse" />
+      ))}
+    </div>
+  );
+}
+
+// ── Connected dashboard ───────────────────────────────────────────────────────
 function ConnectedDashboard({
   connection,
   prs,
-  loadingPRs,
+  commits,
+  loading,
   prError,
+  commitError,
   user,
-  onRefreshPRs,
+  onRefresh,
   onLogout,
   onChangeRepo,
 }: {
   connection: ProjectGitHubConnection;
   prs: GitHubPullRequest[];
-  loadingPRs: boolean;
+  commits: GitHubCommit[];
+  loading: boolean;
   prError: string | null;
+  commitError: string | null;
   user: GitHubUser | null;
-  onRefreshPRs: () => void;
+  onRefresh: () => void;
   onLogout: () => void;
   onChangeRepo: () => void;
 }) {
@@ -408,9 +474,8 @@ function ConnectedDashboard({
       animate={{ opacity: 1 }}
       className="w-full flex flex-col gap-5"
     >
-      {/* Top bar */}
+      {/* ── Top bar (unchanged) ─────────────────────────────────────────── */}
       <div className="flex items-center gap-3 flex-wrap">
-        {/* Repo badge */}
         <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 shadow-sm">
           <GitHubMark size={14} className="text-white" />
           <span className="text-xs font-outfit font-bold text-white truncate max-w-[220px]">
@@ -428,22 +493,17 @@ function ConnectedDashboard({
           </span>
         </div>
 
-        {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Top-right actions */}
         <div className="flex items-center gap-2">
-          {/* Refresh */}
           <button
-            onClick={onRefreshPRs}
-            disabled={loadingPRs}
-            title="Refresh pull requests"
+            onClick={onRefresh}
+            disabled={loading}
+            title="Refresh"
             className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors shadow-sm text-slate-500 hover:text-slate-700 disabled:opacity-40"
           >
-            <RefreshCw size={14} className={loadingPRs ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
-
-          {/* Change repository */}
           <button
             onClick={onChangeRepo}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors shadow-sm text-xs font-outfit font-semibold text-slate-700"
@@ -451,78 +511,114 @@ function ConnectedDashboard({
             <Link2 size={13} />
             Change repo
           </button>
-
-          {/* Account dropdown (includes Logout) */}
           <AccountDropdown user={user} onLogout={onLogout} onChangeRepo={onChangeRepo} />
         </div>
       </div>
 
-      {/* PR grid header */}
-      <div className="flex items-center gap-2">
-        <GitPullRequest size={16} className="text-slate-500" />
-        <h2 className="text-sm font-outfit font-bold text-slate-700">
-          Pull Requests
-          {!loadingPRs && !prError && (
-            <span className="ml-2 text-slate-400 font-normal">({prs.length})</span>
-          )}
-        </h2>
-        <a
-          href={`https://github.com/${connection.repoFullName}/pulls`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline"
-        >
-          View on GitHub <ExternalLink size={11} />
-        </a>
-      </div>
+      {/* ── Two-column content ──────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-6">
 
-      {/* Loading */}
-      {loadingPRs && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-[130px] rounded-2xl bg-slate-100 animate-pulse" />
-          ))}
-        </div>
-      )}
-
-      {/* Error */}
-      {!loadingPRs && prError && (
-        <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center">
-            <AlertCircle size={18} className="text-red-500" />
-          </div>
-          <p className="text-sm text-slate-600 font-outfit">{prError}</p>
-          <button onClick={onRefreshPRs} className="text-sm text-blue-600 font-outfit font-semibold hover:underline">
-            Try again
-          </button>
-        </div>
-      )}
-
-      {/* Empty */}
-      {!loadingPRs && !prError && prs.length === 0 && (
-        <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
-            <GitPullRequest size={18} className="text-slate-400" />
-          </div>
-          <p className="text-sm text-slate-500 font-outfit">No pull requests found for this repository.</p>
-        </div>
-      )}
-
-      {/* PR Grid */}
-      {!loadingPRs && !prError && prs.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {prs.map((pr, i) => (
-            <motion.div
-              key={pr.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
+        {/* ── Left: Pull Requests ──────────────────────────────────── */}
+        <div className="flex flex-col gap-3 min-w-0">
+          <div className="flex items-center gap-2">
+            <GitPullRequest size={15} className="text-slate-500 shrink-0" />
+            <h2 className="text-sm font-outfit font-bold text-slate-700">
+              Pull Requests
+              {!loading && !prError && (
+                <span className="ml-1.5 text-slate-400 font-normal">({prs.length})</span>
+              )}
+            </h2>
+            <a
+              href={`https://github.com/${connection.repoFullName}/pulls`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline shrink-0"
             >
-              <PRCard pr={pr} />
-            </motion.div>
-          ))}
+              GitHub <ExternalLink size={10} />
+            </a>
+          </div>
+
+          {loading && <SkeletonList />}
+
+          {!loading && prError && (
+            <div className="flex flex-col items-center gap-2 py-10 text-center">
+              <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
+                <AlertCircle size={16} className="text-red-500" />
+              </div>
+              <p className="text-xs text-slate-500 font-outfit">{prError}</p>
+              <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
+            </div>
+          )}
+
+          {!loading && !prError && prs.length === 0 && (
+            <div className="flex flex-col items-center gap-2 py-10">
+              <GitPullRequest size={20} className="text-slate-300" />
+              <p className="text-xs text-slate-400 font-outfit">No pull requests found</p>
+            </div>
+          )}
+
+          {!loading && !prError && prs.length > 0 && (
+            <div className="flex flex-col gap-3">
+              {prs.map((pr, i) => (
+                <motion.div key={pr.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+                  <PRCard pr={pr} />
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* ── Right: Commits ───────────────────────────────────────── */}
+        <div className="flex flex-col gap-3 min-w-0">
+          <div className="flex items-center gap-2">
+            <GitCommit size={15} className="text-slate-500 shrink-0" />
+            <h2 className="text-sm font-outfit font-bold text-slate-700">
+              Commits
+              {!loading && !commitError && (
+                <span className="ml-1.5 text-slate-400 font-normal">({commits.length})</span>
+              )}
+            </h2>
+            <a
+              href={`https://github.com/${connection.repoFullName}/commits`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline shrink-0"
+            >
+              GitHub <ExternalLink size={10} />
+            </a>
+          </div>
+
+          {loading && <SkeletonList />}
+
+          {!loading && commitError && (
+            <div className="flex flex-col items-center gap-2 py-10 text-center">
+              <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
+                <AlertCircle size={16} className="text-red-500" />
+              </div>
+              <p className="text-xs text-slate-500 font-outfit">{commitError}</p>
+              <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
+            </div>
+          )}
+
+          {!loading && !commitError && commits.length === 0 && (
+            <div className="flex flex-col items-center gap-2 py-10">
+              <GitCommit size={20} className="text-slate-300" />
+              <p className="text-xs text-slate-400 font-outfit">No commits found</p>
+            </div>
+          )}
+
+          {!loading && !commitError && commits.length > 0 && (
+            <div className="flex flex-col gap-3">
+              {commits.map((commit, i) => (
+                <motion.div key={commit.sha} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+                  <CommitCard commit={commit} />
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
     </motion.div>
   );
 }
@@ -535,8 +631,10 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   const [connection, setConnection] = useState<ProjectGitHubConnection | null>(null);
   const [user, setUser] = useState<GitHubUser | null>(null);
   const [prs, setPRs] = useState<GitHubPullRequest[]>([]);
-  const [loadingPRs, setLoadingPRs] = useState(false);
+  const [commits, setCommits] = useState<GitHubCommit[]>([]);
+  const [loading, setLoading] = useState(false);
   const [prError, setPRError] = useState<string | null>(null);
+  const [commitError, setCommitError] = useState<string | null>(null);
 
   // Repo modal state
   const [showModal, setShowModal] = useState(false);
@@ -549,29 +647,29 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     setConnection(getProjectGitHubRepo(projectId));
   }, [projectId]);
 
-  const loadPRs = useCallback(async (conn: ProjectGitHubConnection) => {
+  const loadData = useCallback(async (conn: ProjectGitHubConnection) => {
     const token = getGitHubToken();
     if (!token) return;
-    setLoadingPRs(true);
+    setLoading(true);
     setPRError(null);
-    try {
-      const [prData, userData] = await Promise.all([
-        fetchPullRequests(token, conn.ownerLogin, conn.repoName),
-        fetchGitHubUser(token),
-      ]);
-      setPRs(prData);
-      setUser(userData);
-    } catch (err) {
-      setPRError(err instanceof Error ? err.message : 'Failed to load pull requests');
-    } finally {
-      setLoadingPRs(false);
-    }
+    setCommitError(null);
+    const [prResult, commitResult, userResult] = await Promise.allSettled([
+      fetchPullRequests(token, conn.ownerLogin, conn.repoName),
+      fetchCommits(token, conn.ownerLogin, conn.repoName),
+      fetchGitHubUser(token),
+    ]);
+    if (prResult.status === 'fulfilled') setPRs(prResult.value);
+    else setPRError(prResult.reason instanceof Error ? prResult.reason.message : 'Failed to load pull requests');
+    if (commitResult.status === 'fulfilled') setCommits(commitResult.value);
+    else setCommitError(commitResult.reason instanceof Error ? commitResult.reason.message : 'Failed to load commits');
+    if (userResult.status === 'fulfilled') setUser(userResult.value);
+    setLoading(false);
   }, []);
 
-  // Auto-load PRs when connection is set
+  // Auto-load data when connection is set
   useEffect(() => {
-    if (connection) void loadPRs(connection);
-  }, [connection, loadPRs]);
+    if (connection) void loadData(connection);
+  }, [connection, loadData]);
 
   const loadRepos = useCallback(async () => {
     const token = getGitHubToken();
@@ -622,7 +720,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     setConnection(newConn);
     setShowModal(false);
     setRepoSearch('');
-    void loadPRs(newConn);
+    void loadData(newConn);
   };
 
   const handleLogout = async () => {
@@ -641,6 +739,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     setConnection(null);
     setUser(null);
     setPRs([]);
+    setCommits([]);
   };
 
   const filteredRepos = allRepos.filter(r =>
@@ -655,10 +754,12 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
             key="dashboard"
             connection={connection}
             prs={prs}
-            loadingPRs={loadingPRs}
+            commits={commits}
+            loading={loading}
             prError={prError}
+            commitError={commitError}
             user={user}
-            onRefreshPRs={() => void loadPRs(connection)}
+            onRefresh={() => void loadData(connection)}
             onLogout={() => void handleLogout()}
             onChangeRepo={handleOpenModal}
           />

@@ -128,6 +128,35 @@ export async function fetchPullRequests(
   return response.json()
 }
 
+export interface GitHubCommit {
+  sha: string
+  html_url: string
+  commit: {
+    message: string
+    author: { name: string; date: string }
+  }
+  author: { login: string; avatar_url: string; html_url: string } | null
+}
+
+export async function fetchCommits(
+  token: string,
+  owner: string,
+  repo: string,
+): Promise<GitHubCommit[]> {
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/commits?per_page=10`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    },
+  )
+  if (response.status === 404) throw new Error('Repository not found or no access')
+  if (!response.ok) throw new Error('Failed to fetch commits')
+  return response.json()
+}
+
 // ── GitHub token (stored per browser session) ────────────────────────────────
 
 export function getGitHubToken(): string | null {
