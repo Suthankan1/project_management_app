@@ -24,6 +24,7 @@ export function useProjectTabs(projectId: string | null, isAgile: boolean) {
       { id: 'dms',        label: 'DMS' },
       { id: 'list',       label: 'List' },
       { id: 'report',     label: 'Report' },
+      { id: 'github',     label: 'GitHub' },
     );
 
     return base;
@@ -43,6 +44,7 @@ export function useProjectTabs(projectId: string | null, isAgile: boolean) {
     if (pathname.startsWith('/members'))  return 'members';
     if (pathname.startsWith('/pages') || pathname.startsWith('/folders')) return 'dms';
     if (pathname.startsWith('/report'))   return 'report';
+    if (pathname.startsWith('/github'))   return 'github';
     return 'summary';
   }, [pathname]);
 
@@ -66,6 +68,7 @@ export function useProjectTabs(projectId: string | null, isAgile: boolean) {
       case 'members':    return projectId ? `/members/${projectId}` : '/members';
       case 'dms':        return withProjectId('/pages');
       case 'report':     return projectId ? `/report/${projectId}` : '/dashboard';
+      case 'github':     return projectId ? `/github/${projectId}` : '/dashboard';
       default:           return projectId ? `/summary/${projectId}` : '/dashboard';
     }
   };
@@ -93,6 +96,7 @@ export function useProjectTabs(projectId: string | null, isAgile: boolean) {
       '/notifications',
       '/members',
       '/report',
+      '/github',
     ];
     return hasProjectContext && projectScopedPaths.some(path => pathname.startsWith(path));
   }, [pathname, projectId]);
