@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Alert, ActionSheetIOS, Platform } from 'react-native';
+import { View, StyleSheet, Alert, ActionSheetIOS, Platform, GestureResponderEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useChat } from '@/src/hooks/chat/useChat';
@@ -17,6 +17,12 @@ import { ChatMessage, ChatRoom } from '@/src/types/chat';
 import { QUICK_REACTIONS } from '@/src/hooks/chat/chatUtils';
 import { QuickReactionBar } from '@/src/components/chat/QuickReactionBar';
 
+interface ReactionTarget {
+  message: ChatMessage;
+  anchorY: number;
+  isMe: boolean;
+}
+
 export default function ChatScreen() {
   const { id: projectId } = useLocalSearchParams<{ id: string }>();
   const [showSidebar, setShowSidebar] = useState(true);
@@ -29,7 +35,7 @@ export default function ChatScreen() {
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [deletingMessageId, setDeletingMessageId] = useState<number | null>(null);
   const [editingRoom, setEditingRoom] = useState<{ id: number; name: string; topic: string; description: string } | null>(null);
-  const [reactionTarget, setReactionTarget] = useState<ChatMessage | null>(null);
+  const [reactionTarget, setReactionTarget] = useState<ReactionTarget | null>(null);
 
   const {
     currentUser, currentUserAliases, users, userProfilePics,
@@ -96,13 +102,25 @@ export default function ChatScreen() {
     currentUser.trim().toLowerCase(),
     ...currentUserAliases.map(alias => alias.trim().toLowerCase()),
   ]);
+  const reactionMessage = reactionTarget?.message ?? null;
+  const selectedReaction = reactionMessage?.id
+    ? messageReactions[reactionMessage.id]?.find(reaction => reaction.reactedByCurrentUser)?.emoji
+    : undefined;
 
   const isConnected         = isSocketConnected;
   const isReconnectError    = error.toLowerCase().includes('reconnect');
   const shouldShowErrorBanner = Boolean(error) && !isReconnectError;
 
-  const handleMessageLongPress = (message: ChatMessage) => {
-    setReactionTarget(message);
+  const handleMessageLongPress = (
+    message: ChatMessage,
+    event: GestureResponderEvent,
+    messageIsMe: boolean,
+  ) => {
+    setReactionTarget({
+      message,
+      anchorY: event.nativeEvent.pageY,
+      isMe: messageIsMe,
+    });
   };
 
   const handleAction = (index: number, message: ChatMessage, isMe: boolean) => {
@@ -304,10 +322,13 @@ export default function ChatScreen() {
       <QuickReactionBar
         visible={!!reactionTarget}
         onClose={() => setReactionTarget(null)}
-        onReact={(emoji) => { if (reactionTarget?.id) toggleReaction(reactionTarget.id, emoji); }}
-        onReply={() => reactionTarget && openThread(reactionTarget)}
-        onEdit={reactionTarget && currentUserIdentitySet.has((reactionTarget.sender || '').trim().toLowerCase()) ? () => setEditingMessage(reactionTarget) : undefined}
-        onDelete={reactionTarget && currentUserIdentitySet.has((reactionTarget.sender || '').trim().toLowerCase()) && reactionTarget.id ? () => setDeletingMessageId(reactionTarget.id as number) : undefined}
+        onReact={(emoji) => { if (reactionMessage?.id) toggleReaction(reactionMessage.id, emoji); }}
+        onReply={() => reactionMessage && openThread(reactionMessage)}
+        onEdit={reactionMessage && currentUserIdentitySet.has((reactionMessage.sender || '').trim().toLowerCase()) ? () => setEditingMessage(reactionMessage) : undefined}
+        onDelete={reactionMessage && currentUserIdentitySet.has((reactionMessage.sender || '').trim().toLowerCase()) && reactionMessage.id ? () => setDeletingMessageId(reactionMessage.id as number) : undefined}
+        anchorY={reactionTarget?.anchorY}
+        isMe={reactionTarget?.isMe}
+        selectedEmoji={selectedReaction}
       />
     </SafeAreaView>
   );

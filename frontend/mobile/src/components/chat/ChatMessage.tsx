@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, Linking,
-  FlatList, Dimensions,
+  FlatList, Dimensions, GestureResponderEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/src/constants/colors';
@@ -20,7 +20,7 @@ interface ChatMessageProps {
   currentUser: string;
   currentUserAliases: string[];
   reactions: ChatReactionSummary[];
-  onLongPress: (message: ChatMessageType) => void;
+  onLongPress: (message: ChatMessageType, event: GestureResponderEvent, isMe: boolean) => void;
   onToggleReaction: (messageId: number, emoji: string) => void;
   onOpenThread: (message: ChatMessageType) => void;
   isPinned?: boolean;
@@ -176,7 +176,7 @@ export function ChatMessage({
             <Text style={styles.senderName}>{message.sender}</Text>
           )}
 
-          <TouchableOpacity onLongPress={() => onLongPress(message)} activeOpacity={0.85}>
+          <TouchableOpacity onLongPress={(event) => onLongPress(message, event, isMe)} activeOpacity={0.85}>
             <View style={[
               styles.bubble,
               isMe ? styles.myBubble : styles.otherBubble,

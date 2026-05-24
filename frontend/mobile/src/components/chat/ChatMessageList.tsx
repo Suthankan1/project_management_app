@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Animated,
+  GestureResponderEvent,
 } from 'react-native';
 import { ChatMessage } from './ChatMessage';
 import { ChatMessage as ChatMessageType, ChatReactionSummary } from '../../types/chat';
@@ -29,7 +30,7 @@ interface ChatMessageListProps {
   onToggleReaction: (messageId: number, emoji: string) => void;
   onPinRoomMessage?: (messageId: number | null) => void;
   typingUser?: string;
-  onLongPress: (message: ChatMessageType) => void;
+  onLongPress: (message: ChatMessageType, event: GestureResponderEvent, isMe: boolean) => void;
   isLoadingMore?: boolean;
 }
 

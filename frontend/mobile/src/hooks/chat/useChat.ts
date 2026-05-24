@@ -431,6 +431,12 @@ export function useChat(projectId: string) {
     stompSend(`/app/project/${projectId}/typing`, body);
   }, [projectId, stompSend]);
 
+  const toggleReaction = useCallback((messageId: number, emoji: string) => {
+    const ws = socketRef.current;
+    const canUseStomp = isSocketConnected && ws?.readyState === WebSocket.OPEN;
+    return reactionsHook.toggleReaction(messageId, emoji, canUseStomp ? stompSend : undefined);
+  }, [isSocketConnected, reactionsHook, stompSend]);
+
   // ── Selection actions ─────────────────────────────────────────────────────
   const selectPrivateUser = useCallback((user: string | null) => {
     const displayUser = user ? usersRef.current.find(u => dmKey(u) === dmKey(user)) || user : null;
@@ -491,7 +497,7 @@ export function useChat(projectId: string) {
     closeThread: threadsHook.closeThread,
     editMessage: messagesHook.editMessage,
     deleteMessage: messagesHook.deleteMessage,
-    toggleReaction: reactionsHook.toggleReaction,
+    toggleReaction,
     loadPrivateHistory: messagesHook.loadPrivateHistory,
     loadRoomHistory: messagesHook.loadRoomHistory,
     createRoom: roomsHook.createRoom,

@@ -64,7 +64,10 @@ export function ThreadBottomSheet(props: ThreadBottomSheetProps) {
 
   if (!rootMessage && !visible) return null;
 
-  const data = rootMessage ? [rootMessage, ...threadMessages] : [];
+  const replies = rootMessage?.id
+    ? threadMessages.filter(message => message.id !== rootMessage.id)
+    : threadMessages;
+  const data = rootMessage ? [rootMessage, ...replies] : [];
   const identitySet = new Set([
     currentUser.trim().toLowerCase(),
     ...currentUserAliases.map(alias => alias.trim().toLowerCase()),
@@ -87,7 +90,12 @@ export function ThreadBottomSheet(props: ThreadBottomSheetProps) {
 
         <FlatList
           data={data}
-          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+          keyExtractor={(item, index) => {
+            const prefix = index === 0 ? 'thread-root' : 'thread-reply';
+            if (item.localId) return `${prefix}-${item.localId}-${index}`;
+            if (item.id) return `${prefix}-${item.id}-${index}`;
+            return `${prefix}-${index}`;
+          }}
           renderItem={({ item, index }) => (
             <ChatMessage
               message={item}

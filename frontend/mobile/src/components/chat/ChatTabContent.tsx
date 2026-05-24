@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { GestureResponderEvent, View, StyleSheet, Alert } from 'react-native';
 import { useChat } from '@/src/hooks/chat/useChat';
 import { ChatSidebar }          from '@/src/components/chat/ChatSidebar';
 import { ChatHeader }           from '@/src/components/chat/ChatHeader';
@@ -23,6 +23,12 @@ interface Props {
   navHeight: number;
 }
 
+interface ReactionTarget {
+  message: ChatMessage;
+  anchorY: number;
+  isMe: boolean;
+}
+
 export function ChatTabContent({ projectId, navHeight }: Props) {
   const [showSidebar, setShowSidebar] = useState(true);
   const [showSearch,  setShowSearch]  = useState(false);
@@ -33,7 +39,7 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
   const [editingMessage,     setEditingMessage]      = useState<ChatMessage | null>(null);
   const [deletingMessageId,  setDeletingMessageId]   = useState<number | null>(null);
   const [editingRoom,        setEditingRoom]         = useState<{ id: number; name: string; topic: string; description: string } | null>(null);
-  const [reactionTarget,     setReactionTarget]      = useState<ChatMessage | null>(null);
+  const [reactionTarget,     setReactionTarget]      = useState<ReactionTarget | null>(null);
 
   const {
     currentUser, currentUserAliases, users, userProfilePics,
@@ -95,6 +101,22 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
     currentUser.trim().toLowerCase(),
     ...currentUserAliases.map(alias => alias.trim().toLowerCase()),
   ]);
+  const reactionMessage = reactionTarget?.message ?? null;
+  const selectedReaction = reactionMessage?.id
+    ? messageReactions[reactionMessage.id]?.find(reaction => reaction.reactedByCurrentUser)?.emoji
+    : undefined;
+
+  const handleMessageLongPress = (
+    message: ChatMessage,
+    event: GestureResponderEvent,
+    messageIsMe: boolean,
+  ) => {
+    setReactionTarget({
+      message,
+      anchorY: event.nativeEvent.pageY,
+      isMe: messageIsMe,
+    });
+  };
 
   const isConnected           = isSocketConnected;
   const isReconnectError      = error.toLowerCase().includes('reconnect');
@@ -198,7 +220,7 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
             onToggleReaction={toggleReaction}
             onPinRoomMessage={selectedRoomId ? (mid) => pinRoomMessage(selectedRoomId, mid) : undefined}
             typingUser={activeTyping}
-            onLongPress={(msg) => setReactionTarget(msg)}
+            onLongPress={handleMessageLongPress}
           />
           <ChatInput
             onSendMessage={handleSendMessage}
@@ -263,18 +285,21 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
       <QuickReactionBar
         visible={!!reactionTarget}
         onClose={() => setReactionTarget(null)}
-        onReact={(emoji) => { if (reactionTarget?.id) toggleReaction(reactionTarget.id, emoji); }}
-        onReply={() => reactionTarget && openThread(reactionTarget)}
+        onReact={(emoji) => { if (reactionMessage?.id) toggleReaction(reactionMessage.id, emoji); }}
+        onReply={() => reactionMessage && openThread(reactionMessage)}
         onEdit={
-          reactionTarget && currentUserIdentitySet.has((reactionTarget.sender || '').trim().toLowerCase())
-            ? () => setEditingMessage(reactionTarget)
+          reactionMessage && currentUserIdentitySet.has((reactionMessage.sender || '').trim().toLowerCase())
+            ? () => setEditingMessage(reactionMessage)
             : undefined
         }
         onDelete={
-          reactionTarget && currentUserIdentitySet.has((reactionTarget.sender || '').trim().toLowerCase()) && reactionTarget.id
-            ? () => setDeletingMessageId(reactionTarget.id as number)
+          reactionMessage && currentUserIdentitySet.has((reactionMessage.sender || '').trim().toLowerCase()) && reactionMessage.id
+            ? () => setDeletingMessageId(reactionMessage.id as number)
             : undefined
         }
+        anchorY={reactionTarget?.anchorY}
+        isMe={reactionTarget?.isMe}
+        selectedEmoji={selectedReaction}
       />
     </View>
   );
