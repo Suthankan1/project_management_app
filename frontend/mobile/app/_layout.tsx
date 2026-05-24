@@ -13,10 +13,13 @@ import 'react-native-reanimated';
  *  │    ├─ spaces                → My Spaces
  *  │    ├─ inbox                 → Inbox
  *  │    └─ profile               → Profile
- *  └─ app/create-project/*       → 3-step Create Project flow
- *       ├─ index                 → Step 1: Select project type
- *       ├─ setup                 → Step 2: Project details & team
- *       └─ invite                → Step 3: Invite team members
+ *  ├─ app/create-project/*       → 3-step Create Project flow
+ *  │    ├─ index                 → Step 1: Select project type
+ *  │    ├─ setup                 → Step 2: Project details & team
+ *  │    └─ invite                → Step 3: Invite team members
+ *  └─ app/portfolios/*           → Portfolio management
+ *       ├─ index                 → Portfolio list
+ *       └─ [id]                  → Portfolio detail with metrics
  */
 export default function RootLayout() {
   return (
@@ -29,7 +32,10 @@ export default function RootLayout() {
         <Stack.Screen name="create-project/index"   options={{ headerShown: false, animation: 'slide_from_bottom' }} />
         <Stack.Screen name="create-project/setup"   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="create-project/invite"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="modal"                  options={{ presentation: 'modal' }} />
+        <Stack.Screen name="portfolios/index"                options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="portfolios/[id]"              options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="project/[projectId]/settings" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="modal"                        options={{ presentation: 'modal' }} />
       </Stack>
       <StatusBar style="dark" />
     </>

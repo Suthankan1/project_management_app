@@ -53,11 +53,10 @@ export default function DashboardScreen() {
   const {
     user,
     projects,
-    tabItems,
+    tabItemsByTab,
     assignedCount,
     loadingProjects,
-    loadingTab,
-    activeTab,
+    loadingTabs,
     setActiveTab,
     refreshProjects,
     refreshTab,
@@ -121,9 +120,8 @@ export default function DashboardScreen() {
         <FadeSlideIn delay={160}>
           <View style={[styles.section, styles.sectionBottom]}>
             <TasksSection
-              items={tabItems}
-              loading={loadingTab}
-              activeTab={activeTab}
+              itemsByTab={tabItemsByTab}
+              loadingTabs={loadingTabs}
               assignedCount={assignedCount}
               onTabChange={setActiveTab}
             />
