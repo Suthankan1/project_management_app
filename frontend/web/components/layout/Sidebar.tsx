@@ -26,6 +26,7 @@ import {
   ProfileIcon,
   InboxIcon,
   BellIcon,
+  PortfolioIcon,
 } from './sidebar/SidebarIcons';
 
 /* -- Types -- */
@@ -157,7 +158,11 @@ export default function Sidebar() {
   const [notifPanelOpen, setNotifPanelOpen] = useState(false);
   const [loadingInbox, setLoadingInbox] = useState(false);
 
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    if (window.innerWidth < 768) return true;
+    return localStorage.getItem('planora:sidebar:collapsed') === 'true';
+  });
   const [favOpen, setFavOpen] = useState(false);
   const [recentOpen, setRecentOpen] = useState(false);
   const [favSearch, setFavSearch] = useState('');
@@ -165,11 +170,12 @@ export default function Sidebar() {
   const [inboxSearch, setInboxSearch] = useState('');
   const [notifSearch, setNotifSearch] = useState('');
 
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+
   useEffect(() => {
     let isCurrentlyMobile = window.innerWidth < 768;
-    setIsMobile(isCurrentlyMobile);
-    if (isCurrentlyMobile) setCollapsed(true);
 
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
@@ -233,12 +239,6 @@ export default function Sidebar() {
   }, [fetchInboxActivity]);
 
   /* -- effects -- */
-  useEffect(() => {
-    if (window.innerWidth >= 768) {
-      setCollapsed(localStorage.getItem('planora:sidebar:collapsed') === 'true');
-    }
-  }, []);
-
   useEffect(() => {
     void fetchInboxActivity();
   }, [pathname, fetchInboxActivity, recentProjects.length]);
@@ -470,6 +470,14 @@ export default function Sidebar() {
                 collapsed={collapsed}
                 active={pathname === '/dashboard'}
                 onClick={() => { closeAll(); router.push('/dashboard'); }}
+              />
+
+              <NavRow
+                icon={<PortfolioIcon />}
+                label="Portfolios"
+                collapsed={collapsed}
+                active={pathname.startsWith('/portfolios')}
+                onClick={() => { closeAll(); router.push('/portfolios'); }}
               />
 
               <SpacesList
