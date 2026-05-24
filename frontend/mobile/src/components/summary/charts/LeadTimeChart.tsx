@@ -74,7 +74,7 @@ export function LeadTimeChart({ tasks }: { tasks: Task[] }) {
           {coords.map((c, i) => <Circle key={`dot-${i}`} cx={c.x} cy={c.y} r={3} fill="#F59E0B" stroke="#fff" strokeWidth={1.5} />)}
           <Circle cx={coords[coords.length-1].x} cy={coords[coords.length-1].y} r={5} fill="#F59E0B" stroke="#fff" strokeWidth={2} />
         </Svg>
-        <View style={[StyleSheet.absoluteFillObject, { pointerEvents: 'none' }]}>
+        <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
           {ticks.map(v => (
             <Text key={`tick-${v}`} style={[st.axisY, { top: ty(v) - 7, left: 0, width: P.l - 3 }]}>{v}d</Text>
           ))}

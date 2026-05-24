@@ -101,7 +101,7 @@ export function BurndownLineChart({ tasks, sprints }: { tasks: Task[]; sprints: 
         </Svg>
 
         {/* Axis labels — positioned absolutely */}
-        <View style={[StyleSheet.absoluteFillObject, { pointerEvents: 'none' }]}>
+        <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
           {ticks.map(v => (
             <Text key={`tick-${v}`} style={[st.axisY, { top: ty(v) - 7, left: 0, width: P.l - 3 }]}>{v}</Text>
           ))}

@@ -272,6 +272,7 @@ export function useChat(projectId: string) {
             sendStompFrame(ws, buildSubscribe('sub-unread', `/user/queue/project/${projectId}/unread-badge`));
             sendStompFrame(ws, buildSubscribe('sub-presence', `/topic/project/${projectId}/presence`));
             sendStompFrame(ws, buildSubscribe('sub-rooms-events', `/topic/project/${projectId}/rooms`));
+            sendStompFrame(ws, buildSubscribe('sub-message-reactions', `/topic/project/${projectId}/messages/*/reactions`));
 
             // Subscribe to all already-loaded rooms
             roomsHook.rooms.forEach(r => subscribeRoom(ws, r.id));

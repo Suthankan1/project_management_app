@@ -80,7 +80,7 @@ function LoadingOverlay() {
       </View>
 
       {/* Frosted glass overlay — contains both bar and quote */}
-      <View style={[sl.glass, { pointerEvents: 'none' }]}>
+      <View pointerEvents="none" style={sl.glass}>
         <Animated.View style={[sl.loadingContent, { opacity: quoteOp }]}>
 
           {/* Progress bar 80% width, 20px above quote */}

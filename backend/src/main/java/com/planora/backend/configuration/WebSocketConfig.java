@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -76,7 +77,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
                         if (auth == null || auth.trim().isEmpty()) {
                             log.warn("[WebSocket] Missing Authorization header");
-                            return null;
+                            throw new MessagingException("Missing Authorization header");
                         }
 
                         // Remove "Bearer " prefix if present
@@ -95,14 +96,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         
                         if (user == null) {
                             log.warn("[WebSocket] User not found in database for email: {}", email);
-                            return null;
+                            throw new MessagingException("User not found for provided token");
                         }
 
                         String username = user.getUsername();
                         
                         if (username == null || username.trim().isEmpty()) {
                             log.warn("[WebSocket] Invalid username in token for user: {}", email);
-                            return null;
+                            throw new MessagingException("Invalid username in token");
                         }
 
                         String normalizedUsername = username.toLowerCase();
@@ -119,13 +120,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         log.info("[WebSocket] Authentication successful for user: {}", normalizedUsername);
                     } catch (io.jsonwebtoken.ExpiredJwtException e) {
                         log.warn("[WebSocket] Authentication failed: JWT expired");
-                        return null;
+                        throw new MessagingException("JWT expired", e);
                     } catch (io.jsonwebtoken.JwtException | IllegalArgumentException e) {
                         log.warn("[WebSocket] Authentication failed: {}", e.getMessage());
-                        return null;
-                    } catch (Exception e) {
+                        throw new MessagingException("Invalid JWT", e);
+                    } catch (RuntimeException e) {
                         log.error("[WebSocket] Unexpected authentication error: {}", e.getMessage(), e);
-                        return null;
+                        throw new MessagingException("Unexpected authentication error", e);
                     }
                 }
 

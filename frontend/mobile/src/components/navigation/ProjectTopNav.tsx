@@ -358,7 +358,8 @@ export default function ProjectTopNav({
       {/* Animated Frosted Glass Background Overlay */}
       <Pressable
         onPress={() => setMoreOpen(false)}
-        style={[StyleSheet.absoluteFill, { zIndex: 90, pointerEvents: moreOpen ? 'auto' : 'none' }]}
+        pointerEvents={moreOpen ? 'auto' : 'none'}
+        style={[StyleSheet.absoluteFill, { zIndex: 90 }]}
       >
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: dropdownOp }]}>
           <BlurView intensity={50} tint="dark" experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
