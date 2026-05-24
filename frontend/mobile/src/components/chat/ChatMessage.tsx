@@ -105,26 +105,31 @@ export function ChatMessage({
     if (isFile) {
       const name = getFileName(message.content);
       return (
-        <View style={styles.fileCard}>
+        <TouchableOpacity
+          activeOpacity={0.82}
+          style={[
+            styles.fileCard,
+            isMe ? styles.fileCardMe : styles.fileCardOther,
+          ]}
+          onPress={() => Linking.openURL(message.content)}
+        >
           <Ionicons
-            name="document-outline"
-            size={28}
-            color={isMe ? Colors.chatBubbleMeText : Colors.primary}
+            name="document-text-outline"
+            size={32}
+            color={isMe ? 'rgba(255,255,255,0.9)' : Colors.primary}
           />
-          <Text
-            style={[styles.fileName, isMe ? styles.fileNameMe : styles.fileNameOther]}
-            numberOfLines={2}
-          >
-            {name}
-          </Text>
-          <TouchableOpacity onPress={() => Linking.openURL(message.content)}>
-            <Ionicons
-              name="open-outline"
-              size={20}
-              color={isMe ? Colors.chatBubbleMeText : Colors.primary}
-            />
-          </TouchableOpacity>
-        </View>
+          <View style={styles.fileTextColumn}>
+            <Text
+              style={[styles.fileName, isMe ? styles.fileNameMe : styles.fileNameOther]}
+              numberOfLines={2}
+            >
+              {name}
+            </Text>
+            <Text style={[styles.fileSubtext, isMe ? styles.fileSubtextMe : styles.fileSubtextOther]}>
+              Tap to open
+            </Text>
+          </View>
+        </TouchableOpacity>
       );
     }
     return (
@@ -290,10 +295,23 @@ const styles = StyleSheet.create({
   timeText: { fontSize: 10 },
   tickIcon: { marginLeft: 2 },
 
-  fileCard: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  fileName: { flex: 1, fontSize: 13, fontWeight: '600' },
+  fileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 8,
+    borderRadius: 10,
+    maxWidth: 220,
+  },
+  fileCardMe: { backgroundColor: 'rgba(255,255,255,0.15)' },
+  fileCardOther: { backgroundColor: Colors.chatInputBg },
+  fileTextColumn: { flex: 1, minWidth: 0 },
+  fileName: { fontSize: 13, fontWeight: '600' },
   fileNameMe: { color: Colors.chatBubbleMeText },
-  fileNameOther: { color: Colors.chatBubbleOtherText },
+  fileNameOther: { color: Colors.textPrimary },
+  fileSubtext: { marginTop: 2, fontSize: 11 },
+  fileSubtextMe: { color: 'rgba(255,255,255,0.7)' },
+  fileSubtextOther: { color: Colors.textMuted },
 
   reactionsList: { marginTop: 4 },
   reactionsLeft: { alignSelf: 'flex-start' },
@@ -311,4 +329,86 @@ const styles = StyleSheet.create({
   threadLinkLeft: { alignSelf: 'flex-start' },
   threadLinkRight: { alignSelf: 'flex-end' },
   threadLinkText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
+
+  pinnedBanner: {
+    height: 40,
+    backgroundColor: Colors.bannerAmberBg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.bannerAmberBorder,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  pinnedBannerPress: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+  },
+  pinnedBannerLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pinnedBannerLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.mentionAmber,
+  },
+  pinnedBannerPreview: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  pinnedBannerClose: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
 });
+
+interface PinnedMessageBannerProps {
+  pinnedMessage: ChatMessageType | null;
+  onPress: () => void;
+  onDismiss: () => void;
+}
+
+export function PinnedMessageBanner({ pinnedMessage, onPress, onDismiss }: PinnedMessageBannerProps) {
+  if (!pinnedMessage) return null;
+
+  const preview = pinnedMessage.deleted ? 'This message was deleted' : pinnedMessage.content;
+
+  return (
+    <View style={styles.pinnedBanner}>
+      <TouchableOpacity
+        activeOpacity={0.82}
+        style={styles.pinnedBannerPress}
+        onPress={onPress}
+      >
+        <View style={styles.pinnedBannerLabelRow}>
+          <Ionicons name="pin" size={14} color={Colors.mentionAmber} />
+          <Text style={styles.pinnedBannerLabel}>Pinned Message</Text>
+        </View>
+        <Text
+          style={styles.pinnedBannerPreview}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {preview}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        activeOpacity={0.75}
+        style={styles.pinnedBannerClose}
+        onPress={onDismiss}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Ionicons name="close" size={16} color={Colors.textMuted} />
+      </TouchableOpacity>
+    </View>
+  );
+}

@@ -11,6 +11,7 @@ import { ChatMessageList }        from '@/src/components/chat/ChatMessageList';
 import { ChatInput }              from '@/src/components/chat/ChatInput';
 import { ChatLoadingSkeleton }    from '@/src/components/chat/ChatLoadingSkeleton';
 import { ThreadBottomSheet }      from '@/src/components/chat/ThreadBottomSheet';
+import { PinnedMessageBanner }    from '@/src/components/chat/ChatMessage';
 import { CreateChannelModal, EditMessageModal, ConfirmDeleteModal, EditChannelModal } from '@/src/components/chat/ChatModals';
 import { Colors }                 from '@/src/constants/colors';
 import { ChatMessage, ChatRoom } from '@/src/types/chat';
@@ -67,6 +68,9 @@ export default function ChatScreen() {
     : selectedUser
       ? (privateMessages[selectedUser.toLowerCase()] || [])
       : messages;
+  const pinnedMessage = selectedRoom?.pinnedMessageId
+    ? displayMessages.find(message => message.id === selectedRoom.pinnedMessageId) ?? null
+    : null;
 
   const filteredUsers = users.filter(u =>
     !currentUserAliases.some(a => a?.toLowerCase() === u.toLowerCase()) &&
@@ -201,6 +205,12 @@ export default function ChatScreen() {
             showSearch={showSearch}
             onToggleSearch={() => setShowSearch(p => !p)}
             onShowSidebar={() => setShowSidebar(true)}
+          />
+
+          <PinnedMessageBanner
+            pinnedMessage={pinnedMessage}
+            onPress={() => pinnedMessage && openThread(pinnedMessage)}
+            onDismiss={() => selectedRoomId && pinRoomMessage(selectedRoomId, null)}
           />
 
           {featureFlags.phaseDEnabled && (
