@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { PASSWORD_REQUIREMENTS } from '../../lib/validation';
 import { Colors } from '../../constants/colors';
 
@@ -12,15 +12,32 @@ type Props = {
 };
 
 export default function PasswordStrengthBar({ strength, password }: Props) {
+  const barAnims = useRef([0, 1, 2, 3].map(() => new Animated.Value(0))).current;
+
+  useEffect(() => {
+    barAnims.forEach((anim, i) => {
+      Animated.timing(anim, {
+        toValue: strength >= i + 1 ? 1 : 0,
+        duration: 220,
+        useNativeDriver: false,
+      }).start();
+    });
+  }, [strength]);
+
   return (
     <View style={styles.container}>
       <View style={styles.bars}>
-        {[0, 1, 2, 3].map(i => (
-          <View
+        {[0, 1, 2, 3].map((_, i) => (
+          <Animated.View
             key={i}
             style={[
               styles.bar,
-              { backgroundColor: strength >= i + 1 ? STRENGTH_COLORS[strength] : '#E5E7EB' },
+              {
+                backgroundColor: barAnims[i].interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['#E5E7EB', STRENGTH_COLORS[strength] || '#E5E7EB'],
+                }),
+              },
             ]}
           />
         ))}

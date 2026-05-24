@@ -48,6 +48,8 @@ export interface Task {
   startDate?: string; // ISO date string
   createdAt?: string;
   updatedAt?: string;
+  archived?: boolean;
+  archivedAt?: string;
   assignee?: Assignee;
   assigneeId?: number;
   assigneeName?: string;
@@ -57,6 +59,7 @@ export interface Task {
   reporterName?: string;
   projectId?: number;
   sprintId?: number;
+  parentTaskId?: number | null;
   labels?: Label[];
   labelId?: number;        // single label ID (one label per task per SRS)
   milestoneId?: number;    // milestone ID (new feature — may be null)
@@ -103,4 +106,3 @@ export interface DateFilter {
   startDate: Date | null;
   endDate: Date | null;
 }
-

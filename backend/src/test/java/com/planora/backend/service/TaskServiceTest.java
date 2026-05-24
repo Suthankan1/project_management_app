@@ -203,7 +203,7 @@ class TaskServiceTest {
             saved.setId(999L);
             return saved;
         });
-        when(taskRepository.findByIdWithDetails(999L)).thenAnswer(invocation -> {
+        when(taskRepository.findByIdFullyFetched(999L)).thenAnswer(invocation -> {
             Task t = buildTask(999L);
             t.setAssignee(assignee);
             t.setReporter(creator);
@@ -273,7 +273,7 @@ class TaskServiceTest {
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
         when(userRepository.findAllById(any())).thenReturn(List.of(creatorUser, assigneeUser));
-        when(taskRepository.findByIdWithDetails(50L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByIdFullyFetched(50L)).thenReturn(Optional.of(task));
 
         TaskResponseDTO result = taskService.updateTask(50L, request, 500L);
 
@@ -292,7 +292,7 @@ class TaskServiceTest {
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
         when(userRepository.findAllById(any())).thenReturn(List.of(creatorUser, assigneeUser));
-        when(taskRepository.findByIdWithDetails(51L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByIdFullyFetched(51L)).thenReturn(Optional.of(task));
 
         TaskResponseDTO result = taskService.updatePriority(51L, "HIGH", 500L);
 
@@ -369,7 +369,7 @@ class TaskServiceTest {
 
         when(taskRepository.findByIdWithProjectTeam(72L)).thenReturn(Optional.of(task));
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(taskRepository.findByIdWithDetails(72L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByIdFullyFetched(72L)).thenReturn(Optional.of(task));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
         when(teamMembershipLookupService.getTeamMember(20L, 300L)).thenReturn(newMember);
         when(userRepository.findAllById(argThat(ids -> {
@@ -397,7 +397,7 @@ class TaskServiceTest {
 
         when(taskRepository.findByIdWithProjectTeam(73L)).thenReturn(Optional.of(task));
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(taskRepository.findByIdWithDetails(73L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByIdFullyFetched(73L)).thenReturn(Optional.of(task));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
 
         TaskResponseDTO result = taskService.updateAssignees(73L, List.of(200L, 500L), 500L);
@@ -494,7 +494,7 @@ class TaskServiceTest {
             saved.setId(1001L);
             return saved;
         });
-        when(taskRepository.findByIdWithDetails(1001L)).thenAnswer(invocation -> {
+        when(taskRepository.findByIdFullyFetched(1001L)).thenAnswer(invocation -> {
             Task t = buildTask(1001L);
             t.setReporter(creator);
             return Optional.of(t);
@@ -575,7 +575,7 @@ class TaskServiceTest {
         request.setStatus("DONE");
 
         when(taskRepository.findByIdWithProjectTeam(1L)).thenReturn(Optional.of(task));
-        when(taskRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByIdFullyFetched(1L)).thenReturn(Optional.of(task));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
         when(taskRepository.save(any(Task.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -594,7 +594,7 @@ class TaskServiceTest {
         request.setStatus("IN_PROGRESS");
 
         when(taskRepository.findByIdWithProjectTeam(2L)).thenReturn(Optional.of(task));
-        when(taskRepository.findByIdWithDetails(2L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByIdFullyFetched(2L)).thenReturn(Optional.of(task));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
         when(taskRepository.save(any(Task.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -660,7 +660,7 @@ class TaskServiceTest {
             saved.setId(1200L);
             return saved;
         });
-        when(taskRepository.findByIdWithDetails(1200L)).thenAnswer(invocation -> {
+        when(taskRepository.findByIdFullyFetched(1200L)).thenAnswer(invocation -> {
             Task task = buildTask(1200L);
             task.setMilestone(milestone);
             return Optional.of(task);
@@ -686,7 +686,7 @@ class TaskServiceTest {
         when(taskRepository.findByIdWithProjectTeam(1300L)).thenReturn(Optional.of(task));
         when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(taskRepository.findByIdWithDetails(1300L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByIdFullyFetched(1300L)).thenReturn(Optional.of(task));
 
         taskService.updateTask(1300L, request, 500L);
 

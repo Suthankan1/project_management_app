@@ -77,6 +77,16 @@ public class JwtFilter extends OncePerRequestFilter {
 
             UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
+            // BUG-002 Fix: reject unverified accounts
+            if (!userDetails.isEnabled()) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                response.getWriter().write(
+                        "{\"error\": \"Email not verified\", \"errorCode\": \"EMAIL_NOT_VERIFIED\"}"
+                );
+                return;
+            }
+
             if(jwtService.validateToken(token,userDetails)){
                 UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
 

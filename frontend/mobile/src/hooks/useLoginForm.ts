@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import api from '../api/axios';
-import { getValidToken, saveToken, saveRefreshToken } from '../auth/storage';
+import { clearRefreshToken, getValidToken, saveRefreshToken, saveToken, setRememberMe } from '../auth/storage';
 import { EMAIL_REGEX } from '../lib/validation';
 
 export function useLoginForm() {
@@ -22,12 +22,12 @@ export function useLoginForm() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleLogin = async (emailVal: string, passwordVal: string) => {
+  const handleLogin = async () => {
     if (isLoading) return;
     setIsLoading(true);
     setError('');
 
-    if (!EMAIL_REGEX.test(emailVal)) {
+    if (!EMAIL_REGEX.test(email)) {
       setError('Please enter a valid email address.');
       setIsLoading(false);
       return;
@@ -35,14 +35,17 @@ export function useLoginForm() {
 
     try {
       const response = await api.post('/api/auth/login', {
-        email: emailVal.toLowerCase(),
-        password: passwordVal,
+        email: email.toLowerCase(),
+        password,
       });
 
       if (response.data.success) {
         await saveToken(response.data.token);
-        if (response.data.refreshToken) {
+        await setRememberMe(remember);
+        if (remember && response.data.refreshToken) {
           await saveRefreshToken(response.data.refreshToken);
+        } else {
+          await clearRefreshToken();
         }
         router.replace('/(tabs)');
       } else {

@@ -363,6 +363,25 @@ public class SprintboardService {
         }
     }
 
+    @Transactional
+    public void deleteColumnFromSprintboard(Long sprintboardId, Long columnId, Long currentUserId) {
+        Sprintboard sprintboard = getSprintboardById(sprintboardId);
+        Sprint sprint = sprintboard.getSprint();
+        requireViewBoard(sprint.getProId(), currentUserId);
+
+        Sprintcolumn column = springcolumnRepository.findById(columnId)
+                .orElseThrow(() -> new RuntimeException("Sprint column not found"));
+        if (column.getSprintboard() == null || !column.getSprintboard().getId().equals(sprintboardId)) {
+            throw new RuntimeException("Sprint column does not belong to this sprintboard");
+        }
+
+        if (taskRepository.existsBySprint_IdAndStatusAndArchivedFalse(sprint.getId(), column.getColumnStatus())) {
+            throw new RuntimeException("Cannot delete a column that contains tasks");
+        }
+
+        springcolumnRepository.deleteById(columnId);
+    }
+
     public SprintboardResponseDTO getSprintboardBySprintboardId(Long sprintboardId, Long currentUserId) {
         Sprintboard sprintboard = getSprintboardById(sprintboardId);
         Sprint sprint = sprintboard.getSprint();

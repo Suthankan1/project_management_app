@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useProjectSummary } from '../../hooks/useProjectSummary';
 import { DonutPriorityChart } from './charts/DonutPriorityChart';
@@ -361,6 +362,7 @@ export default function SummaryScreen({
   /** Extra paddingTop for ScrollView content to clear the abs-positioned nav bar */
   topOffset?: number;
 }) {
+  const router = useRouter();
   const { data, milestones, loading, error, refresh } = useProjectSummary(projectId);
   // Defer SVG chart rendering until the navigation slide animation is done
   const [chartsReady, setChartsReady] = useState(false);
@@ -417,6 +419,15 @@ export default function SummaryScreen({
               <Text style={s.headerTitle} numberOfLines={1}>{displayName}</Text>
               <Text style={s.headerSub}>Project Overview{isAgile ? ' · Agile' : ''}</Text>
             </View>
+            {!isAgile && (
+              <TouchableOpacity 
+                style={s.boardBtn} 
+                onPress={() => router.push(`/board/${projectId}`)}
+                activeOpacity={0.7}
+              >
+                <Text style={s.boardBtnText}>Board</Text>
+              </TouchableOpacity>
+            )}
             {isAgile && (
               <View style={s.agilePill}>
                 <Text style={s.agilePillText}>AGILE</Text>
@@ -585,6 +596,11 @@ const s = StyleSheet.create({
     backgroundColor: T.primaryLight, borderWidth: 1, borderColor: T.primaryMuted + '55',
   },
   agilePillText: { fontSize: 10, fontWeight: '800', color: T.primary, letterSpacing: 0.8 },
+  boardBtn: {
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
+    backgroundColor: T.primary, borderWidth: 1, borderColor: T.primary,
+  },
+  boardBtnText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.3 },
   scroll: { padding: 16, gap: 12 },
   sectionHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
