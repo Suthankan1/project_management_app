@@ -2,6 +2,7 @@ package com.planora.backend.model;
 
 public enum TaskActivityType {
     TASK_CREATED,
+    UPDATED,
     STATUS_CHANGED,
     PRIORITY_CHANGED,
     ASSIGNEE_CHANGED,

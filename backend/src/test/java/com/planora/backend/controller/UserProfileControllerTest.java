@@ -133,6 +133,7 @@ class UserProfileControllerTest {
     void uploadProfilePhoto_returns200_whenImageValid() throws Exception {
         MockMultipartFile validFile = new MockMultipartFile("file", "photo.jpg", "image/jpeg", "imagedata".getBytes());
         when(service.isValidImageType("image/jpeg")).thenReturn(true);
+        when(service.isValidImageByMagicBytes(any())).thenReturn(true);
         when(service.uploadProfilePicture(anyString(), any())).thenReturn("s3://bucket/photo.jpg");
         when(service.generatePresignedUrl(anyString())).thenReturn("https://cdn.example.com/photo.jpg?sig=abc");
 

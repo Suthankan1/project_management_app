@@ -28,6 +28,7 @@ interface SprintHeaderProps {
   onDeleteSprint: () => void;
   onViewReport: () => void;
   onNameSave: (name: string) => Promise<void>;
+  existingSprintNames?: string[];
   editingSprintLoading: boolean;
 }
 
@@ -47,11 +48,13 @@ export default function SprintHeader({
   onDeleteSprint,
   onViewReport,
   onNameSave,
+  existingSprintNames = [],
   editingSprintLoading,
 }: SprintHeaderProps) {
   const [showSprintMenu, setShowSprintMenu] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempSprintName, setTempSprintName] = useState(sprintName);
+  const [nameError, setNameError] = useState('');
   const sprintMenuRef = useRef<HTMLDivElement | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const lastTapRef = useRef<number>(0);
@@ -87,7 +90,10 @@ export default function SprintHeader({
     };
   }, []);
 
-  const handleNameDoubleClick = () => setIsEditingName(true);
+  const handleNameDoubleClick = () => {
+    setNameError('');
+    setIsEditingName(true);
+  };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const now = Date.now();
@@ -112,9 +118,21 @@ export default function SprintHeader({
   const handleNameSaveInternal = async () => {
     const trimmed = tempSprintName.trim();
     if (!trimmed || trimmed === sprintName) {
+      setNameError('');
       setIsEditingName(false);
       return;
     }
+
+    const normalizedExistingNames = existingSprintNames
+      .filter((name) => name !== sprintName)
+      .map((name) => name.toLowerCase());
+
+    if (normalizedExistingNames.includes(trimmed.toLowerCase())) {
+      setNameError('Sprint name already exists. Please choose a unique name.');
+      return;
+    }
+
+    setNameError('');
     await onNameSave(trimmed);
     setIsEditingName(false);
   };
@@ -154,19 +172,29 @@ export default function SprintHeader({
 
         <div className="flex flex-wrap items-center gap-2">
           {isEditingName ? (
-            <input
-              ref={nameInputRef}
-              type="text"
-              value={tempSprintName}
-              onChange={(e) => setTempSprintName(e.target.value)}
-              onBlur={() => void handleNameSaveInternal()}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void handleNameSaveInternal();
-                if (e.key === 'Escape') setIsEditingName(false);
-              }}
-              disabled={editingSprintLoading}
-              className="w-full min-w-[200px] border-b border-[#175CD3] bg-transparent text-[14px] font-bold text-[#101828] outline-none"
-            />
+            <div className="flex flex-col gap-2">
+              <input
+                ref={nameInputRef}
+                type="text"
+                value={tempSprintName}
+                onChange={(e) => {
+                  setTempSprintName(e.target.value);
+                  if (nameError) setNameError('');
+                }}
+                onBlur={() => void handleNameSaveInternal()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleNameSaveInternal();
+                  if (e.key === 'Escape') setIsEditingName(false);
+                }}
+                disabled={editingSprintLoading}
+                className="w-full min-w-[200px] border-b border-[#175CD3] bg-transparent text-[14px] font-bold text-[#101828] outline-none"
+              />
+              {nameError ? (
+                <div className="rounded-xl border border-[#F1A7AA] bg-[#FDF2F2] px-3 py-2 text-[13px] text-[#B42318]">
+                  {nameError}
+                </div>
+              ) : null}
+            </div>
           ) : (
             <span
               onClick={(e) => {

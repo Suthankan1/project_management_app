@@ -1,46 +1,8 @@
 import axios from 'axios';
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
-import { getToken, clearTokens, saveToken, saveRefreshToken } from '../auth/storage';
+import { clearTokens, getRefreshToken, getToken, saveRefreshToken, saveToken } from '../auth/storage';
+import { API_BASE_URL } from './baseUrl';
 
-const API_PORT = '8080';
-
-function getExpoDevHost() {
-  const hostUri =
-    Constants.expoConfig?.hostUri ||
-    Constants.manifest2?.extra?.expoGo?.debuggerHost ||
-    Constants.manifest?.debuggerHost;
-
-  return typeof hostUri === 'string' ? hostUri.split(':')[0] : undefined;
-}
-
-function resolveApiBaseUrl() {
-  const configuredUrl = process.env.EXPO_PUBLIC_API_URL || '';
-
-  if (!configuredUrl || Platform.OS === 'web') {
-    return configuredUrl;
-  }
-
-  const isLocalhostUrl = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredUrl);
-
-  if (!isLocalhostUrl) {
-    return configuredUrl;
-  }
-
-  const devHost = getExpoDevHost();
-
-  if (devHost && devHost !== 'localhost' && devHost !== '127.0.0.1') {
-    return configuredUrl.replace(/:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, `://${devHost}:${API_PORT}`);
-  }
-
-  if (Platform.OS === 'android') {
-    return configuredUrl.replace(/:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, `://10.0.2.2:${API_PORT}`);
-  }
-
-  return configuredUrl;
-}
-
-const API_BASE_URL = resolveApiBaseUrl();
+export { API_BASE_URL };
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -76,7 +38,13 @@ api.interceptors.response.use(
       req._retry = true;
       isRefreshing = true;
       try {
-        const { data } = await api.post('/api/auth/refresh');
+        const refreshToken = await getRefreshToken();
+        if (!refreshToken) {
+          await clearTokens();
+          return Promise.reject(error);
+        }
+
+        const { data } = await api.post('/api/auth/refresh', { refreshToken });
         await saveToken(data.token);
         if (data.refreshToken) await saveRefreshToken(data.refreshToken);
         failedQueue.forEach(({ resolve }) => resolve(data.token));

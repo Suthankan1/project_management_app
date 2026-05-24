@@ -4,10 +4,12 @@ import {
   Pressable,
   ActivityIndicator,
   Text,
+  Platform,
   StyleSheet,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/colors';
-import { isWeb } from '../../lib/platform';
+import { shouldUseNativeDriver } from '../../lib/platform';
 
 type Props = {
   onPress: () => void;
@@ -27,66 +29,102 @@ export default function PrimaryButton({
   const pressAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
-    Animated.spring(pressAnim, { toValue: 0.97, useNativeDriver: true }).start();
+    Animated.spring(pressAnim, { toValue: 0.97, useNativeDriver: shouldUseNativeDriver }).start();
   };
 
   const handlePressOut = () => {
-    Animated.spring(pressAnim, { toValue: 1, useNativeDriver: true }).start();
+    Animated.spring(pressAnim, { toValue: 1, useNativeDriver: shouldUseNativeDriver }).start();
   };
 
   const isPrimary = variant === 'primary';
   const isDisabled = disabled || loading;
 
   return (
-    <Animated.View style={{ transform: [{ scale: pressAnim }] }}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        disabled={isDisabled}
-        style={[
-          styles.base,
-          isPrimary ? styles.primary : styles.outline,
-          isDisabled && styles.disabled,
-        ]}
-      >
-        {loading ? (
-          <ActivityIndicator color={isPrimary ? Colors.white : Colors.primary} />
-        ) : (
-          <Text style={[styles.label, isPrimary ? styles.labelPrimary : styles.labelOutline]}>
-            {label}
-          </Text>
-        )}
-      </Pressable>
+    <Animated.View
+      style={[
+        styles.wrap,
+        isPrimary && styles.wrapPrimary,
+        { elevation: isPrimary && !isDisabled ? 8 : 0 },
+        isDisabled && styles.disabled,
+        { transform: [{ scale: pressAnim }] },
+      ]}
+    >
+      {isPrimary ? (
+        <LinearGradient
+          colors={[Colors.gradientStart, Colors.gradientMid]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.base}
+        >
+          <Pressable
+            onPress={onPress}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            disabled={isDisabled}
+            style={styles.pressableFill}
+          >
+            {loading ? (
+              <ActivityIndicator color={Colors.white} />
+            ) : (
+              <Text style={[styles.label, styles.labelPrimary]}>{label}</Text>
+            )}
+          </Pressable>
+        </LinearGradient>
+      ) : (
+        <Pressable
+          onPress={onPress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          disabled={isDisabled}
+          style={[styles.base, styles.outline]}
+        >
+          {loading ? (
+            <ActivityIndicator color={Colors.primary} />
+          ) : (
+            <Text style={[styles.label, styles.labelOutline]}>{label}</Text>
+          )}
+        </Pressable>
+      )}
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrap: {
+    borderRadius: 16,
+  },
+  wrapPrimary: {
+    ...Platform.select({
+      web: {},
+      default: {
+        shadowColor: Colors.gradientMid,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.40,
+        shadowRadius: 16,
+      },
+    }),
+  },
   base: {
-    height: 52,
-    borderRadius: 12,
+    height: 56,
+    borderRadius: 16,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    ...(isWeb
-      ? { boxShadow: `0 4px 8px ${Colors.primary}4D` }
-      : {
-          shadowColor: Colors.primary,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
-        }),
-    elevation: 6,
+    ...Platform.select({
+      web: { boxShadow: '0 8px 16px rgba(152, 16, 250, 0.40)' },
+      default: {},
+    }),
   },
-  primary: {
-    backgroundColor: Colors.primary,
+  pressableFill: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   outline: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
     borderColor: Colors.primary,
-    ...(isWeb ? { boxShadow: 'none' } : { shadowOpacity: 0 }),
-    elevation: 0,
+    ...Platform.select({ web: { boxShadow: 'none' }, default: {} }),
   },
   disabled: {
     opacity: 0.6,
@@ -94,6 +132,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
   labelPrimary: {
     color: Colors.white,

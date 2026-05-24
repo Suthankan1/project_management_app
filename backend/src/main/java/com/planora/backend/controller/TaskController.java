@@ -120,6 +120,38 @@ public class TaskController {
         return new ResponseEntity<>(service.getTasksByProject(projectId, currentUserId, status, assigneeId, priority, sprintId, milestoneId), HttpStatus.OK);
     }
 
+    @GetMapping("/project/{projectId}/archived")
+    public ResponseEntity<List<TaskResponseDTO>> getArchivedTasks(
+            @PathVariable Long projectId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        return ResponseEntity.ok(service.getArchivedTasks(projectId, currentUser.getUserId()));
+    }
+
+    @PatchMapping("/{taskId}/archive")
+    public ResponseEntity<TaskResponseDTO> archiveTask(
+            @PathVariable Long taskId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        TaskResponseDTO task = service.archiveTask(taskId, currentUser.getUserId());
+        messagingTemplate.convertAndSend(
+                "/topic/project/" + task.getProjectId() + "/tasks",
+                Map.of("type", "TASK_UPDATED", "task", task));
+        return ResponseEntity.ok(task);
+    }
+
+    @PatchMapping("/{taskId}/unarchive")
+    public ResponseEntity<TaskResponseDTO> unarchiveTask(
+            @PathVariable Long taskId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        TaskResponseDTO task = service.unarchiveTask(taskId, currentUser.getUserId());
+        messagingTemplate.convertAndSend(
+                "/topic/project/" + task.getProjectId() + "/tasks",
+                Map.of("type", "TASK_UPDATED", "task", task));
+        return ResponseEntity.ok(task);
+    }
+
     // ── DASHBOARD ENDPOINTS ─────────────────────────────────────────────────────
 
     @PostMapping("/{taskId}/access")

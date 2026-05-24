@@ -98,14 +98,22 @@ export default function DesktopTaskRow(props: TaskRowProps) {
       {/* Title */}
       <div className="flex-1 min-w-0 px-2 flex items-center gap-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {renaming ? (
-          <input
-            type="text" value={renameValue}
-            onChange={(e) => setRenameValue(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void commitRename(); if (e.key === 'Escape') setRenaming(false); }}
-            onBlur={() => void commitRename()}
-            autoFocus
-            className="w-full border-b-2 border-[#175CD3] bg-transparent text-[12px] font-semibold text-[#101828] outline-none"
-          />
+          <div className="flex-1 min-w-0">
+            <input
+              type="text" value={renameValue}
+              maxLength={255}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void commitRename(); if (e.key === 'Escape') setRenaming(false); }}
+              onBlur={() => void commitRename()}
+              autoFocus
+              className="w-full border-b-2 border-[#175CD3] bg-transparent text-[12px] font-semibold text-[#101828] outline-none"
+            />
+            {renameValue.length > 200 && (
+              <p className="text-xs text-amber-500 mt-1">
+                {255 - renameValue.length} characters remaining
+              </p>
+            )}
+          </div>
         ) : (
           <>
             <span

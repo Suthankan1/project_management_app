@@ -416,7 +416,7 @@ public class ProjectService {
     public ProjectMetricsDTO getProjectMetrics(Long projectId) {
         Project project = findProjectById(projectId);
 
-        List<Task> allTasks = taskRepository.findByProjectId(projectId);
+        List<Task> allTasks = taskRepository.findByProjectIdWithScalars(projectId);
 
         // Total tasks in the project.
         Long totalTasks = (long) allTasks.size();
@@ -447,7 +447,7 @@ public class ProjectService {
         Long activeSprintId = null;
         if (activeSprint != null) {
             activeSprintId = activeSprint.getId();
-            List<Task> sprintTasksList = taskRepository.findBySprintId(activeSprint.getId());
+            List<Task> sprintTasksList = taskRepository.findBySprintIdWithScalars(activeSprint.getId());
             Long sprintTasks = (long) sprintTasksList.size();
             Long sprintCompleted = sprintTasksList.stream()
                 .filter(task -> "DONE".equalsIgnoreCase(task.getStatus()))

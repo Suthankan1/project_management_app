@@ -46,8 +46,14 @@ export const T = {
 } as const;
 
 export type StatusKey = 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
+export type StatusMeta = {
+  bg: string;
+  text: string;
+  dot: string;
+  border: string;
+};
 
-export const STATUS_MAP: Record<StatusKey, typeof T.statusTodo> = {
+export const STATUS_MAP: Record<StatusKey, StatusMeta> = {
   TODO:        T.statusTodo,
   IN_PROGRESS: T.statusInProg,
   IN_REVIEW:   T.statusInReview,

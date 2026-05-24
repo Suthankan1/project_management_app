@@ -12,12 +12,14 @@ interface WeekCalendarViewProps {
 
 const eventsForDay = (events: CalendarEventItem[], day: Date) =>
   events.filter((event) => {
-    if (event.kind === 'sprint') {
-      return isDateInRange(day, event.startDate, event.endDate);
+    const start = toDate(event.startDate || event.dueDate || event.endDate);
+    const end = toDate(event.endDate || event.startDate || event.dueDate);
+
+    if (start && end && !isSameDay(start, end)) {
+      return isDateInRange(day, start.toISOString(), end.toISOString());
     }
 
-    const anchor = toDate(event.startDate || event.dueDate || event.endDate);
-    return anchor ? isSameDay(anchor, day) : false;
+    return start ? isSameDay(start, day) : false;
   });
 
 export default function WeekCalendarView({ currentDate, events, onDayClick, onEventDrop }: WeekCalendarViewProps) {
@@ -63,15 +65,22 @@ export default function WeekCalendarView({ currentDate, events, onDayClick, onEv
               }}
             >
               <div className="space-y-1.5">
-                {dayEvents.map((event) => (
+                {dayEvents.map((event) => {
+                const eventStart = toDate(event.startDate || event.dueDate || event.endDate);
+                const eventEnd = toDate(event.endDate || event.startDate || event.dueDate);
+
+                return (
                   <CalendarEventCard
                     key={`${event.id}-${day.toDateString()}`}
                     event={event}
                     compact={false}
+                    isRangeSegmentStart={!eventStart || isSameDay(day, eventStart)}
+                    isRangeSegmentEnd={!eventEnd || isSameDay(day, eventEnd)}
                     onDragStart={(id) => setDraggedId(id)}
                     isDragging={draggedId === event.id}
                   />
-                ))}
+                );
+              })}
                 {dayEvents.length === 0 && (
                   <div className="rounded-md border border-dashed border-[#E4E7EC] px-2 py-3 text-center text-xs text-[#98A2B3]">
                     No items

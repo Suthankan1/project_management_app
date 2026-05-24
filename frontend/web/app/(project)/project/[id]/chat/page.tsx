@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { MessageCircle } from 'lucide-react';
 import { useChat } from './components/useChat';
 import { ChatSidebar } from './components/chatSidebar';
 import { ChatMessages } from './components/chatMessage';
@@ -26,6 +27,10 @@ export default function ChatInterface() {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 1024;
+  });
 
   const {
     currentUser,
@@ -97,6 +102,17 @@ export default function ChatInterface() {
     };
 
     handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      setIsMobileViewport(window.innerWidth < 1024);
+    };
+
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -245,6 +261,8 @@ export default function ChatInterface() {
     loadRoomHistory(normalizedRoomId);
   }, [selectedRoomId, hasSelectedRoom, loadRoomHistory]);
 
+  const showMobileThread = Boolean(activeThreadRoot) && isMobileViewport;
+
   const handleSendMessage = (content: string) => {
     if (hasSelectedRoom) sendRoomMessage(content, selectedRoomId as number);
     else sendMessage(content, selectedUser);
@@ -258,8 +276,9 @@ export default function ChatInterface() {
   };
 
   const isConnected = isSocketConnected;
-  const isReconnectError = error.toLowerCase().includes('reconnect');
-  const shouldShowErrorBanner = Boolean(error) && !isReconnectError;
+  const errorMessage = typeof error === 'string' ? error : String(error ?? '');
+  const isReconnectError = errorMessage.toLowerCase().includes('reconnect');
+  const shouldShowErrorBanner = errorMessage.length > 0 && !isReconnectError;
 
   /* ── Loading skeleton ── */
   if (isLoading) {
@@ -299,6 +318,7 @@ export default function ChatInterface() {
           isLoading={false}
           roomMentionCounts={roomMentionCounts}
           teamMentionCount={teamMentionCount}
+          onlineUsers={onlineUsers}
         />
       </div>
 
@@ -335,8 +355,17 @@ export default function ChatInterface() {
         />
 
         <div className="flex-1 min-h-0 flex flex-col">
-          {/* No conversation selected — empty state */}
-          {!selectedUser && !hasSelectedRoom && displayMessages.length === 0 && !isLoading ? null : null}
+          {!selectedUser && !hasSelectedRoom && displayMessages.length === 0 && !isLoading && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center">
+                <MessageCircle size={28} className="text-blue-400" strokeWidth={1.5} />
+              </div>
+              <div>
+                <h3 className="text-[15px] font-semibold text-gray-800">Select a conversation</h3>
+                <p className="text-[13px] text-gray-400 mt-1">Choose a channel or direct message from the sidebar to start chatting.</p>
+              </div>
+            </div>
+          )}
 
           {/* Messages */}
           <ChatMessages
@@ -378,25 +407,78 @@ export default function ChatInterface() {
       </div>
 
       {/* ── Thread panel ── */}
+      <div className="hidden lg:flex">
+        <AnimatePresence>
+          {activeThreadRoot && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 340, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="overflow-hidden flex-shrink-0"
+            >
+              <ThreadPanel
+                rootMessage={activeThreadRoot}
+                threadMessages={threadMessages}
+                userProfilePics={userProfilePics}
+                reactionsByMessageId={messageReactions}
+                onClose={closeThread}
+                onSendReply={sendThreadReply}
+                onToggleReaction={toggleReaction}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       <AnimatePresence>
-        {activeThreadRoot && (
-          <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 340, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: 'easeInOut' }}
-            className="overflow-hidden flex-shrink-0 hidden lg:flex"
-          >
-            <ThreadPanel
-              rootMessage={activeThreadRoot}
-              threadMessages={threadMessages}
-              userProfilePics={userProfilePics}
-              reactionsByMessageId={messageReactions}
-              onClose={closeThread}
-              onSendReply={sendThreadReply}
-              onToggleReaction={toggleReaction}
+        {activeThreadRoot && showMobileThread && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <motion.button
+              type="button"
+              aria-label="Close thread panel overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 bg-black/45"
+              onClick={() => {
+                closeThread();
+              }}
             />
-          </motion.div>
+
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl"
+            >
+              <div className="flex items-center justify-end border-b border-gray-200 px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeThread();
+                  }}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="h-[calc(100%-57px)]">
+                <ThreadPanel
+                  rootMessage={activeThreadRoot}
+                  threadMessages={threadMessages}
+                  userProfilePics={userProfilePics}
+                  reactionsByMessageId={messageReactions}
+                  onClose={closeThread}
+                  onSendReply={sendThreadReply}
+                  onToggleReaction={toggleReaction}
+                />
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

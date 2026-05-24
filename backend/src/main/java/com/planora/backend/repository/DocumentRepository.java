@@ -4,6 +4,8 @@ import com.planora.backend.model.Document;
 import com.planora.backend.model.DocumentStatus;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,5 +30,10 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
 
     List<Document> findByFolderIdAndStatus(Long folderId, DocumentStatus status);
 
-    List<Document> findByStatusAndDeletedAtBefore(DocumentStatus status, LocalDateTime cutoff);
+    @Query("SELECT d FROM Document d WHERE d.status = :status " +
+            "AND d.deletedAt IS NOT NULL " +
+            "AND d.deletedAt < :cutoff")
+    List<Document> findExpiredSoftDeleted(
+            @Param("status") DocumentStatus status,
+            @Param("cutoff") LocalDateTime cutoff);
 }

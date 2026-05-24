@@ -7,3 +7,10 @@ frontend/web/node_modules
 **/.DS_Store
 planora.pem
 frontend\mobile\.expo
+.claude/
+
+
+
+# Local IDE and Expo metadata
+.expo/
+.idea/
