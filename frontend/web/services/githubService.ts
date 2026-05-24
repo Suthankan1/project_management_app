@@ -11,6 +11,37 @@ export interface GitHubRepository {
   default_branch: string
 }
 
+export interface GitHubUser {
+  login: string
+  name: string | null
+  avatar_url: string
+  html_url: string
+  public_repos: number
+  followers: number
+}
+
+export interface GitHubLabel {
+  id: number
+  name: string
+  color: string
+}
+
+export interface GitHubPullRequest {
+  id: number
+  number: number
+  title: string
+  state: 'open' | 'closed'
+  merged_at: string | null
+  created_at: string
+  updated_at: string
+  html_url: string
+  draft: boolean
+  user: { login: string; avatar_url: string; html_url: string }
+  labels: GitHubLabel[]
+  head: { ref: string }
+  base: { ref: string }
+}
+
 export interface ProjectGitHubConnection {
   repoId: number
   repoName: string
@@ -64,6 +95,36 @@ export async function fetchRepositoriesWithToken(token: string): Promise<GitHubR
     throw new Error('Failed to fetch repositories from GitHub')
   }
 
+  return response.json()
+}
+
+export async function fetchGitHubUser(token: string): Promise<GitHubUser> {
+  const response = await fetch('https://api.github.com/user', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github.v3+json',
+    },
+  })
+  if (!response.ok) throw new Error('Failed to fetch GitHub user')
+  return response.json()
+}
+
+export async function fetchPullRequests(
+  token: string,
+  owner: string,
+  repo: string,
+): Promise<GitHubPullRequest[]> {
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=10&sort=updated&direction=desc`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    },
+  )
+  if (response.status === 404) throw new Error('Repository not found or no access')
+  if (!response.ok) throw new Error('Failed to fetch pull requests')
   return response.json()
 }
 
