@@ -23,12 +23,14 @@ interface MonthCalendarViewProps {
 
 const getEventsForDate = (events: CalendarEventItem[], day: Date) =>
   events.filter((event) => {
-    if (event.kind === 'sprint') {
-      return isDateInRange(day, event.startDate, event.endDate);
+    const start = toDate(event.startDate || event.dueDate || event.endDate);
+    const end = toDate(event.endDate || event.startDate || event.dueDate);
+
+    if (start && end && !isSameDay(start, end)) {
+      return isDateInRange(day, start.toISOString(), end.toISOString());
     }
 
-    const exact = toDate(event.startDate || event.dueDate || event.endDate);
-    return exact ? isSameDay(day, exact) : false;
+    return start ? isSameDay(day, start) : false;
   });
 
 export default function MonthCalendarView({ currentDate, events, onDayClick, onEventDrop }: MonthCalendarViewProps) {
@@ -89,14 +91,16 @@ export default function MonthCalendarView({ currentDate, events, onDayClick, onE
                 {dayEvents.slice(0, 4).map((event) => {
                   const eventStart = toDate(event.startDate || event.dueDate || event.endDate);
                   const eventEnd = toDate(event.endDate || event.startDate || event.dueDate);
+                  const isWeekStart = idx % 7 === 0;
+                  const isWeekEnd = idx % 7 === 6;
 
                   return (
                     <CalendarEventCard
                       key={`${event.id}-${day.toDateString()}`}
                       event={event}
                       compact
-                      isSprintSegmentStart={!eventStart || isSameDay(day, eventStart)}
-                      isSprintSegmentEnd={!eventEnd || isSameDay(day, eventEnd)}
+                      isRangeSegmentStart={!eventStart || isSameDay(day, eventStart) || isWeekStart}
+                      isRangeSegmentEnd={!eventEnd || isSameDay(day, eventEnd) || isWeekEnd}
                       onClick={handleEventClick}
                       onDragStart={(id) => setDraggedId(id)}
                       isDragging={draggedId === event.id}
