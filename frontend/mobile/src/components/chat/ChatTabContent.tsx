@@ -288,12 +288,20 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
         onReply={() => reactionMessage && openThread(reactionMessage)}
         onEdit={
           reactionMessage && currentUserIdentitySet.has((reactionMessage.sender || '').trim().toLowerCase())
-            ? () => setEditingMessage(reactionMessage)
+            ? () => {
+                const msg = reactionTarget?.message ?? null;
+                setReactionTarget(null);
+                if (msg) setEditingMessage(msg);
+              }
             : undefined
         }
         onDelete={
           reactionMessage && currentUserIdentitySet.has((reactionMessage.sender || '').trim().toLowerCase()) && reactionMessage.id
-            ? () => setDeletingMessageId(reactionMessage.id as number)
+            ? () => {
+                const messageId = reactionTarget?.message?.id ?? null;
+                setReactionTarget(null);
+                if (messageId) setDeletingMessageId(messageId);
+              }
             : undefined
         }
         anchorY={reactionTarget?.anchorY}
