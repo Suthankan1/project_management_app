@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GestureResponderEvent, View, StyleSheet, Alert } from 'react-native';
+import { GestureResponderEvent, View, StyleSheet } from 'react-native';
 import { useChat } from '@/src/hooks/chat/useChat';
 import { ChatSidebar }          from '@/src/components/chat/ChatSidebar';
 import { ChatHeader }           from '@/src/components/chat/ChatHeader';
@@ -16,7 +16,6 @@ import {
 import { QuickReactionBar }     from '@/src/components/chat/QuickReactionBar';
 import { Colors }               from '@/src/constants/colors';
 import { ChatMessage, ChatRoom } from '@/src/types/chat';
-import { QUICK_REACTIONS }      from '@/src/hooks/chat/chatUtils';
 
 interface Props {
   projectId: string;

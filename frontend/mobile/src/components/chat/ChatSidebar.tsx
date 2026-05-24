@@ -119,24 +119,30 @@ export function ChatSidebar({
     { key: 'dms', title: 'DIRECT MESSAGES', data: dmUsers.map(u => ({ username: u, type: 'direct' as const })) },
   ];
 
-  const renderDeleteActions = (roomId: number, roomName: string) => () => (
-    <TouchableOpacity
-      style={styles.deleteAction}
-      onPress={() => {
-        Alert.alert(
-          'Delete Channel',
-          `Delete "${roomName}"? This action cannot be undone.`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Delete', style: 'destructive', onPress: () => onDeleteRoom(roomId) },
-          ]
-        );
-      }}
-      activeOpacity={0.85}
-    >
-      <Ionicons name="trash-outline" size={24} color="#fff" />
-    </TouchableOpacity>
-  );
+  const renderDeleteActions = (roomId: number, roomName: string) => {
+    function DeleteRoomAction() {
+      return (
+        <TouchableOpacity
+          style={styles.deleteAction}
+          onPress={() => {
+            Alert.alert(
+              'Delete Channel',
+              `Delete "${roomName}"? This action cannot be undone.`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete', style: 'destructive', onPress: () => onDeleteRoom(roomId) },
+              ]
+            );
+          }}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="trash-outline" size={24} color="#fff" />
+        </TouchableOpacity>
+      );
+    }
+
+    return DeleteRoomAction;
+  };
 
   const renderItem = ({ item }: { item: any }) => {
     if (item.type === 'team') {

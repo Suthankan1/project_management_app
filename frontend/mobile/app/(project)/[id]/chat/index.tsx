@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Alert, ActionSheetIOS, Platform, GestureResponderEvent } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, GestureResponderEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useChat } from '@/src/hooks/chat/useChat';
@@ -15,7 +15,6 @@ import { PinnedMessageBanner }    from '@/src/components/chat/ChatMessage';
 import { CreateChannelModal, EditMessageModal, ConfirmDeleteModal, EditChannelModal } from '@/src/components/chat/ChatModals';
 import { Colors }                 from '@/src/constants/colors';
 import { ChatMessage, ChatRoom } from '@/src/types/chat';
-import { QUICK_REACTIONS } from '@/src/hooks/chat/chatUtils';
 import { QuickReactionBar } from '@/src/components/chat/QuickReactionBar';
 
 interface ReactionTarget {
@@ -125,30 +124,6 @@ export default function ChatScreen() {
       anchorY: event.nativeEvent.pageY,
       isMe: messageIsMe,
     });
-  };
-
-  const handleAction = (index: number, message: ChatMessage, isMe: boolean) => {
-    const actions = isMe
-      ? ['reply', 'edit', 'delete', 'react', 'cancel']
-      : ['reply', 'react', 'cancel'];
-
-    const action = actions[index];
-    if (!action || action === 'cancel') return;
-
-    switch (action) {
-      case 'reply': openThread(message); break;
-      case 'edit': setEditingMessage(message); break;
-      case 'delete': message.id && setDeletingMessageId(message.id); break;
-      case 'react':
-        Alert.alert('React', undefined, [
-          ...QUICK_REACTIONS.map(emoji => ({
-            text: emoji,
-            onPress: () => message.id && toggleReaction(message.id, emoji),
-          })),
-          { text: 'Cancel', style: 'cancel' as const },
-        ]);
-        break;
-    }
   };
 
   if (isLoading) return <ChatLoadingSkeleton />;

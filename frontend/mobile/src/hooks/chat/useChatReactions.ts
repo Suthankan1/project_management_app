@@ -13,7 +13,7 @@ export function useChatReactions(projectId: string) {
     } catch (err) {
       console.error('Failed to load reactions:', err);
     }
-  }, [projectId]);
+  }, []);
 
   const applyOptimisticReaction = useCallback((messageId: number, emoji: string) => {
     setMessageReactions(prev => {

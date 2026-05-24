@@ -98,7 +98,7 @@ function LoadingOverlay() {
 
           {/* Quote text centered in glass */}
           <View style={sl.quoteWrap}>
-            <Text style={sl.quoteText}>"{q.text}"</Text>
+            <Text style={sl.quoteText}>{'"'}{q.text}{'"'}</Text>
             <Text style={sl.quoteAuthor}>— {q.author}</Text>
           </View>
 

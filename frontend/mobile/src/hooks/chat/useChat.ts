@@ -10,7 +10,7 @@ import { useChatReactions } from './useChatReactions';
 import { useChatSearch } from './useChatSearch';
 import { useChatThreads } from './useChatThreads';
 import { useChatUnread } from './useChatUnread';
-import { getToken } from '@/src/auth/storage';
+import { getValidToken } from '@/src/auth/storage';
 
 // ── Minimal inline STOMP builder/parser ──────────────────────────────────────
 
@@ -73,7 +73,7 @@ export function useChat(projectId: string) {
   const [currentUser, setCurrentUser] = useState('');
   const [currentUserAliases, setCurrentUserAliases] = useState<string[]>([]);
   const [users, setUsers] = useState<string[]>([]);
-  const [userProfilePics, setUserProfilePics] = useState<Record<string, string>>({});
+  const [userProfilePics] = useState<Record<string, string>>({});
   const [featureFlags, setFeatureFlags] = useState<ChatFeatureFlags>({
     phaseDEnabled: false, phaseEEnabled: false,
     webhooksEnabled: false, telemetryEnabled: false,
@@ -229,7 +229,7 @@ export function useChat(projectId: string) {
     isConnectingRef.current = true;
 
     try {
-      const token = await getToken();
+      const token = await getValidToken();
       if (!token) { setError('Not authenticated'); isConnectingRef.current = false; return; }
 
       const base = API_BASE_URL.replace(/\/api$/, '');
@@ -303,11 +303,18 @@ export function useChat(projectId: string) {
         }
       };
 
-      ws.onerror = (e) => {
+      ws.onerror = () => {
         if (socketRef.current !== ws) return;
-        console.error('[Chat] WS error', e);
-        setError('Connection error — retrying…');
+        if (__DEV__) {
+          console.info('[Chat] WS connection error; reconnect will be attempted');
+        }
+        setError('Connection error. Retrying...');
         isConnectingRef.current = false;
+        try {
+          ws.close();
+        } catch {
+          socketRef.current = null;
+        }
       };
     } catch (err) {
       console.error('[Chat] connect failed', err);
@@ -371,6 +378,9 @@ export function useChat(projectId: string) {
       dying?.close();
       if (reconnectRef.current) { clearTimeout(reconnectRef.current); reconnectRef.current = null; }
     };
+  // The initialization lifecycle is intentionally keyed to project changes only.
+  // The hook modules expose stable operational callbacks for this flow.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
   // ── Send helpers ──────────────────────────────────────────────────────────
