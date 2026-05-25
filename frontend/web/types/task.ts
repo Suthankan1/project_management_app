@@ -139,6 +139,22 @@ export interface TaskItem {
   labels?: Label[];
 }
 
+export interface CustomField {
+  id: number;
+  projectId: number;
+  name: string;
+  fieldType: 'TEXT' | 'NUMBER' | 'DATE' | 'SELECT';
+  options?: string[];
+  position: number;
+}
+
+export interface CustomFieldValue {
+  customFieldId: number;
+  fieldName: string;
+  fieldType: string;
+  value: string | null;
+}
+
 export interface TaskTemplate {
   id: number;
   projectId: number;
