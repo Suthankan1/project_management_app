@@ -13,6 +13,7 @@ import ReportScreen   from '../../src/components/report/ReportScreen';
 import ProjectBoardScreen from '../../src/components/board/ProjectBoardScreen';
 import ProjectSprintBoardScreen from '../../src/components/board/ProjectSprintBoardScreen';
 import MobileBacklogScreen from '../../src/components/backlog/MobileBacklogScreen';
+import MobileTimelineScreen from '../../src/components/timeline/MobileTimelineScreen';
 import { useProjectSummary } from '../../src/hooks/useProjectSummary';
 import MobilePagesScreen from '../../src/components/pages/MobilePagesScreen';
 import MobileDocsScreen from '../../src/components/docs/MobileDocsScreen';
@@ -58,7 +59,7 @@ export default function ProjectRoute() {
   const handleTabChange = useCallback((tab: ProjectTab | MoreTab) => {
     setActiveTab(tab);
     // Clear more-tab when switching to a main tab
-    if (tab !== 'more' && !['timeline', 'calendar', 'burndown', 'milestone', 'members', 'pages', 'docs', 'list', 'report'].includes(tab as string)) {
+    if (tab !== 'more' && !['calendar', 'burndown', 'milestone', 'members', 'pages', 'docs', 'list', 'report'].includes(tab as string)) {
       setLastMainTab(tab as ProjectTab);
       setActiveMoreTab(undefined);
     }
@@ -119,7 +120,6 @@ export default function ProjectRoute() {
         );
       }
       const labels: Record<MoreTab, string> = {
-        timeline:  'Timeline',
         calendar:  'Calendar',
         burndown:  'Burndown Chart',
         milestone: 'Milestones',
@@ -168,6 +168,14 @@ export default function ProjectRoute() {
           />
         ) : (
           <ProjectBoardScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight + 16}
+          />
+        );
+      case 'timeline':
+        return (
+          <MobileTimelineScreen
             projectId={numericId}
             projectName={name}
             topOffset={navHeight + 16}

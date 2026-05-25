@@ -49,7 +49,7 @@ class TaskActivityControllerTest {
 
     @MockBean
     private UserDetailsService userDetailsService;
-    
+
     @MockBean
     private com.planora.backend.service.TaskGithubService taskGithubService;
 

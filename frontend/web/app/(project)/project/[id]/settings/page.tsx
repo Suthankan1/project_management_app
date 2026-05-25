@@ -14,7 +14,6 @@ import {
   removeScopedProjectValue,
 } from '@/hooks/useProjectContext';
 import { getUserIdFromToken } from '@/lib/auth';
-
 type ProjectType = 'AGILE' | 'KANBAN';
 
 interface ProjectData {
@@ -128,6 +127,7 @@ function DeleteConfirmModal({
               'All tasks, subtasks, and their attachments',
               'All sprint data, boards, and history',
               'All team member associations',
+              'All custom fields and configurations',
               'All milestones and project documents',
             ].map((item) => (
               <li key={item} className="flex items-start gap-2 text-xs text-red-700">
@@ -699,6 +699,14 @@ export default function ProjectSettingsPage() {
                       </button>
                     </div>
                   )}
+                </SectionCard>
+
+                <SectionCard
+                  title="Custom Fields"
+                  description="Add extra fields to all tasks in this project"
+                  icon={<Settings2 size={15} />}
+                >
+                  <CustomFieldsManager projectId={projectId} />
                 </SectionCard>
 
               </div>

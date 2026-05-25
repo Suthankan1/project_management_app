@@ -8,6 +8,9 @@ import PrioritySection from './sidebar/PrioritySection';
 import StoryPointSection from './sidebar/StoryPointSection';
 import DateSection from './sidebar/DateSection';
 import RecurrenceSection from './sidebar/RecurrenceSection';
+<<<<<<< HEAD
+=======
+>>>>>>> 14cc17b19bf0966f744ed80fc8451ba3cd07ff8b
 import TaskGitHubSection from './sidebar/TaskGitHubSection';
 import SidebarField from './sidebar/SidebarField';
 import { Check, ChevronDown, Plus } from 'lucide-react';
@@ -72,6 +75,7 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
   const [sections, setSections] = React.useState<Record<string, boolean>>({
     details: true,
     dates: true,
+    customFields: true,
   });
   const [labelMenuOpen, setLabelMenuOpen] = React.useState(false);
   const [selectedLabelIds, setSelectedLabelIds] = React.useState<number[]>(labelIds);
@@ -265,6 +269,10 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
       {taskId != null && (
         <TaskGitHubSection taskId={taskId} projectId={projectId} />
       )}
+<<<<<<< HEAD
+=======
+      {/* Custom fields removed — keep GitHub section only. */}
+>>>>>>> 14cc17b19bf0966f744ed80fc8451ba3cd07ff8b
       <div className="text-[10px] text-[#9CA3AF] flex justify-between px-1 pb-2">
         <button className="hover:text-[#374151] transition-colors">Configure fields</button>
         <button className="hover:text-[#374151] transition-colors">Plain Text</button>

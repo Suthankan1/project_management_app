@@ -1,26 +1,25 @@
+-- Keep sprint cleanup consistent when a project is removed.
+-- V17 may have created an automatically named foreign key, so replace any
+-- project_id foreign key before adding the canonical cascading constraint.
 DO $$
 DECLARE
-    constraint_name text;
+    constraint_name TEXT;
 BEGIN
-    SELECT con.conname
-    INTO constraint_name
-    FROM pg_constraint con
-    JOIN pg_class rel ON rel.oid = con.conrelid
-    JOIN pg_attribute attr ON attr.attrelid = rel.oid AND attr.attnum = ANY(con.conkey)
-    JOIN pg_class referenced_rel ON referenced_rel.oid = con.confrelid
-    WHERE con.contype = 'f'
-      AND rel.relname = 'sprints'
-      AND attr.attname = 'project_id'
-      AND referenced_rel.relname = 'projects'
-    LIMIT 1;
-
-    IF constraint_name IS NOT NULL THEN
+    FOR constraint_name IN
+        SELECT c.conname
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_attribute a
+            ON a.attrelid = t.oid
+           AND a.attnum = ANY (c.conkey)
+        WHERE t.relname = 'sprints'
+          AND c.contype = 'f'
+          AND a.attname = 'project_id'
+    LOOP
         EXECUTE format('ALTER TABLE sprints DROP CONSTRAINT %I', constraint_name);
-    END IF;
-
-    ALTER TABLE sprints
-        ADD CONSTRAINT fk_sprints_project
-        FOREIGN KEY (project_id)
-        REFERENCES projects(id)
-        ON DELETE CASCADE;
+    END LOOP;
 END $$;
+
+ALTER TABLE sprints
+    ADD CONSTRAINT fk_sprints_project
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
