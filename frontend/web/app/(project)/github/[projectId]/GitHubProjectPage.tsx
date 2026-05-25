@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   GitBranch, Globe, Lock, RefreshCw, Search, X, Check, Link2,
   LogOut, User, ExternalLink, GitPullRequest, ChevronDown, AlertCircle, GitCommit,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -18,12 +19,15 @@ import {
   fetchGitHubUser,
   fetchPullRequests,
   fetchCommits,
+  fetchIssues,
   type GitHubRepository,
   type GitHubPullRequest,
   type GitHubCommit,
+  type GitHubIssue,
   type GitHubUser,
   type ProjectGitHubConnection,
 } from '@/services/githubService';
+import IssueCard from '@/components/github/IssueCard';
 
 const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
 
@@ -445,6 +449,159 @@ function SkeletonList() {
 }
 
 // ── Connected dashboard ───────────────────────────────────────────────────────
+function IssueImportModal({ issue, onClose }: { issue: GitHubIssue; onClose: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[500] flex items-center justify-center p-4"
+      style={{ background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-[0_24px_80px_rgba(0,0,0,0.18)]"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-outfit font-semibold text-slate-400">Import GitHub issue</p>
+            <h3 className="mt-1 text-base font-outfit font-bold text-slate-800">
+              #{issue.number} {issue.title}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <p className="mt-4 text-sm font-outfit text-slate-500">
+          Choose import options and create the Planora task in the import workflow.
+        </p>
+        <div className="mt-5 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-outfit font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            Close
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function IssuesPanel({
+  connection,
+  onCountChange,
+}: {
+  connection: ProjectGitHubConnection;
+  onCountChange: (count: number | null) => void;
+}) {
+  const [issues, setIssues] = useState<GitHubIssue[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedIssue, setSelectedIssue] = useState<GitHubIssue | null>(null);
+  const [importedIssueNumbers] = useState<Set<number>>(() => new Set());
+
+  const loadIssues = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    onCountChange(null);
+    try {
+      const data = await fetchIssues(connection.repoFullName);
+      setIssues(data);
+      onCountChange(data.length);
+    } catch (err) {
+      setIssues([]);
+      setError(err instanceof Error ? err.message : 'Failed to load issues');
+    } finally {
+      setLoading(false);
+    }
+  }, [connection.repoFullName, onCountChange]);
+
+  useEffect(() => {
+    void loadIssues();
+  }, [loadIssues]);
+
+  return (
+    <div className="flex flex-col gap-4 min-w-0">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-outfit font-bold text-slate-700">Issues</h2>
+          {!loading && !error && (
+            <span className="text-sm text-slate-400 font-outfit">({issues.length})</span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => void loadIssues()}
+          disabled={loading}
+          className="p-2 rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:opacity-40"
+          title="Refresh issues"
+        >
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
+        <SlidersHorizontal size={14} className="text-slate-400" />
+        <span className="text-xs font-outfit font-semibold text-slate-500">Filters</span>
+        <button disabled className="ml-2 rounded-lg bg-slate-50 px-2.5 py-1 text-xs font-outfit text-slate-400">
+          All states
+        </button>
+        <button disabled className="rounded-lg bg-slate-50 px-2.5 py-1 text-xs font-outfit text-slate-400">
+          All labels
+        </button>
+      </div>
+
+      {loading && <SkeletonList />}
+
+      {!loading && error && (
+        <div className="flex flex-col items-center gap-2 py-10 text-center">
+          <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
+            <AlertCircle size={16} className="text-red-500" />
+          </div>
+          <p className="text-xs text-slate-500 font-outfit">{error}</p>
+          <button onClick={() => void loadIssues()} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && issues.length === 0 && (
+        <div className="flex flex-col items-center gap-2 py-10">
+          <AlertCircle size={20} className="text-slate-300" />
+          <p className="text-xs text-slate-400 font-outfit">No issues found</p>
+        </div>
+      )}
+
+      {!loading && !error && issues.length > 0 && (
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {issues.map(issue => (
+            <IssueCard
+              key={issue.id}
+              issue={issue}
+              onImport={setSelectedIssue}
+              isImported={importedIssueNumbers.has(issue.number)}
+            />
+          ))}
+        </div>
+      )}
+
+      <AnimatePresence>
+        {selectedIssue && <IssueImportModal issue={selectedIssue} onClose={() => setSelectedIssue(null)} />}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function ConnectedDashboard({
   connection,
   prs,
@@ -468,6 +625,9 @@ function ConnectedDashboard({
   onLogout: () => void;
   onChangeRepo: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState<'pullRequests' | 'commits' | 'issues'>('pullRequests');
+  const [issueCount, setIssueCount] = useState<number | null>(null);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -516,12 +676,34 @@ function ConnectedDashboard({
       </div>
 
       {/* ── Two-column content ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+        {([
+          { id: 'pullRequests', label: 'Pull Requests' },
+          { id: 'commits', label: 'Commits' },
+          { id: 'issues', label: `Issues${issueCount === null ? '' : ` (${issueCount})`}` },
+        ] as const).map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`rounded-xl px-4 py-2 text-sm font-outfit font-semibold transition-colors ${
+              activeTab === tab.id
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
 
         {/* ── Left: Pull Requests ──────────────────────────────────── */}
-        <div className="flex flex-col gap-3 min-w-0">
-          <div className="flex items-center gap-2">
-            <GitPullRequest size={15} className="text-slate-500 shrink-0" />
+        {activeTab === 'pullRequests' && (
+          <div className="flex flex-col gap-3 min-w-0">
+            <div className="flex items-center gap-2">
+              <GitPullRequest size={15} className="text-slate-500 shrink-0" />
             <h2 className="text-sm font-outfit font-bold text-slate-700">
               Pull Requests
               {!loading && !prError && (
@@ -567,11 +749,13 @@ function ConnectedDashboard({
             </div>
           )}
         </div>
+        )}
 
         {/* ── Right: Commits ───────────────────────────────────────── */}
-        <div className="flex flex-col gap-3 min-w-0">
-          <div className="flex items-center gap-2">
-            <GitCommit size={15} className="text-slate-500 shrink-0" />
+        {activeTab === 'commits' && (
+          <div className="flex flex-col gap-3 min-w-0">
+            <div className="flex items-center gap-2">
+              <GitCommit size={15} className="text-slate-500 shrink-0" />
             <h2 className="text-sm font-outfit font-bold text-slate-700">
               Commits
               {!loading && !commitError && (
@@ -617,7 +801,11 @@ function ConnectedDashboard({
             </div>
           )}
         </div>
+        )}
 
+        <div className={activeTab === 'issues' ? '' : 'hidden'}>
+          <IssuesPanel connection={connection} onCountChange={setIssueCount} />
+        </div>
       </div>
     </motion.div>
   );
