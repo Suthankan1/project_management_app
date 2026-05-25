@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.planora.backend.dto.GithubIssueDTO;
+import com.planora.backend.dto.GithubLabelDTO;
 import com.planora.backend.model.Kanban;
 import com.planora.backend.model.KanbanColumn;
 import com.planora.backend.model.Label;
@@ -64,7 +65,7 @@ class GithubIssueConversionServiceTest {
         GithubIssueDTO issue = issue(18, "open", "a".repeat(300), "b".repeat(2200));
         issue.setCreatedAt(createdAt);
         issue.setHtmlUrl("https://github.com/planora/app/issues/18");
-        issue.setLabels(List.of(new GithubIssueDTO.LabelDTO("bug", "d73a4a")));
+        issue.setLabels(List.of(new GithubLabelDTO("bug", "d73a4a")));
         Label label = new Label("bug", "#d73a4a", project);
 
         when(kanbanRepository.findByProjectId(10L)).thenReturn(List.of(board));
@@ -110,6 +111,20 @@ class GithubIssueConversionServiceTest {
         assertEquals(true, service.isAlreadyImported(18L, "planora/app", 10L));
         verify(taskRepository).existsByProjectIdAndGithubIssueNumberAndGithubRepoFullNameIgnoreCase(
                 10L, 18L, "planora/app");
+    }
+
+    @Test
+    void mapGithubLabels_truncatesLongNamesAndAddsColorPrefix() {
+        String longName = "label-name-".repeat(6);
+        String truncatedName = longName.substring(0, 50);
+        Label label = new Label(truncatedName, "#abcdef", project);
+        when(labelService.findOrCreate(truncatedName, "#abcdef", project)).thenReturn(label);
+
+        List<Label> labels = service.mapGithubLabels(
+                List.of(new GithubLabelDTO(longName, "abcdef")), project);
+
+        assertEquals(List.of(label), labels);
+        verify(labelService).findOrCreate(truncatedName, "#abcdef", project);
     }
 
     private GithubIssueDTO issue(Integer number, String state, String title, String body) {

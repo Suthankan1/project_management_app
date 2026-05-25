@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.planora.backend.dto.GithubIssueDTO;
 import com.planora.backend.dto.GithubIssueImportRequestDTO;
 import com.planora.backend.dto.GithubIssueImportResponseDTO;
+import com.planora.backend.dto.GithubLabelDTO;
 import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Task;
@@ -141,7 +142,7 @@ class GithubIssueImportServiceTest {
         issue.setTitle(title);
         issue.setBody(body);
         if (label != null) {
-            issue.setLabels(List.of(new GithubIssueDTO.LabelDTO(label, color)));
+            issue.setLabels(List.of(new GithubLabelDTO(label, color)));
         }
         return issue;
     }

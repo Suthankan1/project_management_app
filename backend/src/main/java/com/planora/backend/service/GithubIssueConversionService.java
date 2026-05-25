@@ -7,11 +7,15 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.planora.backend.dto.GithubIssueDTO;
+import com.planora.backend.dto.GithubLabelDTO;
 import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.Kanban;
 import com.planora.backend.model.KanbanColumn;
+import com.planora.backend.model.Label;
 import com.planora.backend.model.Priority;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Task;
@@ -21,6 +25,9 @@ import com.planora.backend.repository.TaskRepository;
 
 @Service
 public class GithubIssueConversionService {
+
+    private static final Logger log = LoggerFactory.getLogger(GithubIssueConversionService.class);
+    private static final int MAX_LABEL_NAME_LENGTH = 50;
 
     @Autowired
     private TaskRepository taskRepository;
@@ -45,14 +52,19 @@ public class GithubIssueConversionService {
         task.setGithubRepoFullName(extractRepoFullName(issue.getHtmlUrl()));
         task.setCreatedAt(toLocalDateTime(issue.getCreatedAt()));
 
-        if (issue.getLabels() != null) {
-            issue.getLabels().stream()
-                    .filter(label -> label.getName() != null && !label.getName().isBlank())
-                    .map(label -> labelService.findOrCreate(
-                            label.getName(), normalizeColor(label.getColor()), project))
-                    .forEach(task.getLabels()::add);
-        }
+        task.getLabels().addAll(mapGithubLabels(issue.getLabels(), project));
         return task;
+    }
+
+    public List<Label> mapGithubLabels(List<GithubLabelDTO> githubLabels, Project project) {
+        if (githubLabels == null) {
+            return List.of();
+        }
+        return githubLabels.stream()
+                .filter(label -> label.getName() != null && !label.getName().isBlank())
+                .map(label -> labelService.findOrCreate(
+                        truncateLabelName(label.getName()), normalizeColor(label.getColor()), project))
+                .toList();
     }
 
     public boolean isAlreadyImported(Long issueNumber, String repoFullName, Long projectId) {
@@ -93,6 +105,14 @@ public class GithubIssueConversionService {
             return color;
         }
         return color.startsWith("#") ? color : "#" + color;
+    }
+
+    private String truncateLabelName(String name) {
+        if (name.length() <= MAX_LABEL_NAME_LENGTH) {
+            return name;
+        }
+        log.warn("GitHub label name exceeds {} characters and will be truncated: {}", MAX_LABEL_NAME_LENGTH, name);
+        return name.substring(0, MAX_LABEL_NAME_LENGTH);
     }
 
     private java.time.LocalDateTime toLocalDateTime(OffsetDateTime value) {

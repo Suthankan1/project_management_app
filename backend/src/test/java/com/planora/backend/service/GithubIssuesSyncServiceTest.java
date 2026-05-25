@@ -3,6 +3,7 @@ package com.planora.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -12,6 +13,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,7 +21,11 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import com.planora.backend.dto.GithubIssueDTO;
+import com.planora.backend.dto.GithubIssueCreateRequestDTO;
+import com.planora.backend.dto.GithubLabelDTO;
+import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.GithubAuthenticationException;
+import com.planora.backend.exception.GithubIssueValidationException;
 import com.planora.backend.exception.GithubRateLimitException;
 import com.planora.backend.exception.GithubRepositoryNotFoundException;
 
@@ -101,5 +107,95 @@ class GithubIssuesSyncServiceTest {
         assertThrows(GithubRepositoryNotFoundException.class,
                 () -> service.syncIssues("planora/missing", "github-token"));
         server.verify();
+    }
+
+    @Test
+    void syncLabels_fetchesRawRepositoryLabels() {
+        String response = """
+                [{"name": "bug", "color": "d73a4a"}, {"name": "feature", "color": "a2eeef"}]
+                """;
+        server.expect(requestTo("https://api.github.com/repos/planora/app/labels?per_page=100"))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer github-token"))
+                .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
+
+        List<GithubLabelDTO> labels = service.syncLabels("planora/app", "github-token");
+
+        assertEquals(2, labels.size());
+        assertEquals("bug", labels.get(0).getName());
+        assertEquals("d73a4a", labels.get(0).getColor());
+        server.verify();
+    }
+
+    @Test
+    void createIssue_postsPayloadAndMapsCreatedIssue() {
+        GithubIssueCreateRequestDTO request = createRequest();
+        String response = """
+                {"id": 12, "number": 34, "title": "Fix login", "state": "open"}
+                """;
+        server.expect(requestTo("https://api.github.com/repos/planora/app/issues"))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer github-token"))
+                .andExpect(content().json("""
+                        {"title":"Fix login","body":"Session expires early","labels":["bug"],"assignees":["octocat"]}
+                        """))
+                .andRespond(withStatus(HttpStatus.CREATED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(response));
+
+        GithubIssueDTO createdIssue = service.createIssue(request, "github-token");
+
+        assertEquals(34, createdIssue.getNumber());
+        assertEquals("Fix login", createdIssue.getTitle());
+        server.verify();
+    }
+
+    @Test
+    void createIssue_throwsValidationExceptionForUnprocessableRequest() {
+        server.expect(requestTo("https://api.github.com/repos/planora/app/issues"))
+                .andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY));
+
+        assertThrows(GithubIssueValidationException.class,
+                () -> service.createIssue(createRequest(), "github-token"));
+        server.verify();
+    }
+
+    @Test
+    void createIssue_throwsForbiddenExceptionWhenTokenCannotWrite() {
+        server.expect(requestTo("https://api.github.com/repos/planora/app/issues"))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+        assertThrows(ForbiddenException.class,
+                () -> service.createIssue(createRequest(), "github-token"));
+        server.verify();
+    }
+
+    @Test
+    void createIssue_throwsRateLimitExceptionWhenGithubRateLimitIsExhausted() {
+        server.expect(requestTo("https://api.github.com/repos/planora/app/issues"))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN)
+                        .header("X-RateLimit-Remaining", "0"));
+
+        assertThrows(GithubRateLimitException.class,
+                () -> service.createIssue(createRequest(), "github-token"));
+        server.verify();
+    }
+
+    @Test
+    void createIssue_evictsRepositoryIssueCacheAfterSuccess() throws Exception {
+        CacheEvict cacheEvict = GithubIssuesSyncService.class
+                .getMethod("createIssue", GithubIssueCreateRequestDTO.class, String.class)
+                .getAnnotation(CacheEvict.class);
+
+        assertEquals("github-issues", cacheEvict.cacheNames()[0]);
+        assertEquals("#request.repoFullName.toLowerCase()", cacheEvict.key());
+    }
+
+    private GithubIssueCreateRequestDTO createRequest() {
+        GithubIssueCreateRequestDTO request = new GithubIssueCreateRequestDTO();
+        request.setRepoFullName("planora/app");
+        request.setTitle("Fix login");
+        request.setBody("Session expires early");
+        request.setLabels(List.of("bug"));
+        request.setAssignees(List.of("octocat"));
+        return request;
     }
 }

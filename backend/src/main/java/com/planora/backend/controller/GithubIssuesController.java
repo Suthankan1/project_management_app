@@ -4,18 +4,22 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.planora.backend.dto.GithubIssueDTO;
+import com.planora.backend.dto.GithubIssueCreateRequestDTO;
 import com.planora.backend.dto.GithubIssueImportRequestDTO;
 import com.planora.backend.dto.GithubIssueImportResponseDTO;
+import com.planora.backend.dto.GithubLabelDTO;
 import com.planora.backend.exception.GithubAuthenticationException;
 import com.planora.backend.model.User;
 import com.planora.backend.model.UserPrincipal;
@@ -76,6 +80,34 @@ public class GithubIssuesController {
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
         return ResponseEntity.ok(githubIssueImportService.importIssues(request, getCurrentUser(currentUser)));
+    }
+
+    @PostMapping("/issues/create")
+    public ResponseEntity<GithubIssueDTO> createIssue(
+            @Valid @RequestBody GithubIssueCreateRequestDTO request,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        User user = getCurrentUser(currentUser);
+        String accessToken = user.getGithubAccessToken();
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new GithubAuthenticationException("GitHub account is not connected");
+        }
+        GithubIssueDTO createdIssue = githubIssuesSyncService.createIssue(request, accessToken);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdIssue);
+    }
+
+    @GetMapping("/issues/{owner}/{repo}/labels")
+    public ResponseEntity<List<GithubLabelDTO>> getLabels(
+            @PathVariable String owner,
+            @PathVariable String repo,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        User user = getCurrentUser(currentUser);
+        String accessToken = user.getGithubAccessToken();
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new GithubAuthenticationException("GitHub account is not connected");
+        }
+        return ResponseEntity.ok(githubIssuesSyncService.syncLabels(owner + "/" + repo, accessToken));
     }
 
     private boolean hasLabel(GithubIssueDTO issue, String label) {

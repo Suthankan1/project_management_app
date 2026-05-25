@@ -24,7 +24,7 @@ public class GithubIssueDTO {
     private String title;
     private String body;
     private String state;
-    private List<LabelDTO> labels;
+    private List<GithubLabelDTO> labels;
     @JsonDeserialize(contentUsing = AssigneeLoginDeserializer.class)
     private List<String> assignees;
     @JsonProperty("created_at")
@@ -34,14 +34,6 @@ public class GithubIssueDTO {
     @JsonProperty("html_url")
     private String htmlUrl;
     private Integer comments;
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class LabelDTO {
-        private String name;
-        private String color;
-    }
 
     public static class AssigneeLoginDeserializer extends StdDeserializer<String> {
 

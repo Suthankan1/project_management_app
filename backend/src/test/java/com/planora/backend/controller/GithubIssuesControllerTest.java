@@ -25,8 +25,12 @@ import org.springframework.http.MediaType;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.planora.backend.dto.GithubIssueDTO;
+import com.planora.backend.dto.GithubIssueCreateRequestDTO;
 import com.planora.backend.dto.GithubIssueImportResponseDTO;
+import com.planora.backend.dto.GithubLabelDTO;
+import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.GithubRateLimitException;
+import com.planora.backend.exception.GithubIssueValidationException;
 import com.planora.backend.exception.GithubRepositoryNotFoundException;
 import com.planora.backend.model.User;
 import com.planora.backend.model.UserPrincipal;
@@ -179,11 +183,94 @@ class GithubIssuesControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void getLabels_returnsRawGithubLabelsForRepository() throws Exception {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
+        when(githubIssuesSyncService.syncLabels("planora/app", "github-token"))
+                .thenReturn(List.of(new GithubLabelDTO("bug", "d73a4a")));
+
+        mockMvc.perform(get("/api/github/issues/planora/app/labels")
+                        .with(user(principal)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("bug"))
+                .andExpect(jsonPath("$[0].color").value("d73a4a"));
+
+        verify(githubIssuesSyncService).syncLabels("planora/app", "github-token");
+    }
+
+    @Test
+    void createIssue_returnsCreatedGithubIssueUsingStoredToken() throws Exception {
+        GithubIssueDTO createdIssue = new GithubIssueDTO();
+        createdIssue.setNumber(34);
+        createdIssue.setTitle("Fix login");
+        when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
+        when(githubIssuesSyncService.createIssue(any(GithubIssueCreateRequestDTO.class), org.mockito.ArgumentMatchers.eq("github-token")))
+                .thenReturn(createdIssue);
+
+        mockMvc.perform(post("/api/github/issues/create")
+                        .with(user(principal))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"repoFullName":"planora/app","title":"Fix login","body":"Details","labels":["bug"],"assignees":["octocat"]}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.number").value(34))
+                .andExpect(jsonPath("$.title").value("Fix login"));
+    }
+
+    @Test
+    void createIssue_returnsUnauthorizedWhenGithubTokenIsMissing() throws Exception {
+        userEntity.setGithubAccessToken(" ");
+        when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
+
+        mockMvc.perform(post("/api/github/issues/create")
+                        .with(user(principal))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"repoFullName\":\"planora/app\",\"title\":\"Fix login\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("GitHub account is not connected"));
+
+        verify(githubIssuesSyncService, never())
+                .createIssue(any(GithubIssueCreateRequestDTO.class), any());
+    }
+
+    @Test
+    void createIssue_returnsUnprocessableEntityForRejectedIssueData() throws Exception {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
+        when(githubIssuesSyncService.createIssue(any(GithubIssueCreateRequestDTO.class), org.mockito.ArgumentMatchers.eq("github-token")))
+                .thenThrow(new GithubIssueValidationException("GitHub rejected the issue data"));
+
+        mockMvc.perform(post("/api/github/issues/create")
+                        .with(user(principal))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"repoFullName\":\"planora/app\",\"title\":\"Fix login\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("GitHub rejected the issue data"));
+    }
+
+    @Test
+    void createIssue_returnsForbiddenWhenTokenCannotWriteToRepository() throws Exception {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
+        when(githubIssuesSyncService.createIssue(any(GithubIssueCreateRequestDTO.class), org.mockito.ArgumentMatchers.eq("github-token")))
+                .thenThrow(new ForbiddenException("GitHub token does not have permission to create issues"));
+
+        mockMvc.perform(post("/api/github/issues/create")
+                        .with(user(principal))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"repoFullName\":\"planora/app\",\"title\":\"Fix login\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("GitHub token does not have permission to create issues"));
+    }
+
     private GithubIssueDTO issue(Long id, String state, String label) {
         GithubIssueDTO issue = new GithubIssueDTO();
         issue.setId(id);
         issue.setState(state);
-        issue.setLabels(List.of(new GithubIssueDTO.LabelDTO(label, "ffffff")));
+        issue.setLabels(List.of(new GithubLabelDTO(label, "ffffff")));
         return issue;
     }
 }

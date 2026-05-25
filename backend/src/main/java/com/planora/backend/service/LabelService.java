@@ -55,7 +55,8 @@ public class LabelService {
 
     @Transactional
     public Label findOrCreate(String name, String color, Project project) {
-        return findOrCreateLabel(project, name, color);
+        return labelRepository.findFirstByProjectIdAndNameIgnoreCase(project.getId(), name)
+                .orElseGet(() -> labelRepository.save(new Label(name, color, project)));
     }
 
     @Transactional
