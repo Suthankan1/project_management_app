@@ -27,7 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -53,35 +53,35 @@ class ChatRestControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockitoBean
+    @MockBean
     private ChatService chatService;
-    @MockitoBean
+    @MockBean
     private ProjectRepository projectRepository;
-    @MockitoBean
+    @MockBean
     private TeamMemberRepository teamMemberRepository;
-    @MockitoBean
+    @MockBean
     private UserCacheService userCacheService;
-    @MockitoBean
+    @MockBean
     private ProjectMembershipService projectMembershipService;
-    @MockitoBean
+    @MockBean
     private UserRepository userRepository;
-    @MockitoBean
+    @MockBean
     private ChatRoomRepository chatRoomRepository;
-    @MockitoBean
+    @MockBean
     private ChatRoomMemberRepository chatRoomMemberRepository;
-    @MockitoBean
+    @MockBean
     private SimpMessagingTemplate simpMessagingTemplate;
-    @MockitoBean
+    @MockBean
     private ChatPresenceService chatPresenceService;
-    @MockitoBean
+    @MockBean
     private ChatWebhookService chatWebhookService;
-    @MockitoBean
+    @MockBean
     private ChatDocumentService chatDocumentService;
-    @MockitoBean
+    @MockBean
     private NotificationService notificationService;
-    @MockitoBean
+    @MockBean
     private JWTService jwtService;
-    @MockitoBean
+    @MockBean
     private UserDetailsService userDetailsService;
 
     private User alice;

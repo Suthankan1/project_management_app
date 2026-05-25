@@ -160,8 +160,19 @@ function CalendarIcon({ color = '#64748B' }: { color?: string }) {
   );
 }
 
+function MoreVerticalIcon({ color = T.primary }: { color?: string }) {
+  return (
+    <Svg width={21} height={21} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={5} r={2} fill={color} />
+      <Circle cx={12} cy={12} r={2} fill={color} />
+      <Circle cx={12} cy={19} r={2} fill={color} />
+    </Svg>
+  );
+}
+
 function TaskCard({
   task,
+  onEdit,
   onDelete,
   onDueDatePress,
   onDragEnd,
@@ -169,6 +180,7 @@ function TaskCard({
   onDragMove,
 }: {
   task: BoardTask;
+  onEdit: (task: BoardTask) => void;
   onDelete: (task: BoardTask) => void;
   onDueDatePress: (task: BoardTask) => void;
   onDragEnd: (task: BoardTask, dropX: number, translationX: number) => void;
@@ -185,6 +197,7 @@ function TaskCard({
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragActiveRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const resetDragState = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
@@ -251,16 +264,36 @@ function TaskCard({
         { transform: [...drag.getTranslateTransform(), { scale: isDragging ? 1.03 : 1 }] },
       ]}
     >
-      <TouchableOpacity hitSlop={10} onPress={() => onDelete(task)} style={card.iconBtn}>
-        <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-          <Path d="M3 6h18" />
-          <Path d="M8 6V4h8v2" />
-          <Path d="M19 6l-1 14H6L5 6" />
-        </Svg>
+      <TouchableOpacity hitSlop={10} onPress={() => setMenuOpen((open) => !open)} style={card.iconBtn}>
+        <MoreVerticalIcon />
       </TouchableOpacity>
+      {menuOpen && (
+        <View style={card.taskMenu}>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            style={card.taskMenuItem}
+            onPress={() => {
+              setMenuOpen(false);
+              onEdit(task);
+            }}
+          >
+            <Text style={card.taskMenuText}>Edit task</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            style={card.taskMenuItem}
+            onPress={() => {
+              setMenuOpen(false);
+              onDelete(task);
+            }}
+          >
+            <Text style={[card.taskMenuText, card.taskMenuDeleteText]}>Delete task</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
-      <View style={card.dragSurface}>
-        <View {...panResponder.panHandlers} style={card.topRow}>
+      <View {...panResponder.panHandlers} style={card.dragSurface}>
+        <View style={card.topRow}>
           {priority && task.priority ? (
             <View style={[card.priority, { backgroundColor: priority.bg, borderColor: `${priority.dot}24` }]}>
               <View style={[card.priorityDot, { backgroundColor: priority.dot }]} />
@@ -338,6 +371,7 @@ function BoardColumn({
   column,
   tasks,
   onDeleteTask,
+  onEditTask,
   onDueDatePress,
   onCreateTask,
   onDeleteColumn,
@@ -348,6 +382,7 @@ function BoardColumn({
   column: KanbanBoardColumn;
   tasks: BoardTask[];
   onDeleteTask: (task: BoardTask) => void;
+  onEditTask: (task: BoardTask) => void;
   onDueDatePress: (task: BoardTask) => void;
   onCreateTask: (column: KanbanBoardColumn) => void;
   onDeleteColumn: (column: KanbanBoardColumn) => void;
@@ -401,6 +436,7 @@ function BoardColumn({
             <TaskCard
               key={task.id}
               task={task}
+              onEdit={onEditTask}
               onDelete={onDeleteTask}
               onDueDatePress={onDueDatePress}
               onDragStateChange={onDragStateChange}
@@ -413,7 +449,7 @@ function BoardColumn({
 
       <TouchableOpacity activeOpacity={0.8} onPress={() => onCreateTask(column)} style={columnStyles.addTaskBtn}>
         <PlusIcon color={T.primary} />
-        <Text style={columnStyles.addTaskText}>Add task</Text>
+        <Text style={columnStyles.addTaskText}>Create</Text>
       </TouchableOpacity>
     </View>
   );
@@ -639,6 +675,7 @@ export default function ProjectBoardScreen({
     moveTask,
     createTask,
     deleteTask,
+    updateTaskTitle,
     updateTaskDueDate,
     createColumn,
     deleteColumn,
@@ -653,6 +690,8 @@ export default function ProjectBoardScreen({
   const [newTaskDueDate, setNewTaskDueDate] = useState<string | null>(null);
   const [newTaskAssigneeId, setNewTaskAssigneeId] = useState<number | null>(null);
   const [newColumnName, setNewColumnName] = useState('');
+  const [editingTask, setEditingTask] = useState<BoardTask | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showCreateDatePicker, setShowCreateDatePicker] = useState(false);
@@ -761,6 +800,11 @@ export default function ProjectBoardScreen({
     setNewTaskDueDate(null);
     setNewTaskAssigneeId(null);
     setShowTaskModal(true);
+  };
+
+  const openEditTask = (task: BoardTask) => {
+    setEditingTask(task);
+    setEditTaskTitle(task.title);
   };
 
   const openDatePicker = (task: BoardTask) => {
@@ -879,6 +923,20 @@ export default function ProjectBoardScreen({
         },
       },
     ]);
+  };
+
+  const submitEditTask = async () => {
+    if (!editingTask || !editTaskTitle.trim()) return;
+    setSubmitting(true);
+    try {
+      await updateTaskTitle(editingTask.id, editTaskTitle);
+      setEditingTask(null);
+      setEditTaskTitle('');
+    } catch {
+      Alert.alert('Task not updated', 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const confirmDeleteColumn = (column: KanbanBoardColumn) => {
@@ -1029,6 +1087,7 @@ export default function ProjectBoardScreen({
                   column={column}
                   tasks={columnTasks[column.status] || []}
                   onDeleteTask={confirmDeleteTask}
+                  onEditTask={openEditTask}
                   onDueDatePress={openDatePicker}
                   onCreateTask={openCreateTask}
                   onDeleteColumn={confirmDeleteColumn}
@@ -1192,6 +1251,31 @@ export default function ProjectBoardScreen({
         </SafeAreaView>
       </Modal>
 
+      <Modal visible={!!editingTask} transparent animationType="slide">
+        <SafeAreaView style={modal.safe}>
+          <View style={modal.sheet}>
+            <View style={modal.handle} />
+            <Text style={modal.title}>Edit task</Text>
+            <Text style={modal.subtitle}>Update task title</Text>
+            <TextInput
+              style={modal.input}
+              value={editTaskTitle}
+              onChangeText={setEditTaskTitle}
+              placeholder="Task title"
+              placeholderTextColor="#94A3B8"
+              editable={!submitting}
+              autoFocus
+            />
+            <TouchableOpacity activeOpacity={0.85} disabled={submitting || !editTaskTitle.trim()} onPress={submitEditTask} style={[modal.primaryBtn, (!editTaskTitle.trim() || submitting) && modal.disabled]}>
+              {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={modal.primaryText}>Update task</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => setEditingTask(null)} style={modal.secondaryBtn}>
+              <Text style={modal.secondaryText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
       <Modal visible={showColumnModal} transparent animationType="slide">
         <SafeAreaView style={modal.safe}>
           <View style={modal.sheet}>
@@ -1260,11 +1344,12 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.78)',
     marginHorizontal: 14,
     marginTop: 2,
-    padding: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.92)',
-    gap: 12,
+    gap: 6,
     overflow: 'hidden',
     ...shadow,
   },
@@ -1277,41 +1362,41 @@ const s = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(255, 255, 255, 0.48)',
   },
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   boardMark: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroTitleWrap: { flex: 1, minWidth: 0 },
-  eyebrow: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 1 },
-  title: { fontSize: 21, fontWeight: '900', color: '#0F172A', marginTop: 2, letterSpacing: -0.3 },
+  eyebrow: { fontSize: 9, fontWeight: '900', color: '#94A3B8', letterSpacing: 0.9 },
+  title: { fontSize: 17, fontWeight: '900', color: '#0F172A', marginTop: 0, letterSpacing: -0.3 },
   heroActionBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
+    width: 32,
+    height: 32,
+    borderRadius: 11,
     backgroundColor: 'rgba(239, 246, 255, 0.92)',
     borderWidth: 1,
     borderColor: 'rgba(191, 219, 254, 0.95)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  progressWrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  progressTrack: { flex: 1, height: 6, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
+  progressWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  progressTrack: { flex: 1, height: 4, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 999, backgroundColor: '#22C55E' },
-  progressText: { fontSize: 11, fontWeight: '800', color: '#64748B' },
-  metricsRow: { flexDirection: 'row', gap: 10 },
+  progressText: { fontSize: 10, fontWeight: '800', color: '#64748B' },
+  metricsRow: { flexDirection: 'row', gap: 8 },
   metric: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
-    paddingVertical: 10,
+    paddingVertical: 4,
     alignItems: 'center',
   },
-  metricValue: { fontSize: 20, fontWeight: '900' },
-  metricLabel: { fontSize: 10, fontWeight: '800', color: '#64748B', letterSpacing: 0.6, textTransform: 'uppercase' },
+  metricValue: { fontSize: 16, fontWeight: '900' },
+  metricLabel: { fontSize: 8, fontWeight: '800', color: '#64748B', letterSpacing: 0.5, textTransform: 'uppercase' },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1323,17 +1408,17 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: 14,
+    paddingVertical: 6,
+    borderRadius: 12,
     backgroundColor: 'rgba(248, 250, 252, 0.82)',
     borderWidth: 1,
     borderColor: 'rgba(226, 232, 240, 0.78)',
   },
   searchInput: { flex: 1, fontSize: 13, color: '#0F172A', paddingVertical: 0 },
   filterBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(248, 250, 252, 0.82)',
@@ -1438,7 +1523,7 @@ const columnStyles = StyleSheet.create({
   },
   countText: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
   wipText: { color: '#DC2626' },
-  body: { paddingHorizontal: 12, gap: 10, overflow: 'visible' },
+  body: { paddingHorizontal: 12, gap: 8, overflow: 'visible' },
   emptyState: {
     minHeight: 128,
     borderRadius: 14,
@@ -1475,13 +1560,13 @@ const card = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(226, 232, 240, 0.72)',
-    padding: 13,
-    paddingTop: 14,
+    padding: 8,
+    paddingTop: 9,
     zIndex: 1,
     ...shadow,
   },
   dragSurface: {
-    gap: 10,
+    gap: 5,
   },
   cardDragging: {
     borderColor: T.primary,
@@ -1492,14 +1577,14 @@ const card = StyleSheet.create({
       android: { elevation: 24 },
     }),
   },
-  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 24, paddingRight: 34 },
+  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 17, paddingRight: 34 },
   priority: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 2,
     borderRadius: 999,
     borderWidth: 1,
   },
@@ -1509,33 +1594,36 @@ const card = StyleSheet.create({
     position: 'absolute',
     top: 12,
     right: 12,
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
     zIndex: 10,
   },
-  title: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 20 },
-  description: { fontSize: 12, color: '#64748B', lineHeight: 17 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  taskMenu: { position: 'absolute', top: 44, right: 12, width: 148, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingVertical: 6, zIndex: 20, ...shadow },
+  taskMenuItem: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 14 },
+  taskMenuText: { fontSize: 13, fontWeight: '800', color: '#0F172A' },
+  taskMenuDeleteText: { color: '#DC2626' },
+  title: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 17 },
+  description: { fontSize: 12, color: '#64748B', lineHeight: 15 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
   codePill: {
     paddingHorizontal: 7,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: 6,
     backgroundColor: '#EEF2FF',
   },
   codeText: { fontSize: 10, fontWeight: '900', color: '#4338CA' },
   duePill: {
-    minHeight: 24,
+    minHeight: 21,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 2,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -1552,21 +1640,21 @@ const card = StyleSheet.create({
   dueDate: { fontSize: 11, fontWeight: '800', color: '#64748B' },
   dueDateEmpty: { color: T.primary },
   overdue: { color: '#DC2626' },
-  labelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  labelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
   labelPill: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 2,
     borderRadius: 999,
     borderWidth: 1,
     maxWidth: '100%',
   },
   labelText: { fontSize: 10, fontWeight: '900' },
-  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  assigneeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
+  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  assigneeRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1, minWidth: 0 },
   avatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 23,
+    height: 23,
+    borderRadius: 12,
     backgroundColor: T.primary,
     alignItems: 'center',
     justifyContent: 'center',

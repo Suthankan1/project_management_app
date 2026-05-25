@@ -8,6 +8,7 @@ import PrioritySection from './sidebar/PrioritySection';
 import StoryPointSection from './sidebar/StoryPointSection';
 import DateSection from './sidebar/DateSection';
 import RecurrenceSection from './sidebar/RecurrenceSection';
+import TaskGitHubSection from './sidebar/TaskGitHubSection';
 import SidebarField from './sidebar/SidebarField';
 import { Check, ChevronDown, Plus } from 'lucide-react';
 
@@ -261,6 +262,9 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
         </button>
         {sections.dates && <DateSection dates={dates} onUpdateDueDate={canEdit ? onUpdateDueDate : undefined} onUpdateStartDate={canEdit ? onUpdateStartDate : undefined} />}
       </div>
+      {taskId != null && (
+        <TaskGitHubSection taskId={taskId} projectId={projectId} />
+      )}
       <div className="text-[10px] text-[#9CA3AF] flex justify-between px-1 pb-2">
         <button className="hover:text-[#374151] transition-colors">Configure fields</button>
         <button className="hover:text-[#374151] transition-colors">Plain Text</button>

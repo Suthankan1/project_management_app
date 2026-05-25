@@ -22,9 +22,9 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-export type ProjectTab = 'summary' | 'backlog' | 'board' | 'chat' | 'more';
+export type ProjectTab = 'summary' | 'backlog' | 'board' | 'timeline' | 'more' | string;
 export type MoreTab =
-  | 'timeline' | 'calendar' | 'burndown' | 'milestone'
+  | 'calendar' | 'burndown' | 'milestone'
   | 'members' | 'pages' | 'docs' | 'list' | 'report';
 
 type PremiumIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -33,7 +33,7 @@ const TABS: { key: ProjectTab; label: string }[] = [
   { key: 'summary', label: 'Summary' },
   { key: 'backlog', label: 'Backlog' },
   { key: 'board', label: 'Board' },
-  { key: 'chat', label: 'Chat' },
+  { key: 'timeline', label: 'Timeline' },
   { key: 'more', label: 'More' },
 ];
 
@@ -46,7 +46,6 @@ type MoreItem = {
 };
 
 const MORE_ITEMS: MoreItem[] = [
-  { key: 'timeline', label: 'Timeline', icon: 'timeline-clock-outline', tint: '#155DFC', tintSoft: '#E8F0FF' },
   { key: 'calendar', label: 'Calendar', icon: 'calendar-month-outline', tint: '#0F9F6E', tintSoft: '#E7F8F1' },
   { key: 'burndown', label: 'Burndown', icon: 'chart-line-variant', tint: '#E11D48', tintSoft: '#FFF0F4' },
   { key: 'milestone', label: 'Milestone', icon: 'flag-checkered', tint: '#7C3AED', tintSoft: '#F2ECFF' },
@@ -89,6 +88,15 @@ function TabIcon({ name, active }: { name: ProjectTab; active: boolean }) {
       <Rect x={3} y={3} width={5} height={18} rx={2} fill={fa} />
       <Rect x={10} y={3} width={5} height={12} rx={2} fill={fa} />
       <Rect x={17} y={3} width={4} height={15} rx={2} />
+    </Svg>
+  );
+  if (name === 'timeline') return (
+    <Svg {...p}>
+      <Path d="M4 19V5" />
+      <Path d="M8 19V9" />
+      <Path d="M12 19V7" />
+      <Path d="M16 19V11" />
+      <Path d="M20 19V4" />
     </Svg>
   );
   if (name === 'chat') return (
