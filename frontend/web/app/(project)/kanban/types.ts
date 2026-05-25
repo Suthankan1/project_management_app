@@ -65,6 +65,8 @@ export interface Task {
   milestoneId?: number;    // milestone ID (new feature — may be null)
   milestoneName?: string;  // milestone name for display (backend DTO)
   milestoneTitle?: string; // legacy alias for older mapped surfaces
+  githubIssueNumber?: number;
+  githubRepoFullName?: string;
   dependencies?: Dependency[];
   subtasks?: Subtask[];
   commentCount?: number;     // number of comments on this task

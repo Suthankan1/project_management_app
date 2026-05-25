@@ -28,6 +28,7 @@ import {
   type ProjectGitHubConnection,
 } from '@/services/githubService';
 import IssueCard from '@/components/github/IssueCard';
+import GitHubMark from '@/components/github/GitHubMark';
 
 const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
 
@@ -49,15 +50,6 @@ function prStatus(pr: GitHubPullRequest): { label: string; color: string; dot: s
   if (pr.merged_at) return { label: 'Merged', color: 'text-purple-700 bg-purple-50 border-purple-200', dot: 'bg-purple-500' };
   if (pr.state === 'closed') return { label: 'Closed', color: 'text-red-700 bg-red-50 border-red-200', dot: 'bg-red-500' };
   return { label: 'Open', color: 'text-green-700 bg-green-50 border-green-200', dot: 'bg-green-500' };
-}
-
-// ── GitHub SVG mark ───────────────────────────────────────────────────────────
-function GitHubMark({ size = 24, className = '' }: { size?: number; className?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 98 96" fill="currentColor" className={className}>
-      <path fillRule="evenodd" clipRule="evenodd" d="M48.854 0C21.839 0 0 22 0 49.217c0 21.756 13.993 40.172 33.405 46.69 2.427.49 3.316-1.059 3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59 2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015 4.934.326 7.523 5.052 7.523 5.052 4.367 7.496 11.404 5.378 14.235 4.074.404-3.178 1.699-5.378 3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283 0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038 0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1 12.214-1.63c4.125 0 8.33.571 12.213 1.63 9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97 11.816.485 13.038 3.155 3.422 5.015 7.822 5.015 13.2 0 18.905-11.404 23.06-22.324 24.283 1.78 1.548 3.316 4.481 3.316 9.126 0 6.6-.08 11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364 19.412-6.52 33.405-24.935 33.405-46.691C97.707 22 75.788 0 48.854 0z" />
-    </svg>
-  );
 }
 
 // ── Disconnected state ────────────────────────────────────────────────────────
@@ -499,36 +491,27 @@ function IssueImportModal({ issue, onClose }: { issue: GitHubIssue; onClose: () 
 
 function IssuesPanel({
   connection,
+  issues,
+  loading,
+  error,
   onCountChange,
+  onRequireLogin,
+  onRefresh,
 }: {
   connection: ProjectGitHubConnection;
+  issues: GitHubIssue[];
+  loading: boolean;
+  error: string | null;
   onCountChange: (count: number | null) => void;
+  onRequireLogin: () => void;
+  onRefresh: () => void;
 }) {
-  const [issues, setIssues] = useState<GitHubIssue[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<GitHubIssue | null>(null);
   const [importedIssueNumbers] = useState<Set<number>>(() => new Set());
 
-  const loadIssues = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    onCountChange(null);
-    try {
-      const data = await fetchIssues(connection.repoFullName);
-      setIssues(data);
-      onCountChange(data.length);
-    } catch (err) {
-      setIssues([]);
-      setError(err instanceof Error ? err.message : 'Failed to load issues');
-    } finally {
-      setLoading(false);
-    }
-  }, [connection.repoFullName, onCountChange]);
-
   useEffect(() => {
-    void loadIssues();
-  }, [loadIssues]);
+    onCountChange(issues.length);
+  }, [issues, onCountChange]);
 
   return (
     <div className="flex flex-col gap-4 min-w-0">
@@ -541,7 +524,7 @@ function IssuesPanel({
         </div>
         <button
           type="button"
-          onClick={() => void loadIssues()}
+          onClick={onRefresh}
           disabled={loading}
           className="p-2 rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:opacity-40"
           title="Refresh issues"
@@ -564,14 +547,29 @@ function IssuesPanel({
       {loading && <SkeletonList />}
 
       {!loading && error && (
-        <div className="flex flex-col items-center gap-2 py-10 text-center">
+        <div className="flex flex-col items-center gap-4 py-10 text-center">
           <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
             <AlertCircle size={16} className="text-red-500" />
           </div>
           <p className="text-xs text-slate-500 font-outfit">{error}</p>
-          <button onClick={() => void loadIssues()} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">
-            Retry
-          </button>
+          <div className="flex flex-col items-center gap-2">
+            {(!getGitHubToken() || error.toLowerCase().includes('connect')) ? (
+              <button
+                onClick={() => onRequireLogin()}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900 text-white font-outfit font-bold text-sm shadow-sm hover:bg-slate-800 transition-colors"
+              >
+                <GitHubMark size={14} className="text-white" />
+                Connect to GitHub
+              </button>
+            ) : (
+              <button
+                onClick={() => onRefresh()}
+                className="text-xs text-blue-600 font-outfit font-semibold hover:underline"
+              >
+                Retry
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -606,9 +604,11 @@ function ConnectedDashboard({
   connection,
   prs,
   commits,
+  issues,
   loading,
   prError,
   commitError,
+  issueError,
   user,
   onRefresh,
   onLogout,
@@ -617,9 +617,11 @@ function ConnectedDashboard({
   connection: ProjectGitHubConnection;
   prs: GitHubPullRequest[];
   commits: GitHubCommit[];
+  issues: GitHubIssue[];
   loading: boolean;
   prError: string | null;
   commitError: string | null;
+  issueError: string | null;
   user: GitHubUser | null;
   onRefresh: () => void;
   onLogout: () => void;
@@ -804,7 +806,15 @@ function ConnectedDashboard({
         )}
 
         <div className={activeTab === 'issues' ? '' : 'hidden'}>
-          <IssuesPanel connection={connection} onCountChange={setIssueCount} />
+          <IssuesPanel
+            connection={connection}
+            issues={issues}
+            loading={loading}
+            error={issueError}
+            onCountChange={setIssueCount}
+            onRequireLogin={onChangeRepo}
+            onRefresh={onRefresh}
+          />
         </div>
       </div>
     </motion.div>
@@ -820,9 +830,11 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   const [user, setUser] = useState<GitHubUser | null>(null);
   const [prs, setPRs] = useState<GitHubPullRequest[]>([]);
   const [commits, setCommits] = useState<GitHubCommit[]>([]);
+  const [issues, setIssues] = useState<GitHubIssue[]>([]);
   const [loading, setLoading] = useState(false);
   const [prError, setPRError] = useState<string | null>(null);
   const [commitError, setCommitError] = useState<string | null>(null);
+  const [issueError, setIssueError] = useState<string | null>(null);
 
   // Repo modal state
   const [showModal, setShowModal] = useState(false);
@@ -841,15 +853,24 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     setLoading(true);
     setPRError(null);
     setCommitError(null);
-    const [prResult, commitResult, userResult] = await Promise.allSettled([
+    setIssueError(null);
+
+    const [prResult, commitResult, issueResult, userResult] = await Promise.allSettled([
       fetchPullRequests(token, conn.ownerLogin, conn.repoName),
       fetchCommits(token, conn.ownerLogin, conn.repoName),
+      fetchIssues(conn.repoFullName),
       fetchGitHubUser(token),
     ]);
+
     if (prResult.status === 'fulfilled') setPRs(prResult.value);
     else setPRError(prResult.reason instanceof Error ? prResult.reason.message : 'Failed to load pull requests');
+
     if (commitResult.status === 'fulfilled') setCommits(commitResult.value);
     else setCommitError(commitResult.reason instanceof Error ? commitResult.reason.message : 'Failed to load commits');
+
+    if (issueResult.status === 'fulfilled') setIssues(issueResult.value);
+    else setIssueError(issueResult.reason instanceof Error ? issueResult.reason.message : 'Failed to load issues');
+
     if (userResult.status === 'fulfilled') setUser(userResult.value);
     setLoading(false);
   }, []);
@@ -939,18 +960,20 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
       <AnimatePresence mode="wait">
         {connection ? (
           <ConnectedDashboard
-            key="dashboard"
-            connection={connection}
-            prs={prs}
-            commits={commits}
-            loading={loading}
-            prError={prError}
-            commitError={commitError}
-            user={user}
-            onRefresh={() => void loadData(connection)}
-            onLogout={() => void handleLogout()}
-            onChangeRepo={handleOpenModal}
-          />
+              key="dashboard"
+              connection={connection}
+              prs={prs}
+              commits={commits}
+              issues={issues}
+              loading={loading}
+              prError={prError}
+              commitError={commitError}
+              issueError={issueError}
+              user={user}
+              onRefresh={() => void loadData(connection)}
+              onLogout={() => void handleLogout()}
+              onChangeRepo={handleOpenModal}
+            />
         ) : (
           <DisconnectedView key="disconnected" onConnect={handleConnectGitHub} />
         )}

@@ -6,6 +6,8 @@ import TaskMainContent from './TaskMainContent';
 import TaskSidebar from './TaskSidebar';
 import api from '@/lib/axios';
 import { toast } from '@/components/ui';
+import { getProjectGitHubRepo } from '@/services/githubService';
+import CreateIssueFromTaskModal from '@/components/github/CreateIssueFromTaskModal';
 
 interface TaskData {
   id: number;
@@ -25,6 +27,8 @@ interface TaskData {
   dueDate: string;
   subtasks: Array<{ id: number; title: string; status: string }>;
   dependencies: Array<{ id: number; title: string; relation: string }>;
+  githubIssueNumber?: number | null;
+  githubRepoFullName?: string | null;
 }
 
 // Wrapper component that uses searchParams
@@ -36,6 +40,7 @@ function TaskPageContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [showGitHubIssueModal, setShowGitHubIssueModal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -102,6 +107,19 @@ function TaskPageContent() {
       console.error('Failed to update task:', err);
       toast('Failed to update task: ' + (err.response?.data?.message || err.message), 'error');
     }
+  };
+
+  const projectGitHubRepo = taskData?.projectId ? getProjectGitHubRepo(taskData.projectId) : null;
+
+  const handleGitHubIssueCreated = (issue: { number: number }) => {
+    if (!taskId || !taskData) return;
+    const nextTaskData = {
+      ...taskData,
+      githubIssueNumber: issue.number,
+      githubRepoFullName: taskData.githubRepoFullName ?? projectGitHubRepo?.repoFullName ?? null,
+    };
+    setTaskData(nextTaskData);
+    localStorage.setItem(`planora:task:${taskId}`, JSON.stringify(nextTaskData));
   };
 
   const handleClose = () => {
@@ -174,6 +192,9 @@ function TaskPageContent() {
               assignee={taskData.assigneeName}
               reporter={taskData.reporterName}
               labels={taskData.labels?.map(l => l.name) || []}
+              githubIssueNumber={taskData.githubIssueNumber ?? null}
+              githubRepoFullName={taskData.githubRepoFullName ?? null}
+              projectGitHubRepo={projectGitHubRepo}
               priority={taskData.priority}
               sprint={taskData.sprintName}
               storyPoint={taskData.storyPoint}
@@ -185,7 +206,20 @@ function TaskPageContent() {
               onUpdateStatus={(status) => updateTask({ status })}
               onUpdatePriority={(priority) => updateTask({ priority })}
               onUpdateStoryPoint={(storyPoint) => updateTask({ storyPoint })}
+              onCreateGitHubIssue={() => setShowGitHubIssueModal(true)}
           />
+
+          {showGitHubIssueModal && projectGitHubRepo && (
+            <CreateIssueFromTaskModal
+              open={showGitHubIssueModal}
+              taskTitle={taskData.title}
+              taskDescription={taskData.description}
+              taskLabels={taskData.labels?.map((label) => label.name) || []}
+              repoFullName={projectGitHubRepo.repoFullName}
+              onClose={() => setShowGitHubIssueModal(false)}
+              onCreated={handleGitHubIssueCreated}
+            />
+          )}
 
         </div>
       </div>
