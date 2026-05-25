@@ -18,9 +18,9 @@ const ROW_H = 48;
 const TAB_GAP = 8;
 const ICON_SZ = 22;
 
-export type ProjectTab = 'summary' | 'backlog' | 'board' | 'chat' | 'more';
+export type ProjectTab = 'summary' | 'backlog' | 'board' | 'timeline' | 'more' | string;
 export type MoreTab =
-  | 'timeline' | 'calendar' | 'burndown' | 'milestone'
+  | 'calendar' | 'burndown' | 'milestone'
   | 'members' | 'pages' | 'docs' | 'list' | 'report';
 
 type PremiumIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -29,7 +29,7 @@ const TABS: { key: ProjectTab; label: string }[] = [
   { key: 'summary', label: 'Summary' },
   { key: 'backlog', label: 'Backlog' },
   { key: 'board', label: 'Board' },
-  { key: 'chat', label: 'Chat' },
+  { key: 'timeline', label: 'Timeline' },
   { key: 'more', label: 'More' },
 ];
 
@@ -42,7 +42,6 @@ type MoreItem = {
 };
 
 const MORE_ITEMS: MoreItem[] = [
-  { key: 'timeline', label: 'Timeline', icon: 'timeline-clock-outline', tint: '#155DFC', tintSoft: '#E8F0FF' },
   { key: 'calendar', label: 'Calendar', icon: 'calendar-month-outline', tint: '#0F9F6E', tintSoft: '#E7F8F1' },
   { key: 'burndown', label: 'Burndown', icon: 'chart-line-variant', tint: '#E11D48', tintSoft: '#FFF0F4' },
   { key: 'milestone', label: 'Milestone', icon: 'flag-checkered', tint: '#7C3AED', tintSoft: '#F2ECFF' },
@@ -259,8 +258,6 @@ export default function ProjectTopNav({
     ]).start();
   }, []);
 
-  const navBarH = insets.top + 8 + ROW_H + 12;
-
   const dropdownHeightAnim = useRef(new Animated.Value(0)).current;
   const dropdownOp = useRef(new Animated.Value(0)).current;
 
@@ -333,14 +330,15 @@ export default function ProjectTopNav({
 
         <View style={ns.row}>
           {TABS.map((tab, idx) => (
-            <TabBtn
-              key={tab.key}
-              tab={tab}
-              widthAnim={tabWidths[idx]}
-              active={idx === activeIdx}
-              onPress={() => handlePress(tab.key)}
-              hasMoreDot={tab.key === 'more' && !!activeMoreTab}
-            />
+            <React.Fragment key={tab.key}>
+              <TabBtn
+                tab={tab}
+                widthAnim={tabWidths[idx]}
+                active={idx === activeIdx}
+                onPress={() => handlePress(tab.key)}
+                hasMoreDot={tab.key === 'more' && !!activeMoreTab}
+              />
+            </React.Fragment>
           ))}
         </View>
 
