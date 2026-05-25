@@ -65,7 +65,12 @@ export default function ProjectRoute() {
     }
   }, []);
 
-  const handleMoreTabChange = useCallback((tab: MoreTab) => {
+  const handleMoreTabChange = useCallback((tab?: MoreTab) => {
+    if (!tab) {
+      setActiveMoreTab(undefined);
+      return;
+    }
+
     setActiveMoreTab(tab);
     setActiveTab(tab); // Make the new dynamic tab visually active
   }, []);

@@ -32,4 +32,7 @@ export const projectService = {
 
   remove: (projectId: number | string, teamId: number | string): Promise<void> =>
     api.delete(`/api/projects/${projectId}/team/${teamId}`).then(() => undefined),
+
+  leave: (projectId: number | string): Promise<void> =>
+    api.post(`/api/projects/${projectId}/leave`).then(() => undefined),
 };

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
-  AlertTriangle, Trash2, Settings2,
+  AlertTriangle, Trash2, LogOut, Settings2,
   Layers, FileText, Shield, Loader2, CheckCircle2,
   X, Info,
 } from 'lucide-react';
@@ -13,6 +13,7 @@ import {
   setScopedProjectValue,
   removeScopedProjectValue,
 } from '@/hooks/useProjectContext';
+import { getUserIdFromToken } from '@/lib/auth';
 import CustomFieldsManager from './CustomFieldsManager';
 type ProjectType = 'AGILE' | 'KANBAN';
 
@@ -24,6 +25,7 @@ interface ProjectData {
   type: ProjectType;
   teamId?: number;
   teamName?: string;
+  ownerId?: number;
   ownerName?: string;
   createdAt?: string;
 }
@@ -197,6 +199,103 @@ function DeleteConfirmModal({
   );
 }
 
+// ── Leave confirmation modal ───────────────────────────────────────────────────
+
+function LeaveConfirmModal({
+  open,
+  projectName,
+  onClose,
+  onConfirm,
+  isLeaving,
+}: {
+  open: boolean;
+  projectName: string;
+  onClose: () => void;
+  onConfirm: () => void;
+  isLeaving: boolean;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={!isLeaving ? onClose : undefined}
+      />
+      <div className="relative bg-white w-full sm:rounded-2xl sm:max-w-md shadow-2xl border-0 sm:border sm:border-slate-200 rounded-t-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200">
+        <div className="px-5 sm:px-6 pt-5 sm:pt-6 pb-4">
+          <div className="flex items-start gap-4">
+            <div className="w-11 h-11 rounded-full bg-orange-50 ring-4 ring-orange-50 flex items-center justify-center shrink-0">
+              <LogOut size={22} className="text-orange-500" />
+            </div>
+            <div className="flex-1 min-w-0 pt-0.5">
+              <h3 className="text-base font-bold text-slate-900">Leave Project</h3>
+              <p className="text-sm text-slate-500 mt-0.5">
+                You will lose access to{' '}
+                <span className="font-semibold text-slate-700">{projectName}</span> immediately.
+              </p>
+            </div>
+            {!isLeaving && (
+              <button
+                onClick={onClose}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors shrink-0"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="mx-5 sm:mx-6 mb-4 bg-orange-50 border border-orange-100 rounded-xl p-4">
+          <p className="text-[11px] font-bold text-orange-700 mb-2.5 uppercase tracking-wider">
+            What happens when you leave
+          </p>
+          <ul className="space-y-1.5">
+            {[
+              'You will be removed from the project team',
+              'Your task assignments will be unassigned',
+              'You will no longer receive project notifications',
+              'An admin can re-invite you later if needed',
+            ].map((item) => (
+              <li key={item} className="flex items-start gap-2 text-xs text-orange-700">
+                <span className="mt-[5px] w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="px-5 sm:px-6 pb-5 sm:pb-6 flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={isLeaving}
+            className="flex-1 h-10 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isLeaving}
+            className="flex-1 h-10 bg-orange-500 text-white rounded-xl text-sm font-semibold hover:bg-orange-600 active:bg-orange-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isLeaving ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                Leaving…
+              </>
+            ) : (
+              <>
+                <LogOut size={14} />
+                Leave Project
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Type change warning modal ──────────────────────────────────────────────────
 
 function TypeChangeModal({
@@ -321,6 +420,13 @@ export default function ProjectSettingsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Leave
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+
+  const currentUserId = getUserIdFromToken();
+  const isOwner = project !== null && currentUserId !== null && project.ownerId === currentUserId;
+
   const isDirtyGeneral =
     project !== null &&
     (name.trim() !== project.name || description.trim() !== project.description);
@@ -339,6 +445,7 @@ export default function ProjectSettingsPage() {
         type: (data.type as ProjectType | undefined) ?? 'KANBAN',
         teamId: typeof data.teamId === 'number' ? data.teamId : undefined,
         teamName: data.teamName,
+        ownerId: typeof data.ownerId === 'number' ? data.ownerId : undefined,
         ownerName: typeof data.ownerName === 'string' ? data.ownerName : undefined,
         createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined,
       };
@@ -417,6 +524,25 @@ export default function ProjectSettingsPage() {
         'Failed to delete project. Please try again.';
       toast(msg, 'error');
       setIsDeleting(false);
+    }
+  };
+
+  const handleLeaveProject = async () => {
+    setIsLeaving(true);
+    try {
+      await projectsApi.leaveProject(projectId);
+      removeScopedProjectValue('currentProjectId');
+      removeScopedProjectValue('currentProjectName');
+      removeScopedProjectValue('currentProjectType');
+      window.dispatchEvent(new Event('storage'));
+      toast('You have left the project', 'success');
+      router.push('/spaces');
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        'Failed to leave project. Please try again.';
+      toast(msg, 'error');
+      setIsLeaving(false);
     }
   };
 
@@ -640,18 +766,40 @@ export default function ProjectSettingsPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="px-5 py-5">
-                    <h3 className="text-sm font-semibold text-slate-900 mb-1">Delete this project</h3>
-                    <p className="text-xs text-slate-500 leading-relaxed mb-4">
-                      Permanently removes all tasks, members, and sprints. This cannot be reversed.
-                    </p>
-                    <button
-                      onClick={() => setShowDeleteModal(true)}
-                      className="w-full h-9 bg-white border-2 border-red-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 hover:border-red-300 active:bg-red-100 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Trash2 size={14} />
-                      Delete Project
-                    </button>
+                  <div className="px-5 py-5 space-y-4">
+                    {/* Leave — visible to non-owners only */}
+                    {!isOwner && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-900 mb-1">Leave this project</h3>
+                        <p className="text-xs text-slate-500 leading-relaxed mb-3">
+                          Remove yourself from the project team. Your task assignments will be cleared.
+                        </p>
+                        <button
+                          onClick={() => setShowLeaveModal(true)}
+                          className="w-full h-9 bg-white border-2 border-orange-200 text-orange-600 text-sm font-semibold rounded-xl hover:bg-orange-50 hover:border-orange-300 active:bg-orange-100 transition-all flex items-center justify-center gap-2"
+                        >
+                          <LogOut size={14} />
+                          Leave Project
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Delete — visible to owners only */}
+                    {isOwner && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-900 mb-1">Delete this project</h3>
+                        <p className="text-xs text-slate-500 leading-relaxed mb-3">
+                          Permanently removes all tasks, members, and sprints. This cannot be reversed.
+                        </p>
+                        <button
+                          onClick={() => setShowDeleteModal(true)}
+                          className="w-full h-9 bg-white border-2 border-red-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 hover:border-red-300 active:bg-red-100 transition-all flex items-center justify-center gap-2"
+                        >
+                          <Trash2 size={14} />
+                          Delete Project
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -670,6 +818,13 @@ export default function ProjectSettingsPage() {
             onClose={() => !isDeleting && setShowDeleteModal(false)}
             onConfirm={handleDeleteProject}
             isDeleting={isDeleting}
+          />
+          <LeaveConfirmModal
+            open={showLeaveModal}
+            projectName={project.name}
+            onClose={() => !isLeaving && setShowLeaveModal(false)}
+            onConfirm={handleLeaveProject}
+            isLeaving={isLeaving}
           />
           <TypeChangeModal
             open={showTypeModal}

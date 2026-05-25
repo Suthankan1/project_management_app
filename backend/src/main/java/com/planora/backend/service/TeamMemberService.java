@@ -264,6 +264,38 @@ public class TeamMemberService {
                                                 adminMessage, membersLink));
         }
 
+        // =====================================================
+        // LEAVE PROJECT (any non-owner member)
+        // =====================================================
+        @Transactional
+        public void leaveProject(Long teamId, Long userId, Long projectId, String projectName,
+                        Long projectOwnerUserId) {
+                if (userId.equals(projectOwnerUserId)) {
+                        throw new IllegalArgumentException(
+                                        "Project owner cannot leave. Transfer ownership or delete the project instead.");
+                }
+
+                TeamMember member = teamMemberRepository
+                                .findByTeamIdAndUserUserId(teamId, userId)
+                                .orElseThrow(() -> new RuntimeException("You are not a member of this project"));
+
+                taskRepository.nullifyAssigneeForMember(member.getId());
+                taskRepository.nullifyReporterForMember(member.getId());
+                taskRepository.removeFromTaskAssignees(member.getId());
+
+                teamMemberRepository.delete(member);
+
+                String resolvedProjectName = resolveProjectName(projectName);
+                String membersLink = buildMembersLink(projectId);
+                String actorName = resolveDisplayName(member.getUser());
+                String adminMessage = actorName + " left project \"" + resolvedProjectName + "\"";
+
+                teamMemberRepository.findByTeamId(teamId).stream()
+                                .filter(m -> m.getRole() == TeamRole.OWNER || m.getRole() == TeamRole.ADMIN)
+                                .forEach(m -> notificationService.createNotification(m.getUser(), adminMessage,
+                                                membersLink));
+        }
+
         // Returns a safe project name fallback to avoid exposing null or blank values in notification messages.
         private String resolveProjectName(String projectName) {
                 if (projectName == null || projectName.isBlank()) {

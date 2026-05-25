@@ -4,6 +4,7 @@ import com.planora.backend.model.Sprint;
 import com.planora.backend.model.SprintStatus;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -13,6 +14,10 @@ import java.util.Optional;
 public interface SprintRepository extends JpaRepository<Sprint, Long> {
 
     List<Sprint> findByProject_Id(Long projectId);
+
+    @Modifying
+    @Query("DELETE FROM Sprint s WHERE s.project.id = :projectId")
+    void deleteByProjectId(@Param("projectId") Long projectId);
 
     boolean existsByProject_IdAndStatus(Long projectId, SprintStatus status);
 

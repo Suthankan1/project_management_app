@@ -17,6 +17,12 @@ import { Colors }                 from '@/src/constants/colors';
 import { ChatMessage, ChatRoom } from '@/src/types/chat';
 import { QuickReactionBar } from '@/src/components/chat/QuickReactionBar';
 
+type ChatScreenContentProps = {
+  projectId: string;
+  topOffset?: number;
+};
+
+export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenContentProps) {
 interface ReactionTarget {
   message: ChatMessage;
   anchorY: number;
@@ -126,10 +132,19 @@ export default function ChatScreen() {
     });
   };
 
-  if (isLoading) return <ChatLoadingSkeleton />;
+  if (isLoading) {
+    return (
+      <View style={[styles.safe, topOffset > 0 && { paddingTop: topOffset }]}>
+        <ChatLoadingSkeleton />
+      </View>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top','left','right']}>
+    <SafeAreaView
+      style={[styles.safe, topOffset > 0 && { paddingTop: topOffset }]}
+      edges={topOffset > 0 ? ['left', 'right'] : ['top','left','right']}
+    >
       {showSidebar ? (
         <ChatSidebar
           currentUser={currentUser}
@@ -317,6 +332,12 @@ export default function ChatScreen() {
       />
     </SafeAreaView>
   );
+}
+
+export default function ChatScreen() {
+  const { id: projectId } = useLocalSearchParams<{ id: string }>();
+
+  return <ChatScreenContent projectId={projectId as string} />;
 }
 
 const styles = StyleSheet.create({
