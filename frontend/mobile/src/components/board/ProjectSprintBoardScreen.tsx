@@ -83,6 +83,16 @@ function PlusIcon({ color = T.primary }: { color?: string }) {
   );
 }
 
+function MoreVerticalIcon({ color = T.primary }: { color?: string }) {
+  return (
+    <Svg width={21} height={21} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={5} r={2} fill={color} />
+      <Circle cx={12} cy={12} r={2} fill={color} />
+      <Circle cx={12} cy={19} r={2} fill={color} />
+    </Svg>
+  );
+}
+
 function UserIcon({ active }: { active: boolean }) {
   return (
     <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={active ? T.primary : '#64748B'} strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round">
@@ -130,10 +140,11 @@ function SprintBoardBackdrop() {
   );
 }
 
-function TaskCard({ task, onDelete }: { task: SprintboardTask; onDelete: (task: SprintboardTask) => void }) {
+function TaskCard({ task, onEdit, onDelete }: { task: SprintboardTask; onEdit: (task: SprintboardTask) => void; onDelete: (task: SprintboardTask) => void }) {
   const priority = task.priority ? PRIORITY_STYLES[task.priority.toUpperCase()] ?? PRIORITY_STYLES.LOW : null;
   const due = formatDate(task.dueDate);
   const labelColor = task.labelColor?.startsWith('#') ? task.labelColor : T.primary;
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <View style={taskStyles.card}>
@@ -145,9 +156,33 @@ function TaskCard({ task, onDelete }: { task: SprintboardTask; onDelete: (task: 
           </View>
         ) : <View />}
       </View>
-      <TouchableOpacity hitSlop={10} onPress={() => onDelete(task)} style={taskStyles.deleteBtn}>
-        <TrashIcon color="#DC2626" size={15} />
+      <TouchableOpacity hitSlop={10} onPress={() => setMenuOpen((open) => !open)} style={taskStyles.deleteBtn}>
+        <MoreVerticalIcon />
       </TouchableOpacity>
+      {menuOpen && (
+        <View style={taskStyles.taskMenu}>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            style={taskStyles.taskMenuItem}
+            onPress={() => {
+              setMenuOpen(false);
+              onEdit(task);
+            }}
+          >
+            <Text style={taskStyles.taskMenuText}>Edit task</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            style={taskStyles.taskMenuItem}
+            onPress={() => {
+              setMenuOpen(false);
+              onDelete(task);
+            }}
+          >
+            <Text style={[taskStyles.taskMenuText, taskStyles.taskMenuDeleteText]}>Delete task</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       <Text style={taskStyles.title} numberOfLines={3}>{task.title}</Text>
       <View style={taskStyles.metaRow}>
         {task.projectTaskNumber != null && (
@@ -181,12 +216,14 @@ function SprintColumn({
   column,
   tasks,
   onCreateTask,
+  onEditTask,
   onDeleteTask,
   onDeleteColumn,
 }: {
   column: Sprintcolumn;
   tasks: SprintboardTask[];
   onCreateTask: (column: Sprintcolumn) => void;
+  onEditTask: (task: SprintboardTask) => void;
   onDeleteTask: (task: SprintboardTask) => void;
   onDeleteColumn: (column: Sprintcolumn) => void;
 }) {
@@ -222,12 +259,12 @@ function SprintColumn({
             <Text style={columnStyles.emptyTitle}>No sprint tasks</Text>
           </View>
         ) : (
-          tasks.map((task) => <TaskCard key={task.taskId} task={task} onDelete={onDeleteTask} />)
+          tasks.map((task) => <TaskCard key={task.taskId} task={task} onEdit={onEditTask} onDelete={onDeleteTask} />)
         )}
       </View>
       <TouchableOpacity activeOpacity={0.8} onPress={() => onCreateTask(column)} style={columnStyles.addTaskBtn}>
         <PlusIcon />
-        <Text style={columnStyles.addTaskText}>Add task</Text>
+        <Text style={columnStyles.addTaskText}>Create</Text>
       </TouchableOpacity>
     </View>
   );
@@ -243,10 +280,12 @@ export default function ProjectSprintBoardScreen({
   topOffset?: number;
 }) {
   const { width } = useWindowDimensions();
-  const { sprints, selectedSprintId, board, loading, refreshing, error, refresh, selectSprint, createTask, addColumn, deleteTask, deleteColumn } = useProjectSprintBoard(projectId);
+  const { sprints, selectedSprintId, board, loading, refreshing, error, refresh, selectSprint, createTask, addColumn, deleteTask, updateTaskTitle, deleteColumn } = useProjectSprintBoard(projectId);
   const [showSprintModal, setShowSprintModal] = useState(false);
   const [taskTarget, setTaskTarget] = useState<Sprintcolumn | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [editingTask, setEditingTask] = useState<SprintboardTask | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -319,6 +358,11 @@ export default function ProjectSprintBoardScreen({
     setNewTaskTitle('');
   };
 
+  const openEditTask = (task: SprintboardTask) => {
+    setEditingTask(task);
+    setEditTaskTitle(task.title);
+  };
+
   const submitCreateTask = async () => {
     if (!taskTarget || !newTaskTitle.trim()) return;
     setSubmitting(true);
@@ -362,6 +406,20 @@ export default function ProjectSprintBoardScreen({
         },
       },
     ]);
+  };
+
+  const submitEditTask = async () => {
+    if (!editingTask || !editTaskTitle.trim()) return;
+    setSubmitting(true);
+    try {
+      await updateTaskTitle(editingTask.taskId, editTaskTitle);
+      setEditingTask(null);
+      setEditTaskTitle('');
+    } catch {
+      Alert.alert('Task not updated', 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const confirmDeleteColumn = (column: Sprintcolumn) => {
@@ -492,6 +550,7 @@ export default function ProjectSprintBoardScreen({
                   column={column}
                   tasks={visibleTasksByStatus[column.columnStatus] || []}
                   onCreateTask={openCreateTask}
+                  onEditTask={openEditTask}
                   onDeleteTask={confirmDeleteTask}
                   onDeleteColumn={confirmDeleteColumn}
                 />
@@ -606,6 +665,31 @@ export default function ProjectSprintBoardScreen({
         </SafeAreaView>
       </Modal>
 
+      <Modal visible={!!editingTask} transparent animationType="slide">
+        <SafeAreaView style={modal.safe}>
+          <View style={modal.sheet}>
+            <View style={modal.handle} />
+            <Text style={modal.title}>Edit task</Text>
+            <Text style={modal.subtitle}>Update task title</Text>
+            <TextInput
+              style={modal.input}
+              value={editTaskTitle}
+              onChangeText={setEditTaskTitle}
+              placeholder="Task title"
+              placeholderTextColor="#94A3B8"
+              editable={!submitting}
+              autoFocus
+            />
+            <TouchableOpacity activeOpacity={0.85} disabled={submitting || !editTaskTitle.trim()} onPress={submitEditTask} style={[modal.primaryBtn, (!editTaskTitle.trim() || submitting) && modal.disabled]}>
+              {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={modal.primaryText}>Update task</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => setEditingTask(null)} style={modal.secondaryBtn}>
+              <Text style={modal.secondaryText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
       <Modal visible={showColumnModal} transparent animationType="slide">
         <SafeAreaView style={modal.safe}>
           <View style={modal.sheet}>
@@ -674,11 +758,12 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.78)',
     marginHorizontal: 14,
     marginTop: 2,
-    padding: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.92)',
-    gap: 12,
+    gap: 6,
     overflow: 'hidden',
     ...shadow,
   },
@@ -691,27 +776,27 @@ const s = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(255, 255, 255, 0.48)',
   },
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  boardMark: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  boardMark: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   heroTitleWrap: { flex: 1, minWidth: 0 },
-  eyebrow: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 1 },
-  title: { fontSize: 21, fontWeight: '900', color: '#0F172A', marginTop: 2, letterSpacing: -0.3 },
-  heroActionBtn: { width: 42, height: 42, borderRadius: 13, backgroundColor: 'rgba(239, 246, 255, 0.92)', borderWidth: 1, borderColor: 'rgba(191, 219, 254, 0.95)', alignItems: 'center', justifyContent: 'center' },
-  sprintSelect: { minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.78)', backgroundColor: 'rgba(248, 250, 252, 0.82)', paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sprintLabel: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 0.8 },
-  sprintName: { fontSize: 15, fontWeight: '900', color: '#0F172A', marginTop: 2 },
-  progressWrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  progressTrack: { flex: 1, height: 6, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
+  eyebrow: { fontSize: 9, fontWeight: '900', color: '#94A3B8', letterSpacing: 0.9 },
+  title: { fontSize: 17, fontWeight: '900', color: '#0F172A', marginTop: 0, letterSpacing: -0.3 },
+  heroActionBtn: { width: 32, height: 32, borderRadius: 11, backgroundColor: 'rgba(239, 246, 255, 0.92)', borderWidth: 1, borderColor: 'rgba(191, 219, 254, 0.95)', alignItems: 'center', justifyContent: 'center' },
+  sprintSelect: { minHeight: 42, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.78)', backgroundColor: 'rgba(248, 250, 252, 0.82)', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sprintLabel: { fontSize: 9, fontWeight: '900', color: '#94A3B8', letterSpacing: 0.7 },
+  sprintName: { fontSize: 13, fontWeight: '900', color: '#0F172A', marginTop: 0 },
+  progressWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  progressTrack: { flex: 1, height: 4, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 999, backgroundColor: '#22C55E' },
-  progressText: { fontSize: 11, fontWeight: '800', color: '#64748B' },
-  metricsRow: { flexDirection: 'row', gap: 10 },
-  metric: { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 10, alignItems: 'center' },
-  metricValue: { fontSize: 20, fontWeight: '900' },
-  metricLabel: { fontSize: 10, fontWeight: '800', color: '#64748B', letterSpacing: 0.6, textTransform: 'uppercase' },
+  progressText: { fontSize: 10, fontWeight: '800', color: '#64748B' },
+  metricsRow: { flexDirection: 'row', gap: 8 },
+  metric: { flex: 1, borderRadius: 10, borderWidth: 1, paddingVertical: 4, alignItems: 'center' },
+  metricValue: { fontSize: 16, fontWeight: '900' },
+  metricLabel: { fontSize: 8, fontWeight: '800', color: '#64748B', letterSpacing: 0.5, textTransform: 'uppercase' },
   filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  searchWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 14, backgroundColor: 'rgba(248, 250, 252, 0.82)', borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.78)' },
+  searchWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 12, backgroundColor: 'rgba(248, 250, 252, 0.82)', borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.78)' },
   searchInput: { flex: 1, fontSize: 13, color: '#0F172A', paddingVertical: 0 },
-  filterBtn: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(248, 250, 252, 0.82)', borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.78)' },
+  filterBtn: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(248, 250, 252, 0.82)', borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.78)' },
   filterBtnActive: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   errorBox: { borderRadius: 12, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', paddingHorizontal: 12, paddingVertical: 10 },
   errorText: { fontSize: 12, color: '#991B1B', fontWeight: '700' },
@@ -728,7 +813,7 @@ const s = StyleSheet.create({
 });
 
 const columnStyles = StyleSheet.create({
-  card: { backgroundColor: 'rgba(255, 255, 255, 0.88)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.88)', overflow: 'hidden', minHeight: 360, ...shadow },
+  card: { backgroundColor: 'rgba(255, 255, 255, 0.88)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.88)', overflow: 'visible', minHeight: 360, ...shadow },
   accent: { height: 5, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
   headerLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -738,7 +823,7 @@ const columnStyles = StyleSheet.create({
   countPill: { minWidth: 32, height: 28, paddingHorizontal: 9, borderRadius: 999, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   countText: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
   headerDeleteBtn: { width: 28, height: 28, borderRadius: 9, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },
-  body: { paddingHorizontal: 12, paddingBottom: 12, gap: 10 },
+  body: { paddingHorizontal: 12, paddingBottom: 10, gap: 6 },
   emptyState: { minHeight: 128, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 13, fontWeight: '900', color: '#64748B' },
   addTaskBtn: { marginHorizontal: 12, marginBottom: 12, height: 42, borderRadius: 12, borderWidth: 1, borderColor: '#BFDBFE', backgroundColor: '#EFF6FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
@@ -746,21 +831,25 @@ const columnStyles = StyleSheet.create({
 });
 
 const taskStyles = StyleSheet.create({
-  card: { backgroundColor: 'rgba(255, 255, 255, 0.96)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.72)', padding: 13, paddingTop: 14, gap: 10, ...shadow },
-  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 28, paddingRight: 36 },
-  deleteBtn: { position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
-  priority: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
+  card: { backgroundColor: 'rgba(255, 255, 255, 0.96)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.72)', padding: 8, paddingTop: 8, gap: 5, ...shadow },
+  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 16, paddingRight: 36 },
+  deleteBtn: { position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 0, zIndex: 10 },
+  taskMenu: { position: 'absolute', top: 44, right: 12, width: 148, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingVertical: 6, zIndex: 20, ...shadow },
+  taskMenuItem: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 14 },
+  taskMenuText: { fontSize: 13, fontWeight: '800', color: '#0F172A' },
+  taskMenuDeleteText: { color: '#DC2626' },
+  priority: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1 },
   priorityDot: { width: 6, height: 6, borderRadius: 3 },
   priorityText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
-  title: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 20 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
-  codePill: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, backgroundColor: '#EEF2FF' },
+  title: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 16 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
+  codePill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, backgroundColor: '#EEF2FF' },
   codeText: { fontSize: 10, fontWeight: '900', color: '#4338CA' },
   dueDate: { fontSize: 11, fontWeight: '800', color: '#64748B' },
-  labelPill: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
+  labelPill: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1 },
   labelText: { fontSize: 10, fontWeight: '900' },
-  footerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  avatar: { width: 26, height: 26, borderRadius: 13, backgroundColor: T.primary, alignItems: 'center', justifyContent: 'center' },
+  footerRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  avatar: { width: 23, height: 23, borderRadius: 12, backgroundColor: T.primary, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 9, color: '#FFFFFF', fontWeight: '900' },
   assigneeName: { fontSize: 11, fontWeight: '800', color: '#64748B', flex: 1 },
 });

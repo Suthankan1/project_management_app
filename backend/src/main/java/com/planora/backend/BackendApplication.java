@@ -5,12 +5,15 @@ import java.nio.file.Paths;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import io.github.cdimascio.dotenv.Dotenv;
+import com.planora.backend.model.ProjectAccess;
 
 @SpringBootApplication
+@EntityScan(basePackageClasses = ProjectAccess.class)
 @EnableScheduling
 @EnableCaching
 public class BackendApplication {
