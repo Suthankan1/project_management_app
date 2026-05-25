@@ -1,6 +1,6 @@
 /**
- * Mobile documents explorer with dark navy glassmorphism and liquid-glass cards.
- * Design: gradient backdrop, aurora blobs, blurred controls, SVG icons, and staggered rows.
+ * Mobile documents explorer aligned with the app's light mobile theme.
+ * Design: light surfaces, compact controls, SVG icons, and staggered rows.
  * Performance: parallel initial fetch, memoized filters, callback-stable actions, skeleton loading.
  * CI/CD note: scoped to this file only; no token, API, navigation, test, or workflow changes.
  */
@@ -30,13 +30,13 @@ import { T } from '../../constants/tokens';
 
 const { width: SW } = Dimensions.get('window');
 const GLASS = {
-  border: 'rgba(255,255,255,0.20)',
-  text: 'rgba(255,255,255,0.88)',
-  secondary: 'rgba(255,255,255,0.38)',
-  muted: 'rgba(255,255,255,0.25)',
-  placeholder: 'rgba(255,255,255,0.28)',
+  border: T.border,
+  text: T.textPrimary,
+  secondary: T.textSecondary,
+  muted: T.textMuted,
+  placeholder: T.textMuted,
 };
-const BG_GRADIENT = ['#080C24', '#0C1530', '#080C24'] as const;
+const BG_GRADIENT = [T.bgSecondary, '#FFFFFF', T.bgSecondary] as const;
 const GRADIENT_START = { x: 0, y: 0 } as const;
 const GRADIENT_END = { x: 1, y: 1 } as const;
 const useNativeDriver = Platform.OS !== 'web';
@@ -155,9 +155,9 @@ const LiquidGlassCard = memo(function LiquidGlassCard({
 }) {
   return (
     <View style={[styles.card, style]}>
-      <BlurView intensity={intensity} tint="dark" style={StyleSheet.absoluteFill} />
+      <BlurView intensity={intensity} tint="light" style={StyleSheet.absoluteFill} />
       <LinearGradient
-        colors={['rgba(255,255,255,0.13)', 'rgba(255,255,255,0.03)']}
+        colors={['rgba(255,255,255,0.98)', 'rgba(247,248,250,0.94)']}
         start={GRADIENT_START}
         end={GRADIENT_END}
         style={StyleSheet.absoluteFillObject}
@@ -244,8 +244,8 @@ export const DocsSkeleton = memo(function DocsSkeleton() {
 const IconSearch = memo(function IconSearch() {
   return (
     <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Circle cx={11} cy={11} r={8} stroke="rgba(255,255,255,0.35)" strokeWidth={2.5} />
-      <Path d="m21 21-4.3-4.3" stroke="rgba(255,255,255,0.35)" strokeWidth={2.5} strokeLinecap="round" />
+      <Circle cx={11} cy={11} r={8} stroke={T.textMuted} strokeWidth={2.5} />
+      <Path d="m21 21-4.3-4.3" stroke={T.textMuted} strokeWidth={2.5} strokeLinecap="round" />
     </Svg>
   );
 });
@@ -253,7 +253,7 @@ const IconSearch = memo(function IconSearch() {
 const IconBack = memo(function IconBack() {
   return (
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-      <Path d="M19 12H5M12 5l-7 7 7 7" stroke="rgba(255,255,255,0.9)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M19 12H5M12 5l-7 7 7 7" stroke={T.primary} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 });
@@ -261,7 +261,7 @@ const IconBack = memo(function IconBack() {
 export const IconPlus = memo(function IconPlus() {
   return (
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-      <Path d="M5 12h14M12 5v14" stroke="rgba(255,255,255,0.9)" strokeWidth={3} strokeLinecap="round" />
+      <Path d="M5 12h14M12 5v14" stroke={T.primary} strokeWidth={3} strokeLinecap="round" />
     </Svg>
   );
 });
@@ -301,7 +301,7 @@ const IconFolder = memo(function IconFolder({ color = '#F59E0B' }: { color?: str
 const IconChevronRight = memo(function IconChevronRight() {
   return (
     <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="m9 18 6-6-6-6" stroke="rgba(255,255,255,0.25)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="m9 18 6-6-6-6" stroke={T.textMuted} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 });
@@ -309,7 +309,7 @@ const IconChevronRight = memo(function IconChevronRight() {
 const IconNewFolder = memo(function IconNewFolder() {
   return (
     <Svg width={21} height={21} viewBox="0 0 24 24" fill="none">
-      <Path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2zM12 11v6M9 14h6" stroke="rgba(255,255,255,0.9)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2zM12 11v6M9 14h6" stroke={T.primary} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 });
@@ -353,9 +353,9 @@ const GlassIconButton = memo(function GlassIconButton({
       disabled={disabled}
       style={[styles.glassIconButton, label ? styles.glassIconWithLabel : styles.glassIconSquare, accent && styles.glassIconAccent, style]}
     >
-      <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+      <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill} />
       <LinearGradient
-        colors={accent ? ['rgba(21,93,252,0.35)', 'rgba(21,93,252,0.15)'] : ['rgba(255,255,255,0.14)', 'rgba(255,255,255,0.05)']}
+        colors={accent ? [T.primaryLight, '#FFFFFF'] : ['#FFFFFF', T.bgSecondary]}
         start={GRADIENT_START}
         end={GRADIENT_END}
         style={StyleSheet.absoluteFillObject}
@@ -602,7 +602,7 @@ export default function MobileDocsScreen({ projectId, projectName, topOffset = 0
         const active = activeTab === tab;
         return (
           <SpringTouchable key={tab} onPress={() => setActiveTab(tab)} style={[styles.tabButton, active && styles.tabButtonActive]}>
-            {active ? <LinearGradient colors={['rgba(21,93,252,0.45)', 'rgba(21,93,252,0.20)']} style={StyleSheet.absoluteFillObject} /> : null}
+            {active ? <LinearGradient colors={[T.primaryLight, '#FFFFFF']} style={StyleSheet.absoluteFillObject} /> : null}
             <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab === 'all' ? 'All' : 'Folders'}</Text>
           </SpringTouchable>
         );
@@ -635,8 +635,8 @@ export default function MobileDocsScreen({ projectId, projectName, topOffset = 0
         </View>
 
         <View style={styles.searchBar}>
-          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-          <LinearGradient colors={['rgba(255,255,255,0.14)', 'rgba(255,255,255,0.05)']} style={StyleSheet.absoluteFillObject} />
+          <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['#FFFFFF', T.bgSecondary]} style={StyleSheet.absoluteFillObject} />
           <IconSearch />
           <TextInput
             clearButtonMode="while-editing"
@@ -712,8 +712,8 @@ export default function MobileDocsScreen({ projectId, projectName, topOffset = 0
             {empty ? <EmptyState inFolder={inFolder} searchQuery={searchQuery} onCreateFolder={() => setView('create_folder')} onUpload={handleUploadDocument} /> : null}
             {uploading ? (
               <View style={styles.uploadPill}>
-                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                <LinearGradient colors={['rgba(255,255,255,0.14)', 'rgba(255,255,255,0.05)']} style={StyleSheet.absoluteFillObject} />
+                <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill} />
+                <LinearGradient colors={['#FFFFFF', T.bgSecondary]} style={StyleSheet.absoluteFillObject} />
                 <ActivityIndicator color={T.primary} size="small" />
                 <Text style={styles.uploadText}>Uploading file...</Text>
               </View>
@@ -747,7 +747,7 @@ export default function MobileDocsScreen({ projectId, projectName, topOffset = 0
           />
         </LiquidGlassCard>
         <SpringTouchable disabled={creatingFolder} onPress={handleCreateFolder} style={styles.createButton}>
-          <LinearGradient colors={['rgba(21,93,252,0.85)', 'rgba(8,50,180,0.95)']} style={StyleSheet.absoluteFillObject} />
+          <LinearGradient colors={[T.primary, T.primaryHover]} style={StyleSheet.absoluteFillObject} />
           {creatingFolder ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.createButtonText}>Create Folder</Text>}
         </SpringTouchable>
       </View>
@@ -756,8 +756,6 @@ export default function MobileDocsScreen({ projectId, projectName, topOffset = 0
 
   return (
     <LinearGradient colors={BG_GRADIENT} style={[styles.container, { paddingTop: topOffset }]}>
-      <View pointerEvents="none" style={styles.blobOne} />
-      <View pointerEvents="none" style={styles.blobTwo} />
       {view === 'create_folder' ? renderCreateFolderView() : renderExplorerView()}
     </LinearGradient>
   );
@@ -767,49 +765,47 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   fullFlex: { flex: 1 },
   springScale: { alignSelf: 'auto' },
-  blobOne: { position: 'absolute', width: 340, height: 340, borderRadius: 170, backgroundColor: 'rgba(21,93,252,0.07)', top: -100, right: -80 },
-  blobTwo: { position: 'absolute', width: 260, height: 260, borderRadius: 130, backgroundColor: 'rgba(139,92,246,0.05)', bottom: 60, left: -70 },
   card: {
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.20)',
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    ...Platform.select({ ios: { shadowColor: '#155DFC', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.2, shadowRadius: 24 }, android: { elevation: 6 } }),
+    borderColor: T.border,
+    backgroundColor: T.bg,
+    ...Platform.select({ ios: { shadowColor: '#64748B', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.1, shadowRadius: 18 }, android: { elevation: 3 } }),
   },
-  topShine: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.45)' },
+  topShine: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: '#FFFFFF' },
   cardContent: { paddingHorizontal: 16, paddingVertical: 4 },
-  skeletonPulse: { backgroundColor: 'rgba(255,255,255,0.3)' },
+  skeletonPulse: { backgroundColor: '#E5E7EB' },
   docsSkeletonContent: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 40 },
   skeletonSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4, marginBottom: 8, marginTop: 8 },
   skeletonRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 12 },
   skeletonTextStack: { flex: 1, gap: 6 },
   skeletonActions: { flexDirection: 'row', gap: 6 },
-  glassIconButton: { borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.20)' },
+  glassIconButton: { borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: T.border },
   glassIconSquare: { width: 40, height: 40 },
   glassIconWithLabel: { minHeight: 40, paddingHorizontal: 12 },
-  glassIconAccent: { borderColor: 'rgba(21,93,252,0.50)' },
+  glassIconAccent: { borderColor: T.primaryMuted },
   glassIconContent: { flex: 1, minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  glassIconLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.8)' },
+  glassIconLabel: { fontSize: 11, fontWeight: '700', color: T.primary },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4, marginBottom: 8 },
-  sectionLabel: { color: 'rgba(255,255,255,0.35)', fontSize: 10, letterSpacing: 1.8, fontWeight: '800' },
-  sectionBadge: { backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
-  sectionBadgeText: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.45)' },
+  sectionLabel: { color: T.textSecondary, fontSize: 10, letterSpacing: 1.8, fontWeight: '800' },
+  sectionBadge: { backgroundColor: T.primaryLight, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  sectionBadgeText: { fontSize: 10, fontWeight: '700', color: T.primary },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12 },
   headerLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerTitle: { flex: 1, fontSize: 22, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.5 },
+  headerTitle: { flex: 1, fontSize: 22, fontWeight: '800', color: T.textPrimary, letterSpacing: -0.5 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  searchBar: { marginHorizontal: 16, marginBottom: 12, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.20)', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
-  searchInput: { flex: 1, color: 'rgba(255,255,255,0.85)', padding: 0, fontSize: 14, fontWeight: '600' },
+  searchBar: { marginHorizontal: 16, marginBottom: 12, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: T.border, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  searchInput: { flex: 1, color: T.textPrimary, padding: 0, fontSize: 14, fontWeight: '600' },
   tabRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 12 },
-  tabButton: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', paddingHorizontal: 16, paddingVertical: 9 },
-  tabButtonActive: { borderColor: 'rgba(255,255,255,0.28)' },
-  tabText: { fontSize: 12, fontWeight: '800', color: 'rgba(255,255,255,0.40)' },
-  tabTextActive: { color: '#FFFFFF' },
+  tabButton: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: T.border, backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 9 },
+  tabButtonActive: { borderColor: T.primaryMuted },
+  tabText: { fontSize: 12, fontWeight: '800', color: T.textSecondary },
+  tabTextActive: { color: T.primary },
   contentScroll: { paddingHorizontal: 16, paddingBottom: 40 },
   sectionCard: { marginBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: 64, paddingVertical: 14 },
-  rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.07)' },
+  rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: T.borderLight },
   rowLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowTextWrap: { flex: 1 },
   rowTitle: { fontSize: 14, fontWeight: '700', color: GLASS.text },
@@ -820,19 +816,19 @@ const styles = StyleSheet.create({
   fileEmoji: { fontSize: 20 },
   emptyState: { alignItems: 'center', paddingTop: 64, paddingHorizontal: 40, gap: 8 },
   emptyEmoji: { fontSize: 52 },
-  emptyTitle: { fontSize: 18, fontWeight: '800', color: 'rgba(255,255,255,0.85)', textAlign: 'center' },
-  emptySubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.35)', textAlign: 'center', lineHeight: 19 },
+  emptyTitle: { fontSize: 18, fontWeight: '800', color: T.textPrimary, textAlign: 'center' },
+  emptySubtitle: { fontSize: 13, color: T.textSecondary, textAlign: 'center', lineHeight: 19 },
   emptyButtons: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
-  uploadPill: { marginTop: 8, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  uploadText: { color: 'rgba(255,255,255,0.75)', fontWeight: '700', fontSize: 13 },
+  uploadPill: { marginTop: 8, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: T.border, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  uploadText: { color: T.textPrimary, fontWeight: '700', fontSize: 13 },
   errorBanner: { backgroundColor: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.28)', borderWidth: 1, borderRadius: 14, padding: 12, marginTop: 10 },
   errorText: { color: '#F87171', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   createHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 },
-  createHeaderTitle: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
+  createHeaderTitle: { fontSize: 16, fontWeight: '800', color: T.textPrimary },
   headerSpacer: { width: 40 },
   createBody: { paddingHorizontal: 20, paddingTop: 32 },
-  inputLabel: { color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: '800', letterSpacing: 1.8, marginBottom: 8 },
-  folderInput: { fontSize: 15, color: 'rgba(255,255,255,0.9)', paddingVertical: 14, paddingHorizontal: 0 },
+  inputLabel: { color: T.textSecondary, fontSize: 10, fontWeight: '800', letterSpacing: 1.8, marginBottom: 8 },
+  folderInput: { fontSize: 15, color: T.textPrimary, paddingVertical: 14, paddingHorizontal: 0 },
   createButton: {
     height: 52,
     borderRadius: 16,
