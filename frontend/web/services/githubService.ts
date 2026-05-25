@@ -1,5 +1,3 @@
-import api from '@/lib/axios'
-
 export interface GitHubOwner {
   login: string
 }
@@ -83,6 +81,20 @@ export interface ProjectGitHubConnection {
   connectedAt: string
 }
 
+interface GitHubApiIssue {
+  id: number
+  number: number
+  title: string
+  body: string | null
+  state: 'open' | 'closed'
+  labels: Array<{ name: string; color: string }>
+  assignees: Array<{ login: string; avatar_url: string }>
+  created_at: string
+  updated_at: string
+  html_url: string
+  comments: number
+}
+
 export async function fetchRepositories(): Promise<GitHubRepository[]> {
   const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080'
 
@@ -115,24 +127,52 @@ export async function fetchIssues(
   state: 'open' | 'closed' | 'all' = 'all',
   label?: string,
 ): Promise<GitHubIssue[]> {
-  try {
-    const { data } = await api.get<GitHubIssue[]>('/api/github/issues', {
-      params: {
-        repoFullName,
-        state,
-        ...(label?.trim() ? { label: label.trim() } : {}),
-      },
-    })
-    return data
-  } catch (error) {
-    const response = (error as {
-      response?: { status?: number; data?: { message?: string; error?: string } };
-    }).response
-    if (response?.status === 401) throw new Error('Connect GitHub to view issues.')
-    if (response?.status === 404) throw new Error('Repository not found or unavailable.')
-    if (response?.status === 429) throw new Error('GitHub rate limit exceeded. Try again later.')
-    throw new Error(response?.data?.message || response?.data?.error || 'Failed to load issues.')
+  const token = getGitHubToken()
+  if (!token) {
+    throw new Error('Connect GitHub to view issues.')
   }
+
+  const response = await fetch(
+    `https://api.github.com/repos/${repoFullName}/issues?state=${state}&per_page=100${label?.trim() ? `&labels=${encodeURIComponent(label.trim())}` : ''}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    },
+  )
+
+  if (response.status === 401) {
+    throw new Error('Connect GitHub to view issues.')
+  }
+
+  if (response.status === 404) {
+    throw new Error('Repository not found or unavailable.')
+  }
+
+  if (response.status === 429) {
+    throw new Error('GitHub rate limit exceeded. Try again later.')
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as { message?: string }
+    throw new Error(body.message || 'Failed to load issues.')
+  }
+
+  const issues = await response.json() as GitHubApiIssue[]
+  return issues.map(issue => ({
+    id: issue.id,
+    number: issue.number,
+    title: issue.title,
+    body: issue.body ?? undefined,
+    state: issue.state,
+    labels: issue.labels,
+    assignees: issue.assignees,
+    createdAt: issue.created_at,
+    updatedAt: issue.updated_at,
+    htmlUrl: issue.html_url,
+    comments: issue.comments,
+  }))
 }
 
 export async function fetchRepositoriesWithToken(token: string): Promise<GitHubRepository[]> {
