@@ -27,4 +27,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     boolean existsByRecipientUserIdAndMessageAndLinkAndCreatedAtAfter(
             Long userId, String message, String link, LocalDateTime after
     );
+
+    boolean existsByRecipientUserIdAndLinkAndMessageStartingWith(
+            Long userId, String link, String messagePrefix
+    );
 }

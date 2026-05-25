@@ -99,6 +99,28 @@ public class NotificationService {
         return true;
     }
 
+    /**
+     * Prevents repeated event notifications whose descriptive text can change
+     * while their destination and stable event prefix remain the same.
+     */
+    @Transactional
+    public boolean createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+            User recipient,
+            String message,
+            String link,
+            String messagePrefix
+    ) {
+        boolean alreadyExists = notificationRepository
+                .existsByRecipientUserIdAndLinkAndMessageStartingWith(
+                        recipient.getUserId(), link, messagePrefix
+                );
+        if (alreadyExists) {
+            return false;
+        }
+        createNotification(recipient, message, link);
+        return true;
+    }
+
     // =====================================================
     // NOTIFICATION RETRIEVAL & STATUS UPDATES
     // =====================================================

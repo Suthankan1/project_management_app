@@ -174,6 +174,21 @@ class NotificationServiceTest {
     }
 
     @Test
+    void createNotificationIfNotDuplicateByLinkAndMessagePrefix_skipsRepeatedEvent() {
+        String prefix = "\uD83D\uDD00 PR opened: #17 ";
+        String link = "https://github.com/planora/app/pull/17";
+        when(notificationRepository.existsByRecipientUserIdAndLinkAndMessageStartingWith(
+                15L, link, prefix)).thenReturn(true);
+
+        boolean created = notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                recipient, prefix + "Improve sync by @octocat", link, prefix);
+
+        assertFalse(created);
+        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
+    }
+
+    @Test
     void getUserNotifications_mapsEntitiesToDtos() {
         Notification first = new Notification();
         first.setId(1L);

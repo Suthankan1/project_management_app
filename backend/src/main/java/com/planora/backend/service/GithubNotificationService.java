@@ -1,11 +1,19 @@
 package com.planora.backend.service;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com.planora.backend.model.Project;
+import com.planora.backend.model.TeamMember;
 import com.planora.backend.model.User;
+import com.planora.backend.repository.ProjectRepository;
+import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -16,16 +24,46 @@ public class GithubNotificationService {
 
     private final NotificationService notificationService;
     private final UserRepository userRepository;
+    private final ProjectRepository projectRepository;
+    private final TeamMemberRepository teamMemberRepository;
 
     private void ensureDependenciesInjected() {
-        if (notificationService == null || userRepository == null) {
+        if (notificationService == null || userRepository == null
+                || projectRepository == null || teamMemberRepository == null) {
             throw new IllegalStateException("GitHub notification dependencies were not injected");
         }
     }
 
     public void notifyPROpened(String repoFullName, int prNumber, String prTitle, String authorGithubLogin) {
         ensureDependenciesInjected();
-        // Task 107: wire GitHub PR-opened notifications.
+        if (repoFullName == null || repoFullName.isBlank() || prNumber <= 0) {
+            return;
+        }
+
+        Set<Long> authorIds = resolveUsersFromGithubLogin(authorGithubLogin).stream()
+                .map(User::getUserId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, User> recipients = new LinkedHashMap<>();
+
+        for (Project project : projectRepository.findByGithubRepoFullNameIgnoreCase(repoFullName.trim())) {
+            if (project.getTeam() == null || project.getTeam().getId() == null) {
+                continue;
+            }
+            for (TeamMember member : teamMemberRepository.findByTeamId(project.getTeam().getId())) {
+                User user = member.getUser();
+                if (user != null && user.getUserId() != null && !authorIds.contains(user.getUserId())) {
+                    recipients.putIfAbsent(user.getUserId(), user);
+                }
+            }
+        }
+
+        String prefix = "\uD83D\uDD00 PR opened: #" + prNumber + " ";
+        String message = prefix + safeTitle(prTitle) + " by @" + safeLogin(authorGithubLogin);
+        String link = "https://github.com/" + repoFullName.trim() + "/pull/" + prNumber;
+        recipients.values().forEach(recipient ->
+                notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                        recipient, message, link, prefix));
     }
 
     public void notifyPRMerged(String repoFullName, int prNumber, String prTitle, String mergerGithubLogin) {
@@ -60,5 +98,13 @@ public class GithubNotificationService {
         }
 
         return userRepository.findByGithubUsernameIgnoreCase(githubLogin);
+    }
+
+    private String safeTitle(String title) {
+        return title == null ? "" : title;
+    }
+
+    private String safeLogin(String login) {
+        return login == null ? "" : login;
     }
 }

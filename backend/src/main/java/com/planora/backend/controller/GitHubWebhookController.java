@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.planora.backend.model.CiStatus;
 import com.planora.backend.service.CiStatusResolver;
+import com.planora.backend.service.GithubNotificationService;
 import com.planora.backend.service.TaskGithubService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,22 +23,22 @@ import java.security.NoSuchAlgorithmException;
 /**
  * Receives GitHub webhook events and applies real-time CI status updates to tasks.
  *
- * Endpoint: POST /api/github/webhooks
+ * Endpoints: POST /api/github/webhook and POST /api/github/webhooks
  *
  * Supported event types (via X-GitHub-Event header):
  *   check_run  — updates ci_status on the matching commit row when a check run completes
  *   ping       — accepted and acknowledged (GitHub sends this on webhook creation)
  *
- * All other event types receive a 200 OK with no action taken.
+ * Notification event types are routed to {@link GithubNotificationService};
+ * CI check-run events continue to update linked task status.
  *
  * Security:
  *   GitHub signs every delivery with HMAC-SHA256 using the configured webhook secret.
  *   The signature is compared using a constant-time algorithm to prevent timing attacks.
- *   If no secret is configured (GITHUB_WEBHOOK_SECRET is empty) the endpoint accepts
- *   all deliveries in development mode — a warning is logged on every delivery.
+ *   Requests are rejected until GITHUB_WEBHOOK_SECRET is configured.
  */
 @RestController
-@RequestMapping("/api/github/webhooks")
+@RequestMapping({"/api/github/webhook", "/api/github/webhooks"})
 public class GitHubWebhookController {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubWebhookController.class);
@@ -50,6 +51,9 @@ public class GitHubWebhookController {
 
     @Autowired
     private TaskGithubService taskGithubService;
+
+    @Autowired
+    private GithubNotificationService githubNotificationService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -68,14 +72,14 @@ public class GitHubWebhookController {
             @RequestHeader(value = "X-Hub-Signature-256", defaultValue = "") String signature,
             @RequestBody String rawBody) {
 
-        if (!webhookSecret.isBlank() && !isValidSignature(rawBody, signature)) {
+        if (webhookSecret.isBlank()) {
+            log.error("GitHub webhook rejected because GITHUB_WEBHOOK_SECRET is not configured");
+            return ResponseEntity.status(503).body("Webhook secret is not configured");
+        }
+        if (!isValidSignature(rawBody, signature)) {
             log.warn("GitHub webhook rejected: invalid signature for event '{}'", eventType);
             return ResponseEntity.status(401).body("Invalid signature");
         }
-        if (webhookSecret.isBlank()) {
-            log.warn("GitHub webhook received without secret validation — set GITHUB_WEBHOOK_SECRET in production");
-        }
-
         JsonNode body;
         try {
             body = objectMapper.readTree(rawBody);
@@ -85,6 +89,9 @@ public class GitHubWebhookController {
         }
 
         return switch (eventType) {
+            case "pull_request" -> handlePullRequest(body);
+            case "issues"       -> handleIssue(body);
+            case "release"      -> handleRelease(body);
             case "check_run" -> handleCheckRun(body);
             case "ping"      -> ResponseEntity.ok("pong");
             default          -> {
@@ -115,6 +122,66 @@ public class GitHubWebhookController {
      * }
      * </pre>
      */
+    /** Dispatches pull request lifecycle events to notification handlers. */
+    private ResponseEntity<String> handlePullRequest(JsonNode body) {
+        String action = body.path("action").asText("");
+        String repoFullName = repositoryFullName(body);
+        JsonNode pullRequest = body.path("pull_request");
+        int prNumber = pullRequest.path("number").asInt(body.path("number").asInt(0));
+        String title = pullRequest.path("title").asText("");
+
+        if (repoFullName.isBlank() || prNumber <= 0) {
+            return ResponseEntity.badRequest().body("Missing pull request repository or number");
+        }
+
+        switch (action) {
+            case "opened" -> githubNotificationService.notifyPROpened(
+                    repoFullName, prNumber, title, loginAt(pullRequest, "user"));
+            case "closed" -> {
+                if (pullRequest.path("merged").asBoolean(false)) {
+                    githubNotificationService.notifyPRMerged(
+                            repoFullName, prNumber, title, loginAt(pullRequest, "merged_by"));
+                }
+            }
+            case "review_requested" -> githubNotificationService.notifyReviewRequested(
+                    repoFullName, prNumber, title, loginAt(body, "requested_reviewer"));
+            default -> {
+                return ResponseEntity.ok("ignored");
+            }
+        }
+        return ResponseEntity.ok("processed");
+    }
+
+    private ResponseEntity<String> handleIssue(JsonNode body) {
+        JsonNode issue = body.path("issue");
+        String repoFullName = repositoryFullName(body);
+        int issueNumber = issue.path("number").asInt(0);
+        if (repoFullName.isBlank() || issueNumber <= 0) {
+            return ResponseEntity.badRequest().body("Missing issue repository or number");
+        }
+        githubNotificationService.notifyIssueEvent(
+                repoFullName,
+                issueNumber,
+                issue.path("title").asText(""),
+                body.path("action").asText(""),
+                loginAt(body, "sender"));
+        return ResponseEntity.ok("processed");
+    }
+
+    private ResponseEntity<String> handleRelease(JsonNode body) {
+        String repoFullName = repositoryFullName(body);
+        JsonNode release = body.path("release");
+        if (repoFullName.isBlank() || release.isMissingNode()) {
+            return ResponseEntity.badRequest().body("Missing release repository or payload");
+        }
+        githubNotificationService.notifyRelease(
+                repoFullName,
+                release.path("tag_name").asText(""),
+                release.path("name").asText(""));
+        return ResponseEntity.ok("processed");
+    }
+
+    /** Resolves and persists CI state for a GitHub check run event. */
     private ResponseEntity<String> handleCheckRun(JsonNode body) {
         String action     = body.path("action").asText("");
         JsonNode checkRun = body.path("check_run");
@@ -143,9 +210,24 @@ public class GitHubWebhookController {
         }
 
         taskGithubService.updateCiStatusBySha(headSha, resolved);
+        if (resolved == CiStatus.FAILED) {
+            githubNotificationService.notifyCIFailed(
+                    repositoryFullName(body),
+                    checkRun.path("check_suite").path("head_branch").asText(""),
+                    headSha,
+                    checkRun.path("name").asText(""));
+        }
         log.info("CI status updated to {} for SHA {}", resolved,
                 headSha.length() >= 7 ? headSha.substring(0, 7) : headSha);
         return ResponseEntity.ok("updated");
+    }
+
+    private String repositoryFullName(JsonNode body) {
+        return body.path("repository").path("full_name").asText("").trim();
+    }
+
+    private String loginAt(JsonNode parent, String property) {
+        return parent.path(property).path("login").asText("");
     }
 
     // ── HMAC validation ───────────────────────────────────────────────────────────
