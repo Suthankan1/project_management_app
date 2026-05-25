@@ -14,6 +14,7 @@ import com.planora.backend.repository.ProjectAccessRepository;
 import com.planora.backend.repository.ProjectFavoriteRepository;
 import com.planora.backend.repository.ProjectRepository;
 import com.planora.backend.repository.SprintRepository;
+import com.planora.backend.repository.SprintboardRepository;
 import com.planora.backend.repository.TaskRepository;
 import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.TeamRepository;
@@ -54,6 +55,8 @@ class ProjectServiceTest {
     private ProjectFavoriteRepository projectFavoriteRepository;
     @Mock
     private SprintRepository sprintRepository;
+    @Mock
+    private SprintboardRepository sprintboardRepository;
     @Mock
     private TaskRepository taskRepository;
 
@@ -208,5 +211,39 @@ class ProjectServiceTest {
 
         assertEquals(true, exists);
         verify(projectRepository).existsByProjectKey(eq("PLN"));
+    }
+
+    @Test
+    void deleteProject_removesSprintDependenciesBeforeDeletingProject() {
+        Project project = new Project();
+        project.setId(54L);
+        project.setName("Agile Project");
+        project.setProjectKey("AGL");
+        project.setType(ProjectType.AGILE);
+        project.setOwner(owner);
+        project.setTeam(existingTeam);
+
+        TeamMember ownerMember = new TeamMember();
+        ownerMember.setTeam(existingTeam);
+        ownerMember.setUser(owner);
+        ownerMember.setRole(TeamRole.OWNER);
+
+        Sprint sprint = new Sprint();
+        sprint.setId(99L);
+        sprint.setProject(project);
+        sprint.setName("AGL Sprint 1");
+
+        when(projectRepository.findById(54L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(10L, 7L)).thenReturn(Optional.of(ownerMember));
+        when(sprintRepository.findByProject_Id(54L)).thenReturn(java.util.List.of(sprint));
+        when(sprintboardRepository.findBySprintId(99L)).thenReturn(Optional.empty());
+
+        projectService.deleteProject(54L, 10L, 7L);
+
+        verify(taskRepository).detachSprintsByProjectId(54L);
+        verify(sprintRepository).deleteAll(java.util.List.of(sprint));
+        verify(projectAccessRepository).deleteByProject_Id(54L);
+        verify(projectFavoriteRepository).deleteByProject(project);
+        verify(projectRepository).delete(project);
     }
 }
