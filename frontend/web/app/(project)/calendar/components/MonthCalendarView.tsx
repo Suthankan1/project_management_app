@@ -86,7 +86,6 @@ function computeWeekLanes(weekDays: Date[], events: CalendarEventItem[]): LaneSl
 
     // Find the first lane where startCol..endCol are all free
     let lane = 0;
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       if (!laneUsed[lane]) laneUsed[lane] = Array(7).fill(false);
       let fits = true;

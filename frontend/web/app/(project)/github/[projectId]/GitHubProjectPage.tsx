@@ -490,7 +490,7 @@ function IssueImportModal({ issue, onClose }: { issue: GitHubIssue; onClose: () 
 }
 
 function IssuesPanel({
-  connection,
+  connection: _connection,
   issues,
   loading,
   error,

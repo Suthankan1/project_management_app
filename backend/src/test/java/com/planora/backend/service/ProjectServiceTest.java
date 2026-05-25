@@ -241,7 +241,7 @@ class ProjectServiceTest {
         projectService.deleteProject(54L, 10L, 7L);
 
         verify(taskRepository).detachSprintsByProjectId(54L);
-        verify(sprintRepository).deleteAll(java.util.List.of(sprint));
+        verify(sprintRepository).deleteByProjectId(54L);
         verify(projectAccessRepository).deleteByProject_Id(54L);
         verify(projectFavoriteRepository).deleteByProject(project);
         verify(projectRepository).delete(project);

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
-  AlertTriangle, Trash2, LogOut,
+  AlertTriangle, Trash2, LogOut, Settings2,
   Layers, FileText, Shield, Loader2, CheckCircle2,
   X, Info,
 } from 'lucide-react';
@@ -14,6 +14,7 @@ import {
   removeScopedProjectValue,
 } from '@/hooks/useProjectContext';
 import { getUserIdFromToken } from '@/lib/auth';
+import CustomFieldsManager from './CustomFieldsManager';
 type ProjectType = 'AGILE' | 'KANBAN';
 
 interface ProjectData {
