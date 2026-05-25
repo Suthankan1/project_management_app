@@ -83,6 +83,16 @@ function PlusIcon({ color = T.primary }: { color?: string }) {
   );
 }
 
+function MoreVerticalIcon({ color = T.primary }: { color?: string }) {
+  return (
+    <Svg width={21} height={21} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={5} r={2} fill={color} />
+      <Circle cx={12} cy={12} r={2} fill={color} />
+      <Circle cx={12} cy={19} r={2} fill={color} />
+    </Svg>
+  );
+}
+
 function UserIcon({ active }: { active: boolean }) {
   return (
     <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={active ? T.primary : '#64748B'} strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round">
@@ -130,10 +140,11 @@ function SprintBoardBackdrop() {
   );
 }
 
-function TaskCard({ task, onDelete }: { task: SprintboardTask; onDelete: (task: SprintboardTask) => void }) {
+function TaskCard({ task, onEdit, onDelete }: { task: SprintboardTask; onEdit: (task: SprintboardTask) => void; onDelete: (task: SprintboardTask) => void }) {
   const priority = task.priority ? PRIORITY_STYLES[task.priority.toUpperCase()] ?? PRIORITY_STYLES.LOW : null;
   const due = formatDate(task.dueDate);
   const labelColor = task.labelColor?.startsWith('#') ? task.labelColor : T.primary;
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <View style={taskStyles.card}>
@@ -145,9 +156,33 @@ function TaskCard({ task, onDelete }: { task: SprintboardTask; onDelete: (task: 
           </View>
         ) : <View />}
       </View>
-      <TouchableOpacity hitSlop={10} onPress={() => onDelete(task)} style={taskStyles.deleteBtn}>
-        <TrashIcon color="#DC2626" size={15} />
+      <TouchableOpacity hitSlop={10} onPress={() => setMenuOpen((open) => !open)} style={taskStyles.deleteBtn}>
+        <MoreVerticalIcon />
       </TouchableOpacity>
+      {menuOpen && (
+        <View style={taskStyles.taskMenu}>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            style={taskStyles.taskMenuItem}
+            onPress={() => {
+              setMenuOpen(false);
+              onEdit(task);
+            }}
+          >
+            <Text style={taskStyles.taskMenuText}>Edit task</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            style={taskStyles.taskMenuItem}
+            onPress={() => {
+              setMenuOpen(false);
+              onDelete(task);
+            }}
+          >
+            <Text style={[taskStyles.taskMenuText, taskStyles.taskMenuDeleteText]}>Delete task</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       <Text style={taskStyles.title} numberOfLines={3}>{task.title}</Text>
       <View style={taskStyles.metaRow}>
         {task.projectTaskNumber != null && (
@@ -181,12 +216,14 @@ function SprintColumn({
   column,
   tasks,
   onCreateTask,
+  onEditTask,
   onDeleteTask,
   onDeleteColumn,
 }: {
   column: Sprintcolumn;
   tasks: SprintboardTask[];
   onCreateTask: (column: Sprintcolumn) => void;
+  onEditTask: (task: SprintboardTask) => void;
   onDeleteTask: (task: SprintboardTask) => void;
   onDeleteColumn: (column: Sprintcolumn) => void;
 }) {
@@ -222,12 +259,12 @@ function SprintColumn({
             <Text style={columnStyles.emptyTitle}>No sprint tasks</Text>
           </View>
         ) : (
-          tasks.map((task) => <TaskCard key={task.taskId} task={task} onDelete={onDeleteTask} />)
+          tasks.map((task) => <TaskCard key={task.taskId} task={task} onEdit={onEditTask} onDelete={onDeleteTask} />)
         )}
       </View>
       <TouchableOpacity activeOpacity={0.8} onPress={() => onCreateTask(column)} style={columnStyles.addTaskBtn}>
         <PlusIcon />
-        <Text style={columnStyles.addTaskText}>Add task</Text>
+        <Text style={columnStyles.addTaskText}>Create</Text>
       </TouchableOpacity>
     </View>
   );
@@ -243,10 +280,12 @@ export default function ProjectSprintBoardScreen({
   topOffset?: number;
 }) {
   const { width } = useWindowDimensions();
-  const { sprints, selectedSprintId, board, loading, refreshing, error, refresh, selectSprint, createTask, addColumn, deleteTask, deleteColumn } = useProjectSprintBoard(projectId);
+  const { sprints, selectedSprintId, board, loading, refreshing, error, refresh, selectSprint, createTask, addColumn, deleteTask, updateTaskTitle, deleteColumn } = useProjectSprintBoard(projectId);
   const [showSprintModal, setShowSprintModal] = useState(false);
   const [taskTarget, setTaskTarget] = useState<Sprintcolumn | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [editingTask, setEditingTask] = useState<SprintboardTask | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -319,6 +358,11 @@ export default function ProjectSprintBoardScreen({
     setNewTaskTitle('');
   };
 
+  const openEditTask = (task: SprintboardTask) => {
+    setEditingTask(task);
+    setEditTaskTitle(task.title);
+  };
+
   const submitCreateTask = async () => {
     if (!taskTarget || !newTaskTitle.trim()) return;
     setSubmitting(true);
@@ -362,6 +406,20 @@ export default function ProjectSprintBoardScreen({
         },
       },
     ]);
+  };
+
+  const submitEditTask = async () => {
+    if (!editingTask || !editTaskTitle.trim()) return;
+    setSubmitting(true);
+    try {
+      await updateTaskTitle(editingTask.taskId, editTaskTitle);
+      setEditingTask(null);
+      setEditTaskTitle('');
+    } catch {
+      Alert.alert('Task not updated', 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const confirmDeleteColumn = (column: Sprintcolumn) => {
@@ -492,6 +550,7 @@ export default function ProjectSprintBoardScreen({
                   column={column}
                   tasks={visibleTasksByStatus[column.columnStatus] || []}
                   onCreateTask={openCreateTask}
+                  onEditTask={openEditTask}
                   onDeleteTask={confirmDeleteTask}
                   onDeleteColumn={confirmDeleteColumn}
                 />
@@ -600,6 +659,31 @@ export default function ProjectSprintBoardScreen({
               {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={modal.primaryText}>Create task</Text>}
             </TouchableOpacity>
             <TouchableOpacity activeOpacity={0.8} onPress={() => setTaskTarget(null)} style={modal.secondaryBtn}>
+              <Text style={modal.secondaryText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={!!editingTask} transparent animationType="slide">
+        <SafeAreaView style={modal.safe}>
+          <View style={modal.sheet}>
+            <View style={modal.handle} />
+            <Text style={modal.title}>Edit task</Text>
+            <Text style={modal.subtitle}>Update task title</Text>
+            <TextInput
+              style={modal.input}
+              value={editTaskTitle}
+              onChangeText={setEditTaskTitle}
+              placeholder="Task title"
+              placeholderTextColor="#94A3B8"
+              editable={!submitting}
+              autoFocus
+            />
+            <TouchableOpacity activeOpacity={0.85} disabled={submitting || !editTaskTitle.trim()} onPress={submitEditTask} style={[modal.primaryBtn, (!editTaskTitle.trim() || submitting) && modal.disabled]}>
+              {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={modal.primaryText}>Update task</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => setEditingTask(null)} style={modal.secondaryBtn}>
               <Text style={modal.secondaryText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -728,7 +812,7 @@ const s = StyleSheet.create({
 });
 
 const columnStyles = StyleSheet.create({
-  card: { backgroundColor: 'rgba(255, 255, 255, 0.88)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.88)', overflow: 'hidden', minHeight: 360, ...shadow },
+  card: { backgroundColor: 'rgba(255, 255, 255, 0.88)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.88)', overflow: 'visible', minHeight: 360, ...shadow },
   accent: { height: 5, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
   headerLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -738,7 +822,7 @@ const columnStyles = StyleSheet.create({
   countPill: { minWidth: 32, height: 28, paddingHorizontal: 9, borderRadius: 999, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   countText: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
   headerDeleteBtn: { width: 28, height: 28, borderRadius: 9, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },
-  body: { paddingHorizontal: 12, paddingBottom: 12, gap: 10 },
+  body: { paddingHorizontal: 12, paddingBottom: 12, gap: 8 },
   emptyState: { minHeight: 128, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 13, fontWeight: '900', color: '#64748B' },
   addTaskBtn: { marginHorizontal: 12, marginBottom: 12, height: 42, borderRadius: 12, borderWidth: 1, borderColor: '#BFDBFE', backgroundColor: '#EFF6FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
@@ -746,13 +830,17 @@ const columnStyles = StyleSheet.create({
 });
 
 const taskStyles = StyleSheet.create({
-  card: { backgroundColor: 'rgba(255, 255, 255, 0.96)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.72)', padding: 13, paddingTop: 14, gap: 10, ...shadow },
-  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 28, paddingRight: 36 },
-  deleteBtn: { position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
+  card: { backgroundColor: 'rgba(255, 255, 255, 0.96)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.72)', padding: 10, paddingTop: 11, gap: 7, ...shadow },
+  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 20, paddingRight: 36 },
+  deleteBtn: { position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 0, zIndex: 10 },
+  taskMenu: { position: 'absolute', top: 44, right: 12, width: 148, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingVertical: 6, zIndex: 20, ...shadow },
+  taskMenuItem: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 14 },
+  taskMenuText: { fontSize: 13, fontWeight: '800', color: '#0F172A' },
+  taskMenuDeleteText: { color: '#DC2626' },
   priority: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
   priorityDot: { width: 6, height: 6, borderRadius: 3 },
   priorityText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
-  title: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 20 },
+  title: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 18 },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   codePill: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, backgroundColor: '#EEF2FF' },
   codeText: { fontSize: 10, fontWeight: '900', color: '#4338CA' },
