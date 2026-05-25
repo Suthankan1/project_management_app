@@ -16,6 +16,7 @@ import MobileBacklogScreen from '../../src/components/backlog/MobileBacklogScree
 import { useProjectSummary } from '../../src/hooks/useProjectSummary';
 import MobilePagesScreen from '../../src/components/pages/MobilePagesScreen';
 import MobileDocsScreen from '../../src/components/docs/MobileDocsScreen';
+import { ChatScreenContent } from '../(project)/[id]/chat';
 
 /** Height of the nav bar = padding top (8) + title row (56) + tab row (48) + padding bottom (12) */
 const NAV_INNER_HEIGHT = 124; // matches ProjectTopNav.tsx exactly
@@ -63,7 +64,12 @@ export default function ProjectRoute() {
     }
   }, []);
 
-  const handleMoreTabChange = useCallback((tab: MoreTab) => {
+  const handleMoreTabChange = useCallback((tab?: MoreTab) => {
+    if (!tab) {
+      setActiveMoreTab(undefined);
+      return;
+    }
+
     setActiveMoreTab(tab);
     setActiveTab(tab); // Make the new dynamic tab visually active
   }, []);
@@ -169,9 +175,10 @@ export default function ProjectRoute() {
         );
       case 'chat':
         return (
-          <View style={{ flex: 1, paddingTop: navHeight }}>
-            <PlaceholderScreen label="Chat" />
-          </View>
+          <ChatScreenContent
+            projectId={String(numericId)}
+            topOffset={navHeight + 16}
+          />
         );
       default:
         return null;
