@@ -34,6 +34,12 @@ public class Task {
     @Column(length = 2000)
     private String description;
 
+    @Column(name = "github_issue_number")
+    private Long githubIssueNumber;
+
+    @Column(name = "github_repo_full_name")
+    private String githubRepoFullName;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = false)
     @JsonIgnore

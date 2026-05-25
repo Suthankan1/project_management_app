@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import Link from 'next/link';
 import StatusSection from './sidebar/StatusSection';
 import AssigneeSection from './sidebar/AssigneeSection';
 import MultiAssigneeSection from './sidebar/MultiAssigneeSection';
@@ -11,7 +12,10 @@ import RecurrenceSection from './sidebar/RecurrenceSection';
 import CustomFieldsSection from './sidebar/CustomFieldsSection';
 import TaskGitHubSection from './sidebar/TaskGitHubSection';
 import SidebarField from './sidebar/SidebarField';
-import { Check, ChevronDown, Plus } from 'lucide-react';
+import { Check, ChevronDown, Link2, Plus } from 'lucide-react';
+import GitHubIssueBadge from '@/components/github/GitHubIssueBadge';
+import GitHubMark from '@/components/github/GitHubMark';
+import type { ProjectGitHubConnection } from '@/services/githubService';
 
 interface MultiAssignee {
   memberId: number;
@@ -35,6 +39,9 @@ interface TaskSidebarProps {
   storyPoint: number;
   milestoneId?: number | null;
   milestoneName?: string | null;
+  githubIssueNumber?: number | null;
+  githubRepoFullName?: string | null;
+  projectGitHubRepo?: ProjectGitHubConnection | null;
   assignees?: MultiAssignee[];
   recurrenceRule?: string | null;
   recurrenceEnd?: string | null;
@@ -61,19 +68,21 @@ interface TaskSidebarProps {
   members?: Array<{ memberId: number; userId: number; name: string }>;
   allLabels?: Array<{ id: number; name: string }>;
   sprints?: Array<{ id: number; name: string }>;
+  onCreateGitHubIssue?: () => void;
 }
 
 const TaskSidebar: React.FC<TaskSidebarProps> = ({
   taskId, projectId, status, assignee, reporter, labels, labelIds = [], priority, sprint, storyPoint,
-  milestoneId, milestoneName, assignees, recurrenceRule, recurrenceEnd, dates, reporterId, sprintId,
+  milestoneId, milestoneName, githubIssueNumber = null, githubRepoFullName = null, projectGitHubRepo = null, assignees, recurrenceRule, recurrenceEnd, dates, reporterId, sprintId,
   onUpdateStatus, onUpdatePriority, onUpdateStoryPoint, onUpdateDueDate, onUpdateMilestone,
   onUpdateRecurrence, onUnassign, onAssigneesChanged, onUpdateReporter, onUpdateSprint, onUpdateLabels, onUpdateStartDate,
-  canEdit = true, canChangeReporter = false, members = [], allLabels = [], sprints = [],
+  canEdit = true, canChangeReporter = false, members = [], allLabels = [], sprints = [], onCreateGitHubIssue,
 }) => {
   const [sections, setSections] = React.useState<Record<string, boolean>>({
     details: true,
     dates: true,
     customFields: true,
+    github: true,
   });
   const [labelMenuOpen, setLabelMenuOpen] = React.useState(false);
   const [selectedLabelIds, setSelectedLabelIds] = React.useState<number[]>(labelIds);
@@ -122,6 +131,10 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
   }, [labelMenuOpen]);
 
   const selectedLabels = allLabels.filter((label) => selectedLabelIds.includes(label.id));
+  const connectedRepoFullName = githubRepoFullName || projectGitHubRepo?.repoFullName || null;
+  const githubIssueUrl = githubIssueNumber && connectedRepoFullName
+    ? `https://github.com/${connectedRepoFullName}/issues/${githubIssueNumber}`
+    : null;
 
   return (
     <div className="w-full md:w-80 bg-[#F7F8FA] border-t md:border-t-0 md:border-l border-[#EAECF0] flex-shrink-0 overflow-visible md:overflow-y-auto scrollbar-thin min-h-0">
@@ -275,6 +288,55 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
           {sections.customFields && <div className="p-4"><CustomFieldsSection taskId={taskId} projectId={projectId} readOnly={!canEdit} /></div>}
         </div>
       )}
+      <div className="border border-[#E5E7EB] rounded-xl bg-white shadow-sm overflow-hidden">
+        <button onClick={() => toggleSection('github')} className="w-full px-4 py-2.5 border-b border-[#F2F4F7] text-[10px] font-bold text-[#6A7282] uppercase tracking-wider flex items-center justify-between">
+          GitHub <ChevronDown size={14} className={`transition-transform ${sections.github ? '' : '-rotate-90'}`} />
+        </button>
+        {sections.github && (
+          <div className="p-4 space-y-3">
+            {githubIssueNumber ? (
+              <div className="space-y-2">
+                <GitHubIssueBadge
+                  issueNumber={githubIssueNumber}
+                  repoFullName={connectedRepoFullName || 'github.com'}
+                  size="sm"
+                  linkToGitHub={Boolean(githubIssueUrl)}
+                />
+                {githubIssueUrl && (
+                  <Link
+                    href={githubIssueUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-sm font-semibold text-[#155DFC] hover:underline"
+                  >
+                    <Link2 size={12} />
+                    View on GitHub
+                  </Link>
+                )}
+              </div>
+            ) : projectGitHubRepo ? (
+              <button
+                type="button"
+                onClick={onCreateGitHubIssue}
+                className="inline-flex items-center gap-2 rounded-xl border border-[#D0D5DD] bg-white px-3 py-2 text-sm font-semibold text-[#344054] hover:bg-[#F9FAFB] transition-colors"
+              >
+                <GitHubMark size={14} className="text-[#111827]" />
+                Create GitHub Issue
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-[#475467]">Connect a GitHub repo first</p>
+                {projectId != null && (
+                  <Link href={`/github/${projectId}`} className="flex items-center gap-1 text-sm font-semibold text-[#155DFC] hover:underline">
+                    <Link2 size={12} />
+                    Go to GitHub tab
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       <div className="text-[10px] text-[#9CA3AF] flex justify-between px-1 pb-2">
         <button className="hover:text-[#374151] transition-colors">Configure fields</button>
         <button className="hover:text-[#374151] transition-colors">Plain Text</button>

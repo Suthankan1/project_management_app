@@ -1,9 +1,14 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, Image } from 'react-native';
+import React, { useEffect, useMemo } from 'react';
+import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { Colors } from '@/src/constants/colors';
 import { avatarColor } from '@/src/hooks/chat/chatUtils';
-import { LinearGradient } from 'expo-linear-gradient';
 
 interface ChatHeaderProps {
   selectedRoom: { name?: string|null; topic?: string|null } | null;
@@ -17,6 +22,9 @@ interface ChatHeaderProps {
   onShowSidebar: () => void;
 }
 
+const HEADER_HEIGHT = Platform.select({ ios: 56, android: 52 });
+const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
+
 export function ChatHeader({
   selectedRoom,
   selectedUser,
@@ -24,112 +32,172 @@ export function ChatHeader({
   onlineUsers,
   isConnected,
   phaseDEnabled,
-  showSearch,
   onToggleSearch,
   onShowSidebar,
 }: ChatHeaderProps) {
-  const title = selectedRoom ? `# ${selectedRoom.name}` : selectedUser || 'Team Chat';
-  const subtitle = selectedRoom
-    ? (selectedRoom.topic || 'No topic set')
-    : selectedUser
-      ? (onlineUsers.includes(selectedUser.toLowerCase()) ? 'Online' : 'Offline')
-      : 'All team members';
+  const avatarScale = useSharedValue(1);
+  const selectionKey = selectedRoom?.name ?? selectedUser ?? 'team';
+  const isRoom = !!selectedRoom;
+  const isDm = !!selectedUser && !selectedRoom;
+  const normalizedOnlineUsers = useMemo(
+    () => new Set(onlineUsers.map(user => user.trim().toLowerCase())),
+    [onlineUsers],
+  );
+  const isUserOnline = !!selectedUser && normalizedOnlineUsers.has(selectedUser.trim().toLowerCase());
 
-  const avatarName = selectedRoom ? selectedRoom.name : selectedUser || 'T';
+  useEffect(() => {
+    avatarScale.value = 0.9;
+    avatarScale.value = withSpring(1, { damping: 12, stiffness: 180 });
+  }, [avatarScale, selectionKey]);
+
+  const avatarAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: avatarScale.value }],
+  }));
+
+  const title = isRoom ? `# ${selectedRoom?.name ?? 'Room'}` : selectedUser || 'Team Chat';
+  const subtitle = isRoom
+    ? selectedRoom?.topic || 'No topic set'
+    : selectedUser
+      ? isUserOnline ? 'Online' : 'Offline'
+      : isConnected && onlineUsers.length > 0
+        ? `${onlineUsers.length} ${onlineUsers.length === 1 ? 'member' : 'members'} online`
+        : 'Team workspace';
+  const subtitleStyle = selectedUser && isUserOnline
+    ? styles.subtitleOnline
+    : selectedUser
+      ? styles.subtitleMuted
+      : styles.subtitle;
+
+  const avatarName = selectedRoom?.name ?? selectedUser ?? 'Team';
   const profilePic = selectedUser ? userProfilePics[selectedUser] : null;
+  const dotColor = isDm
+    ? isUserOnline ? Colors.onlineGreen : Colors.borderDefault
+    : isConnected ? Colors.onlineGreen : Colors.borderDefault;
 
   return (
     <View style={styles.header}>
-      <TouchableOpacity onPress={onShowSidebar} style={styles.backButton} hitSlop={{top:10,bottom:10,left:10,right:10}}>
+      <TouchableOpacity onPress={onShowSidebar} style={styles.backButton} hitSlop={HIT_SLOP}>
         <Ionicons name="chevron-back" size={24} color={Colors.primary} />
       </TouchableOpacity>
 
-      <View style={styles.avatarContainer}>
-        {profilePic ? (
-          <Image source={{ uri: profilePic }} style={styles.avatar} />
-        ) : (
-          <LinearGradient
-            colors={[avatarColor(avatarName || ''), avatarColor((avatarName || '') + '2')]}
-            style={styles.avatar}
-          >
-            <Text style={styles.avatarText}>{avatarName?.charAt(0).toUpperCase()}</Text>
-          </LinearGradient>
+      <View style={styles.center}>
+        <Animated.View style={[styles.avatarWrap, avatarAnimatedStyle]}>
+          {isDm && profilePic ? (
+            <Image source={{ uri: profilePic }} style={styles.avatar} />
+          ) : (
+            <LinearGradient
+              colors={[avatarColor(avatarName), avatarColor(`${avatarName}2`)]}
+              style={styles.avatar}
+            >
+              <Text style={styles.avatarText}>{isRoom ? '#' : avatarName.charAt(0).toUpperCase()}</Text>
+            </LinearGradient>
+          )}
+          <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
+        </Animated.View>
+
+        <View style={styles.textColumn}>
+          <Text style={styles.title} numberOfLines={1}>{title}</Text>
+          <Text style={subtitleStyle} numberOfLines={1}>{subtitle}</Text>
+        </View>
+      </View>
+
+      <View style={styles.actions}>
+        {phaseDEnabled && (
+          <TouchableOpacity onPress={onToggleSearch} style={styles.iconButton} activeOpacity={0.75}>
+            <Ionicons name="search-outline" size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
         )}
-        <View style={[styles.statusDot, { backgroundColor: isConnected ? Colors.onlineGreen : '#F59E0B' }]} />
-      </View>
-
-      <View style={styles.titleContainer}>
-        <Text style={styles.title} numberOfLines={1}>{title}</Text>
-        <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
-      </View>
-
-      {phaseDEnabled && (
-        <TouchableOpacity onPress={onToggleSearch} style={styles.iconButton}>
-          <Ionicons name={showSearch ? "close" : "search"} size={22} color={Colors.textSecondary} />
+        <TouchableOpacity style={styles.iconButton} activeOpacity={0.75}>
+          <Ionicons name="ellipsis-vertical" size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
-      )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    height: Platform.select({ ios: 56, android: 52 }),
+    height: HEADER_HEIGHT,
     backgroundColor: Colors.chatHeaderBg,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    paddingLeft: 4,
+    paddingRight: 8,
     borderBottomWidth: 1,
     borderBottomColor: Colors.chatDivider,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
+    width: 40,
+    height: 40,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  avatarContainer: {
+  center: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 4,
+    minWidth: 0,
+  },
+  avatarWrap: {
+    width: 38,
+    height: 38,
     position: 'relative',
-    marginRight: 10,
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarText: {
     color: Colors.white,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '800',
   },
   statusDot: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
     borderWidth: 2,
     borderColor: Colors.chatHeaderBg,
+    bottom: -1,
+    right: -1,
   },
-  titleContainer: {
+  textColumn: {
     flex: 1,
+    marginLeft: 10,
+    minWidth: 0,
   },
   title: {
-    fontSize: 15,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
     color: Colors.textPrimary,
   },
   subtitle: {
     fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  subtitleOnline: {
+    fontSize: 12,
+    color: Colors.onlineGreen,
+  },
+  subtitleMuted: {
+    fontSize: 12,
     color: Colors.textMuted,
   },
-  iconButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
+  actions: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+  },
+  iconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

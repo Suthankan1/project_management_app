@@ -51,7 +51,7 @@ export function CurrentSprintCard({ tasks, sprints }: { tasks: Task[]; sprints: 
           <Polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
         </Svg>
         <Text style={st.emptyText}>No active sprint</Text>
-        <Text style={st.emptyHint}>Start a sprint to track your team's progress</Text>
+        <Text style={st.emptyHint}>{"Start a sprint to track your team's progress"}</Text>
       </View>
     );
   }

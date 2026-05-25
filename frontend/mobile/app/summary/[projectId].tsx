@@ -10,6 +10,7 @@ import ProjectTopNav, {
 } from '../../src/components/navigation/ProjectTopNav';
 import SummaryScreen  from '../../src/components/summary/SummaryScreen';
 import ReportScreen   from '../../src/components/report/ReportScreen';
+import { ChatTabContent } from '../../src/components/chat/ChatTabContent';
 import ProjectBoardScreen from '../../src/components/board/ProjectBoardScreen';
 import ProjectSprintBoardScreen from '../../src/components/board/ProjectSprintBoardScreen';
 import MobileBacklogScreen from '../../src/components/backlog/MobileBacklogScreen';
@@ -58,7 +59,7 @@ export default function ProjectRoute() {
   const handleTabChange = useCallback((tab: ProjectTab | MoreTab) => {
     setActiveTab(tab);
     // Clear more-tab when switching to a main tab
-    if (tab !== 'more' && !['calendar', 'burndown', 'milestone', 'members', 'pages', 'docs', 'list', 'report'].includes(tab as string)) {
+    if (tab !== 'more' && !['timeline', 'calendar', 'burndown', 'milestone', 'members', 'pages', 'docs', 'list', 'report'].includes(tab as string)) {
       setLastMainTab(tab as ProjectTab);
       setActiveMoreTab(undefined);
     }
@@ -86,6 +87,15 @@ export default function ProjectRoute() {
   const renderContent = () => {
     // If a "More" sub-tab is active, render it
     if (activeMoreTab) {
+      if (activeMoreTab === 'timeline') {
+        return (
+          <MobileTimelineScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight + 16}
+          />
+        );
+      }
       if (activeMoreTab === 'report') {
         return (
           <ReportScreen
@@ -114,6 +124,7 @@ export default function ProjectRoute() {
         );
       }
       const labels: Record<MoreTab, string> = {
+        timeline:  'Timeline',
         calendar:  'Calendar',
         burndown:  'Burndown Chart',
         milestone: 'Milestones',
@@ -177,9 +188,7 @@ export default function ProjectRoute() {
         );
       case 'chat':
         return (
-          <View style={{ flex: 1, paddingTop: navHeight }}>
-            <PlaceholderScreen label="Chat" />
-          </View>
+          <ChatTabContent projectId={String(numericId)} navHeight={navHeight} />
         );
       default:
         return null;

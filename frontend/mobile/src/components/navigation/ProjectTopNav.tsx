@@ -1,7 +1,7 @@
 import React, { type ComponentProps, useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Platform, Animated, TouchableWithoutFeedback, useWindowDimensions,
+  Platform, Animated, Pressable, useWindowDimensions,
 } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
@@ -22,9 +22,9 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-export type ProjectTab = 'summary' | 'backlog' | 'board' | 'timeline' | 'more' | string;
+export type ProjectTab = 'summary' | 'backlog' | 'board' | 'chat' | 'more' | string;
 export type MoreTab =
-  | 'calendar' | 'burndown' | 'milestone'
+  | 'timeline' | 'calendar' | 'burndown' | 'milestone'
   | 'members' | 'pages' | 'docs' | 'list' | 'report';
 
 type PremiumIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -33,7 +33,7 @@ const TABS: { key: ProjectTab; label: string }[] = [
   { key: 'summary', label: 'Summary' },
   { key: 'backlog', label: 'Backlog' },
   { key: 'board', label: 'Board' },
-  { key: 'timeline', label: 'Timeline' },
+  { key: 'chat', label: 'Chat' },
   { key: 'more', label: 'More' },
 ];
 
@@ -46,6 +46,7 @@ type MoreItem = {
 };
 
 const MORE_ITEMS: MoreItem[] = [
+  { key: 'timeline', label: 'Timeline', icon: 'timeline-clock-outline', tint: '#155DFC', tintSoft: '#E8F0FF' },
   { key: 'calendar', label: 'Calendar', icon: 'calendar-month-outline', tint: '#0F9F6E', tintSoft: '#E7F8F1' },
   { key: 'burndown', label: 'Burndown', icon: 'chart-line-variant', tint: '#E11D48', tintSoft: '#FFF0F4' },
   { key: 'milestone', label: 'Milestone', icon: 'flag-checkered', tint: '#7C3AED', tintSoft: '#F2ECFF' },
@@ -336,14 +337,15 @@ export default function ProjectTopNav({
   return (
     <>
       {/* Animated Frosted Glass Background Overlay */}
-      <TouchableWithoutFeedback onPress={() => setMoreOpen(false)}>
-        <Animated.View
-          pointerEvents={moreOpen ? 'auto' : 'none'}
-          style={[StyleSheet.absoluteFill, { zIndex: 90, opacity: dropdownOp }]}
-        >
+      <Pressable
+        onPress={() => setMoreOpen(false)}
+        pointerEvents={moreOpen ? 'auto' : 'none'}
+        style={[StyleSheet.absoluteFill, { zIndex: 90 }]}
+      >
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: dropdownOp }]}>
           <BlurView intensity={50} tint="dark" experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
         </Animated.View>
-      </TouchableWithoutFeedback>
+      </Pressable>
 
       {/* The Main Top Navigation Bar Expanding Downwards */}
       <Animated.View style={[
