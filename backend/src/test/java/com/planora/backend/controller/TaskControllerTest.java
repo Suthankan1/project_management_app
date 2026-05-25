@@ -15,7 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -37,22 +37,22 @@ class TaskControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockitoBean
+        @MockBean
     private TaskService service;
 
-    @MockitoBean
+        @MockBean
     private TaskActivityService activityService;
 
-    @MockitoBean
+        @MockBean
     private TaskTemplateService templateService;
 
-    @MockitoBean
+        @MockBean
     private SimpMessagingTemplate messagingTemplate;
 
-    @MockitoBean
+        @MockBean
     private JWTService jwtService;
 
-    @MockitoBean
+        @MockBean
     private UserDetailsService userDetailsService;
 
     @Autowired

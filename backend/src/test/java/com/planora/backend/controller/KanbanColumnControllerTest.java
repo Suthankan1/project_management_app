@@ -11,7 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -39,14 +39,14 @@ class KanbanColumnControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockitoBean
+        @MockBean
     private KanbanColumnService kanbanColumnService;
 
-    @MockitoBean
+        @MockBean
     private JWTService jwtService;
 
-    @MockitoBean
-    private UserDetailsService userDetailsService;
+        @MockBean
+        private UserDetailsService userDetailsService;
 
     @Autowired
     private ObjectMapper objectMapper;

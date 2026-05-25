@@ -6,7 +6,7 @@ import com.planora.backend.controller.UserController;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -26,16 +26,16 @@ class SecurityConfigTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockitoBean
+    @MockBean
     private JWTService jwtService;
 
-    @MockitoBean
+    @MockBean
     private UserDetailsService userDetailsService;
 
-    @MockitoBean
+    @MockBean
     private JwtFilter jwtFilter;
 
-    @MockitoBean
+    @MockBean
     private UserService userService;
 
     @Test
