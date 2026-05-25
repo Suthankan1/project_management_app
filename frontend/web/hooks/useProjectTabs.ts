@@ -41,6 +41,7 @@ export function useProjectTabs(projectId: string | null, isAgile: boolean) {
     if (pathname.startsWith('/milestones'))return 'milestones';
     if (pathname.startsWith('/workload'))  return 'workload';
     if (pathname.startsWith('/project/') && pathname.includes('/chat')) return 'chats';
+    if (pathname.startsWith('/project/') && pathname.includes('/settings')) return 'settings';
     if (pathname.startsWith('/members'))  return 'members';
     if (pathname.startsWith('/pages') || pathname.startsWith('/folders')) return 'dms';
     if (pathname.startsWith('/report'))   return 'report';
@@ -77,6 +78,7 @@ export function useProjectTabs(projectId: string | null, isAgile: boolean) {
     if (pathname.startsWith('/dashboard/notifications')) return false;
     if (pathname.startsWith('/inbox')) return false;
     if (pathname.startsWith('/project/') && pathname.includes('/chat')) return true;
+    if (pathname.startsWith('/project/') && pathname.includes('/settings')) return true;
 
     const hasProjectContext = Boolean(projectId);
     const projectScopedPaths = [

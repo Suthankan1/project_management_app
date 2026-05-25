@@ -123,8 +123,8 @@ public class ProjectController {
     public ResponseEntity<Void> deleteProject(
             @PathVariable Long projectId,
             @PathVariable Long teamId,
-            @AuthenticationPrincipal(expression = "userId") Long userId) {
-        projectService.deleteProject(projectId, teamId, userId);
+            @AuthenticationPrincipal com.planora.backend.model.UserPrincipal principal) {
+        projectService.deleteProject(projectId, teamId, principal.getUserId());
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 }

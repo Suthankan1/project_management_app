@@ -25,6 +25,24 @@ export interface DashboardItem {
 }
 
 export type TabKey = 'assigned-to-me' | 'worked-on' | 'viewed' | 'favorites' | 'boards';
+export type TabItemsByKey = Record<TabKey, DashboardItem[]>;
+export type TabLoadingByKey = Record<TabKey, boolean>;
+
+const EMPTY_TAB_ITEMS: TabItemsByKey = {
+  'assigned-to-me': [],
+  'worked-on': [],
+  viewed: [],
+  favorites: [],
+  boards: [],
+};
+
+const EMPTY_TAB_LOADING: TabLoadingByKey = {
+  'assigned-to-me': false,
+  'worked-on': false,
+  viewed: false,
+  favorites: false,
+  boards: false,
+};
 
 // ─── Mappers ─────────────────────────────────────────────────────────────────
 
@@ -114,9 +132,11 @@ interface UseDashboardReturn {
   user: { username?: string; email?: string } | null;
   projects: { recent: ProjectSummary[]; favorites: ProjectSummary[] };
   tabItems: DashboardItem[];
+  tabItemsByTab: TabItemsByKey;
   assignedCount: number;
   loadingProjects: boolean;
   loadingTab: boolean;
+  loadingTabs: TabLoadingByKey;
   activeTab: TabKey;
   setActiveTab: (tab: TabKey) => void;
   refreshProjects: () => void;
@@ -132,8 +152,8 @@ export function useDashboard(): UseDashboardReturn {
   const [projects, setProjects]               = useState<{ recent: ProjectSummary[]; favorites: ProjectSummary[] }>({ recent: [], favorites: [] });
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [activeTab, setActiveTab]             = useState<TabKey>('assigned-to-me');
-  const [tabItems, setTabItems]               = useState<DashboardItem[]>([]);
-  const [loadingTab, setLoadingTab]           = useState(false);
+  const [tabItemsByTab, setTabItemsByTab]     = useState<TabItemsByKey>(EMPTY_TAB_ITEMS);
+  const [loadingTabs, setLoadingTabs]         = useState<TabLoadingByKey>(EMPTY_TAB_LOADING);
   const [assignedCount, setAssignedCount]     = useState(0);
 
   // ── Check auth ──────────────────────────────────────────────────────────────
@@ -186,29 +206,36 @@ export function useDashboard(): UseDashboardReturn {
 
   // ── Fetch tab data ───────────────────────────────────────────────────────────
   const fetchTab = useCallback(async (tab: TabKey) => {
-    setLoadingTab(true);
+    setLoadingTabs(prev => ({ ...prev, [tab]: true }));
     try {
       const items = await fetchTabData(tab);
-      setTabItems(items);
+      setTabItemsByTab(prev => ({ ...prev, [tab]: items }));
     } catch (e) {
       console.error('Dashboard fetchTab error', e);
-      setTabItems([]);
+      setTabItemsByTab(prev => ({ ...prev, [tab]: [] }));
     } finally {
-      setLoadingTab(false);
+      setLoadingTabs(prev => ({ ...prev, [tab]: false }));
     }
   }, []);
 
   useEffect(() => { void fetchTab(activeTab); }, [activeTab, fetchTab]);
+
+  // Preload the default visible dashboard cards so each table owns its data.
+  useEffect(() => {
+    void fetchTab('worked-on');
+    void fetchTab('favorites');
+  }, [fetchTab]);
 
   // ── Toggle favorite ──────────────────────────────────────────────────────────
   const toggleFavorite = useCallback(async (id: number) => {
     try {
       await api.post(`/api/projects/${id}/favorite`);
       void fetchProjects();
+      void fetchTab('favorites');
     } catch (e) {
       console.error('toggleFavorite error', e);
     }
-  }, [fetchProjects]);
+  }, [fetchProjects, fetchTab]);
 
   // ── Record project access ────────────────────────────────────────────────────
   const recordAccess = useCallback(async (id: number) => {
@@ -218,14 +245,18 @@ export function useDashboard(): UseDashboardReturn {
   return {
     user,
     projects,
-    tabItems,
+    tabItems: tabItemsByTab[activeTab],
+    tabItemsByTab,
     assignedCount,
     loadingProjects,
-    loadingTab,
+    loadingTab: loadingTabs[activeTab],
+    loadingTabs,
     activeTab,
     setActiveTab,
     refreshProjects: fetchProjects,
-    refreshTab: () => fetchTab(activeTab),
+    refreshTab: () => {
+      (Object.keys(EMPTY_TAB_ITEMS) as TabKey[]).forEach(tab => { void fetchTab(tab); });
+    },
     toggleFavorite,
     recordAccess,
   };

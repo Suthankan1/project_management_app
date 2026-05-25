@@ -48,7 +48,6 @@ export default function SpacesPage() {
         }
     };
 
-    // Set initial filter/sort from URL param
     useEffect(() => {
         const filter = searchParams.get('filter');
         if (filter === 'favorites') {
@@ -62,9 +61,7 @@ export default function SpacesPage() {
 
     useEffect(() => {
         const savedView = localStorage.getItem('spaces-view') ?? 'grid';
-        if (savedView === 'list' || savedView === 'grid') {
-            setViewMode(savedView);
-        }
+        if (savedView === 'list' || savedView === 'grid') setViewMode(savedView);
     }, []);
 
     useEffect(() => {
@@ -75,147 +72,204 @@ export default function SpacesPage() {
 
     const filteredAndSortedProjects = [...projects]
         .filter((project) => {
-            const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            const matchesSearch =
+                project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 (project.projectKey && project.projectKey.toLowerCase().includes(searchQuery.toLowerCase()));
-
-            if (filterBy === 'starred') {
-                return matchesSearch && Boolean(project.isFavorite);
-            }
+            if (filterBy === 'starred') return matchesSearch && Boolean(project.isFavorite);
             return matchesSearch;
         })
         .sort((a, b) => {
             if (filterBy === 'starred') {
-                const aStarredAt = a.favoriteMarkedAt ? new Date(a.favoriteMarkedAt).getTime() : 0;
-                const bStarredAt = b.favoriteMarkedAt ? new Date(b.favoriteMarkedAt).getTime() : 0;
-                if (aStarredAt !== bStarredAt) {
-                    return bStarredAt - aStarredAt;
-                }
-                return a.name.localeCompare(b.name);
+                const aAt = a.favoriteMarkedAt ? new Date(a.favoriteMarkedAt).getTime() : 0;
+                const bAt = b.favoriteMarkedAt ? new Date(b.favoriteMarkedAt).getTime() : 0;
+                return aAt !== bAt ? bAt - aAt : a.name.localeCompare(b.name);
             }
-
             if (sortBy === 'favorites-first') {
-                const aIsStarred = Boolean(a.isFavorite);
-                const bIsStarred = Boolean(b.isFavorite);
-                return (aIsStarred === bIsStarred)
-                    ? a.name.localeCompare(b.name)
-                    : bIsStarred ? 1 : -1;
+                const aS = Boolean(a.isFavorite), bS = Boolean(b.isFavorite);
+                return aS === bS ? a.name.localeCompare(b.name) : bS ? 1 : -1;
             }
-
-            if (sortBy === 'alphabetical') {
-                return a.name.localeCompare(b.name);
-            }
-
-            const aRecent = a.lastAccessedAt ? new Date(a.lastAccessedAt).getTime() : 0;
-            const bRecent = b.lastAccessedAt ? new Date(b.lastAccessedAt).getTime() : 0;
-            return bRecent - aRecent;
+            if (sortBy === 'alphabetical') return a.name.localeCompare(b.name);
+            const aR = a.lastAccessedAt ? new Date(a.lastAccessedAt).getTime() : 0;
+            const bR = b.lastAccessedAt ? new Date(b.lastAccessedAt).getTime() : 0;
+            return bR - aR;
         });
 
     return (
-        <div className="mobile-page-padding max-w-[1200px] mx-auto pb-6">
-            {/* Mobile Top Header */}
-            <div className="flex items-center gap-3 py-4 md:hidden">
+        <div className="w-full max-w-[1200px] mx-auto px-4 sm:px-6 pt-2 sm:pt-6 pb-10">
+
+            {/* ── Mobile top bar ──────────────────────────────────────────── */}
+            <div className="flex items-center gap-2 py-3 md:hidden">
                 <button
                     onClick={() => window.dispatchEvent(new CustomEvent('planora:sidebar:toggle'))}
-                    className="p-2 -ml-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors border border-slate-100"
+                    className="p-2 -ml-1 rounded-xl text-[#6B6F7B] hover:bg-[#F0F0F5] transition-colors"
                     aria-label="Toggle Sidebar"
                 >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="3" y1="12" x2="21" y2="12" />
-                        <line x1="3" y1="6" x2="21" y2="6" />
-                        <line x1="3" y1="18" x2="21" y2="18" />
+                        <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
                     </svg>
                 </button>
-                <div className="font-outfit text-xl font-extrabold tracking-tight text-[#101828] flex items-center gap-2">
-                    <span className="w-2 h-5 bg-blue-600 rounded-full"></span>
+                <div className="flex-1 font-outfit text-[17px] font-extrabold tracking-tight text-[#1A1A2E] flex items-center gap-2">
+                    <span className="w-1.5 h-4 bg-[#155DFC] rounded-full" />
                     PLANORA
                 </div>
-            </div>
-            {/* Header */}
-            <div className="flex flex-col gap-1 mb-5">
-                <div className="flex items-center gap-2 text-[13px] text-[#4A5565]">
-                    <Link href="/dashboard" className="hover:text-[#0052CC]">Dashboard</Link>
-                    <span>/</span>
-                    <span className="font-medium text-[#101828]">Spaces</span>
-                </div>
-                <h1 className="font-outfit text-2xl sm:text-[32px] font-bold text-[#101828]">All spaces</h1>
+                <Link
+                    href="/createProject"
+                    className="flex items-center justify-center w-8 h-8 rounded-xl text-white"
+                    style={{ background: '#155DFC' }}
+                    aria-label="Create project"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                </Link>
             </div>
 
-            {/* Filters Bar */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-[#E5E7EB] mb-6">
-                {/* Search */}
-                <div className="relative w-full sm:w-[320px]">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#99A1AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                    </div>
-                    <input
-                        type="text"
-                        placeholder="Search spaces"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="block w-full pl-9 pr-3 py-2 border border-[#D1D5DC] rounded-xl leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-arimo transition-all"
-                    />
+            {/* ── Desktop header ──────────────────────────────────────────── */}
+            <div className="hidden sm:flex items-center justify-between mb-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-[#1A1A2E] leading-tight">All Projects</h1>
+                    <p className="text-[#6B6F7B] text-sm mt-0.5">
+                        {projects.length > 0
+                            ? `${projects.length} project${projects.length !== 1 ? 's' : ''}`
+                            : 'Create and manage your projects'}
+                    </p>
                 </div>
+            </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto min-w-0">
-                    {/* Filter tabs */}
-                    <div className="flex items-center gap-1.5 bg-[#F4F5F7] p-1 rounded-xl overflow-x-auto no-scrollbar w-full sm:w-auto min-w-0">
-                        {(['all', 'starred'] as const).map((tab) => (
+            {/* ── Mobile page title (compact) ─────────────────────────────── */}
+            <div className="md:hidden mb-3">
+                <h1 className="text-xl font-bold text-[#1A1A2E] leading-tight">All Projects</h1>
+                <p className="text-[#6B6F7B] text-xs mt-0.5">
+                    {projects.length > 0
+                        ? `${projects.length} project${projects.length !== 1 ? 's' : ''}`
+                        : 'Create and manage your projects'}
+                </p>
+            </div>
+
+            {/* ── View tabs ───────────────────────────────────────────────── */}
+            <div className="flex gap-1 mb-4 bg-[#F0F0F5] p-1 rounded-xl w-full sm:w-fit">
+                <span className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 rounded-lg text-[13px] font-semibold bg-white text-[#155DFC] shadow-sm cursor-default">
+                    All Projects
+                </span>
+                <Link
+                    href="/portfolios"
+                    className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 rounded-lg text-[13px] font-medium text-[#6B6F7B] hover:text-[#1A1A2E] transition-colors"
+                >
+                    Portfolios
+                </Link>
+            </div>
+
+            {/* ── Search (both) ───────────────────────────────────────────── */}
+            <div className="relative mb-3">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+                </div>
+                <input
+                    type="text"
+                    placeholder="Search projects"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="block w-full pl-9 pr-3 py-2.5 border border-[#E8E8ED] rounded-xl bg-white placeholder-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] text-sm transition-all text-[#1A1A2E]"
+                />
+            </div>
+
+            {/* ── Mobile filter strip (single scrollable row) ─────────────── */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-3 sm:hidden">
+                {(['all', 'starred'] as const).map(tab => (
+                    <button
+                        key={tab}
+                        onClick={() => setFilterBy(tab)}
+                        className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                            filterBy === tab
+                                ? 'bg-[#155DFC] text-white'
+                                : 'bg-[#F0F0F5] text-[#6B6F7B]'
+                        }`}
+                    >
+                        {tab === 'all' ? 'All' : '⭐ Starred'}
+                    </button>
+                ))}
+                <div className="w-px h-4 bg-[#E8E8ED] flex-shrink-0" />
+                {([
+                    { key: 'recent', label: 'Recent' },
+                    { key: 'alphabetical', label: 'A–Z' },
+                    { key: 'favorites-first', label: 'Favorites' },
+                ] as const).map(tab => (
+                    <button
+                        key={tab.key}
+                        onClick={() => setSortBy(tab.key)}
+                        className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                            sortBy === tab.key
+                                ? 'bg-[#155DFC] text-white'
+                                : 'bg-[#F0F0F5] text-[#6B6F7B]'
+                        }`}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+                <div className="w-px h-4 bg-[#E8E8ED] flex-shrink-0" />
+                <div className="flex-shrink-0 flex items-center bg-[#F0F0F5] p-0.5 rounded-lg">
+                    <button
+                        onClick={() => setAndPersistView('grid')}
+                        className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white text-[#155DFC] shadow-sm' : 'text-[#6B6F7B]'}`}
+                        aria-label="Grid view"
+                    >
+                        <LayoutGrid size={14} />
+                    </button>
+                    <button
+                        onClick={() => setAndPersistView('list')}
+                        className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white text-[#155DFC] shadow-sm' : 'text-[#6B6F7B]'}`}
+                        aria-label="List view"
+                    >
+                        <List size={14} />
+                    </button>
+                </div>
+            </div>
+
+            {/* ── Desktop filter bar ──────────────────────────────────────── */}
+            <div className="hidden sm:flex justify-between items-center gap-3 pb-4 border-b border-[#E8E8ED] mb-6">
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 bg-[#F0F0F5] p-1 rounded-xl">
+                        {(['all', 'starred'] as const).map(tab => (
                             <button
                                 key={tab}
                                 onClick={() => setFilterBy(tab)}
-                                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-                                    filterBy === tab
-                                        ? 'bg-white text-[#0052CC] shadow-sm'
-                                        : 'text-[#4A5565] hover:text-[#101828]'
+                                className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
+                                    filterBy === tab ? 'bg-white text-[#155DFC] shadow-sm' : 'text-[#6B6F7B] hover:text-[#1A1A2E]'
                                 }`}
                             >
                                 {tab === 'all' ? 'All' : 'Starred'}
                             </button>
                         ))}
                     </div>
-
-                    {/* Sort tabs */}
-                    <div className="flex items-center gap-1.5 bg-[#F4F5F7] p-1 rounded-xl overflow-x-auto no-scrollbar w-full sm:w-auto min-w-0">
+                    <div className="flex items-center gap-1 bg-[#F0F0F5] p-1 rounded-xl">
                         {([
                             { key: 'recent', label: 'Recent' },
                             { key: 'alphabetical', label: 'A-Z' },
-                            { key: 'favorites-first', label: 'Favorites first' }
-                        ] as const).map((tab) => (
+                            { key: 'favorites-first', label: 'Favorites first' },
+                        ] as const).map(tab => (
                             <button
                                 key={tab.key}
                                 onClick={() => setSortBy(tab.key)}
-                                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-                                    sortBy === tab.key
-                                        ? 'bg-white text-[#0052CC] shadow-sm'
-                                        : 'text-[#4A5565] hover:text-[#101828]'
+                                className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
+                                    sortBy === tab.key ? 'bg-white text-[#155DFC] shadow-sm' : 'text-[#6B6F7B] hover:text-[#1A1A2E]'
                                 }`}
                             >
                                 {tab.label}
                             </button>
                         ))}
                     </div>
-
-                    {/* View toggle */}
-                    <div className="self-end sm:self-auto ml-0 sm:ml-0 flex items-center bg-[#F4F5F7] p-1 rounded-xl">
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center bg-[#F0F0F5] p-1 rounded-xl">
                         <button
                             onClick={() => setAndPersistView('grid')}
-                            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-                                viewMode === 'grid'
-                                    ? 'bg-white text-[#0052CC] shadow-sm'
-                                    : 'text-[#4A5565] hover:text-[#101828]'
-                            }`}
-                            aria-label="Switch to grid view"
+                            className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${viewMode === 'grid' ? 'bg-white text-[#155DFC] shadow-sm' : 'text-[#6B6F7B] hover:text-[#1A1A2E]'}`}
+                            aria-label="Grid view"
                         >
                             <LayoutGrid size={16} />
                         </button>
                         <button
                             onClick={() => setAndPersistView('list')}
-                            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-                                viewMode === 'list'
-                                    ? 'bg-white text-[#0052CC] shadow-sm'
-                                    : 'text-[#4A5565] hover:text-[#101828]'
-                            }`}
-                            aria-label="Switch to list view"
+                            className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${viewMode === 'list' ? 'bg-white text-[#155DFC] shadow-sm' : 'text-[#6B6F7B] hover:text-[#1A1A2E]'}`}
+                            aria-label="List view"
                         >
                             <List size={16} />
                         </button>
@@ -223,16 +277,16 @@ export default function SpacesPage() {
                 </div>
             </div>
 
-            {/* Projects */}
+            {/* ── Projects ────────────────────────────────────────────────── */}
             {loading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                    {[1, 2, 3, 4, 5, 6].map(i => (
                         <div key={i} className="skeleton h-[160px] rounded-2xl" />
                     ))}
                 </div>
             ) : filteredAndSortedProjects.length > 0 ? (
                 viewMode === 'grid' ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 min-w-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                         {filteredAndSortedProjects.map((project) => (
                             <RecentProjectCard
                                 key={project.id}
@@ -240,9 +294,7 @@ export default function SpacesPage() {
                                 name={project.name}
                                 projectKey={project.projectKey}
                                 isFavorite={project.isFavorite}
-                                onFavoriteToggle={() => {
-                                    void fetchProjects();
-                                }}
+                                onFavoriteToggle={() => void fetchProjects()}
                                 type={project.type === 'AGILE' ? 'Agile Scrum' : 'Kanban'}
                                 boardCount={1}
                                 width="w-full min-w-0 max-w-none"
@@ -250,33 +302,33 @@ export default function SpacesPage() {
                         ))}
                     </div>
                 ) : (
-                    <div className="overflow-x-auto rounded-xl border border-[#E5E7EB] bg-white">
-                        <table className="min-w-full text-sm font-arimo">
-                            <thead className="bg-[#F8FAFC] text-[#4A5565]">
+                    <div className="overflow-x-auto rounded-xl border border-[#E8E8ED] bg-white">
+                        <table className="min-w-full text-sm">
+                            <thead className="bg-[#F7F8FA] text-[#6B6F7B]">
                                 <tr>
                                     <th className="text-left px-4 py-3 font-semibold">Project Name</th>
                                     <th className="text-left px-4 py-3 font-semibold">Type</th>
-                                    <th className="text-left px-4 py-3 font-semibold">Members</th>
-                                    <th className="text-left px-4 py-3 font-semibold">Last Updated</th>
+                                    <th className="text-left px-4 py-3 font-semibold hidden md:table-cell">Members</th>
+                                    <th className="text-left px-4 py-3 font-semibold hidden md:table-cell">Last Updated</th>
                                     <th className="text-left px-4 py-3 font-semibold">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {filteredAndSortedProjects.map((project) => (
-                                    <tr key={project.id} className="border-t border-[#EEF2F7] hover:bg-[#FAFBFF]">
-                                        <td className="px-4 py-3 font-semibold text-[#101828]">
+                                    <tr key={project.id} className="border-t border-[#F0F0F5] hover:bg-[#F7F8FA]">
+                                        <td className="px-4 py-3 font-semibold text-[#1A1A2E]">
                                             <div>{project.name}</div>
                                             {project.projectKey && (
-                                                <div className="text-xs text-[#6B7280] mt-0.5">{project.projectKey}</div>
+                                                <div className="text-xs text-[#9CA3AF] mt-0.5">{project.projectKey}</div>
                                             )}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-[#EAF2FF] text-[#0052CC]">
+                                            <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-[#EBF2FF] text-[#155DFC]">
                                                 {project.type === 'AGILE' ? 'Agile' : 'Kanban'}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-[#4A5565]">{project.memberCount ?? '-'}</td>
-                                        <td className="px-4 py-3 text-[#4A5565]">
+                                        <td className="px-4 py-3 text-[#6B6F7B] hidden md:table-cell">{project.memberCount ?? '-'}</td>
+                                        <td className="px-4 py-3 text-[#6B6F7B] hidden md:table-cell">
                                             {project.updatedAt ? new Date(project.updatedAt).toLocaleDateString() : '-'}
                                         </td>
                                         <td className="px-4 py-3">
@@ -291,25 +343,13 @@ export default function SpacesPage() {
                                                             console.error('Failed to toggle favorite:', error);
                                                         }
                                                     }}
-                                                    className={`p-2 rounded-md border transition-colors ${project.isFavorite ? 'text-[#F59E0B] border-[#FDE68A] bg-[#FFFBEB]' : 'text-[#6B7280] border-[#E5E7EB] hover:text-[#F59E0B]'}`}
+                                                    className={`p-2 rounded-md border transition-colors ${project.isFavorite ? 'text-[#F59E0B] border-[#FDE68A] bg-[#FFFBEB]' : 'text-[#9CA3AF] border-[#E8E8ED] hover:text-[#F59E0B]'}`}
                                                     aria-label={project.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                                                 >
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill={project.isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <svg width="15" height="15" viewBox="0 0 24 24" fill={project.isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                                                     </svg>
                                                 </button>
-                                                <Link
-                                                    href={`/members/${project.id}`}
-                                                    className="p-2 rounded-md border border-[#E5E7EB] text-[#6B7280] hover:text-[#0052CC] hover:bg-blue-50 transition-colors"
-                                                    title="Project Members"
-                                                >
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                                        <circle cx="9" cy="7" r="4" />
-                                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                                                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                                                    </svg>
-                                                </Link>
                                                 <Link
                                                     href={`/summary/${project.id}`}
                                                     className="px-3 py-1.5 rounded-lg bg-[#155DFC] text-white text-xs font-semibold hover:bg-[#0E4FCC] transition-colors"
@@ -326,28 +366,24 @@ export default function SpacesPage() {
                 )
             ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#99A1AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3h18v18H3z"/><path d="M9 9h6v6H9z"/></svg>
+                    <div className="w-16 h-16 rounded-2xl bg-[#EBF2FF] flex items-center justify-center mb-4 text-3xl">
+                        📋
                     </div>
-                    <h3 className="text-[18px] font-bold text-[#101828]">No spaces found</h3>
-                    <p className="text-[#4A5565] text-sm mt-1">
-                        {searchQuery ? "Try a different search term" : "Create your first project to get started."}
+                    <h3 className="text-base font-semibold text-[#1A1A2E]">No projects found</h3>
+                    <p className="text-[#6B6F7B] text-sm mt-1 max-w-xs">
+                        {searchQuery ? 'Try a different search term' : 'Create your first project to get started.'}
                     </p>
                     {!searchQuery && (
                         <Link
                             href="/createProject"
-                            className="mt-4 px-4 py-2 rounded-xl bg-[#155DFC] text-white text-sm font-semibold"
+                            className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+                            style={{ background: '#155DFC' }}
                         >
                             Create Project
                         </Link>
                     )}
                 </div>
             )}
-
-            {/* FAB — mobile only */}
-            <Link href="/createProject" className="fab md:hidden flex items-center justify-center" aria-label="Create project">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-            </Link>
         </div>
     );
 }

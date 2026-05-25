@@ -74,6 +74,13 @@ export default function ProjectRoute() {
   const { data } = useProjectSummary(numericId);
   const name = paramName || data?.projectDetails?.name;
 
+  const handleSettingsPress = useCallback(() => {
+    router.push({
+      pathname: '/project/[projectId]/settings',
+      params: { projectId: numericId, projectName: name ?? '' },
+    });
+  }, [router, numericId, name]);
+
   // ── Content area ────────────────────────────────────────────────────────────
   const renderContent = () => {
     // If a "More" sub-tab is active, render it
@@ -180,11 +187,12 @@ export default function ProjectRoute() {
 
       {/* Nav bar floats on top — absolutely positioned */}
       <ProjectTopNav
-        activeTab={activeTab}
+        activeTab={activeMoreTab ? 'more' : activeTab as ProjectTab}
         activeMoreTab={activeMoreTab}
         onTabChange={handleTabChange}
         onMoreTabChange={handleMoreTabChange}
         projectName={name}
+        onSettingsPress={handleSettingsPress}
       />
     </View>
   );
