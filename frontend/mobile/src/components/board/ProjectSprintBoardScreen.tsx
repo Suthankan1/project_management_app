@@ -822,7 +822,7 @@ const columnStyles = StyleSheet.create({
   countPill: { minWidth: 32, height: 28, paddingHorizontal: 9, borderRadius: 999, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   countText: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
   headerDeleteBtn: { width: 28, height: 28, borderRadius: 9, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },
-  body: { paddingHorizontal: 24, paddingBottom: 12, gap: 10 },
+  body: { paddingHorizontal: 12, paddingBottom: 12, gap: 8 },
   emptyState: { minHeight: 128, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 13, fontWeight: '900', color: '#64748B' },
   addTaskBtn: { marginHorizontal: 12, marginBottom: 12, height: 42, borderRadius: 12, borderWidth: 1, borderColor: '#BFDBFE', backgroundColor: '#EFF6FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
@@ -830,8 +830,8 @@ const columnStyles = StyleSheet.create({
 });
 
 const taskStyles = StyleSheet.create({
-  card: { backgroundColor: 'rgba(255, 255, 255, 0.96)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.72)', padding: 13, paddingTop: 14, gap: 10, ...shadow },
-  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 28, paddingRight: 36 },
+  card: { backgroundColor: 'rgba(255, 255, 255, 0.96)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.72)', padding: 10, paddingTop: 11, gap: 7, ...shadow },
+  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 20, paddingRight: 36 },
   deleteBtn: { position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 0, zIndex: 10 },
   taskMenu: { position: 'absolute', top: 44, right: 12, width: 148, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingVertical: 6, zIndex: 20, ...shadow },
   taskMenuItem: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 14 },
@@ -840,7 +840,7 @@ const taskStyles = StyleSheet.create({
   priority: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
   priorityDot: { width: 6, height: 6, borderRadius: 3 },
   priorityText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
-  title: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 20 },
+  title: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 18 },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   codePill: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, backgroundColor: '#EEF2FF' },
   codeText: { fontSize: 10, fontWeight: '900', color: '#4338CA' },

@@ -1522,7 +1522,7 @@ const columnStyles = StyleSheet.create({
   },
   countText: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
   wipText: { color: '#DC2626' },
-  body: { paddingHorizontal: 24, gap: 10, overflow: 'visible' },
+  body: { paddingHorizontal: 12, gap: 8, overflow: 'visible' },
   emptyState: {
     minHeight: 128,
     borderRadius: 14,
@@ -1559,13 +1559,13 @@ const card = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(226, 232, 240, 0.72)',
-    padding: 13,
-    paddingTop: 14,
+    padding: 10,
+    paddingTop: 11,
     zIndex: 1,
     ...shadow,
   },
   dragSurface: {
-    gap: 10,
+    gap: 7,
   },
   cardDragging: {
     borderColor: T.primary,
@@ -1576,7 +1576,7 @@ const card = StyleSheet.create({
       android: { elevation: 24 },
     }),
   },
-  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 24, paddingRight: 34 },
+  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 20, paddingRight: 34 },
   priority: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -1606,8 +1606,8 @@ const card = StyleSheet.create({
   taskMenuItem: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 14 },
   taskMenuText: { fontSize: 13, fontWeight: '800', color: '#0F172A' },
   taskMenuDeleteText: { color: '#DC2626' },
-  title: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 20 },
-  description: { fontSize: 12, color: '#64748B', lineHeight: 17 },
+  title: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 18 },
+  description: { fontSize: 12, color: '#64748B', lineHeight: 16 },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   codePill: {
     paddingHorizontal: 7,
