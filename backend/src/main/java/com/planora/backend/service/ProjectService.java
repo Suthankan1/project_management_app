@@ -11,6 +11,7 @@ import com.planora.backend.repository.ProjectAccessRepository;
 import com.planora.backend.repository.ProjectFavoriteRepository;
 import com.planora.backend.repository.ProjectRepository;
 import com.planora.backend.repository.SprintRepository;
+import com.planora.backend.repository.SprintboardRepository;
 import com.planora.backend.repository.TaskRepository;
 import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.TeamRepository;
@@ -39,6 +40,7 @@ public class ProjectService {
     private final ProjectAccessRepository projectAccessRepository;
     private final ProjectFavoriteRepository projectFavoriteRepository;
     private final SprintRepository sprintRepository;
+    private final SprintboardRepository sprintboardRepository;
     private final TaskRepository taskRepository;
 
     // Checks whether a project key is already in use.
@@ -341,6 +343,18 @@ public class ProjectService {
     public void deleteProject(Long projectId, Long teamId, Long userId) {
         Project project = findProjectById(projectId);
         validateOwnerPermission(teamId, userId);
+
+        // Detach tasks from sprints first so sprint rows have no dependents.
+        taskRepository.detachSprintsByProjectId(projectId);
+
+        // Delete sprintboards before sprints (sprintboards FK → sprints).
+        sprintRepository.findByProject_Id(projectId).forEach(sprint ->
+                sprintboardRepository.findBySprintId(sprint.getId()).ifPresent(sprintboardRepository::delete));
+
+        // Bulk DELETE bypasses Hibernate flush ordering so sprints are removed
+        // from the DB before the project DELETE is issued.
+        sprintRepository.deleteByProjectId(projectId);
+
         projectAccessRepository.deleteByProject_Id(projectId);
         projectFavoriteRepository.deleteByProject(project);
         projectRepository.delete(project);
