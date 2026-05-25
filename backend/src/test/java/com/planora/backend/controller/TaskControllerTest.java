@@ -55,6 +55,9 @@ class TaskControllerTest {
         @MockBean
     private UserDetailsService userDetailsService;
 
+            @MockBean
+        private com.planora.backend.service.TaskGithubService taskGithubService;
+
     @Autowired
     private ObjectMapper objectMapper;
 
