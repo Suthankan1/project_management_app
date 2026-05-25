@@ -55,6 +55,10 @@ public class GithubNotificationService {
 
     public List<User> resolveUsersFromGithubLogin(String githubLogin) {
         ensureDependenciesInjected();
-        return Collections.emptyList();
+        if (githubLogin == null || githubLogin.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        return userRepository.findByGithubUsernameIgnoreCase(githubLogin);
     }
 }

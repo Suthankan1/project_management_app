@@ -28,5 +28,6 @@ public class UserResponseDTO {
     private String company;
     private String position;
     private String bio;
+    private String githubUsername;
     private boolean notifyDueDateReminders;
 }

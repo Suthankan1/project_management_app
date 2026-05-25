@@ -503,6 +503,7 @@ public class UserService {
                 user.getCompany(),
                 user.getPosition(),
                 user.getBio(),
+                user.getGithubUsername(),
                 user.isNotifyDueDateReminders()
         );
     }
@@ -520,6 +521,37 @@ public class UserService {
         // Orchestration method: Updates user and immediately returns the fresh DTO state.
         User updatedUser = updateUserProfile(email, request);
         return mapToUserResponseDTO(updatedUser);
+    }
+
+    @Transactional
+    @CachePut(value = "userProfile", key = "#email")
+    public UserResponseDTO updateGithubUsernameAndGetDTO(String email, String githubUsername) {
+        User user = getUserByEmail(email);
+        validateGithubUsernameUniqueness(user, githubUsername);
+        user.setGithubUsername(githubUsername);
+        return mapToUserResponseDTO(userRepository.save(user));
+    }
+
+    @Transactional
+    @CachePut(value = "userProfile", key = "#email")
+    public UserResponseDTO unlinkGithubUsernameAndGetDTO(String email) {
+        User user = getUserByEmail(email);
+        user.setGithubUsername(null);
+        return mapToUserResponseDTO(userRepository.save(user));
+    }
+
+    private void validateGithubUsernameUniqueness(User currentUser, String githubUsername) {
+        if (githubUsername == null || githubUsername.isBlank()) {
+            return;
+        }
+
+        List<User> linkedUsers = userRepository.findByGithubUsernameIgnoreCase(githubUsername);
+        boolean conflict = linkedUsers.stream()
+                .anyMatch(otherUser -> !otherUser.getUserId().equals(currentUser.getUserId()));
+
+        if (conflict) {
+            throw new IllegalStateException("GitHub username is already linked to another user");
+        }
     }
 
     /**
