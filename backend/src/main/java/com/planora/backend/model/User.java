@@ -85,6 +85,9 @@ public class User {
     @Column(name = "github_access_token", columnDefinition = "TEXT")
     private String githubAccessToken;
 
+    @Column(name = "github_username", length = 100)
+    private String githubUsername;
+
     @Column(name = "notify_due_date_reminders", nullable = false)
     private boolean notifyDueDateReminders = true;
 
