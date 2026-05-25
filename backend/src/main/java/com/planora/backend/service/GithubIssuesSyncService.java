@@ -14,6 +14,7 @@ import org.springframework.web.client.RestClient;
 
 import com.planora.backend.dto.GithubIssueDTO;
 import com.planora.backend.dto.GithubIssueCreateRequestDTO;
+import com.planora.backend.dto.GithubCommentDTO;
 import com.planora.backend.dto.GithubLabelDTO;
 import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.GithubAuthenticationException;
@@ -83,6 +84,32 @@ public class GithubIssuesSyncService {
                     throw new GithubRepositoryNotFoundException("GitHub repository not found");
                 })
                 .body(new ParameterizedTypeReference<List<GithubLabelDTO>>() {
+                });
+    }
+
+    @Cacheable(
+            cacheNames = "github-issue-comments",
+            key = "#repoFullName.toLowerCase() + ':' + #issueNumber",
+            sync = true)
+    public List<GithubCommentDTO> fetchIssueComments(String repoFullName, int issueNumber, String accessToken) {
+        String[] repositoryParts = repositoryParts(repoFullName);
+
+        return githubClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/repos/{owner}/{repo}/issues/{issueNumber}/comments")
+                        .build(repositoryParts[0], repositoryParts[1], issueNumber))
+                .headers(headers -> headers.setBearerAuth(accessToken))
+                .retrieve()
+                .onStatus(status -> status.value() == 401, (request, response) -> {
+                    throw new GithubAuthenticationException("Invalid GitHub access token");
+                })
+                .onStatus(status -> status.value() == 403, (request, response) -> {
+                    throw new GithubRateLimitException("GitHub API rate limit exceeded");
+                })
+                .onStatus(status -> status.value() == 404, (request, response) -> {
+                    throw new GithubRepositoryNotFoundException("GitHub issue or repository not found");
+                })
+                .body(new ParameterizedTypeReference<List<GithubCommentDTO>>() {
                 });
     }
 

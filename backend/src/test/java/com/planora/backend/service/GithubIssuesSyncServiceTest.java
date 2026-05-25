@@ -9,11 +9,13 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -22,6 +24,7 @@ import org.springframework.web.client.RestClient;
 
 import com.planora.backend.dto.GithubIssueDTO;
 import com.planora.backend.dto.GithubIssueCreateRequestDTO;
+import com.planora.backend.dto.GithubCommentDTO;
 import com.planora.backend.dto.GithubLabelDTO;
 import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.GithubAuthenticationException;
@@ -187,6 +190,51 @@ class GithubIssuesSyncServiceTest {
 
         assertEquals("github-issues", cacheEvict.cacheNames()[0]);
         assertEquals("#request.repoFullName.toLowerCase()", cacheEvict.key());
+    }
+
+    @Test
+    void fetchIssueComments_fetchesAndMapsGithubComments() {
+        String response = """
+                [{
+                  "id": 72,
+                  "body": "This is fixed now.",
+                  "user": {"login": "octocat", "avatar_url": "https://avatars.example/octocat"},
+                  "created_at": "2026-05-24T10:15:30Z"
+                }]
+                """;
+        server.expect(requestTo("https://api.github.com/repos/planora/app/issues/34/comments"))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer github-token"))
+                .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
+
+        List<GithubCommentDTO> comments = service.fetchIssueComments("planora/app", 34, "github-token");
+
+        assertEquals(1, comments.size());
+        assertEquals(72L, comments.get(0).getId());
+        assertEquals("This is fixed now.", comments.get(0).getBody());
+        assertEquals("octocat", comments.get(0).getUserLogin());
+        assertEquals("https://avatars.example/octocat", comments.get(0).getUserAvatarUrl());
+        assertEquals(Instant.parse("2026-05-24T10:15:30Z"), comments.get(0).getCreatedAt());
+        server.verify();
+    }
+
+    @Test
+    void fetchIssueComments_throwsNotFoundForMissingIssue() {
+        server.expect(requestTo("https://api.github.com/repos/planora/app/issues/34/comments"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThrows(GithubRepositoryNotFoundException.class,
+                () -> service.fetchIssueComments("planora/app", 34, "github-token"));
+        server.verify();
+    }
+
+    @Test
+    void fetchIssueComments_usesDedicatedRepositoryIssueCache() throws Exception {
+        Cacheable cacheable = GithubIssuesSyncService.class
+                .getMethod("fetchIssueComments", String.class, int.class, String.class)
+                .getAnnotation(Cacheable.class);
+
+        assertEquals("github-issue-comments", cacheable.cacheNames()[0]);
+        assertEquals("#repoFullName.toLowerCase() + ':' + #issueNumber", cacheable.key());
     }
 
     private GithubIssueCreateRequestDTO createRequest() {

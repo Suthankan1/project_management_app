@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.List;
 import java.util.Optional;
+import java.time.Instant;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,8 @@ import org.springframework.http.MediaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.planora.backend.dto.GithubIssueDTO;
 import com.planora.backend.dto.GithubIssueCreateRequestDTO;
+import com.planora.backend.dto.GithubCommentDTO;
+import com.planora.backend.dto.GithubCommentSyncResponseDTO;
 import com.planora.backend.dto.GithubIssueImportResponseDTO;
 import com.planora.backend.dto.GithubLabelDTO;
 import com.planora.backend.exception.ForbiddenException;
@@ -36,6 +39,7 @@ import com.planora.backend.model.User;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.repository.UserRepository;
 import com.planora.backend.service.GithubIssueImportService;
+import com.planora.backend.service.GithubIssueCommentSyncService;
 import com.planora.backend.service.GithubIssuesSyncService;
 import com.planora.backend.service.JWTService;
 
@@ -53,6 +57,9 @@ class GithubIssuesControllerTest {
 
     @MockitoBean
     private GithubIssueImportService githubIssueImportService;
+
+    @MockitoBean
+    private GithubIssueCommentSyncService githubIssueCommentSyncService;
 
     @MockitoBean
     private UserRepository userRepository;
@@ -264,6 +271,42 @@ class GithubIssuesControllerTest {
                         .content("{\"repoFullName\":\"planora/app\",\"title\":\"Fix login\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value("GitHub token does not have permission to create issues"));
+    }
+
+    @Test
+    void getIssueComments_returnsRawGithubCommentsForIssue() throws Exception {
+        GithubCommentDTO comment = new GithubCommentDTO();
+        comment.setId(72L);
+        comment.setBody("This is fixed now.");
+        comment.setUserLogin("octocat");
+        comment.setCreatedAt(Instant.parse("2026-05-24T10:15:30Z"));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
+        when(githubIssuesSyncService.fetchIssueComments("planora/app", 34, "github-token"))
+                .thenReturn(List.of(comment));
+
+        mockMvc.perform(get("/api/github/issues/planora/app/34/comments")
+                        .with(user(principal)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(72))
+                .andExpect(jsonPath("$[0].userLogin").value("octocat"));
+
+        verify(githubIssuesSyncService).fetchIssueComments("planora/app", 34, "github-token");
+    }
+
+    @Test
+    void syncIssueComments_returnsSyncedCount() throws Exception {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
+        when(githubIssueCommentSyncService.syncComments(10L, 34, userEntity))
+                .thenReturn(new GithubCommentSyncResponseDTO(2));
+
+        mockMvc.perform(post("/api/github/issues/34/sync-comments")
+                        .param("projectId", "10")
+                        .with(user(principal))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.synced").value(2));
+
+        verify(githubIssueCommentSyncService).syncComments(10L, 34, userEntity);
     }
 
     private GithubIssueDTO issue(Long id, String state, String label) {

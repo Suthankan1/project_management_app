@@ -23,6 +23,7 @@ public class CacheConfiguration {
                 "team-member",
                 "project-team-id",
                 "github-issues",
+                "github-issue-comments",
                 "userProfile");
         manager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(Duration.ofSeconds(60))
@@ -46,6 +47,11 @@ public class CacheConfiguration {
                 Caffeine.newBuilder()
                         .expireAfterWrite(Duration.ofMinutes(5))
                         .maximumSize(500)
+                        .build());
+        manager.registerCustomCache("github-issue-comments",
+                Caffeine.newBuilder()
+                        .expireAfterWrite(Duration.ofMinutes(5))
+                        .maximumSize(1_000)
                         .build());
         return manager;
     }

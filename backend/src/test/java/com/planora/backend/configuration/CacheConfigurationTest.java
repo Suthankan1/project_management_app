@@ -23,5 +23,6 @@ class CacheConfigurationTest {
         assertNotNull(cacheManager.getCache("project-team-id"));
         assertNotNull(cacheManager.getCache("team-member"));
         assertNotNull(cacheManager.getCache("github-issues"));
+        assertNotNull(cacheManager.getCache("github-issue-comments"));
     }
 }

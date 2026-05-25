@@ -17,6 +17,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     boolean existsByProjectIdAndGithubIssueNumberAndGithubRepoFullNameIgnoreCase(
             Long projectId, Long githubIssueNumber, String githubRepoFullName);
 
+    List<Task> findByProjectIdAndGithubIssueNumber(Long projectId, Long githubIssueNumber);
+
     @Query("""
            SELECT t FROM Task t
            LEFT JOIN FETCH t.project p
