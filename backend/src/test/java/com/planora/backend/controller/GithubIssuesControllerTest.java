@@ -1,10 +1,13 @@
 package com.planora.backend.controller;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -18,13 +21,17 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.http.MediaType;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.planora.backend.dto.GithubIssueDTO;
+import com.planora.backend.dto.GithubIssueImportResponseDTO;
 import com.planora.backend.exception.GithubRateLimitException;
 import com.planora.backend.exception.GithubRepositoryNotFoundException;
 import com.planora.backend.model.User;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.repository.UserRepository;
+import com.planora.backend.service.GithubIssueImportService;
 import com.planora.backend.service.GithubIssuesSyncService;
 import com.planora.backend.service.JWTService;
 
@@ -34,8 +41,14 @@ class GithubIssuesControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @MockitoBean
     private GithubIssuesSyncService githubIssuesSyncService;
+
+    @MockitoBean
+    private GithubIssueImportService githubIssueImportService;
 
     @MockitoBean
     private UserRepository userRepository;
@@ -135,6 +148,34 @@ class GithubIssuesControllerTest {
     @Test
     void getIssues_requiresAuthentication() throws Exception {
         mockMvc.perform(get("/api/github/issues").param("repoFullName", "planora/app"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void importIssues_returnsImportedAndSkippedTaskResults() throws Exception {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
+        when(githubIssueImportService.importIssues(any(), org.mockito.ArgumentMatchers.eq(userEntity)))
+                .thenReturn(new GithubIssueImportResponseDTO(List.of(101L, 102L), List.of(3)));
+
+        mockMvc.perform(post("/api/github/issues/import")
+                        .with(user(principal))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(java.util.Map.of(
+                                "projectId", 10L,
+                                "repoFullName", "planora/app",
+                                "issueNumbers", List.of(1, 2, 3)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imported[0]").value(101))
+                .andExpect(jsonPath("$.skipped[0]").value(3));
+    }
+
+    @Test
+    void importIssues_requiresAuthentication() throws Exception {
+        mockMvc.perform(post("/api/github/issues/import")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10,\"repoFullName\":\"planora/app\",\"issueNumbers\":[1]}"))
                 .andExpect(status().isUnauthorized());
     }
 

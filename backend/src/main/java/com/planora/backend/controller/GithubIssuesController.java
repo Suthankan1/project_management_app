@@ -7,17 +7,23 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.planora.backend.dto.GithubIssueDTO;
+import com.planora.backend.dto.GithubIssueImportRequestDTO;
+import com.planora.backend.dto.GithubIssueImportResponseDTO;
 import com.planora.backend.exception.GithubAuthenticationException;
 import com.planora.backend.model.User;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.repository.UserRepository;
+import com.planora.backend.service.GithubIssueImportService;
 import com.planora.backend.service.GithubIssuesSyncService;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 
 @Validated
@@ -30,6 +36,9 @@ public class GithubIssuesController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private GithubIssueImportService githubIssueImportService;
 
     @GetMapping("/issues")
     public ResponseEntity<List<GithubIssueDTO>> getIssues(
@@ -61,9 +70,25 @@ public class GithubIssuesController {
         return ResponseEntity.ok(filteredIssues);
     }
 
+    @PostMapping("/issues/import")
+    public ResponseEntity<GithubIssueImportResponseDTO> importIssues(
+            @Valid @RequestBody GithubIssueImportRequestDTO request,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        return ResponseEntity.ok(githubIssueImportService.importIssues(request, getCurrentUser(currentUser)));
+    }
+
     private boolean hasLabel(GithubIssueDTO issue, String label) {
         return issue.getLabels() != null && issue.getLabels().stream()
                 .anyMatch(issueLabel -> issueLabel.getName() != null
                         && issueLabel.getName().equalsIgnoreCase(label));
+    }
+
+    private User getCurrentUser(UserPrincipal currentUser) {
+        if (currentUser == null) {
+            throw new GithubAuthenticationException("Authentication is required");
+        }
+        return userRepository.findById(currentUser.getUserId())
+                .orElseThrow(() -> new GithubAuthenticationException("Authenticated user not found"));
     }
 }
