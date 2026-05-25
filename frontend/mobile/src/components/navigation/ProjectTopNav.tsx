@@ -1,7 +1,7 @@
 import React, { type ComponentProps, useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Platform, Animated, Dimensions, TouchableWithoutFeedback,
+  Platform, Animated, TouchableWithoutFeedback, useWindowDimensions,
 } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
@@ -10,13 +10,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { T } from '../../constants/tokens';
 
-const { width: SW } = Dimensions.get('window');
-
 const INACTIVE_W = 48;
 const ACTIVE_W = 124;
 const ROW_H = 48;
 const TAB_GAP = 8;
 const ICON_SZ = 22;
+const TOP_NAV_SIDE_PADDING = 12;
+const MORE_GRID_COLUMNS = 3;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
 
 export type ProjectTab = 'summary' | 'backlog' | 'board' | 'chat' | 'more';
 export type MoreTab =
@@ -103,47 +107,53 @@ function TabIcon({ name, active }: { name: ProjectTab; active: boolean }) {
 
 // ─── Tab Button ───────────────────────────────────────────────────────────────
 function TabBtn({
-  tab, widthAnim, active, onPress, hasMoreDot,
+  tab, widthAnim, inactiveWidth, activeWidth, active, onPress, hasMoreDot,
 }: {
   tab: typeof TABS[number];
   widthAnim: Animated.Value;
+  inactiveWidth: number;
+  activeWidth: number;
   active: boolean;
   onPress: () => void;
   hasMoreDot?: boolean;
 }) {
   const press = useRef(new Animated.Value(1)).current;
+  const labelTargetWidth = useMemo(
+    () => Math.min(Math.max(tab.label.length * 8.4, 34), activeWidth - ICON_SZ - 22),
+    [activeWidth, tab.label]
+  );
 
   // Fade background early so it feels like a solid pill
   const activeBgOp = widthAnim.interpolate({
-    inputRange: [INACTIVE_W, INACTIVE_W + 24, ACTIVE_W],
+    inputRange: [inactiveWidth, inactiveWidth + 24, activeWidth],
     outputRange: [0, 1, 1],
     extrapolate: 'clamp',
   });
 
   // Fade text/icon smoothly over the entire expansion
   const activeOp = widthAnim.interpolate({
-    inputRange: [INACTIVE_W, ACTIVE_W],
+    inputRange: [inactiveWidth, activeWidth],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
 
   // Animate the label container width so content stays perfectly centered
   const labelWidth = widthAnim.interpolate({
-    inputRange: [INACTIVE_W, ACTIVE_W],
-    outputRange: [0, 66],
+    inputRange: [inactiveWidth, activeWidth],
+    outputRange: [0, labelTargetWidth],
     extrapolate: 'clamp',
   });
 
   // Animate the gap so when inactive, the icon is perfectly alone in the center
   const labelMargin = widthAnim.interpolate({
-    inputRange: [INACTIVE_W, ACTIVE_W],
+    inputRange: [inactiveWidth, activeWidth],
     outputRange: [0, 8],
     extrapolate: 'clamp',
   });
 
   // Slide text leftwards when shrinking so it tucks behind the icon and escapes the collapsing right edge
   const textX = widthAnim.interpolate({
-    inputRange: [INACTIVE_W, ACTIVE_W],
+    inputRange: [inactiveWidth, activeWidth],
     outputRange: [-20, 0],
     extrapolate: 'clamp',
   });
@@ -199,10 +209,14 @@ function TabBtn({
 // Removed MorePopup completely. Dropping down from TopNav inline.
 
 function PremiumMoreIcon({ item, selected }: { item: MoreItem; selected: boolean }) {
+  const iconColors = selected
+    ? [item.tint, T.primary] as const
+    : [item.tint + '22', item.tintSoft] as const;
+
   return (
     <View style={[ds.iconShell, selected && ds.iconShellSel]}>
       <LinearGradient
-        colors={selected ? [item.tint, T.primary] : ['rgba(255,255,255,0.96)', item.tintSoft]}
+        colors={iconColors}
         start={{ x: 0.1, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={ds.iconGradient}
@@ -233,22 +247,46 @@ export default function ProjectTopNav({
   activeTab, activeMoreTab, onTabChange, onMoreTabChange, onSettingsPress,
 }: ProjectTopNavProps) {
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const [moreOpen, setMoreOpen] = useState(false);
 
   const activeIdx = useMemo(() => TABS.findIndex(t => t.key === activeTab), [activeTab]);
+  const tabMetrics = useMemo(() => {
+    const availableWidth = Math.max(0, screenWidth - TOP_NAV_SIDE_PADDING * 2);
+    const totalGap = TAB_GAP * (TABS.length - 1);
+    const activeWidth = clamp(availableWidth * 0.32, 92, ACTIVE_W);
+    const inactiveWidth = clamp((availableWidth - totalGap - activeWidth) / (TABS.length - 1), 36, INACTIVE_W);
+
+    return { activeWidth, inactiveWidth };
+  }, [screenWidth]);
+
+  const moreGridMetrics = useMemo(() => {
+    const horizontalPadding = screenWidth < 360 ? 12 : 16;
+    const gap = screenWidth < 360 ? 10 : 12;
+    const gridWidth = Math.max(0, screenWidth - horizontalPadding * 2);
+    const cellWidth = Math.floor((gridWidth - gap * (MORE_GRID_COLUMNS - 1)) / MORE_GRID_COLUMNS);
+    const cellHeight = clamp(cellWidth * 0.78, 78, 90);
+    const rows = Math.ceil(MORE_ITEMS.length / MORE_GRID_COLUMNS);
+    const dropdownHeight = 16 + 30 + cellHeight * rows + gap * (rows - 1) + 32;
+
+    return { horizontalPadding, gap, cellWidth, cellHeight, dropdownHeight };
+  }, [screenWidth]);
 
   const tabWidths = useRef(
-    TABS.map((_, i) => new Animated.Value(i === 0 ? ACTIVE_W : INACTIVE_W))
+    TABS.map((_, i) => new Animated.Value(i === activeIdx ? tabMetrics.activeWidth : tabMetrics.inactiveWidth))
   ).current;
 
   useEffect(() => {
     const cfg = { tension: 340, friction: 28, useNativeDriver: false };
     Animated.parallel(
       TABS.map((_, i) =>
-        Animated.spring(tabWidths[i], { toValue: i === activeIdx ? ACTIVE_W : INACTIVE_W, ...cfg })
+        Animated.spring(tabWidths[i], {
+          toValue: i === activeIdx ? tabMetrics.activeWidth : tabMetrics.inactiveWidth,
+          ...cfg,
+        })
       )
     ).start();
-  }, [activeIdx]);
+  }, [activeIdx, tabMetrics.activeWidth, tabMetrics.inactiveWidth, tabWidths]);
 
   const entryY = useRef(new Animated.Value(-80)).current;
   const entryOp = useRef(new Animated.Value(0)).current;
@@ -259,15 +297,13 @@ export default function ProjectTopNav({
     ]).start();
   }, []);
 
-  const navBarH = insets.top + 8 + ROW_H + 12;
-
   const dropdownHeightAnim = useRef(new Animated.Value(0)).current;
   const dropdownOp = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (moreOpen) {
       Animated.parallel([
-        Animated.spring(dropdownHeightAnim, { toValue: 392, tension: 300, friction: 26, useNativeDriver: false }),
+        Animated.spring(dropdownHeightAnim, { toValue: moreGridMetrics.dropdownHeight, tension: 300, friction: 26, useNativeDriver: false }),
         Animated.timing(dropdownOp, { toValue: 1, duration: 200, useNativeDriver: true, delay: 50 }),
       ]).start();
     } else {
@@ -276,7 +312,7 @@ export default function ProjectTopNav({
         Animated.timing(dropdownOp, { toValue: 0, duration: 150, useNativeDriver: true }),
       ]).start();
     }
-  }, [moreOpen]);
+  }, [dropdownHeightAnim, dropdownOp, moreOpen, moreGridMetrics.dropdownHeight]);
 
   const handlePress = useCallback((tab: ProjectTab) => {
     if (tab === 'more') {
@@ -337,6 +373,8 @@ export default function ProjectTopNav({
               key={tab.key}
               tab={tab}
               widthAnim={tabWidths[idx]}
+              inactiveWidth={tabMetrics.inactiveWidth}
+              activeWidth={tabMetrics.activeWidth}
               active={idx === activeIdx}
               onPress={() => handlePress(tab.key)}
               hasMoreDot={tab.key === 'more' && !!activeMoreTab}
@@ -346,13 +384,18 @@ export default function ProjectTopNav({
 
         {/* The Inline Full-Width Dropdown Area */}
         <Animated.View style={{ height: dropdownHeightAnim, overflow: 'hidden' }}>
-          <Animated.View style={{ opacity: dropdownOp, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 }}>
+          <Animated.View style={{
+            opacity: dropdownOp,
+            paddingHorizontal: moreGridMetrics.horizontalPadding,
+            paddingTop: 16,
+            paddingBottom: 32,
+          }}>
             <View style={ds.hdr}>
               <View style={ds.hdrAccent} />
               <Text style={ds.hdrTxt}>MORE VIEWS</Text>
             </View>
 
-            <View style={ds.grid}>
+            <View style={[ds.grid, { gap: moreGridMetrics.gap }]}>
               {MORE_ITEMS.map(item => {
                 const isSel = activeMoreTab === item.key;
                 return (
@@ -360,7 +403,11 @@ export default function ProjectTopNav({
                     key={item.key}
                     onPress={() => { onMoreTabChange?.(item.key); setMoreOpen(false); }}
                     activeOpacity={0.7}
-                    style={[ds.cell, isSel && ds.cellSel]}
+                    style={[
+                      ds.cell,
+                      { width: moreGridMetrics.cellWidth, height: moreGridMetrics.cellHeight },
+                      isSel && ds.cellSel,
+                    ]}
                   >
                     <PremiumMoreIcon item={item} selected={isSel} />
                     <Text style={ds.cellLbl}>{item.label}</Text>
@@ -513,26 +560,25 @@ const ds = StyleSheet.create({
   hdrTxt:  { fontSize: 11, fontWeight: '800', color: T.textSecondary, letterSpacing: 1.6 },
   grid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   cell: {
-    width: (SW - 32 - 24) / 3,
     height: 90,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.68)',
+    backgroundColor: 'rgba(255,255,255,0.16)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.82)',
+    borderColor: 'rgba(255,255,255,0.34)',
     alignItems: 'center', justifyContent: 'center',
     gap: 7,
     overflow: 'hidden',
     ...Platform.select({
-      ios: { shadowColor: '#64748B', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.1, shadowRadius: 18 },
-      android: { elevation: 3 },
+      ios: { shadowColor: '#64748B', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 18 },
+      android: { elevation: 0 },
     }),
   },
   cellSel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: T.primaryMuted + '70',
+    backgroundColor: T.primary + '10',
+    borderColor: T.primaryMuted + '7A',
     ...Platform.select({
-      ios: { shadowColor: T.primary, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.18, shadowRadius: 20 },
-      android: { elevation: 5 },
+      ios: { shadowColor: T.primary, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.16, shadowRadius: 20 },
+      android: { elevation: 2 },
     }),
   },
   iconShell: {
@@ -540,19 +586,19 @@ const ds = StyleSheet.create({
     height: 46,
     borderRadius: 16,
     padding: 1,
-    backgroundColor: 'rgba(255,255,255,0.75)',
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.86)',
+    borderColor: 'rgba(255,255,255,0.30)',
     ...Platform.select({
       ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 12 },
-      android: { elevation: 2 },
+      android: { elevation: 0 },
     }),
   },
   iconShellSel: {
-    borderColor: 'rgba(255,255,255,0.95)',
+    borderColor: 'rgba(255,255,255,0.72)',
     ...Platform.select({
       ios: { shadowColor: T.primary, shadowOffset: { width: 0, height: 7 }, shadowOpacity: 0.22, shadowRadius: 16 },
-      android: { elevation: 4 },
+      android: { elevation: 2 },
     }),
   },
   iconGradient: {
