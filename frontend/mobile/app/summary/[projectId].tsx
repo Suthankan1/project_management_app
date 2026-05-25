@@ -10,6 +10,7 @@ import ProjectTopNav, {
 } from '../../src/components/navigation/ProjectTopNav';
 import SummaryScreen  from '../../src/components/summary/SummaryScreen';
 import ReportScreen   from '../../src/components/report/ReportScreen';
+import { ChatTabContent } from '../../src/components/chat/ChatTabContent';
 import ProjectBoardScreen from '../../src/components/board/ProjectBoardScreen';
 import ProjectSprintBoardScreen from '../../src/components/board/ProjectSprintBoardScreen';
 import MobileBacklogScreen from '../../src/components/backlog/MobileBacklogScreen';
@@ -17,7 +18,6 @@ import MobileTimelineScreen from '../../src/components/timeline/MobileTimelineSc
 import { useProjectSummary } from '../../src/hooks/useProjectSummary';
 import MobilePagesScreen from '../../src/components/pages/MobilePagesScreen';
 import MobileDocsScreen from '../../src/components/docs/MobileDocsScreen';
-import { ChatScreenContent } from '../(project)/[id]/chat';
 
 /** Height of the nav bar = padding top (8) + title row (56) + tab row (48) + padding bottom (12) */
 const NAV_INNER_HEIGHT = 124; // matches ProjectTopNav.tsx exactly
@@ -59,7 +59,7 @@ export default function ProjectRoute() {
   const handleTabChange = useCallback((tab: ProjectTab | MoreTab) => {
     setActiveTab(tab);
     // Clear more-tab when switching to a main tab
-    if (tab !== 'more' && !['calendar', 'burndown', 'milestone', 'members', 'pages', 'docs', 'list', 'report'].includes(tab as string)) {
+    if (tab !== 'more' && !['timeline', 'calendar', 'burndown', 'milestone', 'members', 'pages', 'docs', 'list', 'report'].includes(tab as string)) {
       setLastMainTab(tab as ProjectTab);
       setActiveMoreTab(undefined);
     }
@@ -92,6 +92,15 @@ export default function ProjectRoute() {
   const renderContent = () => {
     // If a "More" sub-tab is active, render it
     if (activeMoreTab) {
+      if (activeMoreTab === 'timeline') {
+        return (
+          <MobileTimelineScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight + 16}
+          />
+        );
+      }
       if (activeMoreTab === 'report') {
         return (
           <ReportScreen
@@ -120,6 +129,7 @@ export default function ProjectRoute() {
         );
       }
       const labels: Record<MoreTab, string> = {
+        timeline:  'Timeline',
         calendar:  'Calendar',
         burndown:  'Burndown Chart',
         milestone: 'Milestones',
@@ -183,10 +193,7 @@ export default function ProjectRoute() {
         );
       case 'chat':
         return (
-          <ChatScreenContent
-            projectId={String(numericId)}
-            topOffset={navHeight + 16}
-          />
+          <ChatTabContent projectId={String(numericId)} navHeight={navHeight} />
         );
       default:
         return null;

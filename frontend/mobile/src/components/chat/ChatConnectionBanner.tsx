@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Colors } from '@/src/constants/colors';
 
 interface Props {
@@ -14,11 +14,11 @@ interface Props {
 export function ChatConnectionBanner({ isConnected, shouldShowErrorBanner, error, onRetry }: Props) {
   const height = useSharedValue(0);
   const showBanner = !isConnected || shouldShowErrorBanner;
-  const isError = shouldShowErrorBanner && !isConnected;
+  const isError = shouldShowErrorBanner;
 
   useEffect(() => {
     height.value = withTiming(showBanner ? 44 : 0, { duration: 200 });
-  }, [showBanner]);
+  }, [height, showBanner]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     height: height.value,
@@ -27,23 +27,24 @@ export function ChatConnectionBanner({ isConnected, shouldShowErrorBanner, error
 
   if (!showBanner) return null;
 
+  const tone = isError ? 'error' : 'warning';
+  const iconName = isError ? 'alert-circle-outline' : 'wifi-outline';
+  const textColor = isError ? Colors.bannerRedText : Colors.bannerAmberText;
+  const message = isError ? error : 'Reconnecting…';
+  const actionLabel = isError ? 'Retry' : 'Reconnect';
+
   return (
     <Animated.View style={animatedStyle}>
-      <View style={[styles.banner, isError ? styles.errorBanner : styles.warnBanner]}>
-        <View style={styles.contentRow}>
-          {!isError && <Ionicons name="wifi-outline" size={14} color={Colors.bannerAmberText} />}
-          <Text style={[styles.bannerText, isError ? styles.errorText : styles.warnText]} numberOfLines={1}>
-            {isError ? error : 'Disconnected — reconnecting…'}
+      <View style={[styles.banner, tone === 'error' ? styles.errorBanner : styles.warningBanner]}>
+        <View style={styles.content}>
+          <Ionicons name={iconName} size={14} color={textColor} />
+          <Text style={[styles.message, { color: textColor }]} numberOfLines={1}>
+            {message}
           </Text>
         </View>
-        <TouchableOpacity
-          onPress={onRetry}
-          style={styles.retryBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={[styles.retryText, isError ? styles.errorText : styles.warnText]}>
-            {isError ? 'Retry' : 'Reconnect'}
-          </Text>
+
+        <TouchableOpacity onPress={onRetry} style={styles.actionBtn} hitSlop={8} activeOpacity={0.75}>
+          <Text style={[styles.actionText, { color: textColor }]}>{actionLabel}</Text>
         </TouchableOpacity>
       </View>
     </Animated.View>
@@ -52,15 +53,15 @@ export function ChatConnectionBanner({ isConnected, shouldShowErrorBanner, error
 
 const styles = StyleSheet.create({
   banner: {
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    height: 44,
   },
-  warnBanner: {
+  warningBanner: {
     backgroundColor: Colors.bannerAmberBg,
     borderBottomColor: Colors.bannerAmberBorder,
   },
@@ -68,33 +69,25 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bannerRedBg,
     borderBottomColor: Colors.bannerRedBorder,
   },
-  contentRow: {
+  content: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    flex: 1,
+    minWidth: 0,
   },
-  bannerText: {
+  message: {
+    flex: 1,
     fontSize: 12,
-    fontWeight: '500',
-    flex: 1,
   },
-  warnText: {
-    color: Colors.bannerAmberText,
-  },
-  errorText: {
-    color: Colors.bannerRedText,
-  },
-  retryBtn: {
-    minHeight: 44,
-    minWidth: 44,
+  actionBtn: {
+    minHeight: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    paddingLeft: 12,
   },
-  retryText: {
+  actionText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
   },
 });

@@ -1,3 +1,5 @@
+import api from '@/lib/axios'
+
 export interface GitHubOwner {
   login: string
 }
@@ -21,9 +23,28 @@ export interface GitHubUser {
 }
 
 export interface GitHubLabel {
-  id: number
+  id?: number
   name: string
   color: string
+}
+
+export interface GitHubIssueAssignee {
+  login: string
+  avatar_url: string
+}
+
+export interface GitHubIssue {
+  id: number
+  number: number
+  title: string
+  state: 'open' | 'closed'
+  labels: GitHubLabel[]
+  assignees: Array<GitHubIssueAssignee | string>
+  createdAt: string
+  updatedAt: string
+  htmlUrl: string
+  comments: number
+  body?: string
 }
 
 export interface GitHubPullRequest {
@@ -87,6 +108,31 @@ export async function fetchRepositories(): Promise<GitHubRepository[]> {
   }
 
   return response.json()
+}
+
+export async function fetchIssues(
+  repoFullName: string,
+  state: 'open' | 'closed' | 'all' = 'all',
+  label?: string,
+): Promise<GitHubIssue[]> {
+  try {
+    const { data } = await api.get<GitHubIssue[]>('/api/github/issues', {
+      params: {
+        repoFullName,
+        state,
+        ...(label?.trim() ? { label: label.trim() } : {}),
+      },
+    })
+    return data
+  } catch (error) {
+    const response = (error as {
+      response?: { status?: number; data?: { message?: string; error?: string } };
+    }).response
+    if (response?.status === 401) throw new Error('Connect GitHub to view issues.')
+    if (response?.status === 404) throw new Error('Repository not found or unavailable.')
+    if (response?.status === 429) throw new Error('GitHub rate limit exceeded. Try again later.')
+    throw new Error(response?.data?.message || response?.data?.error || 'Failed to load issues.')
+  }
 }
 
 export async function fetchRepositoriesWithToken(token: string): Promise<GitHubRepository[]> {
