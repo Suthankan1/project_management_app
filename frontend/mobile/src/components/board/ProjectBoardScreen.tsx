@@ -160,8 +160,19 @@ function CalendarIcon({ color = '#64748B' }: { color?: string }) {
   );
 }
 
+function MoreVerticalIcon({ color = T.primary }: { color?: string }) {
+  return (
+    <Svg width={21} height={21} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={5} r={2} fill={color} />
+      <Circle cx={12} cy={12} r={2} fill={color} />
+      <Circle cx={12} cy={19} r={2} fill={color} />
+    </Svg>
+  );
+}
+
 function TaskCard({
   task,
+  onEdit,
   onDelete,
   onDueDatePress,
   onDragEnd,
@@ -169,6 +180,7 @@ function TaskCard({
   onDragMove,
 }: {
   task: BoardTask;
+  onEdit: (task: BoardTask) => void;
   onDelete: (task: BoardTask) => void;
   onDueDatePress: (task: BoardTask) => void;
   onDragEnd: (task: BoardTask, dropX: number, translationX: number) => void;
@@ -185,6 +197,7 @@ function TaskCard({
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragActiveRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const resetDragState = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
@@ -251,13 +264,33 @@ function TaskCard({
         { transform: [...drag.getTranslateTransform(), { scale: isDragging ? 1.03 : 1 }] },
       ]}
     >
-      <TouchableOpacity hitSlop={10} onPress={() => onDelete(task)} style={card.iconBtn}>
-        <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-          <Path d="M3 6h18" />
-          <Path d="M8 6V4h8v2" />
-          <Path d="M19 6l-1 14H6L5 6" />
-        </Svg>
+      <TouchableOpacity hitSlop={10} onPress={() => setMenuOpen((open) => !open)} style={card.iconBtn}>
+        <MoreVerticalIcon />
       </TouchableOpacity>
+      {menuOpen && (
+        <View style={card.taskMenu}>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            style={card.taskMenuItem}
+            onPress={() => {
+              setMenuOpen(false);
+              onEdit(task);
+            }}
+          >
+            <Text style={card.taskMenuText}>Edit task</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            style={card.taskMenuItem}
+            onPress={() => {
+              setMenuOpen(false);
+              onDelete(task);
+            }}
+          >
+            <Text style={[card.taskMenuText, card.taskMenuDeleteText]}>Delete task</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={card.dragSurface}>
         <View {...panResponder.panHandlers} style={card.topRow}>
@@ -338,6 +371,7 @@ function BoardColumn({
   column,
   tasks,
   onDeleteTask,
+  onEditTask,
   onDueDatePress,
   onCreateTask,
   onDeleteColumn,
@@ -348,6 +382,7 @@ function BoardColumn({
   column: KanbanBoardColumn;
   tasks: BoardTask[];
   onDeleteTask: (task: BoardTask) => void;
+  onEditTask: (task: BoardTask) => void;
   onDueDatePress: (task: BoardTask) => void;
   onCreateTask: (column: KanbanBoardColumn) => void;
   onDeleteColumn: (column: KanbanBoardColumn) => void;
@@ -401,6 +436,7 @@ function BoardColumn({
             <TaskCard
               key={task.id}
               task={task}
+              onEdit={onEditTask}
               onDelete={onDeleteTask}
               onDueDatePress={onDueDatePress}
               onDragStateChange={onDragStateChange}
@@ -413,7 +449,7 @@ function BoardColumn({
 
       <TouchableOpacity activeOpacity={0.8} onPress={() => onCreateTask(column)} style={columnStyles.addTaskBtn}>
         <PlusIcon color={T.primary} />
-        <Text style={columnStyles.addTaskText}>Add task</Text>
+        <Text style={columnStyles.addTaskText}>Create</Text>
       </TouchableOpacity>
     </View>
   );
@@ -639,6 +675,7 @@ export default function ProjectBoardScreen({
     moveTask,
     createTask,
     deleteTask,
+    updateTaskTitle,
     updateTaskDueDate,
     createColumn,
     deleteColumn,
@@ -653,6 +690,8 @@ export default function ProjectBoardScreen({
   const [newTaskDueDate, setNewTaskDueDate] = useState<string | null>(null);
   const [newTaskAssigneeId, setNewTaskAssigneeId] = useState<number | null>(null);
   const [newColumnName, setNewColumnName] = useState('');
+  const [editingTask, setEditingTask] = useState<BoardTask | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showCreateDatePicker, setShowCreateDatePicker] = useState(false);
@@ -761,6 +800,11 @@ export default function ProjectBoardScreen({
     setNewTaskDueDate(null);
     setNewTaskAssigneeId(null);
     setShowTaskModal(true);
+  };
+
+  const openEditTask = (task: BoardTask) => {
+    setEditingTask(task);
+    setEditTaskTitle(task.title);
   };
 
   const openDatePicker = (task: BoardTask) => {
@@ -879,6 +923,20 @@ export default function ProjectBoardScreen({
         },
       },
     ]);
+  };
+
+  const submitEditTask = async () => {
+    if (!editingTask || !editTaskTitle.trim()) return;
+    setSubmitting(true);
+    try {
+      await updateTaskTitle(editingTask.id, editTaskTitle);
+      setEditingTask(null);
+      setEditTaskTitle('');
+    } catch {
+      Alert.alert('Task not updated', 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const confirmDeleteColumn = (column: KanbanBoardColumn) => {
@@ -1029,6 +1087,7 @@ export default function ProjectBoardScreen({
                   column={column}
                   tasks={columnTasks[column.status] || []}
                   onDeleteTask={confirmDeleteTask}
+                  onEditTask={openEditTask}
                   onDueDatePress={openDatePicker}
                   onCreateTask={openCreateTask}
                   onDeleteColumn={confirmDeleteColumn}
@@ -1186,6 +1245,31 @@ export default function ProjectBoardScreen({
               {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={modal.primaryText}>Create task</Text>}
             </TouchableOpacity>
             <TouchableOpacity activeOpacity={0.8} onPress={() => setShowTaskModal(false)} style={modal.secondaryBtn}>
+              <Text style={modal.secondaryText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={!!editingTask} transparent animationType="slide">
+        <SafeAreaView style={modal.safe}>
+          <View style={modal.sheet}>
+            <View style={modal.handle} />
+            <Text style={modal.title}>Edit task</Text>
+            <Text style={modal.subtitle}>Update task title</Text>
+            <TextInput
+              style={modal.input}
+              value={editTaskTitle}
+              onChangeText={setEditTaskTitle}
+              placeholder="Task title"
+              placeholderTextColor="#94A3B8"
+              editable={!submitting}
+              autoFocus
+            />
+            <TouchableOpacity activeOpacity={0.85} disabled={submitting || !editTaskTitle.trim()} onPress={submitEditTask} style={[modal.primaryBtn, (!editTaskTitle.trim() || submitting) && modal.disabled]}>
+              {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={modal.primaryText}>Update task</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => setEditingTask(null)} style={modal.secondaryBtn}>
               <Text style={modal.secondaryText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -1438,7 +1522,7 @@ const columnStyles = StyleSheet.create({
   },
   countText: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
   wipText: { color: '#DC2626' },
-  body: { paddingHorizontal: 12, gap: 10, overflow: 'visible' },
+  body: { paddingHorizontal: 24, gap: 10, overflow: 'visible' },
   emptyState: {
     minHeight: 128,
     borderRadius: 14,
@@ -1509,16 +1593,19 @@ const card = StyleSheet.create({
     position: 'absolute',
     top: 12,
     right: 12,
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
     zIndex: 10,
   },
+  taskMenu: { position: 'absolute', top: 44, right: 12, width: 148, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingVertical: 6, zIndex: 20, ...shadow },
+  taskMenuItem: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 14 },
+  taskMenuText: { fontSize: 13, fontWeight: '800', color: '#0F172A' },
+  taskMenuDeleteText: { color: '#DC2626' },
   title: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 20 },
   description: { fontSize: 12, color: '#64748B', lineHeight: 17 },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
