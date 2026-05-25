@@ -1,16 +1,20 @@
 package com.planora.backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.planora.backend.dto.GitHubRepositoryDTO;
 import com.planora.backend.dto.GitHubTaskData;
 import com.planora.backend.model.CiStatus;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,6 +43,55 @@ public class GitHubIntegrationService {
 
     @Autowired
     private CiStatusResolver ciStatusResolver;
+
+    /**
+     * Fetches the authenticated user's repositories from GitHub.
+     *
+     * This mirrors the old Express endpoint used by the frontend repo picker.
+     * The caller must provide a GitHub OAuth token or PAT.
+     */
+    public List<GitHubRepositoryDTO> fetchUserRepositories(String githubToken) {
+        if (isBlank(githubToken)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "GitHub token is required");
+        }
+
+        String url = GITHUB_API + "/user/repos?per_page=100&sort=updated";
+        HttpHeaders headers = buildHeaders(githubToken);
+
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+
+            JsonNode body = response.getBody();
+            if (body == null || !body.isArray()) {
+                return Collections.emptyList();
+            }
+
+            List<GitHubRepositoryDTO> repositories = new ArrayList<>();
+            for (JsonNode repo : body) {
+                repositories.add(toRepositoryDTO(repo));
+            }
+            return repositories;
+        } catch (HttpClientErrorException.Unauthorized e) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Invalid GitHub token. Please reconnect your account.", e);
+        } catch (HttpClientErrorException.TooManyRequests e) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "GitHub API rate limit exceeded. Please try again later.", e);
+        } catch (HttpClientErrorException.Forbidden e) {
+            String message = e.getResponseBodyAsString();
+            if (message != null && message.toLowerCase().contains("rate limit")) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "GitHub API rate limit exceeded. Please try again later.", e);
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Failed to fetch repositories from GitHub", e);
+        } catch (RestClientException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Failed to fetch repositories from GitHub", e);
+        }
+    }
 
     /**
      * Returns a populated {@link GitHubTaskData} for the given repo + branch, or
@@ -280,6 +333,20 @@ public class GitHubIntegrationService {
         headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
         headers.set(HttpHeaders.ACCEPT, "application/vnd.github.v3+json");
         return headers;
+    }
+
+    private GitHubRepositoryDTO toRepositoryDTO(JsonNode repo) {
+        JsonNode ownerNode = repo.path("owner");
+        return GitHubRepositoryDTO.builder()
+                .id(repo.path("id").asLong())
+                .name(repo.path("name").asText(""))
+                .fullName(repo.path("full_name").asText(""))
+                .privateRepo(repo.path("private").asBoolean(false))
+                .defaultBranch(repo.path("default_branch").asText(""))
+                .owner(GitHubRepositoryDTO.OwnerDTO.builder()
+                        .login(ownerNode.path("login").asText(""))
+                        .build())
+                .build();
     }
 
     private boolean isBlank(String s) {
