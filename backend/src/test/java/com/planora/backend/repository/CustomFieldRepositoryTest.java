@@ -32,7 +32,7 @@ class CustomFieldRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        
+
         User owner = new User();
         owner.setEmail("owner@test.com");
         owner.setUsername("owner");

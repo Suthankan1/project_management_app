@@ -13,4 +13,5 @@ public interface ProjectFavoriteRepository extends JpaRepository<ProjectFavorite
     List<ProjectFavorite> findByUserOrderByCreatedAtDesc(User user);  // most recently favourited first
     boolean existsByUserAndProject(User user, Project project);
     void deleteByUserAndProject(User user, Project project);
+    void deleteByProject(Project project);
 }
