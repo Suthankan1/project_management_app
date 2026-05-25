@@ -17,21 +17,20 @@ const ROW_H = 44;
 const TAB_GAP = 6;
 const ICON_SZ = 20;
 
-export type ProjectTab = 'summary' | 'backlog' | 'board' | 'chat' | 'more' | string;
+export type ProjectTab = 'summary' | 'backlog' | 'board' | 'timeline' | 'more' | string;
 export type MoreTab =
-  | 'timeline' | 'calendar' | 'burndown' | 'milestone'
+  | 'calendar' | 'burndown' | 'milestone'
   | 'members' | 'pages' | 'docs' | 'list' | 'report';
 
 const TABS: { key: ProjectTab; label: string }[] = [
   { key: 'summary', label: 'Summary' },
   { key: 'backlog', label: 'Backlog' },
   { key: 'board', label: 'Board' },
-  { key: 'chat', label: 'Chat' },
+  { key: 'timeline', label: 'Timeline' },
   { key: 'more', label: 'More' },
 ];
 
 const MORE_ITEMS: { key: MoreTab; label: string; emoji: string }[] = [
-  { key: 'timeline', label: 'Timeline', emoji: '📅' },
   { key: 'calendar', label: 'Calendar', emoji: '🗓️' },
   { key: 'burndown', label: 'Burndown', emoji: '📉' },
   { key: 'milestone', label: 'Milestone', emoji: '🚩' },
@@ -295,7 +294,7 @@ export default function ProjectTopNav({
       0: { w: activeTab === 'summary' ? ACTIVE_W : INACTIVE_W, m: TAB_GAP, o: 1 },
       1: { w: activeTab === 'backlog' ? ACTIVE_W : INACTIVE_W, m: TAB_GAP, o: 1 },
       2: { w: activeTab === 'board' ? ACTIVE_W : INACTIVE_W, m: TAB_GAP, o: 1 },
-      3: { w: activeTab === 'chat' ? ACTIVE_W : INACTIVE_W, m: TAB_GAP, o: 1 },
+      3: { w: activeTab === 'timeline' ? ACTIVE_W : INACTIVE_W, m: TAB_GAP, o: 1 },
       4: {
         w: isDynamicActive ? (activeTab === activeMoreTab ? ACTIVE_W : INACTIVE_W) : 0,
         m: isDynamicActive ? TAB_GAP : 0,
@@ -385,7 +384,7 @@ export default function ProjectTopNav({
           <TabBtn tab={TABS[0]} widthAnim={widths[0]} marginAnim={margins[0]} opacityAnim={opacities[0]} active={activeTab === 'summary'} onPress={() => handlePress('summary')} />
           <TabBtn tab={TABS[1]} widthAnim={widths[1]} marginAnim={margins[1]} opacityAnim={opacities[1]} active={activeTab === 'backlog'} onPress={() => handlePress('backlog')} />
           <TabBtn tab={TABS[2]} widthAnim={widths[2]} marginAnim={margins[2]} opacityAnim={opacities[2]} active={activeTab === 'board'} onPress={() => handlePress('board')} />
-          <TabBtn tab={TABS[3]} widthAnim={widths[3]} marginAnim={margins[3]} opacityAnim={opacities[3]} active={activeTab === 'chat'} onPress={() => handlePress('chat')} />
+          <TabBtn tab={TABS[3]} widthAnim={widths[3]} marginAnim={margins[3]} opacityAnim={opacities[3]} active={activeTab === 'timeline'} onPress={() => handlePress('timeline')} />
 
           <TabBtn
             tab={{ key: dynamicTabKey || 'report', label: MORE_ITEMS.find(m => m.key === dynamicTabKey)?.label || 'Report' }}
@@ -603,4 +602,3 @@ const ds = StyleSheet.create({
     backgroundColor: T.primary,
   },
 });
-
