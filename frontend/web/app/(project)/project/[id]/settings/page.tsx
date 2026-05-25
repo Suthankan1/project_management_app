@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
-  AlertTriangle, Trash2, ChevronLeft, Settings2,
+  AlertTriangle, Trash2,
   Layers, FileText, Shield, Loader2, CheckCircle2,
   X, Info,
 } from 'lucide-react';
@@ -13,8 +13,6 @@ import {
   setScopedProjectValue,
   removeScopedProjectValue,
 } from '@/hooks/useProjectContext';
-import CustomFieldsManager from './CustomFieldsManager';
-
 type ProjectType = 'AGILE' | 'KANBAN';
 
 interface ProjectData {
@@ -127,7 +125,6 @@ function DeleteConfirmModal({
               'All tasks, subtasks, and their attachments',
               'All sprint data, boards, and history',
               'All team member associations',
-              'All custom fields and configurations',
               'All milestones and project documents',
             ].map((item) => (
               <li key={item} className="flex items-start gap-2 text-xs text-red-700">
@@ -432,275 +429,224 @@ export default function ProjectSettingsPage() {
   return (
     <>
       <div className="min-h-full bg-slate-50/70">
-        {/* Sticky page header */}
-        <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
-            <button
-              onClick={() => router.back()}
-              className="p-2 -ml-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-              aria-label="Go back"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div className="h-5 w-px bg-slate-200" />
-            <div className="flex-1 min-w-0">
-              <h1 className="text-sm font-bold text-slate-900 leading-none">Project Settings</h1>
-              {project && (
-                <p className="text-xs text-slate-400 mt-0.5 truncate">{project.name}</p>
-              )}
-            </div>
-          </div>
-        </div>
 
-        {/* Loading state */}
+{/* ── Loading ───────────────────────────────────────────────── */}
         {loading && (
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-3 py-20">
             <Loader2 size={26} className="animate-spin text-slate-300" />
             <p className="text-sm text-slate-400">Loading settings…</p>
           </div>
         )}
 
-        {/* Settings content */}
+        {/* ── Content grid ──────────────────────────────────────────── */}
         {!loading && (
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-4 pb-20">
+          <div className="px-6 py-6 pb-20">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 items-start">
 
-            {/* ── General ─────────────────────────────────────────── */}
-            <SectionCard
-              title="General"
-              description="Project name and description"
-              icon={<FileText size={15} />}
-            >
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                    Project Name
-                  </label>
-                  <input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter project name"
-                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-white"
-                  />
-                </div>
+              {/* ── Left column (3/5) ── General + Project Type ──── */}
+              <div className="lg:col-span-3 space-y-5">
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                    Description
-                    <span className="ml-1.5 font-normal text-slate-400">(optional)</span>
-                  </label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Describe what this project is about…"
-                    rows={3}
-                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-white resize-none"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
-                  <div className="h-5">
-                    {generalSaved && (
-                      <span className="flex items-center gap-1.5 text-xs text-emerald-600">
-                        <CheckCircle2 size={13} />
-                        Changes saved
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    onClick={handleSaveGeneral}
-                    disabled={!isDirtyGeneral || isSavingGeneral}
-                    className="h-9 px-5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm shadow-blue-100"
-                  >
-                    {isSavingGeneral ? (
-                      <Loader2 size={13} className="animate-spin" />
-                    ) : null}
-                    {isSavingGeneral ? 'Saving…' : 'Save Changes'}
-                  </button>
-                </div>
-              </div>
-            </SectionCard>
-
-            {/* ── Project Identity ─────────────────────────────────── */}
-            {project && (
-              <SectionCard
-                title="Project Identity"
-                description="Read-only metadata about this project"
-                icon={<Info size={15} />}
-              >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[
-                    { label: 'Project Key', value: project.projectKey },
-                    {
-                      label: 'Created',
-                      value: project.createdAt
-                        ? new Date(project.createdAt).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })
-                        : undefined,
-                    },
-                    { label: 'Team', value: project.teamName },
-                    { label: 'Owner', value: project.ownerName },
-                  ]
-                    .filter((f) => f.value)
-                    .map(({ label, value }) => (
-                      <div key={label}>
-                        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
-                          {label}
-                        </p>
-                        <div className="h-9 px-3.5 border border-slate-100 rounded-xl bg-slate-50 flex items-center">
-                          <span className="text-sm text-slate-700 font-medium truncate">
-                            {value}
+                {/* General */}
+                <SectionCard
+                  title="General"
+                  description="Project name and description"
+                  icon={<FileText size={15} />}
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                        Project Name
+                      </label>
+                      <input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Enter project name"
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                        Description
+                        <span className="ml-1.5 font-normal text-slate-400">(optional)</span>
+                      </label>
+                      <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Describe what this project is about…"
+                        rows={4}
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-white resize-none"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="h-5">
+                        {generalSaved && (
+                          <span className="flex items-center gap-1.5 text-xs text-emerald-600">
+                            <CheckCircle2 size={13} />
+                            Changes saved
                           </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={handleSaveGeneral}
+                        disabled={!isDirtyGeneral || isSavingGeneral}
+                        className="h-9 px-5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm shadow-blue-100"
+                      >
+                        {isSavingGeneral && <Loader2 size={13} className="animate-spin" />}
+                        {isSavingGeneral ? 'Saving…' : 'Save Changes'}
+                      </button>
+                    </div>
+                  </div>
+                </SectionCard>
+
+                {/* Project Type */}
+                <SectionCard
+                  title="Project Type"
+                  description="Choose how your team manages and tracks work"
+                  icon={<Layers size={15} />}
+                >
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* AGILE */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedType('AGILE')}
+                      className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
+                        selectedType === 'AGILE'
+                          ? 'border-blue-500 bg-blue-50/70 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${selectedType === 'AGILE' ? 'border-blue-500 bg-blue-500' : 'border-slate-300'}`}>
+                            {selectedType === 'AGILE' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                          </div>
+                          <span className="text-sm font-bold text-slate-900">Agile</span>
                         </div>
-                      </div>
-                    ))}
-                </div>
-              </SectionCard>
-            )}
-
-            {/* ── Project Type ─────────────────────────────────────── */}
-            <SectionCard
-              title="Project Type"
-              description="Choose how your team manages and tracks work"
-              icon={<Layers size={15} />}
-            >
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* AGILE */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedType('AGILE')}
-                  className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
-                    selectedType === 'AGILE'
-                      ? 'border-blue-500 bg-blue-50/70 shadow-sm'
-                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${
-                          selectedType === 'AGILE'
-                            ? 'border-blue-500 bg-blue-500'
-                            : 'border-slate-300'
-                        }`}
-                      >
-                        {selectedType === 'AGILE' && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                        {project?.type === 'AGILE' && (
+                          <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-full">Current</span>
                         )}
                       </div>
-                      <span className="text-sm font-bold text-slate-900">Agile</span>
-                    </div>
-                    {project?.type === 'AGILE' && (
-                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-full">
-                        Current
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Sprint-based workflow with backlog management, burndown charts, and velocity tracking.
-                  </p>
-                </button>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Sprint-based workflow with backlog management, burndown charts, and velocity tracking.
+                      </p>
+                    </button>
 
-                {/* KANBAN */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedType('KANBAN')}
-                  className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
-                    selectedType === 'KANBAN'
-                      ? 'border-blue-500 bg-blue-50/70 shadow-sm'
-                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${
-                          selectedType === 'KANBAN'
-                            ? 'border-blue-500 bg-blue-500'
-                            : 'border-slate-300'
-                        }`}
-                      >
-                        {selectedType === 'KANBAN' && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                    {/* KANBAN */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedType('KANBAN')}
+                      className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
+                        selectedType === 'KANBAN'
+                          ? 'border-blue-500 bg-blue-50/70 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${selectedType === 'KANBAN' ? 'border-blue-500 bg-blue-500' : 'border-slate-300'}`}>
+                            {selectedType === 'KANBAN' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                          </div>
+                          <span className="text-sm font-bold text-slate-900">Kanban</span>
+                        </div>
+                        {project?.type === 'KANBAN' && (
+                          <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-full">Current</span>
                         )}
                       </div>
-                      <span className="text-sm font-bold text-slate-900">Kanban</span>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Continuous flow with a visual board, column management, and WIP limit support.
+                      </p>
+                    </button>
+                  </div>
+
+                  {isTypeDirty && (
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                      <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex-1">
+                        <AlertTriangle size={13} className="shrink-0" />
+                        <span>Changing project type may affect existing workflow data</span>
+                      </div>
+                      <button
+                        onClick={() => setShowTypeModal(true)}
+                        className="h-9 px-5 bg-amber-500 text-white text-sm font-semibold rounded-xl hover:bg-amber-600 active:bg-amber-700 transition-colors shrink-0 shadow-sm shadow-amber-100"
+                      >
+                        Apply Change
+                      </button>
                     </div>
-                    {project?.type === 'KANBAN' && (
-                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-full">
-                        Current
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Continuous flow with a visual board, column management, and WIP limit support.
-                  </p>
-                </button>
+                  )}
+                </SectionCard>
+
               </div>
 
-              {isTypeDirty && (
-                <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                  <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex-1">
-                    <AlertTriangle size={13} className="shrink-0" />
-                    <span>Changing project type may affect existing workflow data</span>
-                  </div>
-                  <button
-                    onClick={() => setShowTypeModal(true)}
-                    className="h-9 px-5 bg-amber-500 text-white text-sm font-semibold rounded-xl hover:bg-amber-600 active:bg-amber-700 transition-colors shrink-0 shadow-sm shadow-amber-100"
+              {/* ── Right column (2/5) ── Identity + Danger Zone ─── */}
+              <div className="lg:col-span-2 space-y-5">
+
+                {/* Project Identity */}
+                {project && (
+                  <SectionCard
+                    title="Project Identity"
+                    description="Read-only metadata"
+                    icon={<Info size={15} />}
                   >
-                    Apply Change
-                  </button>
-                </div>
-              )}
-            </SectionCard>
+                    <div className="space-y-3">
+                      {[
+                        { label: 'Project Key', value: project.projectKey },
+                        {
+                          label: 'Created',
+                          value: project.createdAt
+                            ? new Date(project.createdAt).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })
+                            : undefined,
+                        },
+                        { label: 'Team', value: project.teamName },
+                        { label: 'Owner', value: project.ownerName },
+                      ]
+                        .filter((f) => f.value)
+                        .map(({ label, value }) => (
+                          <div key={label}>
+                            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
+                              {label}
+                            </p>
+                            <div className="h-9 px-3.5 border border-slate-100 rounded-xl bg-slate-50 flex items-center">
+                              <span className="text-sm text-slate-700 font-medium truncate">{value}</span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </SectionCard>
+                )}
 
-            {/* ── Custom Fields ────────────────────────────────────── */}
-            <SectionCard
-              title="Custom Fields"
-              description="Add extra fields to all tasks in this project"
-              icon={<Settings2 size={15} />}
-            >
-              <CustomFieldsManager projectId={projectId} />
-            </SectionCard>
-
-            {/* ── Danger Zone ──────────────────────────────────────── */}
-            <div className="bg-white rounded-2xl border-2 border-red-100 overflow-hidden shadow-sm">
-              <div className="px-5 sm:px-6 py-4 border-b border-red-100 bg-red-50/40">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center text-red-500 shrink-0">
-                    <Shield size={15} />
+                {/* Danger Zone */}
+                <div className="bg-white rounded-2xl border-2 border-red-100 overflow-hidden shadow-sm">
+                  <div className="px-5 py-4 border-b border-red-100 bg-red-50/40">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center text-red-500 shrink-0">
+                        <Shield size={15} />
+                      </div>
+                      <div>
+                        <h2 className="text-sm font-semibold text-red-900">Danger Zone</h2>
+                        <p className="text-xs text-red-500 mt-0.5">Irreversible actions</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-sm font-semibold text-red-900">Danger Zone</h2>
-                    <p className="text-xs text-red-500 mt-0.5">
-                      Irreversible actions — proceed with caution
+                  <div className="px-5 py-5">
+                    <h3 className="text-sm font-semibold text-slate-900 mb-1">Delete this project</h3>
+                    <p className="text-xs text-slate-500 leading-relaxed mb-4">
+                      Permanently removes all tasks, members, and sprints. This cannot be reversed.
                     </p>
+                    <button
+                      onClick={() => setShowDeleteModal(true)}
+                      className="w-full h-9 bg-white border-2 border-red-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 hover:border-red-300 active:bg-red-100 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Trash2 size={14} />
+                      Delete Project
+                    </button>
                   </div>
                 </div>
-              </div>
 
-              <div className="px-5 sm:px-6 py-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-slate-900">Delete this project</h3>
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                      Permanently remove this project and all associated data including tasks,
-                      members, sprints, and custom fields. This cannot be reversed.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowDeleteModal(true)}
-                    className="h-9 px-4 bg-white border-2 border-red-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 hover:border-red-300 active:bg-red-100 transition-all shrink-0 flex items-center gap-2 self-start sm:self-auto"
-                  >
-                    <Trash2 size={14} />
-                    Delete Project
-                  </button>
-                </div>
               </div>
             </div>
-
           </div>
         )}
       </div>

@@ -341,6 +341,8 @@ public class ProjectService {
     public void deleteProject(Long projectId, Long teamId, Long userId) {
         Project project = findProjectById(projectId);
         validateOwnerPermission(teamId, userId);
+        projectAccessRepository.deleteByProject_Id(projectId);
+        projectFavoriteRepository.deleteByProject(project);
         projectRepository.delete(project);
     }
 
