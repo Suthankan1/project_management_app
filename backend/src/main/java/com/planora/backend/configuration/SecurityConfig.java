@@ -59,6 +59,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(request -> request
                 .requestMatchers(PUBLIC_ENDPOINTS.toArray(new String[0]))
                         .permitAll()
+                .requestMatchers("/api/github/issues")
+                        .authenticated()
                         .anyRequest().authenticated())
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
