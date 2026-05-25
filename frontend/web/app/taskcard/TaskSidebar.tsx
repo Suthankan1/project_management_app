@@ -8,7 +8,6 @@ import PrioritySection from './sidebar/PrioritySection';
 import StoryPointSection from './sidebar/StoryPointSection';
 import DateSection from './sidebar/DateSection';
 import RecurrenceSection from './sidebar/RecurrenceSection';
-import CustomFieldsSection from './sidebar/CustomFieldsSection';
 import SidebarField from './sidebar/SidebarField';
 import { Check, ChevronDown, Plus } from 'lucide-react';
 
@@ -72,7 +71,6 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
   const [sections, setSections] = React.useState<Record<string, boolean>>({
     details: true,
     dates: true,
-    customFields: true,
   });
   const [labelMenuOpen, setLabelMenuOpen] = React.useState(false);
   const [selectedLabelIds, setSelectedLabelIds] = React.useState<number[]>(labelIds);
@@ -263,14 +261,6 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
         </button>
         {sections.dates && <DateSection dates={dates} onUpdateDueDate={canEdit ? onUpdateDueDate : undefined} onUpdateStartDate={canEdit ? onUpdateStartDate : undefined} />}
       </div>
-      {taskId != null && projectId != null && (
-        <div className="border border-[#E5E7EB] rounded-xl bg-white shadow-sm overflow-hidden">
-          <button onClick={() => toggleSection('customFields')} className="w-full px-4 py-2.5 border-b border-[#F2F4F7] text-[10px] font-bold text-[#6A7282] uppercase tracking-wider flex items-center justify-between">
-            Custom Fields <ChevronDown size={14} className={`transition-transform ${sections.customFields ? '' : '-rotate-90'}`} />
-          </button>
-          {sections.customFields && <div className="p-4"><CustomFieldsSection taskId={taskId} projectId={projectId} readOnly={!canEdit} /></div>}
-        </div>
-      )}
       <div className="text-[10px] text-[#9CA3AF] flex justify-between px-1 pb-2">
         <button className="hover:text-[#374151] transition-colors">Configure fields</button>
         <button className="hover:text-[#374151] transition-colors">Plain Text</button>
