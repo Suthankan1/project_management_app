@@ -1,11 +1,7 @@
 import React, { type ComponentProps, useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-<<<<<<< HEAD
   Platform, Animated, Dimensions, Modal, Pressable,
-=======
-  Platform, Animated, Dimensions, TouchableWithoutFeedback,
->>>>>>> 8afc0e8c0a44b8b39460d577342f676f7009fea6
 } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';

@@ -1,2 +1,0 @@
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS github_issue_number BIGINT;
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS github_repo_full_name VARCHAR(255);

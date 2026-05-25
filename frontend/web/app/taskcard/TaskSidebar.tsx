@@ -10,6 +10,7 @@ import StoryPointSection from './sidebar/StoryPointSection';
 import DateSection from './sidebar/DateSection';
 import RecurrenceSection from './sidebar/RecurrenceSection';
 import CustomFieldsSection from './sidebar/CustomFieldsSection';
+import TaskGitHubSection from './sidebar/TaskGitHubSection';
 import SidebarField from './sidebar/SidebarField';
 import { Check, ChevronDown, Link2, Plus } from 'lucide-react';
 import GitHubIssueBadge from '@/components/github/GitHubIssueBadge';
@@ -276,6 +277,9 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
         </button>
         {sections.dates && <DateSection dates={dates} onUpdateDueDate={canEdit ? onUpdateDueDate : undefined} onUpdateStartDate={canEdit ? onUpdateStartDate : undefined} />}
       </div>
+      {taskId != null && (
+        <TaskGitHubSection taskId={taskId} projectId={projectId} />
+      )}
       {taskId != null && projectId != null && (
         <div className="border border-[#E5E7EB] rounded-xl bg-white shadow-sm overflow-hidden">
           <button onClick={() => toggleSection('customFields')} className="w-full px-4 py-2.5 border-b border-[#F2F4F7] text-[10px] font-bold text-[#6A7282] uppercase tracking-wider flex items-center justify-between">

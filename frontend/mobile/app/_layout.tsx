@@ -71,7 +71,6 @@ export default function RootLayout() {
   }, [showSplash, authChecked, isAuthed]);
 
   return (
-<<<<<<< HEAD
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.root}>
         {/* Stack navigator — always mounted so screens can prepare */}
@@ -84,26 +83,11 @@ export default function RootLayout() {
           <Stack.Screen name="create-project/index"   options={{ headerShown: false, animation: 'slide_from_bottom' }} />
           <Stack.Screen name="create-project/setup"   options={{ headerShown: false, animation: 'slide_from_right' }} />
           <Stack.Screen name="create-project/invite"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-          <Stack.Screen name="modal"                  options={{ presentation: 'modal' }} />
+          <Stack.Screen name="portfolios/index"                options={{ headerShown: false, animation: 'slide_from_right' }} />
+          <Stack.Screen name="portfolios/[id]"                 options={{ headerShown: false, animation: 'slide_from_right' }} />
+          <Stack.Screen name="project/[projectId]/settings"    options={{ headerShown: false, animation: 'slide_from_right' }} />
+          <Stack.Screen name="modal"                           options={{ presentation: 'modal' }} />
         </Stack>
-=======
-    <View style={styles.root}>
-      {/* Stack navigator — always mounted so screens can prepare */}
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index"                  options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)"                 options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)"                 options={{ headerShown: false }} />
-        <Stack.Screen name="summary/[projectId]"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="board/[projectId]"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="create-project/index"   options={{ headerShown: false, animation: 'slide_from_bottom' }} />
-        <Stack.Screen name="create-project/setup"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="create-project/invite"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="portfolios/index"                options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="portfolios/[id]"              options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="project/[projectId]/settings" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="modal"                        options={{ presentation: 'modal' }} />
-      </Stack>
->>>>>>> 8afc0e8c0a44b8b39460d577342f676f7009fea6
 
         {/* Custom splash overlaid above everything, removed after animation */}
         {showSplash && (

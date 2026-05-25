@@ -5,13 +5,8 @@ import Image from 'next/image';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Task, Subtask } from '../../(project)/kanban/types';
-<<<<<<< HEAD
 import { Calendar, Trash2, Edit2 } from 'lucide-react';
 import GitHubIssueBadge from '@/components/github/GitHubIssueBadge';
-=======
-import { Calendar, GitPullRequest, Trash2, Edit2 } from 'lucide-react';
-import { CIStatusBadge } from '@/components/ui';
->>>>>>> 8afc0e8c0a44b8b39460d577342f676f7009fea6
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
@@ -123,28 +118,8 @@ export default function KanbanCard({ task, onDelete, onEdit, onOpenTask, usersMa
         </div>
       )}
 
-<<<<<<< HEAD
       {/* Assignee + Subtask + GitHub row */}
       {(task.assigneeName || totalSubtasks > 0 || task.githubIssueNumber) && (
-=======
-      {/* GitHub: CI status + open PR count */}
-      {(task.ciStatus || (task.openPrCount ?? 0) > 0) && (
-        <div className="flex items-center gap-1.5 mb-2">
-          {task.ciStatus && (
-            <CIStatusBadge status={task.ciStatus} size="sm" showLabel={false} />
-          )}
-          {(task.openPrCount ?? 0) > 0 && (
-            <span className="inline-flex items-center gap-0.5 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700">
-              <GitPullRequest size={9} aria-hidden="true" />
-              {task.openPrCount}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Assignee + Subtask row */}
-      {(task.assigneeName || totalSubtasks > 0) && (
->>>>>>> 8afc0e8c0a44b8b39460d577342f676f7009fea6
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mt-2 min-w-0">
           {task.assigneeName ? (
             <div className="flex items-center gap-1.5 min-w-0">

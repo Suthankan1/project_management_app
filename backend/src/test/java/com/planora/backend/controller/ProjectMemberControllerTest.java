@@ -18,7 +18,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -51,24 +51,24 @@ class ProjectMemberControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockitoBean
-    private ProjectRepository projectRepository;
-    @MockitoBean
-    private TeamMemberRepository teamMemberRepository;
-    @MockitoBean
-    private TeamInvitationRepository teamInvitationRepository;
-    @MockitoBean
-    private TaskRepository taskRepository;
-    @MockitoBean
-    private TeamMemberService teamMemberService;
-    @MockitoBean
-    private UserService userService;
-        @MockitoBean
+    @MockBean
+        private ProjectRepository projectRepository;
+    @MockBean
+        private TeamMemberRepository teamMemberRepository;
+    @MockBean
+        private TeamInvitationRepository teamInvitationRepository;
+    @MockBean
+        private TaskRepository taskRepository;
+    @MockBean
+        private TeamMemberService teamMemberService;
+    @MockBean
+        private UserService userService;
+        @MockBean
         private SimpMessagingTemplate simpMessagingTemplate;
-    @MockitoBean
-    private JWTService jwtService;
-    @MockitoBean
-    private UserDetailsService userDetailsService;
+    @MockBean
+        private JWTService jwtService;
+    @MockBean
+        private UserDetailsService userDetailsService;
 
     private Team team;
     private Project project;

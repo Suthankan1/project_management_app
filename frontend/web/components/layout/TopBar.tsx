@@ -3,8 +3,8 @@
 // Global TopBar component containing search, notifications, project title, and dynamic project tabs based on the active route.
 import { useState, useEffect, useSyncExternalStore, Suspense, useRef, useMemo } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { Menu, Plus } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
+import { Menu, Plus, Settings } from 'lucide-react';
 
 import { useNavigation } from '@/lib/navigation-context';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -23,8 +23,9 @@ import { useProjectTabs } from '@/hooks/useProjectTabs';
 
 function TopBarContent() {
   const router = useRouter();
+  const pathname = usePathname();
   const { profilePicUrl: resolvedProfilePicUrl } = useCurrentUser();
-  
+
   const token = useSyncExternalStore<string | null>(subscribeToBrowserStorage, () => getValidToken(), () => null);
   const user = useMemo<User | null>(() => token ? getUserFromToken() : null, [token]);
 
@@ -190,6 +191,22 @@ function TopBarContent() {
 
         {/* Right Side Actions */}
         <div className="flex items-center gap-4 flex-1 justify-end max-w-[900px] ml-auto">
+          {/* Settings Icon — left of search */}
+          {projectId && (
+            <button
+              onClick={() => router.push(`/project/${projectId}/settings`)}
+              className={`p-2 rounded-lg transition-all shrink-0 ${
+                pathname.includes('/settings')
+                  ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-100'
+                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+              }`}
+              title="Project Settings"
+              aria-label="Project Settings"
+            >
+              <Settings size={18} strokeWidth={pathname.includes('/settings') ? 2.5 : 2} />
+            </button>
+          )}
+
           {/* Global Search Bar - Hidden on small screens to save space */}
           <div className="flex-1 max-w-[400px] hidden md:block">
             <GlobalSearch projectId={projectId} />
