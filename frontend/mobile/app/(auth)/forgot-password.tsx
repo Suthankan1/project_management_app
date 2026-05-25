@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,31 +7,75 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useForgotPassword } from '@/src/hooks/useForgotPassword';
 import BrandHeader from '@/src/components/ui/BrandHeader';
 import TextInputField from '@/src/components/ui/TextInputField';
 import PrimaryButton from '@/src/components/ui/PrimaryButton';
 import ErrorBanner from '@/src/components/ui/ErrorBanner';
 import { Colors } from '@/src/constants/colors';
-import { isWeb } from '@/src/lib/platform';
+import { shouldUseNativeDriver } from '@/src/lib/platform';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const {
     email, setEmail,
     isLoading,
-    submitted, setSubmitted,
+    submitted,
     error,
     countdown,
     handleSubmit,
+    handleReset,
   } = useForgotPassword();
 
+  const cardAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(cardAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 60,
+      friction: 10,
+      delay: 80,
+    }).start();
+  }, [cardAnim]);
+
+  const cardStyle = {
+    opacity: cardAnim,
+    transform: [{
+      translateY: cardAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [24, 0],
+      }),
+    }],
+  };
+
+  const scaleAnim = useRef(new Animated.Value(0.5)).current;
+
+  useEffect(() => {
+    if (submitted) {
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 80,
+        friction: 10,
+        useNativeDriver: shouldUseNativeDriver,
+      }).start();
+    }
+  }, [submitted]);
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <LinearGradient
+      colors={['#F0F4FF', '#F8FAFC', '#FDF0FA']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.gradient}
+    >
+      <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -39,24 +83,24 @@ export default function ForgotPasswordScreen() {
           <ScrollView
             style={styles.flex}
             contentContainerStyle={styles.scrollContent}
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
             {/* Back */}
             <TouchableOpacity
-              style={styles.backRow}
+              style={styles.backButton}
               onPress={() => router.push('/(auth)/login')}
             >
-              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+              <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
                 <Path
                   d="M15 18l-6-6 6-6"
-                  stroke={Colors.textMuted}
-                  strokeWidth={2}
+                  stroke={Colors.textPrimary}
+                  strokeWidth={2.5}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
               </Svg>
-              <Text style={styles.backText}>Back to login</Text>
             </TouchableOpacity>
 
             {/* Brand */}
@@ -68,7 +112,8 @@ export default function ForgotPasswordScreen() {
             </View>
 
             {/* Card */}
-            <View style={styles.card}>
+            <Animated.View style={cardStyle}>
+            <BlurView intensity={20} tint="light" style={styles.card}>
               {!submitted ? (
                 /* Input State */
                 <View style={styles.formGap}>
@@ -94,17 +139,24 @@ export default function ForgotPasswordScreen() {
               ) : (
                 /* Success State */
                 <View style={styles.successContainer}>
-                  <View style={styles.successIcon}>
-                    <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
-                      <Path
-                        d="M5 13l4 4L19 7"
-                        stroke={Colors.successGreen}
-                        strokeWidth={2.5}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </Svg>
-                  </View>
+                  <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                    <LinearGradient
+                      colors={['#34D399', '#10B981']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.successIcon}
+                    >
+                      <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+                        <Path
+                          d="M5 13l4 4L19 7"
+                          stroke="#FFFFFF"
+                          strokeWidth={3}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </Svg>
+                    </LinearGradient>
+                  </Animated.View>
 
                   <Text style={styles.successTitle}>Check your email</Text>
                   <Text style={styles.successDesc}>
@@ -125,44 +177,50 @@ export default function ForgotPasswordScreen() {
                   ) : (
                     <TouchableOpacity
                       style={styles.resendButton}
-                      onPress={() => setSubmitted(false)}
+                      onPress={handleReset}
                     >
                       <Text style={styles.resendText}>Send to another email</Text>
                     </TouchableOpacity>
                   )}
                 </View>
               )}
-            </View>
+            </BlurView>
+            </Animated.View>
 
             <Text style={styles.footer}>© 2026 Planora. All rights reserved.</Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.pageBg,
+    backgroundColor: 'transparent',
   },
   flex: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    flexGrow: 1,
+    paddingBottom: 160,
   },
-  backRow: {
-    flexDirection: 'row',
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    minHeight: 44,
-  },
-  backText: {
-    fontSize: 14,
-    color: Colors.textMuted,
+    justifyContent: 'center',
+    marginTop: 16,
+    marginLeft: 20,
   },
   headerWrapper: {
     alignItems: 'center',
@@ -172,18 +230,21 @@ const styles = StyleSheet.create({
   card: {
     marginTop: 24,
     marginHorizontal: 20,
-    borderRadius: 24,
-    backgroundColor: Colors.cardBg,
+    borderRadius: 28,
+    backgroundColor: Platform.OS === 'ios' ? 'rgba(255, 255, 255, 0.82)' : 'rgba(255, 255, 255, 0.96)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
     padding: 24,
-    ...(isWeb
-      ? { boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)' }
-      : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.08,
-          shadowRadius: 16,
-        }),
-    elevation: 4,
+    ...Platform.select({
+      web: { boxShadow: '0 12px 28px rgba(99, 102, 241, 0.12)' },
+      default: {
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.12,
+        shadowRadius: 28,
+      },
+    }),
+    elevation: 16,
   },
   formGap: {
     gap: 16,
@@ -194,16 +255,15 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   successIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.successGreenBg,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   successTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: Colors.textPrimary,
     marginTop: 16,
     textAlign: 'center',
@@ -213,6 +273,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 8,
+    lineHeight: 22,
   },
   successEmail: {
     fontWeight: '700',
@@ -224,7 +285,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
     marginBottom: 24,
-    lineHeight: 18,
+    lineHeight: 22,
   },
   countdownText: {
     fontSize: 13,
@@ -245,7 +306,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: '#C0C8D8',
     textAlign: 'center',
     marginTop: 24,
   },

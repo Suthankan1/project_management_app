@@ -5,6 +5,7 @@ import com.planora.backend.dto.ProjectResponseDTO;
 import com.planora.backend.dto.UpdateProjectDTO;
 import com.planora.backend.dto.ProjectMetricsDTO;
 import com.planora.backend.exception.ConflictException;
+import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.model.*;
 import com.planora.backend.repository.ProjectAccessRepository;
 import com.planora.backend.repository.ProjectFavoriteRepository;
@@ -415,7 +416,7 @@ public class ProjectService {
     public ProjectMetricsDTO getProjectMetrics(Long projectId) {
         Project project = findProjectById(projectId);
 
-        List<Task> allTasks = taskRepository.findByProjectId(projectId);
+        List<Task> allTasks = taskRepository.findByProjectIdWithScalars(projectId);
 
         // Total tasks in the project.
         Long totalTasks = (long) allTasks.size();
@@ -446,7 +447,7 @@ public class ProjectService {
         Long activeSprintId = null;
         if (activeSprint != null) {
             activeSprintId = activeSprint.getId();
-            List<Task> sprintTasksList = taskRepository.findBySprintId(activeSprint.getId());
+            List<Task> sprintTasksList = taskRepository.findBySprintIdWithScalars(activeSprint.getId());
             Long sprintTasks = (long) sprintTasksList.size();
             Long sprintCompleted = sprintTasksList.stream()
                 .filter(task -> "DONE".equalsIgnoreCase(task.getStatus()))
@@ -468,10 +469,10 @@ public class ProjectService {
     private void validateOwnerPermission(Long teamId, Long userId) {
         TeamMember member = teamMemberRepository
                 .findByTeamIdAndUserUserId(teamId, userId)
-                .orElseThrow(() -> new RuntimeException("User is not a member of this team"));
+                .orElseThrow(() -> new ForbiddenException("You are not a member of this project's team"));
 
         if (member.getRole() != TeamRole.OWNER) {
-            throw new RuntimeException("Only PROJECT OWNER can delete this project");
+            throw new ForbiddenException("Only the project owner can delete this project");
         }
     }
 }

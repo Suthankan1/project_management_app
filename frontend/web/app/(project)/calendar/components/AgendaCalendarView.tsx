@@ -31,12 +31,14 @@ export default function AgendaCalendarView({ currentDate, events }: AgendaCalend
       <div className="max-h-[650px] overflow-y-auto">
         {days.map((day) => {
           const dayEvents = events.filter((event) => {
-            if (event.kind === 'sprint') {
-              return isDateInRange(day, event.startDate, event.endDate);
+            const start = toDate(event.startDate || event.dueDate || event.endDate);
+            const end = toDate(event.endDate || event.startDate || event.dueDate);
+
+            if (start && end && !isSameDay(start, end)) {
+              return isDateInRange(day, start.toISOString(), end.toISOString());
             }
 
-            const anchor = toDate(event.startDate || event.dueDate || event.endDate);
-            return anchor ? isSameDay(anchor, day) : false;
+            return start ? isSameDay(start, day) : false;
           });
 
           return (
@@ -47,9 +49,20 @@ export default function AgendaCalendarView({ currentDate, events }: AgendaCalend
 
               <div className="space-y-1.5">
                 {dayEvents.length > 0 ? (
-                  dayEvents.map((event) => (
-                    <CalendarEventCard key={`${event.id}-${day.toDateString()}`} event={event} onClick={handleEventClick} />
-                  ))
+                  dayEvents.map((event) => {
+                    const eventStart = toDate(event.startDate || event.dueDate || event.endDate);
+                    const eventEnd = toDate(event.endDate || event.startDate || event.dueDate);
+
+                    return (
+                      <CalendarEventCard
+                        key={`${event.id}-${day.toDateString()}`}
+                        event={event}
+                        onClick={handleEventClick}
+                        isRangeSegmentStart={!eventStart || isSameDay(day, eventStart)}
+                        isRangeSegmentEnd={!eventEnd || isSameDay(day, eventEnd)}
+                      />
+                    );
+                  })
                 ) : (
                   <div className="text-xs text-[#98A2B3]">No events</div>
                 )}

@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/colors';
+import { PlanoraIconMark, PlanoraWordmark } from './PlanoraLogoMark';
 
 type Props = {
   title: string;
@@ -11,19 +12,20 @@ type Props = {
 export default function BrandHeader({ title, subtitle }: Props) {
   return (
     <View style={styles.container}>
-      <View style={styles.iconBox}>
-        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
-          <Path
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-            stroke={Colors.white}
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </Svg>
+      {/* Glowing icon mark */}
+      <View style={styles.iconGlow}>
+        <PlanoraIconMark size={72} />
       </View>
-      <Text style={styles.appName}>Planora</Text>
+
+      {/* Wordmark */}
+      <View style={styles.wordmarkWrap}>
+        <PlanoraWordmark width={150} />
+      </View>
+
+      {/* Optional subtitle (page context, e.g. "Enter the reset code") */}
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+
+      {/* Page title (e.g. "Welcome Back", "Create Account") */}
       <Text style={styles.title}>{title}</Text>
     </View>
   );
@@ -32,32 +34,31 @@ export default function BrandHeader({ title, subtitle }: Props) {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
+    paddingVertical: 4,
   },
-  iconBox: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+  iconGlow: {
+    shadowColor: '#9810FA',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 0,
   },
-  appName: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-    marginTop: 16,
+  wordmarkWrap: {
+    marginTop: 10,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: Colors.textSecondary,
-    marginTop: 4,
+    marginTop: 8,
     textAlign: 'center',
+    lineHeight: 18,
   },
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '700',
     color: Colors.textPrimary,
-    marginTop: 4,
+    marginTop: 6,
     textAlign: 'center',
+    letterSpacing: -0.3,
   },
 });

@@ -92,6 +92,7 @@ export default function ProductBacklogSection({
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [showCreateTaskBox, setShowCreateTaskBox] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskTitleLength, setNewTaskTitleLength] = useState(0);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
   const canDeleteTask = currentUserRole !== 'VIEWER';
@@ -331,24 +332,36 @@ export default function ProductBacklogSection({
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (!newTaskTitle.trim()) { setShowCreateTaskBox(false); setNewTaskTitle(''); return; }
+                if (!newTaskTitle.trim()) { setShowCreateTaskBox(false); setNewTaskTitle(''); setNewTaskTitleLength(0); return; }
                 void onCreateTask({ title: newTaskTitle.trim(), storyPoint: 0, priority: 'MEDIUM' });
                 setNewTaskTitle('');
+                setNewTaskTitleLength(0);
                 setShowCreateTaskBox(false);
               }}
               className="mt-2 flex items-center gap-3 rounded-lg border-2 border-[#175CD3] bg-white px-3 py-1.5 transition-all duration-200"
             >
-              <input
-                type="text"
-                value={newTaskTitle}
-                onChange={(e) => setNewTaskTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') { setShowCreateTaskBox(false); setNewTaskTitle(''); }
-                }}
-                placeholder="Task name"
-                autoFocus
-                className="flex-1 min-w-0 bg-transparent text-[12px] font-medium text-[#101828] outline-none placeholder-[#98A2B3]"
-              />
+              <div className="flex-1 min-w-0">
+                <input
+                  type="text"
+                  maxLength={255}
+                  value={newTaskTitle}
+                  onChange={(e) => {
+                    setNewTaskTitle(e.target.value);
+                    setNewTaskTitleLength(e.target.value.length);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') { setShowCreateTaskBox(false); setNewTaskTitle(''); setNewTaskTitleLength(0); }
+                  }}
+                  placeholder="Task name"
+                  autoFocus
+                  className="w-full bg-transparent text-[12px] font-medium text-[#101828] outline-none placeholder-[#98A2B3]"
+                />
+                {newTaskTitleLength > 200 && (
+                  <p className="text-xs text-amber-500 mt-1">
+                    {255 - newTaskTitleLength} characters remaining
+                  </p>
+                )}
+              </div>
               <button
                 type="submit"
                 disabled={!newTaskTitle.trim()}

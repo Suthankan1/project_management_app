@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,36 +8,78 @@ import {
   Platform,
   StyleSheet,
   TextInput,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Path, Rect } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import api from '@/src/api/axios';
 import BrandHeader from '@/src/components/ui/BrandHeader';
 import PrimaryButton from '@/src/components/ui/PrimaryButton';
 import ErrorBanner from '@/src/components/ui/ErrorBanner';
 import { Colors } from '@/src/constants/colors';
-import { isWeb } from '@/src/lib/platform';
 
 export default function VerifyEmailScreen() {
   const router = useRouter();
   const { email } = useLocalSearchParams<{ email: string }>();
 
-  const [otp,            setOtp]            = useState('');
-  const [isLoading,      setIsLoading]      = useState(false);
-  const [isResending,    setIsResending]    = useState(false);
-  const [error,          setError]          = useState('');
+  const [otp,             setOtp]            = useState('');
+  const [isLoading,       setIsLoading]      = useState(false);
+  const [isResending,     setIsResending]    = useState(false);
+  const [error,           setError]          = useState('');
   const [resendCountdown, setResendCountdown] = useState(0);
+  const [focusedIndex,    setFocusedIndex]   = useState<number | null>(null);
 
-  const inputRefs  = useRef<TextInput[]>([]);
+  const inputRefs   = useRef<TextInput[]>([]);
+  const prevOtp     = useRef(otp);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const otpChars   = otp.padEnd(6, '').split('').slice(0, 6);
+  const otpChars    = otp.padEnd(6, '').split('').slice(0, 6);
+
+  const cardAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(cardAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 60,
+      friction: 10,
+      delay: 80,
+    }).start();
+  }, [cardAnim]);
+
+  const cardStyle = {
+    opacity: cardAnim,
+    transform: [{
+      translateY: cardAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [24, 0],
+      }),
+    }],
+  };
+
+  const scaleAnims = useRef([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(1))).current;
+  const shakeAnim  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);
+
+  const triggerShake = useCallback(() =>
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 8,  duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 4,  duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0,  duration: 60, useNativeDriver: true }),
+    ]).start(), [shakeAnim]);
+
+  const triggerScale = (index: number) =>
+    Animated.sequence([
+      Animated.spring(scaleAnims[index], { toValue: 1.05, useNativeDriver: true, tension: 400, friction: 10 }),
+      Animated.spring(scaleAnims[index], { toValue: 1.0,  useNativeDriver: true, tension: 200, friction: 15 }),
+    ]).start();
 
   const startCountdown = () => {
     setResendCountdown(60);
@@ -54,35 +96,29 @@ export default function VerifyEmailScreen() {
   };
 
   const handleOtpChange = (text: string, index: number) => {
-    const char = text.slice(-1);
-    setOtp(prev => {
-      const current = prev.padEnd(6, ' ').split('');
-      current[index] = char || ' ';
-      const newOtp = current.join('').replace(/\s/g, '');
-      if (char && index < 5) {
-        setTimeout(() => inputRefs.current[index + 1]?.focus(), 10);
-      }
-      return newOtp;
-    });
-  };
-
-  const handleOtpKeyPress = (key: string, index: number) => {
-    if (key === 'Backspace') {
-      setOtp(prev => {
-        const current = prev.padEnd(6, ' ').split('');
-        // If current box is empty, move back and clear previous
-        if ((!current[index] || current[index] === ' ') && index > 0) {
-          inputRefs.current[index - 1]?.focus();
-          current[index - 1] = ' ';
-        } else {
-          current[index] = ' ';
-        }
-        return current.join('').replace(/\s/g, '');
-      });
+    if (index === 0 && text.length === 6 && /^\d{6}$/.test(text)) {
+      setOtp(text);
+      inputRefs.current[5]?.focus();
+      [0, 1, 2, 3, 4, 5].forEach(i => triggerScale(i));
+      return;
     }
+
+    if (!/^\d?$/.test(text)) return;
+    const isDeleting = text === '' && prevOtp.current.length >= otp.length;
+    setOtp(prev => {
+      const chars = prev.padEnd(6, ' ').split('');
+      chars[index] = text || ' ';
+      const next = chars.join('').replace(/ /g, '');
+      prevOtp.current = next;
+      if (text && index < 5) setTimeout(() => inputRefs.current[index + 1]?.focus(), 0);
+      if (!text && isDeleting && index > 0) setTimeout(() => inputRefs.current[index - 1]?.focus(), 0);
+      return next;
+    });
+
+    if (text) triggerScale(index);
   };
 
-  const handleVerify = async () => {
+  const handleVerify = useCallback(async () => {
     if (otp.length < 6) {
       setError('Enter the full 6-digit code.');
       return;
@@ -101,10 +137,17 @@ export default function VerifyEmailScreen() {
         msg = (errorData as { message: string }).message;
       }
       setError(msg);
+      triggerShake();
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [otp, email, router, triggerShake]);
+
+  useEffect(() => {
+    if (otp.length !== 6) return;
+    const timer = setTimeout(handleVerify, 150);
+    return () => clearTimeout(timer);
+  }, [otp, handleVerify]);
 
   const handleResend = async () => {
     if (isResending || resendCountdown > 0) return;
@@ -128,7 +171,13 @@ export default function VerifyEmailScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <LinearGradient
+      colors={['#F0F4FF', '#F8FAFC', '#FDF0FA']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.gradient}
+    >
+      <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -136,9 +185,26 @@ export default function VerifyEmailScreen() {
           <ScrollView
             style={styles.flex}
             contentContainerStyle={styles.scrollContent}
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
+            {/* Back button */}
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.canGoBack() ? router.back() : router.replace('/(auth)/register')}
+            >
+              <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M15 18l-6-6 6-6"
+                  stroke={Colors.textPrimary}
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            </TouchableOpacity>
+
             {/* Brand */}
             <View style={styles.headerWrapper}>
               <BrandHeader
@@ -148,7 +214,8 @@ export default function VerifyEmailScreen() {
             </View>
 
             {/* Card */}
-            <View style={styles.card}>
+            <Animated.View style={cardStyle}>
+            <BlurView intensity={20} tint="light" style={styles.card}>
               {/* Email icon */}
               <View style={styles.emailIconWrapper}>
                 <View style={styles.emailIconBox}>
@@ -173,27 +240,30 @@ export default function VerifyEmailScreen() {
                 {/* OTP Input */}
                 <View>
                   <Text style={styles.otpLabel}>Verification Code</Text>
-                  <View style={styles.otpRow}>
+                  <Animated.View style={[styles.otpRow, { transform: [{ translateX: shakeAnim }] }]}>
                     {[0, 1, 2, 3, 4, 5].map(i => (
-                      <TextInput
-                        key={i}
-                        ref={ref => { if (ref) inputRefs.current[i] = ref; }}
-                        style={[
-                          styles.otpInput,
-                          otpChars[i] ? styles.otpInputFilled : null,
-                        ]}
-                        value={otpChars[i] || ''}
-                        onChangeText={text => handleOtpChange(text, i)}
-                        onKeyPress={({ nativeEvent }) => handleOtpKeyPress(nativeEvent.key, i)}
-                        maxLength={2}
-                        keyboardType="number-pad"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        textAlign="center"
-                        selectTextOnFocus
-                      />
+                      <Animated.View key={i} style={{ transform: [{ scale: scaleAnims[i] }] }}>
+                        <TextInput
+                          ref={ref => { if (ref) inputRefs.current[i] = ref; }}
+                          style={[
+                            styles.otpInput,
+                            otpChars[i] ? styles.otpInputFilled : null,
+                            focusedIndex === i && styles.otpInputFocused,
+                          ]}
+                          value={otpChars[i] || ''}
+                          onChangeText={text => handleOtpChange(text, i)}
+                          onFocus={() => setFocusedIndex(i)}
+                          onBlur={() => setFocusedIndex(null)}
+                          maxLength={i === 0 ? 6 : 1}
+                          keyboardType="number-pad"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          textAlign="center"
+                          selectTextOnFocus
+                        />
+                      </Animated.View>
                     ))}
-                  </View>
+                  </Animated.View>
                 </View>
 
                 <ErrorBanner message={error} visible={!!error} />
@@ -219,25 +289,43 @@ export default function VerifyEmailScreen() {
                   )}
                 </View>
               </View>
-            </View>
+            </BlurView>
+            </Animated.View>
 
             <Text style={styles.footer}>© 2026 Planora. All rights reserved.</Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.pageBg,
+    backgroundColor: 'transparent',
   },
   flex: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    flexGrow: 1,
+    paddingBottom: 160,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    marginLeft: 20,
   },
   headerWrapper: {
     alignItems: 'center',
@@ -247,18 +335,21 @@ const styles = StyleSheet.create({
   card: {
     marginTop: 24,
     marginHorizontal: 20,
-    borderRadius: 24,
-    backgroundColor: Colors.cardBg,
+    borderRadius: 28,
+    backgroundColor: Platform.OS === 'ios' ? 'rgba(255, 255, 255, 0.82)' : 'rgba(255, 255, 255, 0.96)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
     padding: 24,
-    ...(isWeb
-      ? { boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)' }
-      : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.08,
-          shadowRadius: 16,
-        }),
-    elevation: 4,
+    ...Platform.select({
+      web: { boxShadow: '0 12px 28px rgba(99, 102, 241, 0.12)' },
+      default: {
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.12,
+        shadowRadius: 28,
+      },
+    }),
+    elevation: 16,
   },
   emailIconWrapper: {
     alignItems: 'center',
@@ -277,7 +368,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 16,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   emailBold: {
     fontWeight: '700',
@@ -289,29 +380,42 @@ const styles = StyleSheet.create({
   otpLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: '#6B7280',
     marginBottom: 8,
   },
   otpRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
     justifyContent: 'center',
   },
   otpInput: {
-    width: 44,
-    height: 52,
-    borderRadius: 12,
+    width: 48,
+    height: 56,
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: Colors.borderDefault,
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#000000', // Hardcoded black to rule out color issues
-    backgroundColor: Colors.white,
+    borderColor: '#E0E7FF',
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    backgroundColor: 'rgba(255, 255, 255, 0.90)',
     textAlign: 'center',
     padding: 0,
   },
   otpInputFilled: {
     borderColor: Colors.primary,
+  },
+  otpInputFocused: {
+    borderColor: Colors.primary,
+    ...Platform.select({
+      web: { boxShadow: `0 0 8px ${Colors.primary}40` },
+      default: {
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 3,
+      },
+    }),
   },
   resendRow: {
     alignItems: 'center',
@@ -331,7 +435,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: '#C0C8D8',
     textAlign: 'center',
     marginTop: 24,
   },

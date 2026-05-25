@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import StatusDonutChart from './StatusDonutChart';
 import { T, STATUS_MAP, STATUS_LABELS, StatusKey } from '../../constants/tokens';
-import type { DashboardItem, TabKey } from '../../hooks/useDashboard';
+import type { DashboardItem, TabItemsByKey, TabKey, TabLoadingByKey } from '../../hooks/useDashboard';
 
 // ─── Tab definitions ────────────────────────────────────────────────────────────
 
@@ -521,15 +521,14 @@ const cardStyles = StyleSheet.create({
 // ─── Main exported component ────────────────────────────────────────────────────
 
 interface TasksSectionProps {
-  items: DashboardItem[];
-  loading: boolean;
-  activeTab: TabKey;
+  itemsByTab: TabItemsByKey;
+  loadingTabs: TabLoadingByKey;
   assignedCount: number;
   onTabChange: (tab: TabKey) => void;
 }
 
 export default function TasksSection({
-  items, loading, activeTab, assignedCount, onTabChange,
+  itemsByTab, loadingTabs, assignedCount, onTabChange,
 }: TasksSectionProps) {
   const router = useRouter();
   const [secondaryTab, setSecondaryTab] = useState<TabKey>('worked-on');
@@ -554,8 +553,8 @@ export default function TasksSection({
         activeTab="assigned-to-me"
         onTabChange={onTabChange}
         assignedCount={assignedCount}
-        items={items}
-        loading={loading && activeTab === 'assigned-to-me'}
+        items={itemsByTab['assigned-to-me']}
+        loading={loadingTabs['assigned-to-me']}
         searchQuery=""
       />
 
@@ -568,8 +567,8 @@ export default function TasksSection({
         ]}
         activeTab={secondaryTab}
         onTabChange={(t) => { setSecondaryTab(t); onTabChange(t); }}
-        items={items}
-        loading={loading && (activeTab === 'worked-on' || activeTab === 'viewed')}
+        items={itemsByTab[secondaryTab]}
+        loading={loadingTabs[secondaryTab]}
         searchQuery=""
       />
 
@@ -582,8 +581,8 @@ export default function TasksSection({
         ]}
         activeTab={tertiaryTab}
         onTabChange={(t) => { setTertiaryTab(t); onTabChange(t); }}
-        items={items}
-        loading={loading && (activeTab === 'favorites' || activeTab === 'boards')}
+        items={itemsByTab[tertiaryTab]}
+        loading={loadingTabs[tertiaryTab]}
         searchQuery=""
       />
     </View>
