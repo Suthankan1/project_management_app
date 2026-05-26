@@ -12,7 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -31,13 +31,13 @@ class UserProfileControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockitoBean
+    @MockBean
     private UserService service;
 
-    @MockitoBean
+    @MockBean
     private JWTService jwtService;
 
-    @MockitoBean
+    @MockBean
     private UserDetailsService userDetailsService;
 
     @Autowired
@@ -133,6 +133,7 @@ class UserProfileControllerTest {
     void uploadProfilePhoto_returns200_whenImageValid() throws Exception {
         MockMultipartFile validFile = new MockMultipartFile("file", "photo.jpg", "image/jpeg", "imagedata".getBytes());
         when(service.isValidImageType("image/jpeg")).thenReturn(true);
+        when(service.isValidImageByMagicBytes(any())).thenReturn(true);
         when(service.uploadProfilePicture(anyString(), any())).thenReturn("s3://bucket/photo.jpg");
         when(service.generatePresignedUrl(anyString())).thenReturn("https://cdn.example.com/photo.jpg?sig=abc");
 

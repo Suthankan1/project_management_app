@@ -168,8 +168,12 @@ export async function pinRoomMessage(projectId: string, roomId: number, messageI
   await api.patch(`/api/projects/${projectId}/chat/rooms/${roomId}/pin`, { messageId });
 }
 
-export async function toggleReaction(messageId: number, emoji: string, projectId: string): Promise<void> {
-  await api.post(`/api/projects/${projectId}/chat/messages/${messageId}/reactions/toggle`, { emoji });
+export async function toggleReaction(messageId: number, emoji: string, projectId: string): Promise<ChatReactionSummary[]> {
+  const { data } = await api.post<ChatReactionSummary[]>(
+    `/api/projects/${projectId}/chat/messages/${messageId}/reactions/toggle`,
+    { emoji },
+  );
+  return data;
 }
 
 export async function markTeamRead(projectId: string): Promise<void> {

@@ -41,7 +41,7 @@ class DocumentCleanupServiceTest {
 
     @Test
     void cleanupSoftDeletedDocuments_doesNothingWhenNoExpiredDocs() {
-        when(documentRepository.findByStatusAndDeletedAtBefore(eq(DocumentStatus.SOFT_DELETED), any()))
+        when(documentRepository.findExpiredSoftDeleted(eq(DocumentStatus.SOFT_DELETED), any()))
                 .thenReturn(List.of());
 
         documentCleanupScheduler.cleanupSoftDeletedDocuments();
@@ -61,7 +61,7 @@ class DocumentCleanupServiceTest {
         version.setId(1L);
         version.setObjectKey("project-10/uuid-spec.pdf");
 
-        when(documentRepository.findByStatusAndDeletedAtBefore(eq(DocumentStatus.SOFT_DELETED), any()))
+        when(documentRepository.findExpiredSoftDeleted(eq(DocumentStatus.SOFT_DELETED), any()))
                 .thenReturn(List.of(doc));
         when(documentVersionRepository.findByDocumentIdOrderByVersionNumberDesc(1L))
                 .thenReturn(List.of(version));
@@ -87,7 +87,7 @@ class DocumentCleanupServiceTest {
         version.setId(1L);
         version.setObjectKey("broken-key");
 
-        when(documentRepository.findByStatusAndDeletedAtBefore(eq(DocumentStatus.SOFT_DELETED), any()))
+        when(documentRepository.findExpiredSoftDeleted(eq(DocumentStatus.SOFT_DELETED), any()))
                 .thenReturn(List.of(doc));
         when(documentVersionRepository.findByDocumentIdOrderByVersionNumberDesc(1L))
                 .thenReturn(List.of(version));

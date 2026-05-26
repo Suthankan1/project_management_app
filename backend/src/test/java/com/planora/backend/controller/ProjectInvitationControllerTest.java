@@ -17,7 +17,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,13 +37,13 @@ class ProjectInvitationControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockitoBean
+    @MockBean
     private ProjectInvitationService projectInvitationService;
 
-    @MockitoBean
+    @MockBean
     private JWTService jwtService;
 
-    @MockitoBean
+    @MockBean
     private UserDetailsService userDetailsService;
 
     private UserPrincipal principal;

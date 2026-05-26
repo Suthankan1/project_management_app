@@ -5,6 +5,7 @@ import com.planora.backend.dto.UpdateProfileRequest;
 import com.planora.backend.dto.UserResponseDTO;
 import com.planora.backend.model.User;
 import com.planora.backend.service.UserService;
+import java.io.IOException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -75,6 +76,28 @@ public class UserProfileController {
                 // to show a localized, friendly error message without parsing the raw string.
                 PhotoUploadResponse response = new PhotoUploadResponse(false, "Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed", null, "INVALID_FILE_TYPE");
                 return new ResponseEntity<>(response, HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+            }
+
+            long maxSizeBytes = 5 * 1024 * 1024; // 5 MB
+            if (file.getSize() > maxSizeBytes) {
+                PhotoUploadResponse response = new PhotoUploadResponse(false, "File size exceeds 5 MB limit.", null, "FILE_TOO_LARGE");
+                return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+            }
+
+            try {
+                if (!service.isValidImageByMagicBytes(file)) {
+                    PhotoUploadResponse response = new PhotoUploadResponse(
+                            false,
+                            "File content does not match a valid image format.",
+                            null,
+                            "INVALID_FILE_CONTENT"
+                    );
+                    return new ResponseEntity<>(response, HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+                }
+            } catch (IOException e) {
+                PhotoUploadResponse response = new PhotoUploadResponse(
+                        false, "Could not read file content.", null, "FILE_READ_ERROR");
+                return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
             }
 
             String email = getAuthenticatedUserEmail(authentication);

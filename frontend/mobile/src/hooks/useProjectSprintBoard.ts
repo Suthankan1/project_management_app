@@ -148,6 +148,14 @@ export function useProjectSprintBoard(projectId: number) {
     await fetchBoard(true, selectedSprintId);
   }, [fetchBoard, selectedSprintId]);
 
+  const updateTaskTitle = useCallback(async (taskId: number, title: string) => {
+    if (!selectedSprintId) return;
+    const cleanTitle = title.trim();
+    if (!cleanTitle) return;
+    await api.put(`/api/tasks/${taskId}`, { title: cleanTitle });
+    await fetchBoard(true, selectedSprintId);
+  }, [fetchBoard, selectedSprintId]);
+
   const deleteColumn = useCallback(async (columnId: number) => {
     if (!board?.id || !columnId || !selectedSprintId) return;
     await api.delete(`/api/sprintboards/${board.id}/columns/${columnId}`);
@@ -167,6 +175,7 @@ export function useProjectSprintBoard(projectId: number) {
     createTask,
     addColumn,
     deleteTask,
+    updateTaskTitle,
     deleteColumn,
   };
 }

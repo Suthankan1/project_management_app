@@ -1,6 +1,8 @@
 import axios from '@/lib/axios';
 import { Task, Label, KanbanColumnConfig } from './types';
 
+export type TaskResponseDTO = Task;
+
 export interface KanbanBoardResponse {
   kanbanId: number;
   name: string;
@@ -34,6 +36,21 @@ export async function fetchTasksByProject(
     throw error;
   }
 }
+
+export const archiveTask = async (taskId: number): Promise<TaskResponseDTO> => {
+  const res = await axios.patch(`/api/tasks/${taskId}/archive`);
+  return res.data;
+};
+
+export const unarchiveTask = async (taskId: number): Promise<TaskResponseDTO> => {
+  const res = await axios.patch(`/api/tasks/${taskId}/unarchive`);
+  return res.data;
+};
+
+export const getArchivedTasks = async (projectId: number): Promise<TaskResponseDTO[]> => {
+  const res = await axios.get(`/api/tasks/project/${projectId}/archived`);
+  return res.data;
+};
 
 /**
  * Update task status (move between columns)
@@ -387,4 +404,3 @@ export async function createProjectLabel(
     throw error;
   }
 }
-

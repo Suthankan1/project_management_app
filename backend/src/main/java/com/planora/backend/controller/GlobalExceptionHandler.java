@@ -2,6 +2,10 @@ package com.planora.backend.controller;
 
 import com.planora.backend.exception.ConflictException;
 import com.planora.backend.exception.ForbiddenException;
+import com.planora.backend.exception.GithubAuthenticationException;
+import com.planora.backend.exception.GithubIssueValidationException;
+import com.planora.backend.exception.GithubRateLimitException;
+import com.planora.backend.exception.GithubRepositoryNotFoundException;
 import com.planora.backend.exception.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
@@ -37,6 +41,26 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<Map<String, Object>> handleForbidden(ForbiddenException ex) {
         return buildError(HttpStatus.FORBIDDEN, ex.getMessage(), null);
+    }
+
+    @ExceptionHandler(GithubAuthenticationException.class)
+    public ResponseEntity<Map<String, Object>> handleGithubAuthentication(GithubAuthenticationException ex) {
+        return buildError(HttpStatus.UNAUTHORIZED, ex.getMessage(), null);
+    }
+
+    @ExceptionHandler(GithubRateLimitException.class)
+    public ResponseEntity<Map<String, Object>> handleGithubRateLimit(GithubRateLimitException ex) {
+        return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), null);
+    }
+
+    @ExceptionHandler(GithubRepositoryNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleGithubRepositoryNotFound(GithubRepositoryNotFoundException ex) {
+        return buildError(HttpStatus.NOT_FOUND, ex.getMessage(), null);
+    }
+
+    @ExceptionHandler(GithubIssueValidationException.class)
+    public ResponseEntity<Map<String, Object>> handleGithubIssueValidation(GithubIssueValidationException ex) {
+        return buildError(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), null);
     }
 
     @ExceptionHandler(ConflictException.class)

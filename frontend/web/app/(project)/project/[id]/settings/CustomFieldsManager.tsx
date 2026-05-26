@@ -70,7 +70,7 @@ export default function CustomFieldsManager({ projectId }: Props) {
     }
   };
 
-  if (loading) return <div className="text-sm text-gray-500 py-4">Loading fields…</div>;
+  if (loading) return <div className="text-sm text-gray-500 py-4">Loading fields...</div>;
 
   return (
     <div className="space-y-4">
@@ -98,7 +98,7 @@ export default function CustomFieldsManager({ projectId }: Props) {
                 autoFocus
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Customer, Budget…"
+                placeholder="e.g. Customer, Budget..."
                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -133,7 +133,7 @@ export default function CustomFieldsManager({ projectId }: Props) {
               disabled={saving || !newName.trim()}
               className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
-              {saving ? 'Saving…' : 'Create field'}
+              {saving ? 'Saving...' : 'Create field'}
             </button>
             <button
               onClick={() => { setShowForm(false); setNewName(''); setNewType('TEXT'); setNewOptions(''); }}

@@ -43,6 +43,7 @@ public class SecurityConfig {
             "/api/auth/forgot",
             "/api/auth/reset",
             "/api/auth/refresh",
+            "/api/github/webhooks",   // GitHub webhook deliveries carry no JWT
             "/ws/**",
             "/ws-native/**",
             "/v3/api-docs/**",
@@ -59,6 +60,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(request -> request
                 .requestMatchers(PUBLIC_ENDPOINTS.toArray(new String[0]))
                         .permitAll()
+                .requestMatchers("/api/github/issues/**")
+                        .authenticated()
                         .anyRequest().authenticated())
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)

@@ -8,6 +8,7 @@ import Animated, {
   withSpring,
   withDelay,
   withSequence,
+  withRepeat,
   runOnJS,
   Easing,
 } from 'react-native-reanimated';
@@ -46,6 +47,10 @@ export default function SplashAnimation({ onFinished }: Props) {
   const wordmarkTranslateY = useSharedValue(18);
 
   const taglineOpacity = useSharedValue(0);
+
+  const outerOrbitRotation = useSharedValue(0);
+  const rightOrbitRotation = useSharedValue(0);
+  const innerOrbitRotation = useSharedValue(0);
 
   const exitOpacity = useSharedValue(1);
   const logoScale = useSharedValue(1);
@@ -86,6 +91,18 @@ export default function SplashAnimation({ onFinished }: Props) {
     opacity: taglineOpacity.value,
   }));
 
+  const outerOrbitStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${outerOrbitRotation.value}deg` }],
+  }));
+
+  const rightOrbitStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rightOrbitRotation.value}deg` }],
+  }));
+
+  const innerOrbitStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${innerOrbitRotation.value}deg` }],
+  }));
+
   const exitStyle = useAnimatedStyle(() => ({
     opacity: exitOpacity.value,
     transform: [{ scale: logoScale.value }],
@@ -117,6 +134,19 @@ export default function SplashAnimation({ onFinished }: Props) {
 
     taglineOpacity.value = withDelay(1340, withTiming(1, { duration: 220 }));
 
+    outerOrbitRotation.value = withDelay(
+      700,
+      withRepeat(withTiming(360, { duration: 2600, easing: Easing.linear }), -1, false),
+    );
+    rightOrbitRotation.value = withDelay(
+      760,
+      withRepeat(withTiming(-360, { duration: 3400, easing: Easing.linear }), -1, false),
+    );
+    innerOrbitRotation.value = withDelay(
+      820,
+      withRepeat(withTiming(360, { duration: 1900, easing: Easing.linear }), -1, false),
+    );
+
     logoScale.value = withDelay(
       1800,
       withSequence(
@@ -143,6 +173,9 @@ export default function SplashAnimation({ onFinished }: Props) {
     letterOpacity,
     logoScale,
     onFinished,
+    outerOrbitRotation,
+    rightOrbitRotation,
+    innerOrbitRotation,
     taglineOpacity,
     wordmarkOpacity,
     wordmarkTranslateY,
@@ -193,7 +226,10 @@ export default function SplashAnimation({ onFinished }: Props) {
 
             <Circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
             <Circle cx="100" cy="100" r="56" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1.2" />
+          </Svg>
 
+          <Animated.View style={[styles.orbitLayer, outerOrbitStyle]}>
+            <Svg width={markSize} height={markSize} viewBox="0 0 200 200" style={styles.svgLayer}>
             <AnimatedPath
               d="M 100 12 A 88 88 0 0 0 25 163"
               fill="none"
@@ -205,32 +241,42 @@ export default function SplashAnimation({ onFinished }: Props) {
               opacity={0.95}
             />
 
-            <AnimatedPath
-              d="M 100 12 A 88 88 0 0 1 188 100"
-              fill="none"
-              stroke="white"
-              strokeWidth="7"
-              strokeLinecap="round"
-              strokeDasharray={ARC2_LEN}
-              animatedProps={arc2Props}
-              opacity={0.8}
-            />
-
-            <AnimatedPath
-              d="M 100 44 A 56 56 0 1 1 64 148"
-              fill="none"
-              stroke="white"
-              strokeWidth="5"
-              strokeLinecap="round"
-              strokeDasharray={ARC3_LEN}
-              animatedProps={arc3Props}
-              opacity={0.5}
-            />
-
             <AnimatedCircle cx="100" cy="12" r="7" fill="white" opacity={0.9} />
-            <AnimatedCircle cx="188" cy="100" r="7" fill="white" opacity={0.75} />
             <AnimatedCircle cx="25" cy="163" r="5" fill="white" opacity={0.45} />
-          </Svg>
+            </Svg>
+          </Animated.View>
+
+          <Animated.View style={[styles.orbitLayer, rightOrbitStyle]}>
+            <Svg width={markSize} height={markSize} viewBox="0 0 200 200" style={styles.svgLayer}>
+              <AnimatedPath
+                d="M 100 12 A 88 88 0 0 1 188 100"
+                fill="none"
+                stroke="white"
+                strokeWidth="7"
+                strokeLinecap="round"
+                strokeDasharray={ARC2_LEN}
+                animatedProps={arc2Props}
+                opacity={0.8}
+              />
+
+              <AnimatedCircle cx="188" cy="100" r="7" fill="white" opacity={0.75} />
+            </Svg>
+          </Animated.View>
+
+          <Animated.View style={[styles.orbitLayer, innerOrbitStyle]}>
+            <Svg width={markSize} height={markSize} viewBox="0 0 200 200" style={styles.svgLayer}>
+              <AnimatedPath
+                d="M 100 44 A 56 56 0 1 1 64 148"
+                fill="none"
+                stroke="white"
+                strokeWidth="5"
+                strokeLinecap="round"
+                strokeDasharray={ARC3_LEN}
+                animatedProps={arc3Props}
+                opacity={0.5}
+              />
+            </Svg>
+          </Animated.View>
 
           <Animated.View style={[styles.centerLayer, coreStyle]}>
             <Svg width={markSize} height={markSize} viewBox="0 0 200 200">
@@ -261,6 +307,10 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
   svgLayer: {
+    overflow: 'visible',
+  },
+  orbitLayer: {
+    ...StyleSheet.absoluteFillObject,
     overflow: 'visible',
   },
   centerLayer: {

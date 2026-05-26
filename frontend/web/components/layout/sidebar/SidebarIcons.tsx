@@ -86,6 +86,14 @@ export const BellIcon = () => (
   </svg>
 );
 
+export const PortfolioIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="7" width="16" height="10" rx="1.5" />
+    <path d="M6 7V5.5A1.5 1.5 0 0 1 7.5 4h5A1.5 1.5 0 0 1 14 5.5V7" />
+    <path d="M2 11h16" />
+  </svg>
+);
+
 export const SearchIcon = () => (
   <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#B0B8C4" strokeWidth="2" strokeLinecap="round">
     <circle cx="7" cy="7" r="5" /><path d="M11 11L14 14" />

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Alert, ActionSheetIOS, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, GestureResponderEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useChat } from '@/src/hooks/chat/useChat';
@@ -11,11 +11,23 @@ import { ChatMessageList }        from '@/src/components/chat/ChatMessageList';
 import { ChatInput }              from '@/src/components/chat/ChatInput';
 import { ChatLoadingSkeleton }    from '@/src/components/chat/ChatLoadingSkeleton';
 import { ThreadBottomSheet }      from '@/src/components/chat/ThreadBottomSheet';
+import { PinnedMessageBanner }    from '@/src/components/chat/ChatMessage';
 import { CreateChannelModal, EditMessageModal, ConfirmDeleteModal, EditChannelModal } from '@/src/components/chat/ChatModals';
 import { Colors }                 from '@/src/constants/colors';
 import { ChatMessage, ChatRoom } from '@/src/types/chat';
-import { QUICK_REACTIONS } from '@/src/hooks/chat/chatUtils';
 import { QuickReactionBar } from '@/src/components/chat/QuickReactionBar';
+
+type ChatScreenContentProps = {
+  projectId: string;
+  topOffset?: number;
+};
+
+export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenContentProps) {
+interface ReactionTarget {
+  message: ChatMessage;
+  anchorY: number;
+  isMe: boolean;
+}
 
 export default function ChatScreen() {
   const { id: projectId } = useLocalSearchParams<{ id: string }>();
@@ -29,7 +41,7 @@ export default function ChatScreen() {
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [deletingMessageId, setDeletingMessageId] = useState<number | null>(null);
   const [editingRoom, setEditingRoom] = useState<{ id: number; name: string; topic: string; description: string } | null>(null);
-  const [reactionTarget, setReactionTarget] = useState<ChatMessage | null>(null);
+  const [reactionTarget, setReactionTarget] = useState<ReactionTarget | null>(null);
 
   const {
     currentUser, currentUserAliases, users, userProfilePics,
@@ -61,6 +73,9 @@ export default function ChatScreen() {
     : selectedUser
       ? (privateMessages[selectedUser.toLowerCase()] || [])
       : messages;
+  const pinnedMessage = selectedRoom?.pinnedMessageId
+    ? displayMessages.find(message => message.id === selectedRoom.pinnedMessageId) ?? null
+    : null;
 
   const filteredUsers = users.filter(u =>
     !currentUserAliases.some(a => a?.toLowerCase() === u.toLowerCase()) &&
@@ -96,43 +111,40 @@ export default function ChatScreen() {
     currentUser.trim().toLowerCase(),
     ...currentUserAliases.map(alias => alias.trim().toLowerCase()),
   ]);
+  const reactionMessage = reactionTarget?.message ?? null;
+  const selectedReaction = reactionMessage?.id
+    ? messageReactions[reactionMessage.id]?.find(reaction => reaction.reactedByCurrentUser)?.emoji
+    : undefined;
 
   const isConnected         = isSocketConnected;
   const isReconnectError    = error.toLowerCase().includes('reconnect');
   const shouldShowErrorBanner = Boolean(error) && !isReconnectError;
 
-  const handleMessageLongPress = (message: ChatMessage) => {
-    setReactionTarget(message);
+  const handleMessageLongPress = (
+    message: ChatMessage,
+    event: GestureResponderEvent,
+    messageIsMe: boolean,
+  ) => {
+    setReactionTarget({
+      message,
+      anchorY: event.nativeEvent.pageY,
+      isMe: messageIsMe,
+    });
   };
 
-  const handleAction = (index: number, message: ChatMessage, isMe: boolean) => {
-    const actions = isMe
-      ? ['reply', 'edit', 'delete', 'react', 'cancel']
-      : ['reply', 'react', 'cancel'];
-
-    const action = actions[index];
-    if (!action || action === 'cancel') return;
-
-    switch (action) {
-      case 'reply': openThread(message); break;
-      case 'edit': setEditingMessage(message); break;
-      case 'delete': message.id && setDeletingMessageId(message.id); break;
-      case 'react':
-        Alert.alert('React', undefined, [
-          ...QUICK_REACTIONS.map(emoji => ({
-            text: emoji,
-            onPress: () => message.id && toggleReaction(message.id, emoji),
-          })),
-          { text: 'Cancel', style: 'cancel' as const },
-        ]);
-        break;
-    }
-  };
-
-  if (isLoading) return <ChatLoadingSkeleton />;
+  if (isLoading) {
+    return (
+      <View style={[styles.safe, topOffset > 0 && { paddingTop: topOffset }]}>
+        <ChatLoadingSkeleton />
+      </View>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top','left','right']}>
+    <SafeAreaView
+      style={[styles.safe, topOffset > 0 && { paddingTop: topOffset }]}
+      edges={topOffset > 0 ? ['left', 'right'] : ['top','left','right']}
+    >
       {showSidebar ? (
         <ChatSidebar
           currentUser={currentUser}
@@ -183,6 +195,12 @@ export default function ChatScreen() {
             showSearch={showSearch}
             onToggleSearch={() => setShowSearch(p => !p)}
             onShowSidebar={() => setShowSidebar(true)}
+          />
+
+          <PinnedMessageBanner
+            pinnedMessage={pinnedMessage}
+            onPress={() => pinnedMessage && openThread(pinnedMessage)}
+            onDismiss={() => selectedRoomId && pinRoomMessage(selectedRoomId, null)}
           />
 
           {featureFlags.phaseDEnabled && (
@@ -304,13 +322,22 @@ export default function ChatScreen() {
       <QuickReactionBar
         visible={!!reactionTarget}
         onClose={() => setReactionTarget(null)}
-        onReact={(emoji) => { if (reactionTarget?.id) toggleReaction(reactionTarget.id, emoji); }}
-        onReply={() => reactionTarget && openThread(reactionTarget)}
-        onEdit={reactionTarget && currentUserIdentitySet.has((reactionTarget.sender || '').trim().toLowerCase()) ? () => setEditingMessage(reactionTarget) : undefined}
-        onDelete={reactionTarget && currentUserIdentitySet.has((reactionTarget.sender || '').trim().toLowerCase()) && reactionTarget.id ? () => setDeletingMessageId(reactionTarget.id as number) : undefined}
+        onReact={(emoji) => { if (reactionMessage?.id) toggleReaction(reactionMessage.id, emoji); }}
+        onReply={() => reactionMessage && openThread(reactionMessage)}
+        onEdit={reactionMessage && currentUserIdentitySet.has((reactionMessage.sender || '').trim().toLowerCase()) ? () => setEditingMessage(reactionMessage) : undefined}
+        onDelete={reactionMessage && currentUserIdentitySet.has((reactionMessage.sender || '').trim().toLowerCase()) && reactionMessage.id ? () => setDeletingMessageId(reactionMessage.id as number) : undefined}
+        anchorY={reactionTarget?.anchorY}
+        isMe={reactionTarget?.isMe}
+        selectedEmoji={selectedReaction}
       />
     </SafeAreaView>
   );
+}
+
+export default function ChatScreen() {
+  const { id: projectId } = useLocalSearchParams<{ id: string }>();
+
+  return <ChatScreenContent projectId={projectId as string} />;
 }
 
 const styles = StyleSheet.create({

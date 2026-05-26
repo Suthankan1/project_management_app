@@ -131,6 +131,15 @@ export async function refreshAccessToken(): Promise<string | null> {
   }
 }
 
+export async function getCurrentUserId(): Promise<number | null> {
+  const token = await store.get(TOKEN_KEY);
+  if (!token) return null;
+  const payload = decodeJwtPayload(token);
+  if (!payload) return null;
+  const id = payload.userId ?? payload.id;
+  return typeof id === 'number' ? id : null;
+}
+
 export async function getValidToken(): Promise<string | null> {
   const token = await store.get(TOKEN_KEY);
   if (!token) {
