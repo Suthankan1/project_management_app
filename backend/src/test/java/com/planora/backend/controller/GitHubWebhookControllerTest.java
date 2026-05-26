@@ -35,6 +35,21 @@ class GitHubWebhookControllerTest {
               "pull_request":{"number":17,"title":"Improve sync","user":{"login":"octocat"}}
             }
             """;
+    private static final String MERGED_PR_BODY = """
+            {
+              "action":"closed",
+              "repository":{"full_name":"planora/app"},
+              "pull_request":{"number":17,"title":"Improve sync","merged":true,"merged_by":{"login":"maintainer"}}
+            }
+            """;
+    private static final String REVIEW_REQUESTED_BODY = """
+            {
+              "action":"review_requested",
+              "repository":{"full_name":"planora/app"},
+              "pull_request":{"number":17,"title":"Improve sync"},
+              "requested_reviewer":{"login":"reviewer"}
+            }
+            """;
 
     private MockMvc mockMvc;
     private GithubNotificationService githubNotificationService;
@@ -62,6 +77,32 @@ class GitHubWebhookControllerTest {
                 .andExpect(content().string("processed"));
 
         verify(githubNotificationService).notifyPROpened("planora/app", 17, "Improve sync", "octocat");
+    }
+
+    @Test
+    void webhook_dispatchesMergedPullRequest() throws Exception {
+        mockMvc.perform(post("/api/github/webhook")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-GitHub-Event", "pull_request")
+                        .header("X-Hub-Signature-256", signature(MERGED_PR_BODY))
+                        .content(MERGED_PR_BODY))
+                .andExpect(status().isOk())
+                .andExpect(content().string("processed"));
+
+        verify(githubNotificationService).notifyPRMerged("planora/app", 17, "Improve sync", "maintainer");
+    }
+
+    @Test
+    void webhook_dispatchesReviewRequestedPullRequest() throws Exception {
+        mockMvc.perform(post("/api/github/webhook")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-GitHub-Event", "pull_request")
+                        .header("X-Hub-Signature-256", signature(REVIEW_REQUESTED_BODY))
+                        .content(REVIEW_REQUESTED_BODY))
+                .andExpect(status().isOk())
+                .andExpect(content().string("processed"));
+
+        verify(githubNotificationService).notifyReviewRequested("planora/app", 17, "Improve sync", "reviewer");
     }
 
     @Test

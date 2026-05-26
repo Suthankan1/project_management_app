@@ -1,5 +1,8 @@
 package com.planora.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -9,10 +12,13 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
+import com.planora.backend.event.PRMergedEvent;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Team;
 import com.planora.backend.model.TeamMember;
@@ -35,6 +41,9 @@ class GithubNotificationServiceTest {
 
     @Mock
     private TeamMemberRepository teamMemberRepository;
+
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     @InjectMocks
     private GithubNotificationService githubNotificationService;
@@ -87,6 +96,41 @@ class GithubNotificationServiceTest {
         verify(notificationService, never()).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void notifyPRMerged_notifiesMembersExceptMergerAndPublishesEvent() {
+        when(userRepository.findByGithubUsernameIgnoreCase("maintainer")).thenReturn(List.of(author));
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(firstProject, secondProject));
+        when(teamMemberRepository.findByTeamId(11L)).thenReturn(List.of(member(author), member(recipient)));
+        when(teamMemberRepository.findByTeamId(12L)).thenReturn(List.of(member(recipient)));
+
+        githubNotificationService.notifyPRMerged(" planora/app ", 17, "Improve sync", "maintainer");
+
+        String message = "\u2705 PR merged: #17 Improve sync by @maintainer";
+        String link = "https://github.com/planora/app/pull/17";
+        String prefix = "\u2705 PR merged: #17 ";
+        verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                recipient, message, link, prefix);
+        verify(notificationService, never()).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                author, message, link, prefix);
+
+        ArgumentCaptor<PRMergedEvent> eventCaptor = ArgumentCaptor.forClass(PRMergedEvent.class);
+        verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+        PRMergedEvent event = eventCaptor.getValue();
+        assertSame(githubNotificationService, event.getSource());
+        assertEquals("planora/app", event.getRepoFullName());
+        assertEquals(17, event.getPrNumber());
+        assertEquals("Improve sync", event.getPrTitle());
+    }
+
+    @Test
+    void notifyPRMerged_ignoresInvalidRepositoryInputWithoutPublishingEvent() {
+        githubNotificationService.notifyPRMerged(" ", 17, "Improve sync", "maintainer");
+
+        verify(projectRepository, never()).findByGithubRepoFullNameIgnoreCase(any());
+        verify(applicationEventPublisher, never()).publishEvent(any());
     }
 
     private User user(Long id, String username) {

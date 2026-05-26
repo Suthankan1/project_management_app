@@ -7,8 +7,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import com.planora.backend.event.PRMergedEvent;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.TeamMember;
 import com.planora.backend.model.User;
@@ -26,10 +28,12 @@ public class GithubNotificationService {
     private final UserRepository userRepository;
     private final ProjectRepository projectRepository;
     private final TeamMemberRepository teamMemberRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     private void ensureDependenciesInjected() {
         if (notificationService == null || userRepository == null
-                || projectRepository == null || teamMemberRepository == null) {
+                || projectRepository == null || teamMemberRepository == null
+                || applicationEventPublisher == null) {
             throw new IllegalStateException("GitHub notification dependencies were not injected");
         }
     }
@@ -68,7 +72,38 @@ public class GithubNotificationService {
 
     public void notifyPRMerged(String repoFullName, int prNumber, String prTitle, String mergerGithubLogin) {
         ensureDependenciesInjected();
-        // Task 108: wire GitHub PR-merged notifications.
+        if (repoFullName == null || repoFullName.isBlank() || prNumber <= 0) {
+            return;
+        }
+
+        String normalizedRepoFullName = repoFullName.trim();
+        Set<Long> mergerIds = resolveUsersFromGithubLogin(mergerGithubLogin).stream()
+                .map(User::getUserId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, User> recipients = new LinkedHashMap<>();
+
+        for (Project project : projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName)) {
+            if (project.getTeam() == null || project.getTeam().getId() == null) {
+                continue;
+            }
+            for (TeamMember member : teamMemberRepository.findByTeamId(project.getTeam().getId())) {
+                User user = member.getUser();
+                if (user != null && user.getUserId() != null && !mergerIds.contains(user.getUserId())) {
+                    recipients.putIfAbsent(user.getUserId(), user);
+                }
+            }
+        }
+
+        String prefix = "\u2705 PR merged: #" + prNumber + " ";
+        String message = prefix + safeTitle(prTitle) + " by @" + safeLogin(mergerGithubLogin);
+        String link = "https://github.com/" + normalizedRepoFullName + "/pull/" + prNumber;
+        recipients.values().forEach(recipient ->
+                notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                        recipient, message, link, prefix));
+
+        applicationEventPublisher.publishEvent(
+                new PRMergedEvent(this, normalizedRepoFullName, prNumber, safeTitle(prTitle)));
     }
 
     public void notifyReviewRequested(String repoFullName, int prNumber, String prTitle, String reviewerGithubLogin) {
