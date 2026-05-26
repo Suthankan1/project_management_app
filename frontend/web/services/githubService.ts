@@ -99,7 +99,21 @@ export interface GithubAutomationRule {
   projectId: number
   trigger: GithubAutomationTrigger
   action: GithubAutomationAction
+  enabled: boolean
   config: Record<string, string>
+}
+
+export type GithubAutomationOutcome = 'SUCCESS' | 'SKIPPED' | 'ERROR'
+
+export interface GithubAutomationLog {
+  id: number
+  ruleId: number
+  trigger: GithubAutomationTrigger
+  action: GithubAutomationAction
+  context: string
+  outcome: GithubAutomationOutcome
+  message: string
+  executedAt: string
 }
 
 interface GitHubApiIssue {
@@ -338,6 +352,11 @@ export async function fetchGitHubAutomationRules(projectId: string | number): Pr
   return response.data || []
 }
 
+export async function fetchGitHubAutomationLogs(projectId: string | number): Promise<GithubAutomationLog[]> {
+  const response = await api.get(`/api/projects/${projectId}/automations/github/logs`)
+  return response.data || []
+}
+
 export async function createGitHubAutomationRule(
   projectId: string | number,
   payload: {
@@ -352,4 +371,15 @@ export async function createGitHubAutomationRule(
 
 export async function deleteGitHubAutomationRule(projectId: string | number, ruleId: number): Promise<void> {
   await api.delete(`/api/projects/${projectId}/automations/github/${ruleId}`)
+}
+
+export async function setGitHubAutomationRuleEnabled(
+  projectId: string | number,
+  ruleId: number,
+  enabled: boolean,
+): Promise<GithubAutomationRule> {
+  const response = await api.patch(`/api/projects/${projectId}/automations/github/${ruleId}/enabled`, null, {
+    params: { enabled },
+  })
+  return response.data
 }

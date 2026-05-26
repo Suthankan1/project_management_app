@@ -46,6 +46,9 @@ public class GithubAutomationRule {
     @Column(nullable = false, length = 40)
     private GithubAction action;
 
+    @Column(nullable = false)
+    private boolean enabled = true;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
             name = "github_automation_rule_config",

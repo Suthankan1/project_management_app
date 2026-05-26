@@ -1,0 +1,335 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  ArrowRight,
+  AlertCircle,
+  ChevronDown,
+  GitMerge,
+  GitPullRequest,
+  MessageSquare,
+  Package,
+  ShieldAlert,
+  Sparkles,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
+  Tags,
+} from 'lucide-react';
+import GitHubMark from '@/components/github/GitHubMark';
+import { type GithubAutomationLog, type GithubAutomationRule, type GithubAutomationTrigger } from '@/services/githubService';
+
+interface GitHubAutomationsPanelProps {
+  rules: GithubAutomationRule[];
+  logs: GithubAutomationLog[];
+  loadingRules: boolean;
+  loadingLogs: boolean;
+  rulesError: string | null;
+  logsError: string | null;
+  onCreateRule: () => void;
+  onDeleteRule: (ruleId: number) => void;
+  onToggleRule: (ruleId: number, enabled: boolean) => void;
+  onRefreshRules: () => void;
+  onRefreshLogs: () => void;
+}
+
+const TRIGGER_STYLES: Record<GithubAutomationTrigger, { label: string; className: string; icon: typeof GitMerge }> = {
+  PR_MERGED: { label: 'PR_MERGED', className: 'bg-violet-100 text-violet-700 border-violet-200', icon: GitMerge },
+  PR_OPENED: { label: 'PR_OPENED', className: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: GitPullRequest },
+  CI_FAILED: { label: 'CI_FAILED', className: 'bg-red-100 text-red-700 border-red-200', icon: ShieldAlert },
+  ISSUE_OPENED: { label: 'ISSUE_OPENED', className: 'bg-sky-100 text-sky-700 border-sky-200', icon: MessageSquare },
+  ISSUE_LABELED: { label: 'ISSUE_LABELED', className: 'bg-amber-100 text-amber-800 border-amber-200', icon: Tags },
+  RELEASE_PUBLISHED: { label: 'RELEASE_PUBLISHED', className: 'bg-indigo-100 text-indigo-700 border-indigo-200', icon: Package },
+};
+
+const ACTION_STYLES: Record<string, { label: string; className: string }> = {
+  MOVE_TASK_TO_COLUMN: { label: 'MOVE_TASK_TO_COLUMN', className: 'bg-slate-900 text-white border-slate-900' },
+  CREATE_TASK: { label: 'CREATE_TASK', className: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+  SEND_NOTIFICATION: { label: 'SEND_NOTIFICATION', className: 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200' },
+};
+
+const OUTCOME_STYLES: Record<string, { className: string; label: string }> = {
+  SUCCESS: { className: 'bg-emerald-100 text-emerald-700 border-emerald-200', label: 'SUCCESS' },
+  SKIPPED: { className: 'bg-slate-100 text-slate-600 border-slate-200', label: 'SKIPPED' },
+  ERROR: { className: 'bg-red-100 text-red-700 border-red-200', label: 'ERROR' },
+};
+
+function formatTimestamp(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
+}
+
+function triggerSummary(rule: GithubAutomationRule): string {
+  if (rule.action === 'MOVE_TASK_TO_COLUMN') {
+    return `→ Move to ${rule.config.targetColumnName || 'target column'}`;
+  }
+
+  if (rule.action === 'CREATE_TASK') {
+    return `→ Create task${rule.config.taskTitle ? `: ${rule.config.taskTitle}` : ''}`;
+  }
+
+  return '→ Send notification';
+}
+
+function logIcon(trigger: GithubAutomationTrigger) {
+  switch (trigger) {
+    case 'PR_MERGED':
+      return GitMerge;
+    case 'PR_OPENED':
+      return GitPullRequest;
+    case 'CI_FAILED':
+      return ShieldAlert;
+    case 'ISSUE_OPENED':
+      return MessageSquare;
+    case 'ISSUE_LABELED':
+      return Tags;
+    case 'RELEASE_PUBLISHED':
+      return Package;
+    default:
+      return Sparkles;
+  }
+}
+
+function EmptyState({ onCreateRule }: { onCreateRule: () => void }) {
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-dashed border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/60 p-8 text-center">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-900 text-white shadow-lg shadow-slate-900/10">
+        <GitHubMark size={34} className="text-white" />
+      </div>
+      <div className="mx-auto mt-5 max-w-xl">
+        <h3 className="text-lg font-semibold text-slate-900">No GitHub automations yet. Add one to automate your workflow.</h3>
+        <p className="mt-2 text-sm text-slate-500">
+          Connect GitHub events to task movement, task creation, or notifications for this project.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onCreateRule}
+        className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+      >
+        <Sparkles size={15} />
+        Add Rule
+      </button>
+    </div>
+  );
+}
+
+export default function GitHubAutomationsPanel({
+  rules,
+  logs,
+  loadingRules,
+  loadingLogs,
+  rulesError,
+  logsError,
+  onCreateRule,
+  onDeleteRule,
+  onToggleRule,
+  onRefreshRules,
+  onRefreshLogs,
+}: GitHubAutomationsPanelProps) {
+  const [logsOpen, setLogsOpen] = useState(true);
+
+  const recentLogs = useMemo(() => logs.slice(0, 10), [logs]);
+
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
+            <GitHubMark size={20} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">GitHub Automations</h2>
+            <p className="text-sm text-slate-500">Rules, enablement, and execution logs for this project.</p>
+          </div>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onRefreshRules}
+            className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+          >
+            Refresh Rules
+          </button>
+          <button
+            type="button"
+            onClick={onCreateRule}
+            className="rounded-2xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+          >
+            + Add Rule
+          </button>
+        </div>
+      </div>
+
+      {rulesError && (
+        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <p>{rulesError}</p>
+        </div>
+      )}
+
+      <div className="mt-5">
+        {loadingRules ? (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {Array.from({ length: 2 }).map((_, index) => (
+              <div key={index} className="h-36 animate-pulse rounded-3xl bg-slate-100" />
+            ))}
+          </div>
+        ) : rules.length === 0 ? (
+          <EmptyState onCreateRule={onCreateRule} />
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {rules.map((rule) => {
+              const triggerStyle = TRIGGER_STYLES[rule.trigger];
+              const actionStyle = ACTION_STYLES[rule.action];
+
+              return (
+                <motion.div
+                  key={rule.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-3xl border border-slate-200 bg-slate-50 p-4 shadow-sm"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-slate-600 shadow-sm">
+                      <triggerStyle.icon size={18} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${triggerStyle.className}`}>
+                          <triggerStyle.icon size={11} />
+                          {triggerStyle.label}
+                        </span>
+                        <ArrowRight size={14} className="text-slate-400" />
+                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${actionStyle.className}`}>
+                          {actionStyle.label}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-sm font-semibold text-slate-900">{triggerSummary(rule)}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {rule.enabled ? 'Enabled and actively evaluated.' : 'Disabled and skipped by automation processing.'}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onToggleRule(rule.id, !rule.enabled)}
+                        className={[
+                          'inline-flex h-7 w-12 items-center rounded-full border transition-colors',
+                          rule.enabled ? 'justify-end border-emerald-200 bg-emerald-500/90 px-1' : 'justify-start border-slate-200 bg-slate-200 px-1',
+                        ].join(' ')}
+                        aria-label={rule.enabled ? 'Disable automation rule' : 'Enable automation rule'}
+                        title={rule.enabled ? 'Disable rule' : 'Enable rule'}
+                      >
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm">
+                          {rule.enabled ? <ToggleRight size={13} className="text-emerald-600" /> : <ToggleLeft size={13} className="text-slate-500" />}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm('Delete this automation rule?')) {
+                            onDeleteRule(rule.id);
+                          }
+                        }}
+                        className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-white hover:text-red-600"
+                        aria-label="Delete automation rule"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-6 rounded-3xl border border-slate-200 bg-white">
+        <button
+          type="button"
+          onClick={() => setLogsOpen((current) => !current)}
+          className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
+        >
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Recent logs</h3>
+            <p className="text-xs text-slate-500">Last 10 execution events from GitHub automations.</p>
+          </div>
+          <ChevronDown size={16} className={['text-slate-400 transition-transform', logsOpen ? 'rotate-180' : ''].join(' ')} />
+        </button>
+
+        <AnimatePresence initial={false}>
+          {logsOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="border-t border-slate-100 px-4 py-4">
+                {loadingLogs ? (
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="h-16 animate-pulse rounded-2xl bg-slate-100" />
+                    ))}
+                  </div>
+                ) : logsError ? (
+                  <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                    <p>{logsError}</p>
+                  </div>
+                ) : recentLogs.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                    No automation logs yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {recentLogs.map((log) => {
+                      const LogIcon = logIcon(log.trigger);
+                      const outcomeStyle = OUTCOME_STYLES[log.outcome] ?? OUTCOME_STYLES.SKIPPED;
+
+                      return (
+                        <div key={log.id} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white text-slate-600 shadow-sm">
+                            <LogIcon size={16} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${outcomeStyle.className}`}>
+                                {outcomeStyle.label}
+                              </span>
+                              <span className="text-xs font-semibold text-slate-500">{formatTimestamp(log.executedAt)}</span>
+                            </div>
+                            <p className="mt-2 text-sm font-medium text-slate-800">{log.message}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={onRefreshLogs}
+                    className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                  >
+                    Refresh Logs
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </section>
+  );
+}

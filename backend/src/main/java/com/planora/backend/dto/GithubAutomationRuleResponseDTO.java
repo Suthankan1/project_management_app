@@ -15,5 +15,6 @@ public class GithubAutomationRuleResponseDTO {
     private Long projectId;
     private GithubTrigger trigger;
     private GithubAction action;
+    private boolean enabled;
     private Map<String, String> config;
 }

@@ -154,7 +154,7 @@ public class GithubAutomationService {
         }
 
         githubAutomationRuleRepository.findByProject_IdInAndTrigger(projectIds, trigger).stream()
-                .filter(rule -> rule.getTrigger() == trigger)
+            .filter(rule -> rule.getTrigger() == trigger && rule.isEnabled())
                 .forEach(rule -> dispatchAction(rule, context));
     }
 
@@ -175,9 +175,19 @@ public class GithubAutomationService {
         rule.setProject(project);
         rule.setTrigger(request.getTrigger());
         rule.setAction(request.getAction());
+        rule.setEnabled(true);
         rule.setConfig(request.getConfig() == null
                 ? new LinkedHashMap<>()
                 : new LinkedHashMap<>(request.getConfig()));
+        return toResponse(githubAutomationRuleRepository.save(rule));
+    }
+
+    @Transactional
+    public GithubAutomationRuleResponseDTO setRuleEnabled(Long projectId, Long ruleId, boolean enabled) {
+        requireProject(projectId);
+        GithubAutomationRule rule = githubAutomationRuleRepository.findByIdAndProject_Id(ruleId, projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("GitHub automation rule not found"));
+        rule.setEnabled(enabled);
         return toResponse(githubAutomationRuleRepository.save(rule));
     }
 
@@ -597,6 +607,7 @@ public class GithubAutomationService {
                 rule.getProject().getId(),
                 rule.getTrigger(),
                 rule.getAction(),
+            rule.isEnabled(),
                 rule.getConfig() == null ? Map.of() : new LinkedHashMap<>(rule.getConfig()));
     }
 }
