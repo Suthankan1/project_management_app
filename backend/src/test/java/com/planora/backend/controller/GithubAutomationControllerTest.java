@@ -1,0 +1,86 @@
+package com.planora.backend.controller;
+
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import com.planora.backend.dto.GithubAutomationRuleRequestDTO;
+import com.planora.backend.dto.GithubAutomationRuleResponseDTO;
+import com.planora.backend.model.GithubAction;
+import com.planora.backend.model.GithubTrigger;
+import com.planora.backend.service.GithubAutomationService;
+
+class GithubAutomationControllerTest {
+
+    private GithubAutomationService githubAutomationService;
+    private MockMvc mockMvc;
+
+    @BeforeEach
+    void setUp() {
+        githubAutomationService = org.mockito.Mockito.mock(GithubAutomationService.class);
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                new GithubAutomationController(githubAutomationService)).build();
+    }
+
+    @Test
+    void listsGithubAutomationRulesForProject() throws Exception {
+        GithubAutomationRuleResponseDTO rule = response();
+        when(githubAutomationService.getRulesForProject(41L)).thenReturn(List.of(rule));
+
+        mockMvc.perform(get("/api/projects/41/automations/github"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(9))
+                .andExpect(jsonPath("$[0].trigger").value("PR_MERGED"));
+    }
+
+    @Test
+    void createsGithubAutomationRuleForProject() throws Exception {
+        when(githubAutomationService.createRule(
+                org.mockito.ArgumentMatchers.eq(41L),
+                org.mockito.ArgumentMatchers.any(GithubAutomationRuleRequestDTO.class)))
+                .thenReturn(response());
+
+        mockMvc.perform(post("/api/projects/41/automations/github")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "trigger": "PR_MERGED",
+                                  "action": "SEND_NOTIFICATION",
+                                  "config": {"message": "Merged"}
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.projectId").value(41))
+                .andExpect(jsonPath("$.action").value("SEND_NOTIFICATION"));
+    }
+
+    @Test
+    void deletesGithubAutomationRuleWithinProject() throws Exception {
+        mockMvc.perform(delete("/api/projects/41/automations/github/9"))
+                .andExpect(status().isNoContent());
+
+        verify(githubAutomationService).deleteRule(41L, 9L);
+    }
+
+    private GithubAutomationRuleResponseDTO response() {
+        return new GithubAutomationRuleResponseDTO(
+                9L,
+                41L,
+                GithubTrigger.PR_MERGED,
+                GithubAction.SEND_NOTIFICATION,
+                Map.of("message", "Merged"));
+    }
+}

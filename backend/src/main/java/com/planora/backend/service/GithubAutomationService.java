@@ -8,14 +8,18 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.planora.backend.dto.GithubAutomationRuleRequestDTO;
+import com.planora.backend.dto.GithubAutomationRuleResponseDTO;
 import com.planora.backend.event.CIFailedEvent;
 import com.planora.backend.event.IssueLabeledEvent;
 import com.planora.backend.event.IssueOpenedEvent;
 import com.planora.backend.event.PRMergedEvent;
 import com.planora.backend.event.ReleasePublishedEvent;
+import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.GithubAction;
 import com.planora.backend.model.GithubAutomationRule;
 import com.planora.backend.model.GithubTrigger;
@@ -39,10 +43,12 @@ public class GithubAutomationService {
     private final GithubAutomationRuleRepository githubAutomationRuleRepository;
 
     @EventListener
+    @Async
     public void onPRMerged(PRMergedEvent event) {
-        Map<String, Object> context = eventContext(event.getRepoFullName());
-        context.put("prNumber", event.getPrNumber());
-        context.put("prTitle", event.getPrTitle());
+        Map<String, Object> context = Map.of(
+                "repoFullName", event.getRepoFullName(),
+                "prNumber", event.getPrNumber(),
+                "prTitle", event.getPrTitle());
         executeRulesForTrigger(GithubTrigger.PR_MERGED, context);
     }
 
@@ -104,6 +110,37 @@ public class GithubAutomationService {
                 .forEach(rule -> dispatchAction(rule, context));
     }
 
+    @Transactional(readOnly = true)
+    public List<GithubAutomationRuleResponseDTO> getRulesForProject(Long projectId) {
+        requireProject(projectId);
+        return githubAutomationRuleRepository.findByProject_IdOrderByIdAsc(projectId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional
+    public GithubAutomationRuleResponseDTO createRule(
+            Long projectId,
+            GithubAutomationRuleRequestDTO request) {
+        Project project = requireProject(projectId);
+        GithubAutomationRule rule = new GithubAutomationRule();
+        rule.setProject(project);
+        rule.setTrigger(request.getTrigger());
+        rule.setAction(request.getAction());
+        rule.setConfig(request.getConfig() == null
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(request.getConfig()));
+        return toResponse(githubAutomationRuleRepository.save(rule));
+    }
+
+    @Transactional
+    public void deleteRule(Long projectId, Long ruleId) {
+        requireProject(projectId);
+        GithubAutomationRule rule = githubAutomationRuleRepository.findByIdAndProject_Id(ruleId, projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("GitHub automation rule not found"));
+        githubAutomationRuleRepository.delete(rule);
+    }
+
     private void dispatchAction(GithubAutomationRule rule, Map<String, Object> context) {
         if (rule.getAction() == null) {
             log.warn("Skipping GitHub automation rule {} because it has no action", rule.getId());
@@ -143,5 +180,19 @@ public class GithubAutomationService {
         context.put("issueNumber", issueNumber);
         context.put("issueTitle", issueTitle);
         return context;
+    }
+
+    private Project requireProject(Long projectId) {
+        return projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+    }
+
+    private GithubAutomationRuleResponseDTO toResponse(GithubAutomationRule rule) {
+        return new GithubAutomationRuleResponseDTO(
+                rule.getId(),
+                rule.getProject().getId(),
+                rule.getTrigger(),
+                rule.getAction(),
+                rule.getConfig() == null ? Map.of() : new LinkedHashMap<>(rule.getConfig()));
     }
 }

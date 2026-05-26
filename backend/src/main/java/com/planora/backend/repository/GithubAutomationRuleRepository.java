@@ -1,6 +1,7 @@
 package com.planora.backend.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -12,4 +13,8 @@ import com.planora.backend.model.GithubTrigger;
 public interface GithubAutomationRuleRepository extends JpaRepository<GithubAutomationRule, Long> {
 
     List<GithubAutomationRule> findByProject_IdInAndTrigger(List<Long> projectIds, GithubTrigger trigger);
+
+    List<GithubAutomationRule> findByProject_IdOrderByIdAsc(Long projectId);
+
+    Optional<GithubAutomationRule> findByIdAndProject_Id(Long id, Long projectId);
 }
