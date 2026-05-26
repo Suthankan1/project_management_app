@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.planora.backend.dto.GithubAutomationRuleRequestDTO;
 import com.planora.backend.dto.GithubAutomationRuleResponseDTO;
 import com.planora.backend.model.GithubAction;
+import com.planora.backend.model.GithubAutomationLog;
 import com.planora.backend.model.GithubTrigger;
 import com.planora.backend.service.GithubAutomationService;
 
@@ -65,6 +67,25 @@ class GithubAutomationControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.projectId").value(41))
                 .andExpect(jsonPath("$.action").value("SEND_NOTIFICATION"));
+    }
+
+    @Test
+    void listsRecentGithubAutomationLogsForProject() throws Exception {
+        GithubAutomationLog execution = new GithubAutomationLog(
+                22L,
+                9L,
+                GithubTrigger.PR_MERGED,
+                GithubAction.MOVE_TASK_TO_COLUMN,
+                "{\"repoFullName\":\"planora/app\"}",
+                "SUCCESS",
+                "Moved 1 task(s) to column 'Done'",
+                LocalDateTime.of(2026, 5, 26, 12, 0));
+        when(githubAutomationService.getRecentLogsForProject(41L)).thenReturn(List.of(execution));
+
+        mockMvc.perform(get("/api/projects/41/automations/github/logs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ruleId").value(9))
+                .andExpect(jsonPath("$[0].outcome").value("SUCCESS"));
     }
 
     @Test

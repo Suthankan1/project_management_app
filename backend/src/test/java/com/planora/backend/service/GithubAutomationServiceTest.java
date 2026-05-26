@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.planora.backend.dto.GithubAutomationRuleRequestDTO;
 import com.planora.backend.dto.GithubAutomationRuleResponseDTO;
 import com.planora.backend.event.CIFailedEvent;
@@ -27,6 +28,7 @@ import com.planora.backend.event.PRMergedEvent;
 import com.planora.backend.event.PROpenedEvent;
 import com.planora.backend.event.ReleasePublishedEvent;
 import com.planora.backend.model.GithubAction;
+import com.planora.backend.model.GithubAutomationLog;
 import com.planora.backend.model.GithubAutomationRule;
 import com.planora.backend.model.GithubTrigger;
 import com.planora.backend.model.KanbanColumn;
@@ -34,6 +36,7 @@ import com.planora.backend.model.Project;
 import com.planora.backend.model.Sprint;
 import com.planora.backend.model.SprintStatus;
 import com.planora.backend.model.Task;
+import com.planora.backend.repository.GithubAutomationLogRepository;
 import com.planora.backend.repository.GithubAutomationRuleRepository;
 import com.planora.backend.repository.KanbanColumnRepository;
 import com.planora.backend.repository.ProjectRepository;
@@ -56,6 +59,9 @@ class GithubAutomationServiceTest {
     private ProjectRepository projectRepository;
 
     @Mock
+    private GithubAutomationLogRepository automationLogRepository;
+
+    @Mock
     private GithubAutomationRuleRepository ruleRepository;
 
     @Mock
@@ -67,6 +73,9 @@ class GithubAutomationServiceTest {
     @Mock
     private GithubIssueConversionService githubIssueConversionService;
 
+    @Mock
+    private GithubEventBroadcaster githubEventBroadcaster;
+
     private GithubAutomationService automationService;
 
     @BeforeEach
@@ -76,10 +85,13 @@ class GithubAutomationServiceTest {
                 kanbanColumnRepository,
                 notificationService,
                 projectRepository,
+                automationLogRepository,
                 ruleRepository,
                 taskRepository,
                 sprintRepository,
-                githubIssueConversionService);
+                githubIssueConversionService,
+                githubEventBroadcaster,
+                new ObjectMapper());
     }
 
     @Test
@@ -167,8 +179,10 @@ class GithubAutomationServiceTest {
                 GithubAction.MOVE_TASK_TO_COLUMN,
                 Map.of("columnName", "In Review"));
         Task task = new Task();
+        task.setId(99L);
         task.setProjectTaskNumber(123L);
         KanbanColumn column = new KanbanColumn();
+        column.setId(7L);
         column.setName("In Review");
         column.setStatus("IN_REVIEW");
 
@@ -189,9 +203,7 @@ class GithubAutomationServiceTest {
                 "octocat",
                 "feature-planora-123-review"));
 
-        assertEquals(column, task.getKanbanColumn());
-        assertEquals("IN_REVIEW", task.getStatus());
-        verify(taskRepository).save(task);
+        verify(taskService).updateTaskColumn(99L, 7L);
     }
 
     @Test
@@ -205,8 +217,10 @@ class GithubAutomationServiceTest {
                 GithubAction.MOVE_TASK_TO_COLUMN,
                 Map.of("column", "In Review"));
         Task task = new Task();
+        task.setId(99L);
         task.setProjectTaskNumber(123L);
         KanbanColumn column = new KanbanColumn();
+        column.setId(7L);
         column.setStatus("IN_REVIEW");
 
         when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
@@ -221,7 +235,7 @@ class GithubAutomationServiceTest {
         automationService.onPROpened(new PROpenedEvent(
                 this, "planora/app", 17, "Improve sync", "octocat", "feature/task/123-review"));
 
-        verify(taskRepository).save(task);
+        verify(taskService).updateTaskColumn(99L, 7L);
     }
 
     @Test
@@ -340,6 +354,8 @@ class GithubAutomationServiceTest {
                 .thenReturn(List.of(project));
         when(ruleRepository.findByProject_IdInAndTrigger(List.of(41L), GithubTrigger.ISSUE_LABELED))
                 .thenReturn(List.of(rule));
+        when(kanbanColumnRepository.findFirstByKanban_ProjectIdAndNameIgnoreCase(41L, "In Review"))
+                .thenReturn(Optional.of(new KanbanColumn()));
         when(taskRepository.findByProjectIdAndGithubIssueNumberAndGithubRepoFullNameIgnoreCase(
                 41L, 34L, "planora/app")).thenReturn(List.of(task));
         when(kanbanColumnRepository.findFirstByKanban_ProjectIdAndNameIgnoreCase(41L, "In Review"))
@@ -369,13 +385,14 @@ class GithubAutomationServiceTest {
                 .thenReturn(List.of(project));
         when(ruleRepository.findByProject_IdInAndTrigger(List.of(41L), GithubTrigger.ISSUE_LABELED))
                 .thenReturn(List.of(rule));
+        when(kanbanColumnRepository.findFirstByKanban_ProjectIdAndNameIgnoreCase(41L, "In Review"))
+                .thenReturn(Optional.of(new KanbanColumn()));
 
         automationService.onIssueLabeled(new IssueLabeledEvent(
                 this, "planora/app", 34, "Broken sync", "blocked", "d73a4a"));
 
         org.mockito.Mockito.verify(taskService, org.mockito.Mockito.never())
                 .updateTaskColumn(any(), any());
-        verifyNoInteractions(kanbanColumnRepository);
     }
 
     @Test
@@ -403,6 +420,8 @@ class GithubAutomationServiceTest {
                 .thenReturn(List.of(project));
         when(ruleRepository.findByProject_IdInAndTrigger(List.of(41L), GithubTrigger.RELEASE_PUBLISHED))
                 .thenReturn(List.of(rule));
+        when(kanbanColumnRepository.findFirstByKanban_ProjectIdAndNameIgnoreCase(41L, "Done"))
+                .thenReturn(Optional.of(new KanbanColumn()));
         when(sprintRepository.findByProject_Id(41L)).thenReturn(List.of(activeSprint));
         when(taskRepository.findBySprintId(6L)).thenReturn(List.of(firstTask, secondTask));
         when(kanbanColumnRepository.findFirstByKanban_ProjectIdAndNameIgnoreCase(41L, "Done"))
@@ -413,6 +432,9 @@ class GithubAutomationServiceTest {
 
         verify(taskService).updateTaskColumn(90L, 8L);
         verify(taskService).updateTaskColumn(91L, 8L);
+        verify(automationLogRepository).save(org.mockito.ArgumentMatchers.argThat(execution ->
+                "SUCCESS".equals(execution.getOutcome())
+                        && execution.getMessage().contains("Moved 2 task")));
     }
 
     @Test
@@ -430,6 +452,8 @@ class GithubAutomationServiceTest {
                 .thenReturn(List.of(project));
         when(ruleRepository.findByProject_IdInAndTrigger(List.of(41L), GithubTrigger.RELEASE_PUBLISHED))
                 .thenReturn(List.of(rule));
+        when(kanbanColumnRepository.findFirstByKanban_ProjectIdAndNameIgnoreCase(41L, "Done"))
+                .thenReturn(Optional.of(new KanbanColumn()));
 
         automationService.onReleasePublished(new ReleasePublishedEvent(
                 this, "planora/app", "v2.0.0", "Planora 2.0", "https://github.com/planora/app/releases/tag/v2.0.0"));
@@ -437,5 +461,44 @@ class GithubAutomationServiceTest {
         org.mockito.Mockito.verify(taskService, org.mockito.Mockito.never())
                 .updateTaskColumn(any(), any());
         verifyNoInteractions(sprintRepository);
+    }
+
+    @Test
+    void prMergedMovesTaskReferencedByHashBranchAndBroadcastsBadgeUpdate() {
+        Project project = new Project();
+        project.setId(41L);
+        GithubAutomationRule rule = new GithubAutomationRule(
+                15L,
+                project,
+                GithubTrigger.PR_MERGED,
+                GithubAction.MOVE_TASK_TO_COLUMN,
+                Map.of("targetColumnName", "Done"));
+        Task task = new Task();
+        task.setId(99L);
+        task.setGithubIssueNumber(34L);
+        task.setGithubRepoFullName("planora/app");
+        KanbanColumn doneColumn = new KanbanColumn();
+        doneColumn.setId(8L);
+        doneColumn.setName("Done");
+        doneColumn.setStatus("DONE");
+
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(project));
+        when(ruleRepository.findByProject_IdInAndTrigger(List.of(41L), GithubTrigger.PR_MERGED))
+                .thenReturn(List.of(rule));
+        when(kanbanColumnRepository.findFirstByKanban_ProjectIdAndNameIgnoreCase(41L, "Done"))
+                .thenReturn(Optional.of(doneColumn));
+        when(taskRepository.findByProjectIdAndProjectTaskNumber(41L, 123L))
+                .thenReturn(Optional.of(task));
+
+        automationService.onPRMerged(new PRMergedEvent(
+                this, "planora/app", 17, "Improve sync", "release/#123"));
+
+        verify(taskService).updateTaskColumn(99L, 8L);
+        verify(githubEventBroadcaster).broadcastTaskBadgeUpdate(
+                org.mockito.ArgumentMatchers.eq(41L),
+                org.mockito.ArgumentMatchers.eq(99L),
+                org.mockito.ArgumentMatchers.argThat(payload ->
+                        payload.getTaskId().equals(99L) && "closed".equals(payload.getIssueState())));
     }
 }

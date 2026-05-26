@@ -141,7 +141,8 @@ class GithubNotificationServiceTest {
         when(teamMemberRepository.findByTeamId(11L)).thenReturn(List.of(member(author), member(recipient)));
         when(teamMemberRepository.findByTeamId(12L)).thenReturn(List.of(member(recipient)));
 
-        githubNotificationService.notifyPRMerged(" planora/app ", 17, "Improve sync", "maintainer");
+        githubNotificationService.notifyPRMerged(
+                " planora/app ", 17, "Improve sync", "maintainer", "feature/planora-123-review");
 
         String message = "\u2705 PR merged: #17 Improve sync by @maintainer";
         String link = "https://github.com/planora/app/pull/17";
@@ -162,6 +163,7 @@ class GithubNotificationServiceTest {
         assertEquals("planora/app", event.getRepoFullName());
         assertEquals(17, event.getPrNumber());
         assertEquals("Improve sync", event.getPrTitle());
+        assertEquals("feature/planora-123-review", event.getBranch());
     }
 
     @Test

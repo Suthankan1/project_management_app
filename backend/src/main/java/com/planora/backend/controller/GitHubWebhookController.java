@@ -147,7 +147,11 @@ public class GitHubWebhookController {
             case "closed" -> {
                 if (pullRequest.path("merged").asBoolean(false)) {
                     githubNotificationService.notifyPRMerged(
-                            repoFullName, prNumber, title, loginAt(pullRequest, "merged_by"));
+                            repoFullName,
+                            prNumber,
+                            title,
+                            loginAt(pullRequest, "merged_by"),
+                            pullRequest.path("head").path("ref").asText(""));
                 }
             }
             case "review_requested" -> githubNotificationService.notifyReviewRequested(

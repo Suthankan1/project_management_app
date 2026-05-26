@@ -42,6 +42,6 @@ class GithubEventBroadcasterTest {
         verify(messagingTemplate).convertAndSend("/topic/projects/41/github/prs", prPayload);
         verify(messagingTemplate).convertAndSend("/topic/projects/41/github/ci", ciPayload);
         verify(messagingTemplate).convertAndSend("/topic/projects/41/github/issues", issuePayload);
-        verify(messagingTemplate).convertAndSend("/topic/projects/41/tasks/88/github", badgePayload);
+        verify(messagingTemplate).convertAndSend("/topic/projects/41/github/task-badges", badgePayload);
     }
 }

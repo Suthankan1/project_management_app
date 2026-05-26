@@ -104,6 +104,15 @@ public class GithubNotificationService {
     }
 
     public void notifyPRMerged(String repoFullName, int prNumber, String prTitle, String mergerGithubLogin) {
+        notifyPRMerged(repoFullName, prNumber, prTitle, mergerGithubLogin, "");
+    }
+
+    public void notifyPRMerged(
+            String repoFullName,
+            int prNumber,
+            String prTitle,
+            String mergerGithubLogin,
+            String branch) {
         ensureDependenciesInjected();
         if (repoFullName == null || repoFullName.isBlank() || prNumber <= 0) {
             return;
@@ -139,7 +148,7 @@ public class GithubNotificationService {
                 "merged", prNumber, safeTitle(prTitle), link, safeLogin(mergerGithubLogin)));
 
         applicationEventPublisher.publishEvent(
-                new PRMergedEvent(this, normalizedRepoFullName, prNumber, safeTitle(prTitle)));
+                new PRMergedEvent(this, normalizedRepoFullName, prNumber, safeTitle(prTitle), safeText(branch)));
     }
 
     public void notifyReviewRequested(String repoFullName, int prNumber, String prTitle, String reviewerGithubLogin) {

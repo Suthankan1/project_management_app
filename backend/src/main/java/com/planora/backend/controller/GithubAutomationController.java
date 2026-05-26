@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.planora.backend.dto.GithubAutomationRuleRequestDTO;
 import com.planora.backend.dto.GithubAutomationRuleResponseDTO;
+import com.planora.backend.model.GithubAutomationLog;
 import com.planora.backend.service.GithubAutomationService;
 
 import jakarta.validation.Valid;
@@ -30,6 +31,12 @@ public class GithubAutomationController {
     public ResponseEntity<List<GithubAutomationRuleResponseDTO>> getRules(
             @PathVariable Long projectId) {
         return ResponseEntity.ok(githubAutomationService.getRulesForProject(projectId));
+    }
+
+    @GetMapping("/logs")
+    public ResponseEntity<List<GithubAutomationLog>> getRecentLogs(
+            @PathVariable Long projectId) {
+        return ResponseEntity.ok(githubAutomationService.getRecentLogsForProject(projectId));
     }
 
     @PostMapping

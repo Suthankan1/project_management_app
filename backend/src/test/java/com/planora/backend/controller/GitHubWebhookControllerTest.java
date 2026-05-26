@@ -39,7 +39,7 @@ class GitHubWebhookControllerTest {
             {
               "action":"closed",
               "repository":{"full_name":"planora/app"},
-              "pull_request":{"number":17,"title":"Improve sync","merged":true,"merged_by":{"login":"maintainer"}}
+              "pull_request":{"number":17,"title":"Improve sync","merged":true,"merged_by":{"login":"maintainer"},"head":{"ref":"feature/planora-123-review"}}
             }
             """;
     private static final String REVIEW_REQUESTED_BODY = """
@@ -171,7 +171,8 @@ class GitHubWebhookControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string("processed"));
 
-        verify(githubNotificationService).notifyPRMerged("planora/app", 17, "Improve sync", "maintainer");
+        verify(githubNotificationService).notifyPRMerged(
+                "planora/app", 17, "Improve sync", "maintainer", "feature/planora-123-review");
     }
 
     @Test
