@@ -28,10 +28,11 @@ import com.planora.backend.event.PRMergedEvent;
 import com.planora.backend.event.PROpenedEvent;
 import com.planora.backend.event.ReleasePublishedEvent;
 import com.planora.backend.model.GithubAction;
-import com.planora.backend.model.GithubAutomationLog;
 import com.planora.backend.model.GithubAutomationRule;
 import com.planora.backend.model.GithubTrigger;
 import com.planora.backend.model.KanbanColumn;
+import com.planora.backend.model.Label;
+import com.planora.backend.model.Priority;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Sprint;
 import com.planora.backend.model.SprintStatus;
@@ -76,6 +77,9 @@ class GithubAutomationServiceTest {
     @Mock
     private GithubEventBroadcaster githubEventBroadcaster;
 
+        @Mock
+        private LabelService labelService;
+
     private GithubAutomationService automationService;
 
     @BeforeEach
@@ -91,6 +95,7 @@ class GithubAutomationServiceTest {
                 sprintRepository,
                 githubIssueConversionService,
                 githubEventBroadcaster,
+                labelService,
                 new ObjectMapper());
     }
 
@@ -239,7 +244,7 @@ class GithubAutomationServiceTest {
     }
 
     @Test
-    void ciFailedCreateTaskRuleLogsRenderedTaskPreviewWithDefaultPriority(CapturedOutput output) {
+    void ciFailedCreateTaskRuleCreatesTaskWithDefaultPriorityAndBugLabel(CapturedOutput output) {
         Project project = new Project();
         project.setId(41L);
         GithubAutomationRule rule = new GithubAutomationRule(
@@ -247,23 +252,67 @@ class GithubAutomationServiceTest {
                 project,
                 GithubTrigger.CI_FAILED,
                 GithubAction.CREATE_TASK,
-                Map.of(
-                        "projectId", "41",
-                        "taskTitle", "CI failure: {workflowName} on {branch} ({commitSha})",
-                        "labelName", "build-failure"));
+                Map.of("projectId", "41"));
+        Task task = new Task();
+        task.setProject(project);
+        Label label = new Label();
+        label.setId(12L);
+        label.setName("bug");
+        label.setColor("#d73a4a");
 
         when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
                 .thenReturn(List.of(project));
+        when(projectRepository.findById(41L)).thenReturn(Optional.of(project));
         when(ruleRepository.findByProject_IdInAndTrigger(List.of(41L), GithubTrigger.CI_FAILED))
                 .thenReturn(List.of(rule));
+        when(taskService.createAutomationTask(
+                org.mockito.ArgumentMatchers.eq(project),
+                org.mockito.ArgumentMatchers.eq("🔴 CI Failure: Backend checks on main"),
+                org.mockito.ArgumentMatchers.argThat(description -> description.contains("[abcdef123](https://github.com/planora/app/commit/abcdef123)")),
+                org.mockito.ArgumentMatchers.eq(Priority.HIGH)))
+                .thenReturn(task);
+        when(labelService.findOrCreate("bug", "#d73a4a", project)).thenReturn(label);
+        when(taskRepository.save(task)).thenAnswer(invocation -> {
+            Task saved = invocation.getArgument(0);
+            saved.setId(77L);
+            return saved;
+        });
 
         automationService.onCIFailed(new CIFailedEvent(
                 this, "planora/app", "main", "abcdef123", "Backend checks"));
 
-        org.junit.jupiter.api.Assertions.assertTrue(output.getOut().contains(
-                "title='CI failure: Backend checks on main (abcdef123)'"));
-        org.junit.jupiter.api.Assertions.assertTrue(output.getOut().contains("priority='HIGH'"));
-        org.junit.jupiter.api.Assertions.assertTrue(output.getOut().contains("label='build-failure'"));
+        verify(taskService).createAutomationTask(
+                org.mockito.ArgumentMatchers.eq(project),
+                org.mockito.ArgumentMatchers.eq("🔴 CI Failure: Backend checks on main"),
+                org.mockito.ArgumentMatchers.argThat(description -> description.contains("Workflow: Backend checks")
+                        && description.contains("Branch: main")
+                        && description.contains("[abcdef123](https://github.com/planora/app/commit/abcdef123)")),
+                org.mockito.ArgumentMatchers.eq(Priority.HIGH));
+        verify(labelService).findOrCreate("bug", "#d73a4a", project);
+        verify(taskRepository).save(task);
+        verify(automationLogRepository).save(org.mockito.ArgumentMatchers.argThat(execution ->
+                "SUCCESS".equals(execution.getOutcome())
+                        && execution.getMessage().contains("created task 77")));
+        org.junit.jupiter.api.Assertions.assertTrue(output.getOut().contains("created CI failure task 77"));
+    }
+
+    @Test
+    void ciFailedDoesNotCreateTaskWithoutMatchingRule() {
+        Project project = new Project();
+        project.setId(41L);
+
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(project));
+        when(ruleRepository.findByProject_IdInAndTrigger(
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.eq(GithubTrigger.CI_FAILED)))
+                .thenReturn(List.of());
+
+        automationService.executeRulesForTrigger(
+                GithubTrigger.CI_FAILED,
+                Map.of("repoFullName", "planora/app", "branch", "main", "commitSha", "abcdef123", "workflowName", "Backend checks"));
+
+        verifyNoInteractions(taskService, labelService, taskRepository, automationLogRepository);
     }
 
     @Test

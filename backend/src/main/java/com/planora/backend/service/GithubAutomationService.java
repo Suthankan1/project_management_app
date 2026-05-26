@@ -34,9 +34,11 @@ import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.GithubAction;
 import com.planora.backend.model.GithubAutomationLog;
 import com.planora.backend.model.GithubAutomationRule;
+import com.planora.backend.model.Label;
 import com.planora.backend.model.GithubTrigger;
 import com.planora.backend.model.KanbanColumn;
 import com.planora.backend.model.Project;
+import com.planora.backend.model.Priority;
 import com.planora.backend.model.Sprint;
 import com.planora.backend.model.SprintStatus;
 import com.planora.backend.model.Task;
@@ -65,6 +67,7 @@ public class GithubAutomationService {
     private final SprintRepository sprintRepository;
     private final GithubIssueConversionService githubIssueConversionService;
     private final GithubEventBroadcaster githubEventBroadcaster;
+    private final LabelService labelService;
     private final ObjectMapper objectMapper;
 
     @EventListener
@@ -202,8 +205,9 @@ public class GithubAutomationService {
             switch (rule.getAction()) {
                 case MOVE_TASK_TO_COLUMN -> executeMoveTaskToColumn(rule, context);
                 case CREATE_TASK -> {
-                    createTask(rule, context);
-                    recordExecution(rule, context, "SUCCESS", "CREATE_TASK action dispatched");
+                    Optional<Long> createdTaskId = createTask(rule, context);
+                    createdTaskId.ifPresent(taskId -> recordExecution(rule, context, "SUCCESS",
+                            "CREATE_TASK action created task " + taskId));
                 }
                 case SEND_NOTIFICATION -> {
                     sendNotification(rule, context);
@@ -277,17 +281,16 @@ public class GithubAutomationService {
                 "Moved " + movedCount + " task(s) to column '" + column.getName() + "'");
     }
 
-    private void createTask(GithubAutomationRule rule, Map<String, Object> context) {
+    private Optional<Long> createTask(GithubAutomationRule rule, Map<String, Object> context) {
         if (rule.getTrigger() == GithubTrigger.CI_FAILED) {
-            logCIFailedTaskCreation(rule, context);
-            return;
+            return executeCreateTask(rule, context);
         }
         if (rule.getTrigger() == GithubTrigger.ISSUE_OPENED) {
-            importOpenedIssueAsTask(rule, context);
-            return;
+            return importOpenedIssueAsTask(rule, context);
         }
         log.debug("Dispatching GitHub automation action {} for rule {} with context {}",
                 GithubAction.CREATE_TASK, rule.getId(), context);
+        return Optional.empty();
     }
 
     private void sendNotification(GithubAutomationRule rule, Map<String, Object> context) {
@@ -436,48 +439,97 @@ public class GithubAutomationService {
         }
     }
 
-    private void logCIFailedTaskCreation(GithubAutomationRule rule, Map<String, Object> context) {
+    private Optional<Long> executeCreateTask(GithubAutomationRule rule, Map<String, Object> context) {
         Map<String, String> config = rule.getConfig() == null ? Map.of() : rule.getConfig();
+        Project ruleProject = rule.getProject();
+        if (ruleProject == null || ruleProject.getId() == null) {
+            recordExecution(rule, context, "SKIPPED", "Rule has no project");
+            return Optional.empty();
+        }
+
         String configuredProjectId = Objects.toString(config.get("projectId"), "").trim();
-        if (configuredProjectId.isBlank()) {
-            log.warn("Skipping CI-failed automation rule {} because config projectId is required", rule.getId());
-            return;
+        String ruleProjectId = ruleProject.getId().toString();
+        if (!configuredProjectId.isBlank() && !configuredProjectId.equals(ruleProjectId)) {
+            recordExecution(rule, context, "SKIPPED",
+                    "Configured projectId " + configuredProjectId + " does not match rule project " + ruleProjectId);
+            return Optional.empty();
         }
 
-        Project project = rule.getProject();
-        String ruleProjectId = project == null || project.getId() == null
-                ? ""
-                : project.getId().toString();
-        if (!configuredProjectId.equals(ruleProjectId)) {
-            log.warn("Skipping CI-failed automation rule {} because configured projectId {} does not match rule project {}",
-                    rule.getId(), configuredProjectId, ruleProjectId);
-            return;
-        }
+        Project project = requireProject(ruleProject.getId());
+        String titleTemplate = Objects.toString(config.get("taskTitle"), "🔴 CI Failure: {workflowName} on {branch}");
+        String taskTitle = renderTemplate(titleTemplate, context);
+        String taskDescription = buildCIFailureDescription(context);
+        Priority priority = parsePriority(config.get("priority"), Priority.HIGH);
 
-        String titleTemplate = Objects.toString(
-                config.get("taskTitle"), "CI failure: {workflowName} on {branch}");
-        String taskTitle = renderCIFailedTaskTitle(titleTemplate, context);
-        String priority = Objects.toString(config.getOrDefault("priority", "HIGH"), "HIGH")
-                .trim()
-                .toUpperCase();
+        Task task = taskService.createAutomationTask(project, taskTitle, taskDescription, priority);
+
         String labelName = Objects.toString(config.get("labelName"), "").trim();
+        if (labelName.isBlank()) {
+            labelName = "bug";
+        }
+        String labelColor = Objects.toString(config.get("labelColor"), "").trim();
+        if (labelColor.isBlank()) {
+            labelColor = "#d73a4a";
+        }
+        Label label = labelService.findOrCreate(labelName, labelColor, project);
+        task.getLabels().add(label);
+        Task saved = taskRepository.save(task);
 
-        log.info("GitHub automation rule {} would create CI failure task in project {}: title='{}', priority='{}', label='{}'",
-                rule.getId(),
-                configuredProjectId,
-                taskTitle,
-                priority.isBlank() ? "HIGH" : priority,
-                labelName);
+        log.info("GitHub automation rule {} created CI failure task {} in project {}: title='{}', priority='{}', label='{}'",
+                rule.getId(), saved.getId(), project.getId(), saved.getTitle(), saved.getPriority(), label.getName());
+        return Optional.of(saved.getId());
     }
 
-    private String renderCIFailedTaskTitle(String template, Map<String, Object> context) {
+    private String renderTemplate(String template, Map<String, Object> context) {
         return template
                 .replace("{workflowName}", Objects.toString(context.get("workflowName"), ""))
                 .replace("{branch}", Objects.toString(context.get("branch"), ""))
-                .replace("{commitSha}", Objects.toString(context.get("commitSha"), ""));
+                .replace("{commitSha}", Objects.toString(context.get("commitSha"), ""))
+                .replace("{issueTitle}", Objects.toString(context.get("issueTitle"), ""))
+                .replace("{issueNumber}", Objects.toString(context.get("issueNumber"), ""));
     }
 
-    private void importOpenedIssueAsTask(GithubAutomationRule rule, Map<String, Object> context) {
+    private String buildCIFailureDescription(Map<String, Object> context) {
+        String workflowName = Objects.toString(context.get("workflowName"), "").trim();
+        String branch = Objects.toString(context.get("branch"), "").trim();
+        String commitSha = Objects.toString(context.get("commitSha"), "").trim();
+        String repoFullName = Objects.toString(context.get("repoFullName"), "").trim();
+        String commitLink = commitSha.isBlank() || repoFullName.isBlank()
+                ? ""
+                : "https://github.com/" + repoFullName + "/commit/" + commitSha;
+
+        StringBuilder description = new StringBuilder("Automated task created from a failed CI run.\n\n");
+        if (!workflowName.isBlank()) {
+            description.append("Workflow: ").append(workflowName).append('\n');
+        }
+        if (!branch.isBlank()) {
+            description.append("Branch: ").append(branch).append('\n');
+        }
+        if (!commitSha.isBlank()) {
+            description.append("Commit: ");
+            if (commitLink.isBlank()) {
+                description.append(commitSha);
+            } else {
+                description.append('[').append(commitSha).append("](").append(commitLink).append(')');
+            }
+            description.append('\n');
+        }
+        return description.toString().trim();
+    }
+
+    private Priority parsePriority(String value, Priority defaultPriority) {
+        if (value == null || value.isBlank()) {
+            return defaultPriority;
+        }
+        try {
+            return Priority.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException exception) {
+            log.warn("Invalid priority '{}' in GitHub automation rule; defaulting to {}", value, defaultPriority);
+            return defaultPriority;
+        }
+    }
+
+    private Optional<Long> importOpenedIssueAsTask(GithubAutomationRule rule, Map<String, Object> context) {
         Map<String, String> config = rule.getConfig() == null ? Map.of() : rule.getConfig();
         Project project = rule.getProject();
         String configuredProjectId = Objects.toString(config.get("projectId"), "").trim();
@@ -487,7 +539,7 @@ public class GithubAutomationService {
         if (configuredProjectId.isBlank() || !configuredProjectId.equals(ruleProjectId)) {
             log.warn("Skipping issue-opened automation rule {} because config projectId must match its project",
                     rule.getId());
-            return;
+            return Optional.empty();
         }
 
         List<String> labels = issueLabelsFromContext(context);
@@ -495,7 +547,7 @@ public class GithubAutomationService {
         if (!requiredLabel.isBlank() && labels.stream().noneMatch(requiredLabel::equalsIgnoreCase)) {
             log.debug("Skipping issue-opened automation rule {} because label '{}' is absent",
                     rule.getId(), requiredLabel);
-            return;
+            return Optional.empty();
         }
 
         String repoFullName = Objects.toString(context.get("repoFullName"), "").trim();
@@ -503,7 +555,7 @@ public class GithubAutomationService {
         if (githubIssueConversionService.isAlreadyImported((long) issueNumber, repoFullName, project.getId())) {
             log.debug("Skipping issue-opened automation rule {} because issue #{} is already imported",
                     rule.getId(), issueNumber);
-            return;
+            return Optional.empty();
         }
 
         GithubIssueDTO issue = new GithubIssueDTO();
@@ -520,9 +572,10 @@ public class GithubAutomationService {
         }
         task.setProjectTaskNumber(taskRepository.findMaxProjectTaskNumberByProjectId(project.getId()) + 1L);
         task.setBacklogPosition(taskRepository.findMaxBacklogPositionByProjectId(project.getId()) + 1);
-        taskRepository.save(task);
+        Task saved = taskRepository.save(task);
         log.info("GitHub automation imported opened issue #{} as a task in project {}",
                 issueNumber, project.getId());
+        return Optional.of(saved.getId());
     }
 
     @SuppressWarnings("unchecked")
