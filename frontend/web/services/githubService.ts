@@ -1,3 +1,5 @@
+import api from '@/lib/axios'
+
 export interface GitHubOwner {
   login: string
 }
