@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import com.planora.backend.event.CIFailedEvent;
 import com.planora.backend.event.PRMergedEvent;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.TeamMember;
@@ -132,7 +133,37 @@ public class GithubNotificationService {
 
     public void notifyCIFailed(String repoFullName, String branch, String commitSha, String workflowName) {
         ensureDependenciesInjected();
-        // Task 110: wire CI failure notifications.
+        if (repoFullName == null || repoFullName.isBlank()
+                || commitSha == null || commitSha.isBlank()) {
+            return;
+        }
+
+        String normalizedRepoFullName = repoFullName.trim();
+        String normalizedCommitSha = commitSha.trim();
+        Map<Long, User> recipients = new LinkedHashMap<>();
+
+        for (Project project : projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName)) {
+            if (project.getTeam() == null || project.getTeam().getId() == null) {
+                continue;
+            }
+            for (TeamMember member : teamMemberRepository.findByTeamId(project.getTeam().getId())) {
+                User user = member.getUser();
+                if (user != null && user.getUserId() != null) {
+                    recipients.putIfAbsent(user.getUserId(), user);
+                }
+            }
+        }
+
+        String shortSha = normalizedCommitSha.substring(0, Math.min(7, normalizedCommitSha.length()));
+        String prefix = "\u274C CI failed: " + safeText(workflowName) + " on ";
+        String message = prefix + safeText(branch) + " (" + shortSha + ")";
+        String link = "https://github.com/" + normalizedRepoFullName + "/commit/" + normalizedCommitSha + "/checks";
+        recipients.values().forEach(recipient ->
+                notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                        recipient, message, link, prefix));
+
+        applicationEventPublisher.publishEvent(new CIFailedEvent(
+                this, normalizedRepoFullName, safeText(branch), normalizedCommitSha, safeText(workflowName)));
     }
 
     public void notifyIssueEvent(String repoFullName, int issueNumber, String issueTitle, String action, String actorGithubLogin) {
@@ -160,5 +191,9 @@ public class GithubNotificationService {
 
     private String safeLogin(String login) {
         return login == null ? "" : login;
+    }
+
+    private String safeText(String text) {
+        return text == null ? "" : text;
     }
 }

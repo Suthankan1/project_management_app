@@ -18,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import com.planora.backend.event.CIFailedEvent;
 import com.planora.backend.event.PRMergedEvent;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Team;
@@ -160,6 +161,42 @@ class GithubNotificationServiceTest {
         verify(notificationService, never()).createNotification(any(), any(), any());
         verify(projectRepository, never()).findByGithubRepoFullNameIgnoreCase(any());
         verify(teamMemberRepository, never()).findByTeamId(any());
+    }
+
+    @Test
+    void notifyCIFailed_notifiesProjectMembersAndPublishesEvent() {
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(firstProject, secondProject));
+        when(teamMemberRepository.findByTeamId(11L)).thenReturn(List.of(member(author), member(recipient)));
+        when(teamMemberRepository.findByTeamId(12L)).thenReturn(List.of(member(recipient)));
+
+        githubNotificationService.notifyCIFailed(
+                " planora/app ", "main", "abcdef1234567890", "Backend checks");
+
+        String message = "\u274C CI failed: Backend checks on main (abcdef1)";
+        String link = "https://github.com/planora/app/commit/abcdef1234567890/checks";
+        String prefix = "\u274C CI failed: Backend checks on ";
+        verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                author, message, link, prefix);
+        verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                recipient, message, link, prefix);
+
+        ArgumentCaptor<CIFailedEvent> eventCaptor = ArgumentCaptor.forClass(CIFailedEvent.class);
+        verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+        CIFailedEvent event = eventCaptor.getValue();
+        assertSame(githubNotificationService, event.getSource());
+        assertEquals("planora/app", event.getRepoFullName());
+        assertEquals("main", event.getBranch());
+        assertEquals("abcdef1234567890", event.getCommitSha());
+        assertEquals("Backend checks", event.getWorkflowName());
+    }
+
+    @Test
+    void notifyCIFailed_ignoresMissingCommitWithoutPublishingEvent() {
+        githubNotificationService.notifyCIFailed("planora/app", "main", " ", "Backend checks");
+
+        verify(projectRepository, never()).findByGithubRepoFullNameIgnoreCase(any());
+        verify(applicationEventPublisher, never()).publishEvent(any());
     }
 
     private User user(Long id, String username) {

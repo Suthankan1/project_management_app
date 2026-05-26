@@ -50,6 +50,30 @@ class GitHubWebhookControllerTest {
               "requested_reviewer":{"login":"reviewer"}
             }
             """;
+    private static final String FAILED_WORKFLOW_BODY = """
+            {
+              "action":"completed",
+              "repository":{"full_name":"planora/app"},
+              "workflow_run":{
+                "name":"Backend checks",
+                "head_branch":"main",
+                "head_sha":"abcdef1234567890",
+                "conclusion":"failure"
+              }
+            }
+            """;
+    private static final String SUCCESSFUL_WORKFLOW_BODY = """
+            {
+              "action":"completed",
+              "repository":{"full_name":"planora/app"},
+              "workflow_run":{
+                "name":"Backend checks",
+                "head_branch":"main",
+                "head_sha":"abcdef1234567890",
+                "conclusion":"success"
+              }
+            }
+            """;
 
     private MockMvc mockMvc;
     private GithubNotificationService githubNotificationService;
@@ -103,6 +127,37 @@ class GitHubWebhookControllerTest {
                 .andExpect(content().string("processed"));
 
         verify(githubNotificationService).notifyReviewRequested("planora/app", 17, "Improve sync", "reviewer");
+    }
+
+    @Test
+    void webhook_dispatchesCompletedFailedWorkflowRun() throws Exception {
+        mockMvc.perform(post("/api/github/webhook")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-GitHub-Event", "workflow_run")
+                        .header("X-Hub-Signature-256", signature(FAILED_WORKFLOW_BODY))
+                        .content(FAILED_WORKFLOW_BODY))
+                .andExpect(status().isOk())
+                .andExpect(content().string("processed"));
+
+        verify(githubNotificationService).notifyCIFailed(
+                "planora/app", "main", "abcdef1234567890", "Backend checks");
+    }
+
+    @Test
+    void webhook_ignoresSuccessfulWorkflowRun() throws Exception {
+        mockMvc.perform(post("/api/github/webhook")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-GitHub-Event", "workflow_run")
+                        .header("X-Hub-Signature-256", signature(SUCCESSFUL_WORKFLOW_BODY))
+                        .content(SUCCESSFUL_WORKFLOW_BODY))
+                .andExpect(status().isOk())
+                .andExpect(content().string("ignored"));
+
+        verify(githubNotificationService, never()).notifyCIFailed(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test

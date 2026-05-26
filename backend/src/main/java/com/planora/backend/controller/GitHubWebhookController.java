@@ -93,6 +93,7 @@ public class GitHubWebhookController {
             case "issues"       -> handleIssue(body);
             case "release"      -> handleRelease(body);
             case "check_run" -> handleCheckRun(body);
+            case "workflow_run" -> handleWorkflowRun(body);
             case "ping"      -> ResponseEntity.ok("pong");
             default          -> {
                 log.debug("GitHub webhook event '{}' received — no action taken", eventType);
@@ -178,6 +179,27 @@ public class GitHubWebhookController {
                 repoFullName,
                 release.path("tag_name").asText(""),
                 release.path("name").asText(""));
+        return ResponseEntity.ok("processed");
+    }
+
+    private ResponseEntity<String> handleWorkflowRun(JsonNode body) {
+        JsonNode workflowRun = body.path("workflow_run");
+        if (!"completed".equals(body.path("action").asText(""))
+                || !"failure".equals(workflowRun.path("conclusion").asText(""))) {
+            return ResponseEntity.ok("ignored");
+        }
+
+        String repoFullName = repositoryFullName(body);
+        String commitSha = workflowRun.path("head_sha").asText("").trim();
+        if (repoFullName.isBlank() || commitSha.isBlank()) {
+            return ResponseEntity.badRequest().body("Missing workflow repository or commit SHA");
+        }
+
+        githubNotificationService.notifyCIFailed(
+                repoFullName,
+                workflowRun.path("head_branch").asText(""),
+                commitSha,
+                workflowRun.path("name").asText(""));
         return ResponseEntity.ok("processed");
     }
 
