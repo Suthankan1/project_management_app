@@ -1,0 +1,3 @@
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP;
+CREATE INDEX IF NOT EXISTS idx_tasks_archived ON tasks(project_id, archived);

@@ -1,14 +1,17 @@
 package com.planora.backend.service;
 
+import java.io.IOException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.tika.Tika;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,6 +30,8 @@ import com.planora.backend.model.User;
 import com.planora.backend.model.VerificationToken;
 import com.planora.backend.repository.TokenRepository;
 import com.planora.backend.repository.UserRepository;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Cache;
 
 import jakarta.transaction.Transactional;
 import org.springframework.cache.annotation.CachePut;
@@ -73,6 +78,22 @@ public class UserService {
      */
     private final Map<String, Object[]> presignedUrlCache = new ConcurrentHashMap<>();
     private static final Duration PRESIGN_TTL = Duration.ofMinutes(55);
+
+    private final Cache<String, LoginAttemptRecord> loginAttemptCache = Caffeine.newBuilder()
+            .expireAfterWrite(Duration.ofMinutes(20))
+            .build();
+
+    private record LoginAttemptRecord(int failedAttempts, Instant lockedUntil) {
+        boolean isLocked(Instant now) {
+            return lockedUntil != null && now.isBefore(lockedUntil);
+        }
+
+        LoginAttemptRecord recordFailedAttempt(Instant now) {
+            int nextFailedAttempts = failedAttempts + 1;
+            Instant nextLockedUntil = nextFailedAttempts >= 5 ? now.plus(Duration.ofMinutes(15)) : lockedUntil;
+            return new LoginAttemptRecord(nextFailedAttempts, nextLockedUntil);
+        }
+    }
 
     public UserService(UserRepository userRepository, JWTService jwtService, AuthenticationManager authenticationManager, TokenRepository tokenRepository, EmailService emailService, S3Client s3Client, S3Presigner s3Presigner) {
         this.userRepository = userRepository;
@@ -177,20 +198,32 @@ public class UserService {
     // Authenticates a user and issue JWT tokens.
     @Transactional
     public LoginResponse loginUser(User user) {
+        String email = user.getEmail().toLowerCase();
+        LoginAttemptRecord loginAttemptRecord = loginAttemptCache.getIfPresent(email);
+
+        if (loginAttemptRecord != null && loginAttemptRecord.isLocked(Instant.now())) {
+            LoginResponse response = new LoginResponse();
+            response.setSuccess(false);
+            response.setMessage("Account temporarily locked due to too many failed attempts. Try again later.");
+            response.setErrorCode("ACCOUNT_LOCKED");
+            return response;
+        }
+
         try {
             // Step 1: Delegate password checking to Spring Security's AuthenticationManager.
             Authentication authentication =
                     authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(
-                            user.getEmail().toLowerCase(),
+                            email,
                             user.getPassword()));
 
             // Step 2. If auth succeeds, generate JWT.
             if (authentication.isAuthenticated()) {
-                User authenticatedUser = userRepository.findFirstByEmailIgnoreCase(user.getEmail().toLowerCase()).orElse(null);
+                loginAttemptCache.invalidate(email);
+                User authenticatedUser = userRepository.findFirstByEmailIgnoreCase(email).orElse(null);
 
                 // Create short-lived access token and long-lived refresh token.
-                String accessToken  = jwtService.generateToken(user.getEmail().toLowerCase(), authenticatedUser.getUsername(), authenticatedUser.getUserId());
-                String refreshToken = jwtService.generateRefreshToken(user.getEmail().toLowerCase());
+                String accessToken  = jwtService.generateToken(email, authenticatedUser.getUsername(), authenticatedUser.getUserId());
+                String refreshToken = jwtService.generateRefreshToken(email);
 
                 // Store the JTI of the new refresh token for rotation tracking
                 storeRefreshTokenJti(authenticatedUser, refreshToken);
@@ -221,6 +254,14 @@ public class UserService {
 
         } catch (AuthenticationException e) {
             // Exception caught: Password does not match hash.
+            LoginAttemptRecord updatedLoginAttemptRecord = loginAttemptCache.asMap().compute(email, (key, record) -> {
+                LoginAttemptRecord currentRecord = record == null ? new LoginAttemptRecord(0, null) : record;
+                return currentRecord.recordFailedAttempt(Instant.now());
+            });
+            if (updatedLoginAttemptRecord.failedAttempts() == 5) {
+                logger.warn("Account locked for email: {}", email);
+            }
+
             LoginResponse response = new LoginResponse();
             response.setSuccess(false);
             response.setMessage("Incorrect username or password");
@@ -646,6 +687,24 @@ public class UserService {
     }
 
     /**
+     * Validates a MultipartFile is a genuine image by reading its magic bytes.
+     * Rejects files whose actual content does not match an allowed image format,
+     * regardless of what Content-Type the client claimed.
+     */
+    public boolean isValidImageByMagicBytes(MultipartFile file) throws IOException {
+        // Use Apache Tika to detect the REAL media type from the byte stream
+        Tika tika = new Tika();
+        String detectedType = tika.detect(file.getInputStream());
+        // Allow only these four safe image formats
+        return detectedType != null && List.of(
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif"
+        ).contains(detectedType.toLowerCase());
+    }
+
+    /**
      * Resolves the S3 object key from the stored value.
      * Handles both legacy full-URL values and new key-only values for backward compatibility.
      */
@@ -753,5 +812,3 @@ public class UserService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }
-
-

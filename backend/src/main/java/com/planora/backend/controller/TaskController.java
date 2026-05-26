@@ -1,12 +1,17 @@
 package com.planora.backend.controller;
 
 import com.planora.backend.dto.CommentRequestDTO;
+import com.planora.backend.dto.LinkedCommitResponseDTO;
+import com.planora.backend.dto.LinkedPrResponseDTO;
 import com.planora.backend.dto.TaskActivityResponseDTO;
+import com.planora.backend.dto.TaskBranchUpdateDTO;
+import com.planora.backend.dto.TaskGithubSummaryDTO;
 import com.planora.backend.dto.TaskRequestDTO;
 import com.planora.backend.dto.TaskResponseDTO;
 import com.planora.backend.dto.TaskTemplateDTO;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.service.TaskActivityService;
+import com.planora.backend.service.TaskGithubService;
 import com.planora.backend.service.TaskService;
 import com.planora.backend.service.TaskTemplateService;
 import jakarta.validation.Valid;
@@ -39,6 +44,9 @@ public class TaskController {
     @Autowired
     TaskTemplateService templateService;
 
+    @Autowired
+    TaskGithubService taskGithubService;
+
     // Spring's WebSocket messaging template used for real-time push notifications.
     @Autowired
     SimpMessagingTemplate messagingTemplate;
@@ -62,15 +70,122 @@ public class TaskController {
     /*
      * Fetches a single task and silently logs that the user viewed it
      * (used to populate their "Recently Viewed" dashboard).
+     *
+     * Optional GitHub enrichment: supply both X-GitHub-Token header and
+     * repoFullName query param (e.g. "owner/repo") to populate the
+     * githubPrCount, ciStatus, linkedPrs, and recentCommits response fields.
+     * Omitting either parameter returns the task with null GitHub fields —
+     * fully backward-compatible with existing API consumers.
      */
     @GetMapping("/{taskId}")
     public ResponseEntity<TaskResponseDTO> getTaskById(
             @PathVariable Long taskId,
-            @AuthenticationPrincipal UserPrincipal currentUser){
+            @RequestHeader(value = "X-GitHub-Token", required = false) String githubToken,
+            @RequestParam(required = false) String repoFullName,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
         if (currentUser != null) {
             service.recordTaskAccess(taskId, currentUser.getUserId());
         }
-        return new ResponseEntity<>(service.getTaskById(taskId), HttpStatus.OK);
+        TaskResponseDTO dto = (githubToken != null && repoFullName != null)
+                ? service.getTaskById(taskId, repoFullName, githubToken)
+                : service.getTaskById(taskId);
+        return new ResponseEntity<>(dto, HttpStatus.OK);
+    }
+
+    /**
+     * Returns the full GitHub summary (PRs, commits, CI status, branch) for a task.
+     *
+     * When X-GitHub-Token and repoFullName are both provided the service syncs fresh
+     * data from the GitHub API before responding. Omit them to get the last cached data.
+     *
+     * GET /api/tasks/{taskId}/github
+     *     ?repoFullName=owner/repo          (optional)
+     *     Header: X-GitHub-Token: <token>   (optional)
+     */
+    @GetMapping("/{taskId}/github")
+    public ResponseEntity<TaskGithubSummaryDTO> getTaskGithubSummary(
+            @PathVariable Long taskId,
+            @RequestHeader(value = "X-GitHub-Token", required = false) String githubToken,
+            @RequestParam(required = false) String repoFullName,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+
+        TaskGithubSummaryDTO summary = (githubToken != null && repoFullName != null)
+                ? taskGithubService.syncAndGetSummary(taskId, repoFullName, githubToken)
+                : taskGithubService.getTaskGithubSummary(taskId);
+
+        return ResponseEntity.ok(summary);
+    }
+
+    /**
+     * Returns all pull requests linked to a task, sorted by most-recently-updated.
+     *
+     * GET /api/tasks/{taskId}/pull-requests
+     *     ?repoFullName=owner/repo          (optional — triggers a fresh GitHub sync first)
+     *     Header: X-GitHub-Token: <token>   (optional — required when repoFullName is set)
+     *
+     * Without token+repo the endpoint returns the last cached PR data from the DB.
+     * With token+repo it syncs fresh data from GitHub before responding.
+     */
+    @GetMapping("/{taskId}/pull-requests")
+    public ResponseEntity<List<LinkedPrResponseDTO>> getLinkedPullRequests(
+            @PathVariable Long taskId,
+            @RequestHeader(value = "X-GitHub-Token", required = false) String githubToken,
+            @RequestParam(required = false) String repoFullName) {
+
+        List<LinkedPrResponseDTO> prs = (githubToken != null && repoFullName != null)
+                ? taskGithubService.syncAndGetLinkedPrs(taskId, repoFullName, githubToken)
+                : taskGithubService.getLinkedPrs(taskId);
+
+        return ResponseEntity.ok(prs);
+    }
+
+    /**
+     * Returns commits linked to a task, sorted by committed_at descending.
+     *
+     * GET /api/tasks/{taskId}/commits
+     *     ?limit=20                          (optional, 1-50, default 20)
+     *     ?repoFullName=owner/repo           (optional — triggers a fresh GitHub sync first)
+     *     Header: X-GitHub-Token: <token>   (optional — required when repoFullName is set)
+     *
+     * Each commit includes:
+     *   - sha (7-char), fullSha (40-char), message, author, committedAt, htmlUrl, ciStatus
+     *   - referencedTaskNumbers: task project-numbers extracted from the commit message
+     *     using the patterns "#<number>" and "TASK-<number>" (case-insensitive)
+     *
+     * Without token+repo the endpoint returns cached data from the DB.
+     * With token+repo it syncs fresh data from GitHub before responding.
+     */
+    @GetMapping("/{taskId}/commits")
+    public ResponseEntity<List<LinkedCommitResponseDTO>> getLinkedCommits(
+            @PathVariable Long taskId,
+            @RequestHeader(value = "X-GitHub-Token", required = false) String githubToken,
+            @RequestParam(required = false) String repoFullName,
+            @RequestParam(defaultValue = "20") int limit) {
+
+        List<LinkedCommitResponseDTO> commits = (githubToken != null && repoFullName != null)
+                ? taskGithubService.syncAndGetLinkedCommits(taskId, repoFullName, githubToken, limit)
+                : taskGithubService.getLinkedCommits(taskId, limit);
+
+        return ResponseEntity.ok(commits);
+    }
+
+    /**
+     * Manually sets or updates the GitHub branch linked to a task.
+     *
+     * PATCH /api/tasks/{taskId}/github/branch
+     * Body: { "branch": "feature/my-branch" }
+     *
+     * Returns the refreshed TaskGithubSummaryDTO so the frontend can
+     * update its state without a separate GET.
+     */
+    @PatchMapping("/{taskId}/github/branch")
+    public ResponseEntity<TaskGithubSummaryDTO> updateTaskBranch(
+            @PathVariable Long taskId,
+            @Valid @RequestBody TaskBranchUpdateDTO request,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        String actorName = (currentUser != null) ? currentUser.getUsername() : "System";
+        TaskGithubSummaryDTO summary = taskGithubService.updateBranch(taskId, request.getBranch(), actorName);
+        return ResponseEntity.ok(summary);
     }
 
     @PutMapping("/{taskId}")
@@ -118,6 +233,38 @@ public class TaskController {
     ){
         Long currentUserId = currentUser.getUserId();
         return new ResponseEntity<>(service.getTasksByProject(projectId, currentUserId, status, assigneeId, priority, sprintId, milestoneId), HttpStatus.OK);
+    }
+
+    @GetMapping("/project/{projectId}/archived")
+    public ResponseEntity<List<TaskResponseDTO>> getArchivedTasks(
+            @PathVariable Long projectId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        return ResponseEntity.ok(service.getArchivedTasks(projectId, currentUser.getUserId()));
+    }
+
+    @PatchMapping("/{taskId}/archive")
+    public ResponseEntity<TaskResponseDTO> archiveTask(
+            @PathVariable Long taskId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        TaskResponseDTO task = service.archiveTask(taskId, currentUser.getUserId());
+        messagingTemplate.convertAndSend(
+                "/topic/project/" + task.getProjectId() + "/tasks",
+                Map.of("type", "TASK_UPDATED", "task", task));
+        return ResponseEntity.ok(task);
+    }
+
+    @PatchMapping("/{taskId}/unarchive")
+    public ResponseEntity<TaskResponseDTO> unarchiveTask(
+            @PathVariable Long taskId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        TaskResponseDTO task = service.unarchiveTask(taskId, currentUser.getUserId());
+        messagingTemplate.convertAndSend(
+                "/topic/project/" + task.getProjectId() + "/tasks",
+                Map.of("type", "TASK_UPDATED", "task", task));
+        return ResponseEntity.ok(task);
     }
 
     // ── DASHBOARD ENDPOINTS ─────────────────────────────────────────────────────

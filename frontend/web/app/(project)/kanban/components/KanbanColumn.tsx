@@ -80,6 +80,7 @@ export default function KanbanColumn({
   const [renameValue, setRenameValue] = useState(column.title);
   const [showInlineCreate, setShowInlineCreate] = useState(false);
   const [inlineTitle, setInlineTitle] = useState('');
+  const [inlineTitleLength, setInlineTitleLength] = useState(0);
   const [wipValue, setWipValue] = useState(String(wipLimit ?? 0));
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -153,6 +154,7 @@ export default function KanbanColumn({
     if (!inlineTitle.trim() || !onCreateTask) return;
     await onCreateTask(inlineTitle.trim(), column.status);
     setInlineTitle('');
+    setInlineTitleLength(0);
     setShowInlineCreate(false);
   };
 
@@ -340,16 +342,25 @@ export default function KanbanColumn({
             <div className="bg-white rounded-lg border border-blue-200 shadow-sm p-2">
               <input
                 ref={inlineInputRef} type="text" value={inlineTitle}
-                onChange={e => setInlineTitle(e.target.value)}
+                maxLength={255}
+                onChange={e => {
+                  setInlineTitle(e.target.value);
+                  setInlineTitleLength(e.target.value.length);
+                }}
                 onKeyDown={async e => {
                   if (e.key === 'Enter' && inlineTitle.trim()) await handleInlineCreate();
-                  else if (e.key === 'Escape') { setInlineTitle(''); setShowInlineCreate(false); }
+                  else if (e.key === 'Escape') { setInlineTitle(''); setInlineTitleLength(0); setShowInlineCreate(false); }
                 }}
                 placeholder="Task name..."
                 className="w-full text-sm px-2 py-1.5 border-0 focus:outline-none focus:ring-0 placeholder:text-gray-400"
               />
+              {inlineTitleLength > 200 && (
+                <p className="text-xs text-amber-500 mt-1">
+                  {255 - inlineTitleLength} characters remaining
+                </p>
+              )}
               <div className="flex items-center justify-end mt-1.5 gap-1.5">
-                <button onClick={() => { setInlineTitle(''); setShowInlineCreate(false); }}
+                <button onClick={() => { setInlineTitle(''); setInlineTitleLength(0); setShowInlineCreate(false); }}
                   className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700 rounded transition-colors">Cancel</button>
                 <button onClick={handleInlineCreate} disabled={!inlineTitle.trim()}
                   className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Add</button>

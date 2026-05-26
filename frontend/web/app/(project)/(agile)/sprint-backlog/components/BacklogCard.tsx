@@ -35,6 +35,7 @@ interface BacklogCardProps {
   projectLabels?: Array<{ id: number; name: string; color?: string }>;
   onCreateLabel?: (name: string) => Promise<{ id: number; name: string; color?: string }>;
   extraStatuses?: Array<{ value: string; label: string }>;
+  existingSprintNames?: string[];
 }
 
 type SprintStatus = 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
@@ -43,10 +44,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTask, onCreateTask, onDeleteTask, onToggleTask, onSprintDeleted, onStatusChange, onStoryPointsChange, onAssignTask, onRenameTask, onDueDateChange, projectLabels = [], onCreateLabel, extraStatuses = [] }: BacklogCardProps) {
+function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTask, onCreateTask, onDeleteTask, onToggleTask, onSprintDeleted, onStatusChange, onStoryPointsChange, onAssignTask, onRenameTask, onDueDateChange, projectLabels = [], onCreateLabel, extraStatuses = [], existingSprintNames = [] }: BacklogCardProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [showCreateTaskBox, setShowCreateTaskBox] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
+  const [newTaskNameLength, setNewTaskNameLength] = useState(0);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const createTaskRef = useRef<HTMLFormElement | null>(null);
 
@@ -64,6 +66,7 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
     onRenameTask,
     onDueDateChange,
     projectLabels,
+    existingSprintNames,
   });
 
   const totals = useMemo(() => {
@@ -119,6 +122,7 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
         onDeleteSprint={() => handlers.setConfirmDeleteSprint(true)}
         onViewReport={() => handlers.setShowReportModal(true)}
         onNameSave={handlers.handleNameSave}
+        existingSprintNames={existingSprintNames}
         editingSprintLoading={handlers.editingSprintLoading}
       />
 
@@ -244,6 +248,7 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
                 if (!newTaskName.trim()) { setShowCreateTaskBox(false); return; }
                 onCreateTask(newTaskName.trim(), sprint.id);
                 setNewTaskName('');
+                setNewTaskNameLength(0);
                 setShowCreateTaskBox(false);
               }}
               className="mt-2 group relative flex items-center gap-3 rounded-lg border-2 border-[#175CD3] bg-white px-3 py-1.5 transition-all duration-200"
@@ -251,20 +256,32 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
               <div className="h-5 w-5 flex-shrink-0 rounded border-2 border-[#D0D5DD] opacity-50" />
               <ChevronDown size={16} className="text-[#98A2B3] opacity-50" />
 
-              <input
-                type="text"
-                value={newTaskName}
-                onChange={(e) => setNewTaskName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    setShowCreateTaskBox(false);
-                    setNewTaskName('');
-                  }
-                }}
-                placeholder="Task name"
-                autoFocus
-                className="flex-1 min-w-0 bg-transparent text-[12px] font-medium text-[#101828] outline-none placeholder-[#98A2B3]"
-              />
+              <div className="flex-1 min-w-0">
+                <input
+                  type="text"
+                  maxLength={255}
+                  value={newTaskName}
+                  onChange={(e) => {
+                    setNewTaskName(e.target.value);
+                    setNewTaskNameLength(e.target.value.length);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setShowCreateTaskBox(false);
+                      setNewTaskName('');
+                      setNewTaskNameLength(0);
+                    }
+                  }}
+                  placeholder="Task name"
+                  autoFocus
+                  className="w-full bg-transparent text-[12px] font-medium text-[#101828] outline-none placeholder-[#98A2B3]"
+                />
+                {newTaskNameLength > 200 && (
+                  <p className="text-xs text-amber-500 mt-1">
+                    {255 - newTaskNameLength} characters remaining
+                  </p>
+                )}
+              </div>
               
               <button
                 type="submit"
@@ -326,8 +343,9 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
       open={handlers.showEditSprintModal}
       sprintName={sprint.name}
       loading={handlers.editingSprintLoading}
+      error={handlers.editSprintError}
       onConfirm={handlers.confirmEditSprint}
-      onCancel={() => handlers.setShowEditSprintModal(false)}
+      onCancel={() => { handlers.setShowEditSprintModal(false); handlers.setEditSprintError(''); }}
     />
 
     {/* ── Delete Sprint Confirmation ── */}

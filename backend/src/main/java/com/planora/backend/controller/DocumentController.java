@@ -259,6 +259,16 @@ public class DocumentController {
         );
     }
 
+    @PutMapping("/folders/{folderId}/permissions")
+    public ResponseEntity<Map<String, String>> updateFolderPermissions(
+            @PathVariable Long projectId,
+            @PathVariable Long folderId,
+            @RequestBody List<FolderPermissionRequest> permissions,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        documentService.updateFolderPermissions(projectId, folderId, principal.getUserId(), permissions);
+        return ResponseEntity.ok(Map.of("message", "Folder permissions updated"));
+    }
+
     /*
      * Deleting a folder will recursively soft-delete all child folders and documents inside it.
      */

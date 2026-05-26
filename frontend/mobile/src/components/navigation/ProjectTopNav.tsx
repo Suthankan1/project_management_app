@@ -1,26 +1,46 @@
-import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import React, { type ComponentProps, useRef, useEffect, useCallback, useState, useMemo, useLayoutEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Platform, Animated, Dimensions, Modal, TouchableWithoutFeedback,
+  Platform, Animated, Easing, Pressable, useWindowDimensions,
 } from 'react-native';
-import Svg, { Path, Circle, Rect, Line, Polygon } from 'react-native-svg';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { T } from '../../constants/tokens';
 
-const { width: SW } = Dimensions.get('window');
+const INACTIVE_W = 48;
+const ACTIVE_W = 132;
+const MIN_INACTIVE_W = 32;
+const MIN_ACTIVE_W = 92;
+const ROW_H = 48;
+const TAB_GAP = 8;
+const ICON_SZ = 22;
+const TOP_NAV_SIDE_PADDING = 12;
+const MORE_GRID_COLUMNS = 3;
+const ROW_ANIM_MS = 240;
+const DROPDOWN_ANIM_MS = 260;
+const EXITING_MORE_CLEAR_MS = ROW_ANIM_MS + 80;
 
-const INACTIVE_W = 42;
-const ACTIVE_W = 112;
-const ROW_H = 44;
-const TAB_GAP = 6;
-const ICON_SZ = 20;
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
 
-export type ProjectTab = 'summary' | 'backlog' | 'board' | 'chat' | 'more' | string;
+function getLabelWidth(label: string) {
+  return Math.ceil(label.length * 9.2);
+}
+
+function getActiveTabWidth(label: string) {
+  return ICON_SZ + 18 + Math.max(getLabelWidth(label), 44);
+}
+
+export type ProjectTab = 'summary' | 'backlog' | 'board' | 'timeline' | 'chat' | 'more' | string;
 export type MoreTab =
   | 'timeline' | 'calendar' | 'burndown' | 'milestone'
   | 'members' | 'pages' | 'docs' | 'list' | 'report';
+
+type PremiumIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 const TABS: { key: ProjectTab; label: string }[] = [
   { key: 'summary', label: 'Summary' },
@@ -30,20 +50,46 @@ const TABS: { key: ProjectTab; label: string }[] = [
   { key: 'more', label: 'More' },
 ];
 
-const MORE_ITEMS: { key: MoreTab; label: string; emoji: string }[] = [
-  { key: 'timeline', label: 'Timeline', emoji: '📅' },
-  { key: 'calendar', label: 'Calendar', emoji: '🗓️' },
-  { key: 'burndown', label: 'Burndown', emoji: '📉' },
-  { key: 'milestone', label: 'Milestone', emoji: '🚩' },
-  { key: 'members', label: 'Members', emoji: '👥' },
-  { key: 'pages', label: 'Pages', emoji: '📄' },
-  { key: 'docs', label: 'Docs', emoji: '📝' },
-  { key: 'list', label: 'List', emoji: '📋' },
-  { key: 'report', label: 'Report', emoji: '📊' },
+const MAIN_TABS = TABS.filter(tab => tab.key !== 'more');
+const MORE_TAB = TABS.find(tab => tab.key === 'more')!;
+
+type MoreItem = {
+  key: MoreTab;
+  label: string;
+  icon: PremiumIconName;
+  tint: string;
+  tintSoft: string;
+};
+
+type DisplayTab = {
+  id: string;
+  tab: typeof TABS[number];
+  moreItem?: MoreItem;
+  hidden?: boolean;
+};
+
+const MORE_ITEMS: MoreItem[] = [
+  { key: 'timeline', label: 'Timeline', icon: 'timeline-clock-outline', tint: '#155DFC', tintSoft: '#E8F0FF' },
+  { key: 'calendar', label: 'Calendar', icon: 'calendar-month-outline', tint: '#0F9F6E', tintSoft: '#E7F8F1' },
+  { key: 'burndown', label: 'Burndown', icon: 'chart-line-variant', tint: '#E11D48', tintSoft: '#FFF0F4' },
+  { key: 'milestone', label: 'Milestone', icon: 'flag-checkered', tint: '#7C3AED', tintSoft: '#F2ECFF' },
+  { key: 'members', label: 'Members', icon: 'account-group-outline', tint: '#0891B2', tintSoft: '#E6F7FB' },
+  { key: 'pages', label: 'Pages', icon: 'book-open-page-variant-outline', tint: '#D97706', tintSoft: '#FFF6E8' },
+  { key: 'docs', label: 'Docs', icon: 'file-document-edit-outline', tint: '#4F46E5', tintSoft: '#EEF0FF' },
+  { key: 'list', label: 'List', icon: 'format-list-checks', tint: '#475569', tintSoft: '#F1F5F9' },
+  { key: 'report', label: 'Report', icon: 'file-chart-outline', tint: '#DB2777', tintSoft: '#FDF2F8' },
 ];
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-function TabIcon({ name, active }: { name: ProjectTab; active: boolean }) {
+function TabIcon({
+  name,
+  active,
+  moreItem,
+}: {
+  name: ProjectTab;
+  active: boolean;
+  moreItem?: MoreItem;
+}) {
   const c = active ? T.primary : T.textSecondary;
   const sw = 2.2;
   const fa = active ? T.primary + '1A' : T.textSecondary + '25';
@@ -76,58 +122,29 @@ function TabIcon({ name, active }: { name: ProjectTab; active: boolean }) {
       <Rect x={17} y={3} width={4} height={15} rx={2} />
     </Svg>
   );
+  if (name === 'timeline') return (
+    <Svg {...p}>
+      <Path d="M4 19V5" />
+      <Path d="M8 19V9" />
+      <Path d="M12 19V7" />
+      <Path d="M16 19V11" />
+      <Path d="M20 19V4" />
+    </Svg>
+  );
   if (name === 'chat') return (
     <Svg {...p}>
       <Path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" fill={fa} />
     </Svg>
   );
-
-  if (name === 'report') return (
-    <Svg {...p}>
-      <Rect x={3} y={10} width={4} height={10} rx={1} fill={fa} />
-      <Rect x={10} y={4} width={4} height={16} rx={1} fill={fa} />
-      <Rect x={17} y={14} width={4} height={6} rx={1} />
-    </Svg>
-  );
-  if (name === 'timeline' || name === 'calendar') return (
-    <Svg {...p}>
-      <Rect x={3} y={4} width={18} height={18} rx={2} />
-      <Line x1={3} y1={10} x2={21} y2={10} />
-      <Line x1={8} y1={2} x2={8} y2={6} />
-      <Line x1={16} y1={2} x2={16} y2={6} />
-      <Rect x={7} y={14} width={4} height={4} rx={1} fill={fa} />
-    </Svg>
-  );
-  if (name === 'milestone' || name === 'burndown') return (
-    <Svg {...p}>
-      <Path d="M4 22L4 2" />
-      <Path d="M4 4L18 8L4 12" fill={fa} />
-    </Svg>
-  );
-  if (name === 'members') return (
-    <Svg {...p}>
-      <Circle cx={12} cy={7} r={4} fill={fa} />
-      <Path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2" />
-    </Svg>
-  );
-  if (name === 'pages' || name === 'docs') return (
-    <Svg {...p}>
-      <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-      <Path d="M14 2v6h6" fill={fa} />
-      <Line x1={8} y1={13} x2={16} y2={13} />
-      <Line x1={8} y1={17} x2={16} y2={17} />
-    </Svg>
-  );
-  if (name === 'list') return (
-    <Svg {...p}>
-      <Line x1={8} y1={6} x2={21} y2={6} />
-      <Line x1={8} y1={12} x2={21} y2={12} />
-      <Line x1={8} y1={18} x2={21} y2={18} />
-      <Line x1={3} y1={6} x2={3.01} y2={6} />
-      <Line x1={3} y1={12} x2={3.01} y2={12} />
-      <Line x1={3} y1={18} x2={3.01} y2={18} />
-    </Svg>
-  );
+  if (moreItem) {
+    return (
+      <MaterialCommunityIcons
+        name={moreItem.icon}
+        size={ICON_SZ}
+        color={active ? moreItem.tint : T.textSecondary}
+      />
+    );
+  }
 
   return (
     <Svg {...p}>
@@ -140,50 +157,62 @@ function TabIcon({ name, active }: { name: ProjectTab; active: boolean }) {
 
 // ─── Tab Button ───────────────────────────────────────────────────────────────
 function TabBtn({
-  tab, widthAnim, marginAnim, opacityAnim, active, onPress, hasMoreDot,
+  tab, widthAnim, gapAnim, inactiveWidth, activeWidth, active, hidden, onPress, moreItem,
 }: {
-  tab: { key: string; label: string };
+  tab: typeof TABS[number];
   widthAnim: Animated.Value;
-  marginAnim?: Animated.Value;
-  opacityAnim?: Animated.Value;
+  gapAnim: Animated.Value;
+  inactiveWidth: number;
+  activeWidth: number;
   active: boolean;
+  hidden?: boolean;
   onPress: () => void;
-  hasMoreDot?: boolean;
+  moreItem?: MoreItem;
 }) {
   const press = useRef(new Animated.Value(1)).current;
+  const label = moreItem?.label ?? tab.label;
+  const labelTargetWidth = useMemo(
+    () => Math.min(Math.max(getLabelWidth(label), 44), activeWidth - ICON_SZ - 18),
+    [activeWidth, label]
+  );
 
   // Fade background early so it feels like a solid pill
   const activeBgOp = widthAnim.interpolate({
-    inputRange: [INACTIVE_W, INACTIVE_W + 24, ACTIVE_W],
+    inputRange: [inactiveWidth, inactiveWidth + 24, activeWidth],
     outputRange: [0, 1, 1],
     extrapolate: 'clamp',
   });
 
   // Fade text/icon smoothly over the entire expansion
   const activeOp = widthAnim.interpolate({
-    inputRange: [INACTIVE_W, ACTIVE_W],
+    inputRange: [inactiveWidth, activeWidth],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
 
   // Animate the label container width so content stays perfectly centered
   const labelWidth = widthAnim.interpolate({
-    inputRange: [INACTIVE_W, ACTIVE_W],
-    outputRange: [0, 66],
+    inputRange: [inactiveWidth, activeWidth],
+    outputRange: [0, labelTargetWidth],
     extrapolate: 'clamp',
   });
 
   // Animate the gap so when inactive, the icon is perfectly alone in the center
   const labelMargin = widthAnim.interpolate({
-    inputRange: [INACTIVE_W, ACTIVE_W],
+    inputRange: [inactiveWidth, activeWidth],
     outputRange: [0, 8],
     extrapolate: 'clamp',
   });
 
   // Slide text leftwards when shrinking so it tucks behind the icon and escapes the collapsing right edge
   const textX = widthAnim.interpolate({
-    inputRange: [INACTIVE_W, ACTIVE_W],
+    inputRange: [inactiveWidth, activeWidth],
     outputRange: [-20, 0],
+    extrapolate: 'clamp',
+  });
+  const itemOpacity = widthAnim.interpolate({
+    inputRange: [0, Math.max(1, inactiveWidth)],
+    outputRange: [0, 1],
     extrapolate: 'clamp',
   });
 
@@ -193,25 +222,17 @@ function TabBtn({
     Animated.spring(press, { toValue: 1, tension: 300, friction: 18, useNativeDriver: false }).start(), []);
 
   return (
-    <Animated.View style={[
-      ns.tabBtn,
-      { width: widthAnim, transform: [{ scale: press }] },
-      marginAnim ? { marginRight: marginAnim } : {},
-      opacityAnim ? { opacity: opacityAnim } : {}
-    ]}>
-      {/* Liquid glass background for inactive tabs */}
-      <View style={ns.inactiveGlassClip}>
-        <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill} />
-        <View style={ns.inactiveGlassColor} />
-      </View>
+    <Animated.View
+      pointerEvents={hidden ? 'none' : 'auto'}
+      accessibilityElementsHidden={hidden}
+      importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
+      style={[ns.tabBtn, { width: widthAnim, marginRight: gapAnim, opacity: itemOpacity, transform: [{ scale: press }] }]}
+    >
+      {/* Subtle glass background for inactive tabs */}
+      <View style={ns.inactiveBg} />
 
-      {/* Liquid glass background for active tab */}
-      <Animated.View style={[ns.activeGlassShadow, { opacity: activeBgOp }]}>
-        <View style={ns.activeGlassClip}>
-          <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
-          <View style={ns.activeGlassColor} />
-        </View>
-      </Animated.View>
+      {/* Solid white background for active tab */}
+      <Animated.View style={[ns.activeBg, { opacity: activeBgOp }]} />
 
       {/* ContentWrapper clips the text when shrinking to a circle */}
       <View style={ns.contentWrapper}>
@@ -221,29 +242,26 @@ function TabBtn({
           onPressOut={pressOut}
           activeOpacity={1}
           style={ns.touchable}
-          accessibilityLabel={tab.label}
+          accessibilityLabel={label}
           accessibilityRole="tab"
           accessibilityState={{ selected: active }}
         >
-          <View style={ns.tabContentGroup}>
-            <View style={ns.iconBox}>
-              {/* Crossfade icons */}
-              <Animated.View style={[StyleSheet.absoluteFill, { opacity: Animated.subtract(1, activeOp) }]}>
-                <TabIcon name={tab.key} active={false} />
-              </Animated.View>
-              <Animated.View style={[StyleSheet.absoluteFill, { opacity: activeOp }]}>
-                <TabIcon name={tab.key} active={true} />
-              </Animated.View>
-
-              {hasMoreDot && !active && <View style={ns.moreDot} />}
-            </View>
-
-            <Animated.View style={[ns.labelBox, { opacity: activeOp, maxWidth: labelWidth, marginLeft: labelMargin }]}>
-              <Animated.Text numberOfLines={1} style={ns.label}>
-                {tab.label}
-              </Animated.Text>
+          <View style={ns.iconBox}>
+            {/* Crossfade icons */}
+            <Animated.View style={[StyleSheet.absoluteFill, ns.iconLayer, { opacity: Animated.subtract(1, activeOp) }]}>
+              <TabIcon name={tab.key} active={false} moreItem={moreItem} />
             </Animated.View>
+            <Animated.View style={[StyleSheet.absoluteFill, ns.iconLayer, { opacity: activeOp }]}>
+              <TabIcon name={tab.key} active={true} moreItem={moreItem} />
+            </Animated.View>
+
           </View>
+
+          <Animated.View style={[ns.labelBox, { opacity: activeOp, width: labelWidth, marginLeft: labelMargin }]}>
+            <Animated.Text numberOfLines={1} style={[ns.label, { transform: [{ translateX: textX }] }]}>
+              {label}
+            </Animated.Text>
+          </Animated.View>
         </TouchableOpacity>
       </View>
     </Animated.View>
@@ -252,67 +270,166 @@ function TabBtn({
 
 // Removed MorePopup completely. Dropping down from TopNav inline.
 
+function PremiumMoreIcon({ item, selected }: { item: MoreItem; selected: boolean }) {
+  const iconColors = selected
+    ? [item.tint, T.primary] as const
+    : [item.tint + '22', item.tintSoft] as const;
+
+  return (
+    <View style={[ds.iconShell, selected && ds.iconShellSel]}>
+      <LinearGradient
+        colors={iconColors}
+        start={{ x: 0.1, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={ds.iconGradient}
+      >
+        <View style={[ds.iconAura, { backgroundColor: selected ? 'rgba(255,255,255,0.2)' : item.tintSoft }]} />
+        <MaterialCommunityIcons
+          name={item.icon}
+          size={25}
+          color={selected ? '#FFFFFF' : item.tint}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export interface ProjectTopNavProps {
   projectName?: string;
-  activeTab: ProjectTab | MoreTab;
+  activeTab: ProjectTab;
   activeMoreTab?: MoreTab;
-  onTabChange: (tab: ProjectTab | MoreTab) => void;
-  onMoreTabChange?: (tab: MoreTab) => void;
+  onTabChange: (tab: ProjectTab) => void;
+  onMoreTabChange?: (tab?: MoreTab) => void;
+  onSettingsPress?: () => void;
 }
 
 export default function ProjectTopNav({
   projectName,
-  activeTab, activeMoreTab, onTabChange, onMoreTabChange,
+  activeTab, activeMoreTab, onTabChange, onMoreTabChange, onSettingsPress,
 }: ProjectTopNavProps) {
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const [moreOpen, setMoreOpen] = useState(false);
-  const [dynamicTabKey, setDynamicTabKey] = useState<MoreTab | null>(activeMoreTab || null);
+  const activeMoreItem = useMemo(
+    () => MORE_ITEMS.find(item => item.key === activeMoreTab),
+    [activeMoreTab]
+  );
+  const previousMoreItemRef = useRef<MoreItem | undefined>(activeMoreItem);
+  const [exitingMoreItem, setExitingMoreItem] = useState<MoreItem | undefined>();
 
-  useEffect(() => {
-    if (activeMoreTab) setDynamicTabKey(activeMoreTab);
-  }, [activeMoreTab]);
-
-  // 6 slots: summary, backlog, board, chat, dynamic, more
-  const widths = useRef(Array.from({ length: 6 }).map((_, i) => new Animated.Value(i === 0 ? ACTIVE_W : INACTIVE_W))).current;
-  const margins = useRef(Array.from({ length: 6 }).map((_, i) => new Animated.Value(i === 5 ? 0 : TAB_GAP))).current;
-  const opacities = useRef(Array.from({ length: 6 }).map(() => new Animated.Value(1))).current;
-
-  // Immediately hide slot 4 on mount if no activeMoreTab
-  useEffect(() => {
-    if (!activeMoreTab) {
-      widths[4].setValue(0);
-      margins[4].setValue(0);
-      opacities[4].setValue(0);
+  useLayoutEffect(() => {
+    if (activeMoreItem) {
+      previousMoreItemRef.current = activeMoreItem;
+      setExitingMoreItem(undefined);
+      return undefined;
     }
-  }, []);
+
+    if (!previousMoreItemRef.current) return undefined;
+
+    setExitingMoreItem(previousMoreItemRef.current);
+    previousMoreItemRef.current = undefined;
+
+    const timeout = setTimeout(() => setExitingMoreItem(undefined), EXITING_MORE_CLEAR_MS);
+    return () => clearTimeout(timeout);
+  }, [activeMoreItem]);
+
+  const selectedMoreItem = activeMoreItem ?? exitingMoreItem;
+  const displayTabs = useMemo<DisplayTab[]>(() => {
+    const tabs: DisplayTab[] = MAIN_TABS.map(tab => ({ id: tab.key, tab }));
+
+    if (selectedMoreItem) {
+      tabs.push({
+        id: `more-${selectedMoreItem.key}`,
+        tab: { key: 'more', label: selectedMoreItem.label },
+        moreItem: selectedMoreItem,
+        hidden: moreOpen || !!exitingMoreItem,
+      });
+    }
+
+    tabs.push({ id: 'more-menu', tab: MORE_TAB });
+    return tabs;
+  }, [exitingMoreItem, moreOpen, selectedMoreItem]);
+
+  const activeIdx = useMemo(() => {
+    const idx = displayTabs.findIndex(item => (
+      activeMoreItem && !moreOpen
+        ? item.moreItem?.key === activeMoreItem.key
+        : item.id === 'more-menu' && activeTab === 'more'
+          ? true
+          : !item.moreItem && item.tab.key === activeTab
+    ));
+
+    return idx >= 0 ? idx : 0;
+  }, [activeMoreItem, activeTab, displayTabs, moreOpen]);
+  const tabMetrics = useMemo(() => {
+    const availableWidth = Math.max(0, screenWidth - TOP_NAV_SIDE_PADDING * 2);
+    const visibleTabCount = displayTabs.filter(item => !item.hidden).length;
+    const totalGap = TAB_GAP * (visibleTabCount - 1);
+    const activeItem = displayTabs[activeIdx];
+    const activeLabel = activeItem?.moreItem?.label ?? activeItem?.tab.label ?? '';
+    const dynamicActiveWidth = Math.max(ACTIVE_W, getActiveTabWidth(activeLabel));
+    const maxActiveWidth = Math.max(
+      MIN_ACTIVE_W,
+      availableWidth - totalGap - MIN_INACTIVE_W * (visibleTabCount - 1)
+    );
+    const activeWidth = clamp(dynamicActiveWidth, MIN_ACTIVE_W, maxActiveWidth);
+    const inactiveWidth = clamp(
+      (availableWidth - totalGap - activeWidth) / (visibleTabCount - 1),
+      MIN_INACTIVE_W,
+      INACTIVE_W
+    );
+
+    return { activeWidth, inactiveWidth };
+  }, [activeIdx, displayTabs, screenWidth]);
+
+  const moreGridMetrics = useMemo(() => {
+    const horizontalPadding = screenWidth < 360 ? 12 : 16;
+    const gap = screenWidth < 360 ? 10 : 12;
+    const gridWidth = Math.max(0, screenWidth - horizontalPadding * 2);
+    const cellWidth = Math.floor((gridWidth - gap * (MORE_GRID_COLUMNS - 1)) / MORE_GRID_COLUMNS);
+    const cellHeight = clamp(cellWidth * 0.78, 78, 90);
+    const rows = Math.ceil(MORE_ITEMS.length / MORE_GRID_COLUMNS);
+    const dropdownHeight = 16 + 30 + cellHeight * rows + gap * (rows - 1) + 32;
+
+    return { horizontalPadding, gap, cellWidth, cellHeight, dropdownHeight };
+  }, [screenWidth]);
+
+  const tabWidths = useRef(
+    Array.from({ length: MAIN_TABS.length + 2 }, (_, i) =>
+      new Animated.Value(i === activeIdx ? tabMetrics.activeWidth : tabMetrics.inactiveWidth)
+    )
+  ).current;
+  const tabGaps = useRef(
+    Array.from({ length: MAIN_TABS.length + 2 }, (_, i) =>
+      new Animated.Value(i < MAIN_TABS.length ? TAB_GAP : 0)
+    )
+  ).current;
 
   useEffect(() => {
-    const isDynamicActive = !!activeMoreTab;
-    const cfg = { tension: 340, friction: 28, useNativeDriver: false };
-
-    const targets = {
-      0: { w: activeTab === 'summary' ? ACTIVE_W : INACTIVE_W, m: TAB_GAP, o: 1 },
-      1: { w: activeTab === 'backlog' ? ACTIVE_W : INACTIVE_W, m: TAB_GAP, o: 1 },
-      2: { w: activeTab === 'board' ? ACTIVE_W : INACTIVE_W, m: TAB_GAP, o: 1 },
-      3: { w: activeTab === 'chat' ? ACTIVE_W : INACTIVE_W, m: TAB_GAP, o: 1 },
-      4: {
-        w: isDynamicActive ? (activeTab === activeMoreTab ? ACTIVE_W : INACTIVE_W) : 0,
-        m: isDynamicActive ? TAB_GAP : 0,
-        o: isDynamicActive ? 1 : 0
-      },
-      5: { w: activeTab === 'more' ? ACTIVE_W : INACTIVE_W, m: 0, o: 1 }
+    const cfg = {
+      duration: ROW_ANIM_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
     };
+    const lastVisibleIndex = displayTabs.reduce((last, item, i) => item.hidden ? last : i, -1);
 
-    const anims = [];
-    for (let i = 0; i < 6; i++) {
-      anims.push(Animated.spring(widths[i], { toValue: targets[i as keyof typeof targets].w, ...cfg }));
-      anims.push(Animated.spring(margins[i], { toValue: targets[i as keyof typeof targets].m, ...cfg }));
-      anims.push(Animated.timing(opacities[i], { toValue: targets[i as keyof typeof targets].o, duration: 200, useNativeDriver: false }));
-    }
+    tabWidths.forEach(anim => anim.stopAnimation());
+    tabGaps.forEach(anim => anim.stopAnimation());
 
-    Animated.parallel(anims).start();
-  }, [activeTab, activeMoreTab]);
+    Animated.parallel(
+      displayTabs.flatMap((item, i) => [
+        Animated.timing(tabWidths[i], {
+          toValue: item.hidden ? 0 : i === activeIdx ? tabMetrics.activeWidth : tabMetrics.inactiveWidth,
+          ...cfg,
+        }),
+        Animated.timing(tabGaps[i], {
+          toValue: item.hidden || i === lastVisibleIndex ? 0 : TAB_GAP,
+          ...cfg,
+        }),
+      ])
+    ).start();
+  }, [activeIdx, displayTabs, tabGaps, tabMetrics.activeWidth, tabMetrics.inactiveWidth, tabWidths]);
 
   const entryY = useRef(new Animated.Value(-80)).current;
   const entryOp = useRef(new Animated.Value(0)).current;
@@ -323,47 +440,72 @@ export default function ProjectTopNav({
     ]).start();
   }, []);
 
-  const navBarH = insets.top + 8 + ROW_H + 12;
-
   const dropdownHeightAnim = useRef(new Animated.Value(0)).current;
   const dropdownOp = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (moreOpen) {
       Animated.parallel([
-        Animated.spring(dropdownHeightAnim, { toValue: 342, tension: 300, friction: 26, useNativeDriver: false }),
-        Animated.timing(dropdownOp, { toValue: 1, duration: 200, useNativeDriver: true, delay: 50 }),
+        Animated.timing(dropdownHeightAnim, {
+          toValue: moreGridMetrics.dropdownHeight,
+          duration: DROPDOWN_ANIM_MS,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }),
+        Animated.timing(dropdownOp, {
+          toValue: 1,
+          duration: 180,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+          delay: 30,
+        }),
       ]).start();
     } else {
       Animated.parallel([
-        Animated.spring(dropdownHeightAnim, { toValue: 0, tension: 300, friction: 26, useNativeDriver: false }),
-        Animated.timing(dropdownOp, { toValue: 0, duration: 150, useNativeDriver: true }),
+        Animated.timing(dropdownHeightAnim, {
+          toValue: 0,
+          duration: 210,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: false,
+        }),
+        Animated.timing(dropdownOp, {
+          toValue: 0,
+          duration: 130,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
       ]).start();
     }
-  }, [moreOpen]);
+  }, [dropdownHeightAnim, dropdownOp, moreOpen, moreGridMetrics.dropdownHeight]);
 
-  const handlePress = useCallback((tab: string) => {
+  const handlePress = useCallback((tab: ProjectTab) => {
     if (tab === 'more') {
       const opening = !moreOpen;
       setMoreOpen(opening);
       onTabChange('more');
     } else {
       setMoreOpen(false);
-      onTabChange(tab as any);
+      onTabChange(tab);
     }
   }, [moreOpen, onTabChange]);
+  const dropdownTranslateY = dropdownOp.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-10, 0],
+    extrapolate: 'clamp',
+  });
 
   return (
     <>
       {/* Animated Frosted Glass Background Overlay */}
-      <TouchableWithoutFeedback onPress={() => setMoreOpen(false)}>
-        <Animated.View
-          pointerEvents={moreOpen ? 'auto' : 'none'}
-          style={[StyleSheet.absoluteFill, { zIndex: 90, opacity: dropdownOp }]}
-        >
+      <Pressable
+        onPress={() => setMoreOpen(false)}
+        pointerEvents={moreOpen ? 'auto' : 'none'}
+        style={[StyleSheet.absoluteFill, { zIndex: 90 }]}
+      >
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: dropdownOp }]}>
           <BlurView intensity={50} tint="dark" experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
         </Animated.View>
-      </TouchableWithoutFeedback>
+      </Pressable>
 
       {/* The Main Top Navigation Bar Expanding Downwards */}
       <Animated.View style={[
@@ -374,40 +516,67 @@ export default function ProjectTopNav({
 
         {/* Large Project Title (Apple iOS / Web Style) */}
         <View style={ns.titleRow}>
-          <View style={ns.breadcrumbRow}>
-            <Text style={ns.breadcrumbText}>PROJECT</Text>
-            <Text style={ns.breadcrumbSlash}>/</Text>
+          <View style={ns.titleContent}>
+            <View style={ns.breadcrumbRow}>
+              <Text style={ns.breadcrumbText}>PROJECT</Text>
+              <Text style={ns.breadcrumbSlash}>/</Text>
+            </View>
+            <Text style={ns.titleText} numberOfLines={1}>{projectName || 'Workspace'}</Text>
           </View>
-          <Text style={ns.titleText} numberOfLines={1}>{projectName || 'Workspace'}</Text>
+
+          {onSettingsPress && (
+            <TouchableOpacity
+              onPress={onSettingsPress}
+              style={ns.settingsBtn}
+              activeOpacity={0.7}
+              accessibilityLabel="Project Settings"
+              accessibilityRole="button"
+            >
+              <MaterialCommunityIcons name="cog-outline" size={20} color={T.primary} />
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={ns.row}>
-          <TabBtn tab={TABS[0]} widthAnim={widths[0]} marginAnim={margins[0]} opacityAnim={opacities[0]} active={activeTab === 'summary'} onPress={() => handlePress('summary')} />
-          <TabBtn tab={TABS[1]} widthAnim={widths[1]} marginAnim={margins[1]} opacityAnim={opacities[1]} active={activeTab === 'backlog'} onPress={() => handlePress('backlog')} />
-          <TabBtn tab={TABS[2]} widthAnim={widths[2]} marginAnim={margins[2]} opacityAnim={opacities[2]} active={activeTab === 'board'} onPress={() => handlePress('board')} />
-          <TabBtn tab={TABS[3]} widthAnim={widths[3]} marginAnim={margins[3]} opacityAnim={opacities[3]} active={activeTab === 'chat'} onPress={() => handlePress('chat')} />
+          {displayTabs.map((item, idx) => (
+            <TabBtn
+              key={item.id}
+              tab={item.tab}
+              widthAnim={tabWidths[idx]}
+              gapAnim={tabGaps[idx]}
+              inactiveWidth={tabMetrics.inactiveWidth}
+              activeWidth={tabMetrics.activeWidth}
+              active={idx === activeIdx}
+              hidden={item.hidden}
+              onPress={() => {
+                if (item.moreItem) {
+                  onMoreTabChange?.(item.moreItem.key);
+                  setMoreOpen(false);
+                  return;
+                }
 
-          <TabBtn
-            tab={{ key: dynamicTabKey || 'report', label: MORE_ITEMS.find(m => m.key === dynamicTabKey)?.label || 'Report' }}
-            widthAnim={widths[4]}
-            marginAnim={margins[4]}
-            opacityAnim={opacities[4]}
-            active={activeTab === dynamicTabKey}
-            onPress={() => { if (dynamicTabKey) handlePress(dynamicTabKey); }}
-          />
-
-          <TabBtn tab={TABS[4]} widthAnim={widths[5]} marginAnim={margins[5]} opacityAnim={opacities[5]} active={activeTab === 'more'} onPress={() => handlePress('more')} />
+                handlePress(item.tab.key);
+              }}
+              moreItem={item.moreItem}
+            />
+          ))}
         </View>
 
         {/* The Inline Full-Width Dropdown Area */}
         <Animated.View style={{ height: dropdownHeightAnim, overflow: 'hidden' }}>
-          <Animated.View style={{ opacity: dropdownOp, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 }}>
+          <Animated.View style={{
+            opacity: dropdownOp,
+            transform: [{ translateY: dropdownTranslateY }],
+            paddingHorizontal: moreGridMetrics.horizontalPadding,
+            paddingTop: 16,
+            paddingBottom: 32,
+          }}>
             <View style={ds.hdr}>
               <View style={ds.hdrAccent} />
               <Text style={ds.hdrTxt}>MORE VIEWS</Text>
             </View>
 
-            <View style={ds.grid}>
+            <View style={[ds.grid, { gap: moreGridMetrics.gap }]}>
               {MORE_ITEMS.map(item => {
                 const isSel = activeMoreTab === item.key;
                 return (
@@ -415,17 +584,20 @@ export default function ProjectTopNav({
                     key={item.key}
                     onPress={() => { onMoreTabChange?.(item.key); setMoreOpen(false); }}
                     activeOpacity={0.7}
-                    style={[ds.cellWrap, isSel && ds.cellSelWrap]}
+                    style={[
+                      ds.cell,
+                      { width: moreGridMetrics.cellWidth, height: moreGridMetrics.cellHeight },
+                      isSel && [
+                        ds.cellSel,
+                        {
+                          backgroundColor: item.tintSoft,
+                          borderColor: `${item.tint}66`,
+                        },
+                      ],
+                    ]}
                   >
-                    <View style={ds.cellClip}>
-                      <BlurView intensity={isSel ? 60 : 25} tint="light" style={StyleSheet.absoluteFill} />
-                      <View style={[StyleSheet.absoluteFill, { backgroundColor: isSel ? T.primaryLight + 'CC' : 'rgba(255,255,255,0.15)' }]} />
-                    </View>
-                    <View style={ds.cellContent}>
-                      {isSel && <View style={ds.selDot} />}
-                      <Text style={ds.emoji}>{item.emoji}</Text>
-                      <Text style={ds.cellLbl}>{item.label}</Text>
-                    </View>
+                    <PremiumMoreIcon item={item} selected={isSel} />
+                    <Text style={ds.cellLbl}>{item.label}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -450,8 +622,29 @@ const ns = StyleSheet.create({
   titleRow: {
     paddingHorizontal: 20,
     paddingBottom: 12,
-    height: 56, // Increased height to fit the breadcrumb
-    justifyContent: 'flex-end',
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  titleContent: {
+    flex: 1,
+    marginRight: 10,
+  },
+  settingsBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderWidth: 1,
+    borderColor: T.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+    ...Platform.select({
+      ios: { shadowColor: '#64748B', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6 },
+      android: { elevation: 2 },
+    }),
   },
   breadcrumbRow: {
     flexDirection: 'row',
@@ -481,43 +674,29 @@ const ns = StyleSheet.create({
     justifyContent: 'center',
     height: ROW_H,
     alignItems: 'center',
-    paddingHorizontal: 11,
+    paddingHorizontal: 12,
   },
   tabBtn: {
     height: ROW_H,
     borderRadius: ROW_H / 2,
     justifyContent: 'center',
   },
-  inactiveGlassClip: {
+  inactiveBg: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: ROW_H / 2,
-    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.03)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  inactiveGlassColor: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  activeGlassShadow: {
-    ...StyleSheet.absoluteFillObject,
+    borderColor: 'rgba(0,0,0,0.04)',
     borderRadius: ROW_H / 2,
-    backgroundColor: 'transparent',
+  },
+  activeBg: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: T.primaryLight,
+    borderWidth: 1, borderColor: T.primaryMuted + '55',
+    borderRadius: ROW_H / 2,
     ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10 },
+      ios: { shadowColor: T.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8 },
       android: { elevation: 3 },
     }),
-  },
-  activeGlassClip: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: ROW_H / 2,
-    overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.85)',
-  },
-  activeGlassColor: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: T.primaryLight + 'A0', // Subtle brand-tinted glass
   },
   contentWrapper: {
     ...StyleSheet.absoluteFillObject,
@@ -526,10 +705,6 @@ const ns = StyleSheet.create({
   },
   touchable: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabContentGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -539,6 +714,10 @@ const ns = StyleSheet.create({
     height: ICON_SZ,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  iconLayer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   labelBox: {
     justifyContent: 'center',
@@ -550,15 +729,6 @@ const ns = StyleSheet.create({
     color: T.primary,
     letterSpacing: 0.2,
   },
-  moreDot: {
-    position: 'absolute',
-    top: 0,
-    right: -2,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FF453A',
-  },
 });
 
 const ds = StyleSheet.create({
@@ -568,39 +738,68 @@ const ds = StyleSheet.create({
     paddingHorizontal: 6,
   },
   hdrAccent: { width: 4, height: 14, borderRadius: 2, backgroundColor: T.primary, opacity: 0.8 },
-  hdrTxt: { fontSize: 11, fontWeight: '800', color: T.textSecondary, letterSpacing: 1.6 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  cellWrap: {
-    width: (SW - 32 - 24) / 3,
-    height: 80,
-    borderRadius: 20,
-    backgroundColor: 'transparent',
-  },
-  cellSelWrap: {
+  hdrTxt:  { fontSize: 11, fontWeight: '800', color: T.textSecondary, letterSpacing: 1.6 },
+  grid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  cell: {
+    height: 90,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.34)',
+    alignItems: 'center', justifyContent: 'center',
+    gap: 7,
+    overflow: 'hidden',
     ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8 },
+      ios: { shadowColor: '#64748B', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 18 },
+      android: { elevation: 0 },
+    }),
+  },
+  cellSel: {
+    ...Platform.select({
+      ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 16 },
       android: { elevation: 2 },
     }),
   },
-  cellClip: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 20,
-    overflow: 'hidden',
+  iconShell: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    padding: 1,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(255,255,255,0.30)',
+    ...Platform.select({
+      ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 12 },
+      android: { elevation: 0 },
+    }),
   },
-  cellContent: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center', 
+  iconShellSel: {
+    borderColor: 'rgba(255,255,255,0.22)',
+    ...Platform.select({
+      ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.08, shadowRadius: 12 },
+      android: { elevation: 2 },
+    }),
+  },
+  iconGradient: {
+    flex: 1,
+    borderRadius: 15,
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    overflow: 'hidden',
   },
-  emoji: { fontSize: 26 },
-  cellLbl: { fontSize: 11.5, fontWeight: '800', color: T.primary, letterSpacing: 0.2 },
-  selDot: {
-    position: 'absolute', top: 10, right: 10,
-    width: 6, height: 6, borderRadius: 3,
-    backgroundColor: T.primary,
+  iconAura: {
+    position: 'absolute',
+    right: -9,
+    top: -10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    opacity: 0.78,
+  },
+  cellLbl: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: T.textPrimary,
+    letterSpacing: 0,
   },
 });
-

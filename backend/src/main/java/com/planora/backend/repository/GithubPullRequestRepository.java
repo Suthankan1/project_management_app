@@ -1,17 +1,20 @@
 package com.planora.backend.repository;
 
-import com.planora.backend.model.GithubPullRequest;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
 import java.util.List;
 import java.util.Optional;
 
+import com.planora.backend.model.GithubPullRequest;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
 @Repository
 public interface GithubPullRequestRepository extends JpaRepository<GithubPullRequest, Long> {
-
     Page<GithubPullRequest> findByIntegrationIdIn(List<Long> integrationIds, Pageable pageable);
 
     Page<GithubPullRequest> findByIntegrationIdInAndState(List<Long> integrationIds, String state, Pageable pageable);
@@ -23,4 +26,16 @@ public interface GithubPullRequestRepository extends JpaRepository<GithubPullReq
     long countByIntegrationIdIn(List<Long> integrationIds);
 
     long countByIntegrationIdInAndState(List<Long> integrationIds, String state);
+
+    @Query("SELECT p FROM GithubPullRequest p WHERE p.task.id = :taskId "
+            + "ORDER BY COALESCE(p.updatedAt, p.createdAt) DESC")
+    List<GithubPullRequest> findByTaskId(@Param("taskId") Long taskId);
+
+    @Query("SELECT p FROM GithubPullRequest p WHERE p.task.id IN :taskIds "
+            + "ORDER BY COALESCE(p.updatedAt, p.createdAt) DESC")
+    List<GithubPullRequest> findAllByTaskIds(@Param("taskIds") List<Long> taskIds);
+
+    @Modifying
+    @Query("DELETE FROM GithubPullRequest p WHERE p.task.id = :taskId")
+    void deleteAllByTaskId(@Param("taskId") Long taskId);
 }

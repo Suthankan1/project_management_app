@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/axios';
-import { getValidToken, saveToken, saveRefreshToken, setRememberMe } from '@/lib/auth';
+import { ensureValidToken, saveToken, saveRefreshToken, setRememberMe } from '@/lib/auth';
 
 /*
  * Headless Business Logic Hook for Login.
@@ -29,11 +29,20 @@ export function useLoginForm() {
    * If so, instantly kick the user to the dashboard so they don't have to look at a login screen.
    */
   useEffect(() => {
-    if (getValidToken()) {
-      // Use replace() instead of push() so the user can't hit the "Back" button 
-      // and end up stuck on the login page again.
-      router.replace('/dashboard');
-    }
+    let isMounted = true;
+
+    const redirectIfAuthenticated = async () => {
+      if (await ensureValidToken()) {
+        // Use replace() instead of push() so the user can't hit the "Back" button
+        // and end up stuck on the login page again.
+        if (isMounted) router.replace('/dashboard');
+      }
+    };
+
+    void redirectIfAuthenticated();
+    return () => {
+      isMounted = false;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

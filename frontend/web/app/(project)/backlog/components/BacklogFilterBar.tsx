@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Label, DateFilter } from '../../kanban/types';
 import { TeamMemberOption } from '../../kanban/api';
 import DateRangeFilter from '../../kanban/components/DateRangeFilter';
-import { ChevronDown, Search, X, Layers, Tag, User, Filter } from 'lucide-react';
+import { Archive, ChevronDown, Search, X, Layers, Tag, User, Filter } from 'lucide-react';
 
 const STATUS_OPTIONS = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 
@@ -23,6 +23,8 @@ interface BacklogFilterBarProps {
     setFilterDateRange: (v: DateFilter) => void;
     groupBy: 'none' | 'status' | 'priority' | 'assignee';
     setGroupBy: React.Dispatch<React.SetStateAction<'none' | 'status' | 'priority' | 'assignee'>>;
+    showArchived: boolean;
+    setShowArchived: React.Dispatch<React.SetStateAction<boolean>>;
     teamMembers: TeamMemberOption[];
     labels: Label[];
 }
@@ -35,6 +37,7 @@ export default function BacklogFilterBar({
     filterLabel, setFilterLabel,
     filterDateRange, setFilterDateRange,
     groupBy, setGroupBy,
+    showArchived, setShowArchived,
     teamMembers, labels,
 }: BacklogFilterBarProps) {
     const [filterOpen, setFilterOpen] = useState(false);
@@ -255,6 +258,18 @@ export default function BacklogFilterBar({
             >
                 <Layers size={13} />
                 {groupBy === 'none' ? 'Group by' : `By ${groupBy}`}
+            </button>
+
+            <button
+                onClick={() => setShowArchived(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                    showArchived
+                        ? 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-400'
+                        : 'border-border text-muted-foreground hover:border-gray-400'
+                }`}
+            >
+                <Archive className="w-3.5 h-3.5" />
+                {showArchived ? 'Hide Archived' : 'Show Archived'}
             </button>
         </div>
     );

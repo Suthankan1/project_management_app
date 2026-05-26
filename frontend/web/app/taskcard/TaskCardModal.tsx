@@ -8,6 +8,8 @@ import api from '@/lib/axios';
 import { toast } from '@/components/ui';
 import { motion } from 'framer-motion';
 import { useStomp } from '@/ws/stomp-provider';
+import { getProjectGitHubRepo } from '@/services/githubService';
+import CreateIssueFromTaskModal from '@/components/github/CreateIssueFromTaskModal';
 
 interface MultiAssignee {
   memberId: number;
@@ -43,6 +45,8 @@ interface TaskData {
   sprintId?: number | null;
   startDate?: string | null;
   completedAt?: string | null;
+  githubIssueNumber?: number | null;
+  githubRepoFullName?: string | null;
 }
 
 interface ProjectMemberOption {
@@ -75,6 +79,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
   const [projectMembers, setProjectMembers] = useState<ProjectMemberOption[]>([]);
   const [projectLabels, setProjectLabels] = useState<LabelOption[]>([]);
   const [projectSprints, setProjectSprints] = useState<SprintOption[]>([]);
+  const [showGitHubIssueModal, setShowGitHubIssueModal] = useState(false);
   // useRef instead of useState so wasModified always holds the current value inside
   // the Escape keydown listener without needing it in the dependency array.
   const wasModified = useRef<boolean>(false);
@@ -230,6 +235,20 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
     void updateTask({ labelIds: nextLabelIds });
   };
 
+  const projectGitHubRepo = taskData?.projectId ? getProjectGitHubRepo(taskData.projectId) : null;
+
+  const handleGitHubIssueCreated = (issue: { number: number }) => {
+    if (!taskData) return;
+    const nextTaskData = {
+      ...taskData,
+      githubIssueNumber: issue.number,
+      githubRepoFullName: taskData.githubRepoFullName ?? projectGitHubRepo?.repoFullName ?? null,
+    };
+    setTaskData(nextTaskData);
+    localStorage.setItem(`planora:task:${taskId}`, JSON.stringify(nextTaskData));
+    wasModified.current = true;
+  };
+
   return (
     <div className="fixed inset-0 z-[9999]" onClick={() => onClose(wasModified.current)}>
       {/* Backdrop */}
@@ -341,6 +360,9 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
                   storyPoint={taskData.storyPoint}
                   milestoneId={taskData.milestoneId}
                   milestoneName={taskData.milestoneName}
+                  githubIssueNumber={taskData.githubIssueNumber ?? null}
+                  githubRepoFullName={taskData.githubRepoFullName ?? null}
+                  projectGitHubRepo={projectGitHubRepo}
                   dates={{
                     created: taskData.createdAt,
                     updated: taskData.updatedAt,
@@ -366,6 +388,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
                   onUpdateReporter={(reporterId) => canChangeReporter && updateTask({ reporterId })}
                   onUpdateSprint={(sprintId) => canEdit && updateTask({ sprintId })}
                   onUpdateLabels={(labelIds) => canEdit && handleUpdateLabels(labelIds)}
+                  onCreateGitHubIssue={() => setShowGitHubIssueModal(true)}
                   onUnassign={async () => {
                     if (!canEdit) return;
                     try {
@@ -378,6 +401,17 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
                 />
               </div>
             </div>
+            {showGitHubIssueModal && projectGitHubRepo && (
+              <CreateIssueFromTaskModal
+                open={showGitHubIssueModal}
+                taskTitle={taskData.title}
+                taskDescription={taskData.description}
+                taskLabels={taskData.labels?.map((label) => label.name) || []}
+                repoFullName={projectGitHubRepo.repoFullName}
+                onClose={() => setShowGitHubIssueModal(false)}
+                onCreated={handleGitHubIssueCreated}
+              />
+            )}
           </>
         )}
       </motion.div>

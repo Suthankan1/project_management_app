@@ -33,6 +33,7 @@ const nextConfig = {
       proxy('reports'),
       proxy('search'),
       proxy('github'),
+      proxy('portfolios'),
     ];
   },
   images: {

@@ -1,45 +1,66 @@
 package com.planora.backend.model;
 
-import jakarta.persistence.*;
-import lombok.*;
 import java.time.LocalDateTime;
+import java.util.Objects;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Getter
 @Setter
 @Entity
 @Table(name = "github_pull_requests",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"integration_id", "github_pr_number"}))
-@AllArgsConstructor
+        uniqueConstraints = @UniqueConstraint(columnNames = {"integration_id", "github_pr_number"}))
 @NoArgsConstructor
 public class GithubPullRequest {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "integration_id", nullable = false)
+    @JoinColumn(name = "integration_id")
     private GithubIntegration integration;
 
-    @Column(name = "github_pr_number", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "task_id")
+    @JsonIgnore
+    private Task task;
+
+    @Column(name = "github_pr_number")
     private Integer githubPrNumber;
 
-    @Column(nullable = false, length = 500)
+    @Column(name = "pr_number")
+    private int prNumber;
+
+    @Column(length = 500)
     private String title;
 
     @Column(columnDefinition = "TEXT")
     private String body;
 
-    @Column(nullable = false, length = 20)
+    @Column(length = 20)
     private String state;
 
     @Column(name = "author_login")
     private String authorLogin;
 
-    @Column(name = "head_branch")
+    @Column(name = "head_branch", length = 255)
     private String headBranch;
 
-    @Column(name = "base_branch")
+    @Column(name = "base_branch", length = 255)
     private String baseBranch;
 
     @Column(name = "github_url")
@@ -54,8 +75,32 @@ public class GithubPullRequest {
     @Column(name = "github_updated_at")
     private LocalDateTime githubUpdatedAt;
 
-    @Column(name = "merged_at")
-    private LocalDateTime mergedAt;
+    @Column(name = "merged_at", length = 30)
+    private String mergedAt;
+
+    @Column(name = "github_merged_at")
+    private LocalDateTime githubMergedAt;
+
+    @Column(name = "html_url", length = 1000)
+    private String htmlUrl;
+
+    @Column(length = 255)
+    private String author;
+
+    @Column(name = "created_at", length = 30)
+    private String createdAt;
+
+    @Column(name = "head_sha", length = 40)
+    private String headSha;
+
+    @Column(name = "updated_at", length = 30)
+    private String updatedAt;
+
+    @Column(name = "ci_status", length = 20)
+    private String ciStatus;
+
+    @Column(name = "review_status", length = 30)
+    private String reviewStatus;
 
     @Column(name = "synced_at", nullable = false)
     private LocalDateTime syncedAt = LocalDateTime.now();
@@ -63,13 +108,12 @@ public class GithubPullRequest {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        GithubPullRequest that = (GithubPullRequest) o;
-        return java.util.Objects.equals(id, that.id);
+        if (!(o instanceof GithubPullRequest that)) return false;
+        return Objects.equals(id, that.id);
     }
 
     @Override
     public int hashCode() {
-        return java.util.Objects.hash(id);
+        return Objects.hash(id);
     }
 }

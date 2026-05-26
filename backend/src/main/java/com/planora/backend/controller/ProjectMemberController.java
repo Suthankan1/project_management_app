@@ -12,6 +12,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -222,6 +223,20 @@ public class ProjectMemberController {
                                 currentUserId,
                                 projectId,
                                 project.getName(),
+                                project.getOwner().getUserId());
+                return ResponseEntity.ok().build();
+        }
+
+        // POST /api/projects/{projectId}/leave - allows the authenticated member to leave the project.
+        @PostMapping("/{projectId}/leave")
+        public ResponseEntity<?> leaveProject(
+                        @PathVariable Long projectId,
+                        @AuthenticationPrincipal UserPrincipal principal) {
+                Project project = projectRepository.findById(projectId)
+                                .orElseThrow(() -> new RuntimeException("Project not found"));
+                Long teamId = project.getTeam().getId();
+                Long currentUserId = principal.getUserId();
+                teamMemberService.leaveProject(teamId, currentUserId, projectId, project.getName(),
                                 project.getOwner().getUserId());
                 return ResponseEntity.ok().build();
         }

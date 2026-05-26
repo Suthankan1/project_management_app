@@ -6,6 +6,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Task, Subtask } from '../../(project)/kanban/types';
 import { Calendar, Trash2, Edit2 } from 'lucide-react';
+import GitHubIssueBadge from '@/components/github/GitHubIssueBadge';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
@@ -117,8 +118,8 @@ export default function KanbanCard({ task, onDelete, onEdit, onOpenTask, usersMa
         </div>
       )}
 
-      {/* Assignee + Subtask row */}
-      {(task.assigneeName || totalSubtasks > 0) && (
+      {/* Assignee + Subtask + GitHub row */}
+      {(task.assigneeName || totalSubtasks > 0 || task.githubIssueNumber) && (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mt-2 min-w-0">
           {task.assigneeName ? (
             <div className="flex items-center gap-1.5 min-w-0">
@@ -142,6 +143,15 @@ export default function KanbanCard({ task, onDelete, onEdit, onOpenTask, usersMa
               <div className="w-16 sm:w-14 h-1 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
                 <div className="h-full rounded-full bg-blue-500" style={{ width: `${totalSubtasks > 0 ? (completedSubtasks / totalSubtasks) * 100 : 0}%` }} />
               </div>
+            </div>
+          )}
+          {task.githubIssueNumber && task.githubRepoFullName && (
+            <div className="flex justify-end sm:ml-auto">
+              <GitHubIssueBadge
+                issueNumber={task.githubIssueNumber}
+                repoFullName={task.githubRepoFullName}
+                size="xs"
+              />
             </div>
           )}
         </div>

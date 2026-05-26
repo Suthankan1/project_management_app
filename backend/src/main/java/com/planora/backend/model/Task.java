@@ -2,6 +2,8 @@ package com.planora.backend.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 import org.hibernate.annotations.BatchSize;
 
@@ -21,7 +23,9 @@ public class Task {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 255)
+    @NotBlank(message = "Task title is required")
+    @Size(max = 255, message = "Task title must be 255 characters or fewer")
     private String title;
 
     @Column(name = "project_task_number")
@@ -29,6 +33,12 @@ public class Task {
 
     @Column(length = 2000)
     private String description;
+
+    @Column(name = "github_issue_number")
+    private Long githubIssueNumber;
+
+    @Column(name = "github_repo_full_name")
+    private String githubRepoFullName;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = false)
@@ -75,6 +85,12 @@ public class Task {
     private Integer sprintPosition;
     private LocalDateTime updatedAt;
     private LocalDateTime completedAt;
+
+    @Column(nullable = false)
+    private boolean archived = false;
+
+    @Column(name = "archived_at")
+    private LocalDateTime archivedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reporter_id")
@@ -140,6 +156,10 @@ public class Task {
     @JoinColumn(name = "milestone_id")
     @JsonIgnore
     private Milestone milestone;
+
+    // GitHub branch linked to this task (V8 migration)
+    @Column(name = "github_branch")
+    private String githubBranch;
 
     // Recurring task fields (V7 migration)
     @Column(name = "recurrence_rule")

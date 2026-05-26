@@ -49,6 +49,7 @@ export default function SprintColumn({
 }: SprintColumnProps) {
   const [inlineOpen, setInlineOpen] = useState(false);
   const [inlineTitle, setInlineTitle] = useState('');
+  const [inlineTitleLength, setInlineTitleLength] = useState(0);
   const { setNodeRef } = useDroppable({
     id: column.columnStatus,
     data: { type: 'column', columnStatus: column.columnStatus },
@@ -198,29 +199,43 @@ export default function SprintColumn({
       {!collapsed && (
       <div className="mt-3 pb-1">
         {inlineOpen ? (
-          <input
-            autoFocus
-            value={inlineTitle}
-            onChange={(e) => setInlineTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && inlineTitle.trim()) {
-                const title = inlineTitle.trim();
-                setInlineTitle('');
+          <>
+            <input
+              autoFocus
+              maxLength={255}
+              value={inlineTitle}
+              onChange={(e) => {
+                setInlineTitle(e.target.value);
+                setInlineTitleLength(e.target.value.length);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && inlineTitle.trim()) {
+                  const title = inlineTitle.trim();
+                  setInlineTitle('');
+                  setInlineTitleLength(0);
+                  setInlineOpen(false);
+                  void onInlineCreate?.(title, column.columnStatus);
+                }
+                if (e.key === 'Escape') {
+                  setInlineOpen(false);
+                  setInlineTitle('');
+                  setInlineTitleLength(0);
+                }
+              }}
+              onBlur={() => {
                 setInlineOpen(false);
-                void onInlineCreate?.(title, column.columnStatus);
-              }
-              if (e.key === 'Escape') {
-                setInlineOpen(false);
                 setInlineTitle('');
-              }
-            }}
-            onBlur={() => {
-              setInlineOpen(false);
-              setInlineTitle('');
-            }}
-            className="w-full px-3 py-2 text-sm border border-[#155DFC] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white shadow-sm"
-            placeholder="Task name… (Enter to save)"
-          />
+                setInlineTitleLength(0);
+              }}
+              className="w-full px-3 py-2 text-sm border border-[#155DFC] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white shadow-sm"
+              placeholder="Task name… (Enter to save)"
+            />
+            {inlineTitleLength > 200 && (
+              <p className="text-xs text-amber-500 mt-1">
+                {255 - inlineTitleLength} characters remaining
+              </p>
+            )}
+          </>
         ) : (
           <button
             onClick={() => setInlineOpen(true)}

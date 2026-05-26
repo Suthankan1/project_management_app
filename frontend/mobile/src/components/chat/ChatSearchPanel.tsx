@@ -35,14 +35,14 @@ export function ChatSearchPanel({
       duration: 250,
       useNativeDriver: false,
     }).start();
-  }, [showSearch]);
+  }, [maxHeight, panelHeight, showSearch]);
 
   useEffect(() => {
     const sub = Dimensions.addEventListener('change', ({ window }) => {
       if (showSearch) panelHeight.setValue(window.height * 0.35);
     });
     return () => sub?.remove();
-  }, [showSearch]);
+  }, [panelHeight, showSearch]);
 
   if (!phaseDEnabled) return null;
 

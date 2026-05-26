@@ -2,6 +2,7 @@ package com.planora.backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.planora.backend.dto.GithubIssueDTO;
+import com.planora.backend.dto.GithubLabelDTO;
 import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.GithubIntegration;
 import com.planora.backend.model.GithubIssue;
@@ -115,18 +116,22 @@ public class GithubIssueService {
     }
 
     private GithubIssueDTO toDTO(GithubIssue issue) {
-        List<String> labels = (issue.getLabelNames() != null && !issue.getLabelNames().isBlank())
-            ? List.of(issue.getLabelNames().split(","))
+        List<GithubLabelDTO> labels = (issue.getLabelNames() != null && !issue.getLabelNames().isBlank())
+            ? List.of(issue.getLabelNames().split(",")).stream()
+                .map(name -> new GithubLabelDTO(name, null))
+                .toList()
             : List.of();
         return GithubIssueDTO.builder()
             .id(issue.getId())
             .integrationId(issue.getIntegration().getId())
             .githubIssueNumber(issue.getGithubIssueNumber())
+            .number(issue.getGithubIssueNumber())
             .title(issue.getTitle())
             .body(issue.getBody())
             .state(issue.getState())
             .authorLogin(issue.getAuthorLogin())
             .githubUrl(issue.getGithubUrl())
+            .htmlUrl(issue.getGithubUrl())
             .labels(labels)
             .linkedTaskId(issue.getLinkedTaskId())
             .githubCreatedAt(issue.getGithubCreatedAt())

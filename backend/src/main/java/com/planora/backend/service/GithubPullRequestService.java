@@ -83,7 +83,7 @@ public class GithubPullRequestService {
         pr.setGithubUrl(node.path("html_url").asText(null));
         pr.setGithubCreatedAt(parseDateTime(node.path("created_at").asText(null)));
         pr.setGithubUpdatedAt(parseDateTime(node.path("updated_at").asText(null)));
-        pr.setMergedAt(parseDateTime(node.path("merged_at").asText(null)));
+        pr.setGithubMergedAt(parseDateTime(node.path("merged_at").asText(null)));
         pr.setSyncedAt(LocalDateTime.now());
 
         if (pr.getLinkedTaskId() == null) {
@@ -144,7 +144,7 @@ public class GithubPullRequestService {
             .linkedTaskId(pr.getLinkedTaskId())
             .githubCreatedAt(pr.getGithubCreatedAt())
             .githubUpdatedAt(pr.getGithubUpdatedAt())
-            .mergedAt(pr.getMergedAt())
+            .mergedAt(pr.getGithubMergedAt())
             .build();
     }
 

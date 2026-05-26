@@ -10,10 +10,13 @@ import ProjectTopNav, {
 } from '../../src/components/navigation/ProjectTopNav';
 import SummaryScreen  from '../../src/components/summary/SummaryScreen';
 import ReportScreen   from '../../src/components/report/ReportScreen';
+import { ChatTabContent } from '../../src/components/chat/ChatTabContent';
 import ProjectBoardScreen from '../../src/components/board/ProjectBoardScreen';
 import ProjectSprintBoardScreen from '../../src/components/board/ProjectSprintBoardScreen';
 import MobileBacklogScreen from '../../src/components/backlog/MobileBacklogScreen';
 import { useProjectSummary } from '../../src/hooks/useProjectSummary';
+import MobilePagesScreen from '../../src/components/pages/MobilePagesScreen';
+import MobileDocsScreen from '../../src/components/docs/MobileDocsScreen';
 
 /** Height of the nav bar = padding top (8) + title row (56) + tab row (48) + padding bottom (12) */
 const NAV_INNER_HEIGHT = 124; // matches ProjectTopNav.tsx exactly
@@ -61,7 +64,12 @@ export default function ProjectRoute() {
     }
   }, []);
 
-  const handleMoreTabChange = useCallback((tab: MoreTab) => {
+  const handleMoreTabChange = useCallback((tab?: MoreTab) => {
+    if (!tab) {
+      setActiveMoreTab(undefined);
+      return;
+    }
+
     setActiveMoreTab(tab);
     setActiveTab(tab); // Make the new dynamic tab visually active
   }, []);
@@ -71,6 +79,13 @@ export default function ProjectRoute() {
 
   const { data } = useProjectSummary(numericId);
   const name = paramName || data?.projectDetails?.name;
+
+  const handleSettingsPress = useCallback(() => {
+    router.push({
+      pathname: '/project/[projectId]/settings',
+      params: { projectId: numericId, projectName: name ?? '' },
+    });
+  }, [router, numericId, name]);
 
   // ── Content area ────────────────────────────────────────────────────────────
   const renderContent = () => {
@@ -82,6 +97,24 @@ export default function ProjectRoute() {
             projectId={numericId}
             projectName={name}
             topOffset={navHeight + 16}
+          />
+        );
+      }
+      if (activeMoreTab === 'pages') {
+        return (
+          <MobilePagesScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight}
+          />
+        );
+      }
+      if (activeMoreTab === 'docs') {
+        return (
+          <MobileDocsScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight}
           />
         );
       }
@@ -142,9 +175,7 @@ export default function ProjectRoute() {
         );
       case 'chat':
         return (
-          <View style={{ flex: 1, paddingTop: navHeight }}>
-            <PlaceholderScreen label="Chat" />
-          </View>
+          <ChatTabContent projectId={String(numericId)} navHeight={navHeight} />
         );
       default:
         return null;
@@ -160,11 +191,12 @@ export default function ProjectRoute() {
 
       {/* Nav bar floats on top — absolutely positioned */}
       <ProjectTopNav
-        activeTab={activeTab}
+        activeTab={activeMoreTab ? 'more' : activeTab as ProjectTab}
         activeMoreTab={activeMoreTab}
         onTabChange={handleTabChange}
         onMoreTabChange={handleMoreTabChange}
         projectName={name}
+        onSettingsPress={handleSettingsPress}
       />
     </View>
   );

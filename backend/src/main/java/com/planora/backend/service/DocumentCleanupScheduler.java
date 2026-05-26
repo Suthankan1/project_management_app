@@ -51,7 +51,7 @@ public class DocumentCleanupScheduler {
         LocalDateTime cutoff = LocalDateTime.now().minusDays(30);
 
         // Step 2. Query the database for the execution list.
-        List<Document> expired = documentRepository.findByStatusAndDeletedAtBefore(DocumentStatus.SOFT_DELETED, cutoff);
+        List<Document> expired = documentRepository.findExpiredSoftDeleted(DocumentStatus.SOFT_DELETED, cutoff);
 
         // Step 3. Quick exit if the trash is empty. Saves processing power.
         if (expired.isEmpty()) {
