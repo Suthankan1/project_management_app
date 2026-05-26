@@ -249,7 +249,14 @@ class GithubNotificationServiceTest {
         when(teamMemberRepository.findByTeamId(11L)).thenReturn(List.of(member(author), member(recipient)));
         when(teamMemberRepository.findByTeamId(12L)).thenReturn(List.of(member(recipient)));
 
-        githubNotificationService.notifyIssueEvent("planora/app", 34, "Broken sync", "opened", "octocat");
+        githubNotificationService.notifyIssueEvent(
+                "planora/app",
+                34,
+                "Broken sync",
+                "opened",
+                "octocat",
+                "Build fails on main",
+                List.of("bug", "backend"));
 
         String message = "\uD83D\uDC1B Issue opened: #34 Broken sync by @octocat";
         String link = "https://github.com/planora/app/issues/34";
@@ -268,6 +275,9 @@ class GithubNotificationServiceTest {
         assertEquals("planora/app", eventCaptor.getValue().getRepoFullName());
         assertEquals(34, eventCaptor.getValue().getIssueNumber());
         assertEquals("Broken sync", eventCaptor.getValue().getIssueTitle());
+        assertEquals("Build fails on main", eventCaptor.getValue().getIssueBody());
+        assertEquals("octocat", eventCaptor.getValue().getAuthorLogin());
+        assertEquals(List.of("bug", "backend"), eventCaptor.getValue().getLabels());
     }
 
     @Test

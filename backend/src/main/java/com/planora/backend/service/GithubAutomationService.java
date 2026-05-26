@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.time.LocalDateTime;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.planora.backend.dto.GithubAutomationRuleRequestDTO;
 import com.planora.backend.dto.GithubAutomationRuleResponseDTO;
+import com.planora.backend.dto.GithubIssueDTO;
+import com.planora.backend.dto.GithubLabelDTO;
 import com.planora.backend.event.CIFailedEvent;
 import com.planora.backend.event.IssueLabeledEvent;
 import com.planora.backend.event.IssueOpenedEvent;
@@ -49,6 +52,7 @@ public class GithubAutomationService {
     private final ProjectRepository projectRepository;
     private final GithubAutomationRuleRepository githubAutomationRuleRepository;
     private final TaskRepository taskRepository;
+    private final GithubIssueConversionService githubIssueConversionService;
 
     @EventListener
     @Async
@@ -72,19 +76,25 @@ public class GithubAutomationService {
     }
 
     @EventListener
+    @Async
     public void onCIFailed(CIFailedEvent event) {
-        Map<String, Object> context = eventContext(event.getRepoFullName());
-        context.put("workflowName", event.getWorkflowName());
-        context.put("branch", event.getBranch());
-        context.put("commitSha", event.getCommitSha());
-        executeRulesForTrigger(GithubTrigger.CI_FAILED, context);
+        executeRulesForTrigger(GithubTrigger.CI_FAILED, Map.of(
+                "repoFullName", event.getRepoFullName(),
+                "branch", event.getBranch(),
+                "commitSha", event.getCommitSha(),
+                "workflowName", event.getWorkflowName()));
     }
 
     @EventListener
+    @Async
     public void onIssueOpened(IssueOpenedEvent event) {
-        Map<String, Object> context = issueContext(
-                event.getRepoFullName(), event.getIssueNumber(), event.getIssueTitle());
-        executeRulesForTrigger(GithubTrigger.ISSUE_OPENED, context);
+        executeRulesForTrigger(GithubTrigger.ISSUE_OPENED, Map.of(
+                "repoFullName", event.getRepoFullName(),
+                "issueNumber", event.getIssueNumber(),
+                "issueTitle", event.getIssueTitle(),
+                "issueBody", event.getIssueBody(),
+                "authorLogin", event.getAuthorLogin(),
+                "labels", event.getLabels()));
     }
 
     @EventListener
@@ -183,6 +193,14 @@ public class GithubAutomationService {
     }
 
     private void createTask(GithubAutomationRule rule, Map<String, Object> context) {
+        if (rule.getTrigger() == GithubTrigger.CI_FAILED) {
+            logCIFailedTaskCreation(rule, context);
+            return;
+        }
+        if (rule.getTrigger() == GithubTrigger.ISSUE_OPENED) {
+            importOpenedIssueAsTask(rule, context);
+            return;
+        }
         log.debug("Dispatching GitHub automation action {} for rule {} with context {}",
                 GithubAction.CREATE_TASK, rule.getId(), context);
     }
@@ -269,6 +287,103 @@ public class GithubAutomationService {
         return keyedBranch.find()
                 ? Optional.of(Long.valueOf(keyedBranch.group(1)))
                 : Optional.empty();
+    }
+
+    private void logCIFailedTaskCreation(GithubAutomationRule rule, Map<String, Object> context) {
+        Map<String, String> config = rule.getConfig() == null ? Map.of() : rule.getConfig();
+        String configuredProjectId = Objects.toString(config.get("projectId"), "").trim();
+        if (configuredProjectId.isBlank()) {
+            log.warn("Skipping CI-failed automation rule {} because config projectId is required", rule.getId());
+            return;
+        }
+
+        Project project = rule.getProject();
+        String ruleProjectId = project == null || project.getId() == null
+                ? ""
+                : project.getId().toString();
+        if (!configuredProjectId.equals(ruleProjectId)) {
+            log.warn("Skipping CI-failed automation rule {} because configured projectId {} does not match rule project {}",
+                    rule.getId(), configuredProjectId, ruleProjectId);
+            return;
+        }
+
+        String titleTemplate = Objects.toString(
+                config.get("taskTitle"), "CI failure: {workflowName} on {branch}");
+        String taskTitle = renderCIFailedTaskTitle(titleTemplate, context);
+        String priority = Objects.toString(config.getOrDefault("priority", "HIGH"), "HIGH")
+                .trim()
+                .toUpperCase();
+        String labelName = Objects.toString(config.get("labelName"), "").trim();
+
+        log.info("GitHub automation rule {} would create CI failure task in project {}: title='{}', priority='{}', label='{}'",
+                rule.getId(),
+                configuredProjectId,
+                taskTitle,
+                priority.isBlank() ? "HIGH" : priority,
+                labelName);
+    }
+
+    private String renderCIFailedTaskTitle(String template, Map<String, Object> context) {
+        return template
+                .replace("{workflowName}", Objects.toString(context.get("workflowName"), ""))
+                .replace("{branch}", Objects.toString(context.get("branch"), ""))
+                .replace("{commitSha}", Objects.toString(context.get("commitSha"), ""));
+    }
+
+    private void importOpenedIssueAsTask(GithubAutomationRule rule, Map<String, Object> context) {
+        Map<String, String> config = rule.getConfig() == null ? Map.of() : rule.getConfig();
+        Project project = rule.getProject();
+        String configuredProjectId = Objects.toString(config.get("projectId"), "").trim();
+        String ruleProjectId = project == null || project.getId() == null
+                ? ""
+                : project.getId().toString();
+        if (configuredProjectId.isBlank() || !configuredProjectId.equals(ruleProjectId)) {
+            log.warn("Skipping issue-opened automation rule {} because config projectId must match its project",
+                    rule.getId());
+            return;
+        }
+
+        List<String> labels = issueLabelsFromContext(context);
+        String requiredLabel = Objects.toString(config.get("onlyIfLabeled"), "").trim();
+        if (!requiredLabel.isBlank() && labels.stream().noneMatch(requiredLabel::equalsIgnoreCase)) {
+            log.debug("Skipping issue-opened automation rule {} because label '{}' is absent",
+                    rule.getId(), requiredLabel);
+            return;
+        }
+
+        String repoFullName = Objects.toString(context.get("repoFullName"), "").trim();
+        int issueNumber = ((Number) context.get("issueNumber")).intValue();
+        if (githubIssueConversionService.isAlreadyImported((long) issueNumber, repoFullName, project.getId())) {
+            log.debug("Skipping issue-opened automation rule {} because issue #{} is already imported",
+                    rule.getId(), issueNumber);
+            return;
+        }
+
+        GithubIssueDTO issue = new GithubIssueDTO();
+        issue.setNumber(issueNumber);
+        issue.setTitle(Objects.toString(context.get("issueTitle"), ""));
+        issue.setBody(Objects.toString(context.get("issueBody"), ""));
+        issue.setState("open");
+        issue.setHtmlUrl("https://github.com/" + repoFullName + "/issues/" + issueNumber);
+        issue.setLabels(labels.stream().map(label -> new GithubLabelDTO(label, null)).toList());
+
+        Task task = githubIssueConversionService.convertIssueToTask(issue, project);
+        if (task.getCreatedAt() == null) {
+            task.setCreatedAt(LocalDateTime.now());
+        }
+        task.setProjectTaskNumber(taskRepository.findMaxProjectTaskNumberByProjectId(project.getId()) + 1L);
+        task.setBacklogPosition(taskRepository.findMaxBacklogPositionByProjectId(project.getId()) + 1);
+        taskRepository.save(task);
+        log.info("GitHub automation imported opened issue #{} as a task in project {}",
+                issueNumber, project.getId());
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> issueLabelsFromContext(Map<String, Object> context) {
+        Object labels = context.get("labels");
+        return labels instanceof List<?> list
+                ? list.stream().filter(String.class::isInstance).map(String.class::cast).toList()
+                : List.of();
     }
 
     private Project requireProject(Long projectId) {

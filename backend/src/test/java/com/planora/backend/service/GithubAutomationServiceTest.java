@@ -15,9 +15,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import com.planora.backend.dto.GithubAutomationRuleRequestDTO;
 import com.planora.backend.dto.GithubAutomationRuleResponseDTO;
+import com.planora.backend.event.CIFailedEvent;
+import com.planora.backend.event.IssueOpenedEvent;
 import com.planora.backend.event.PRMergedEvent;
 import com.planora.backend.event.PROpenedEvent;
 import com.planora.backend.model.GithubAction;
@@ -31,7 +35,7 @@ import com.planora.backend.repository.KanbanColumnRepository;
 import com.planora.backend.repository.ProjectRepository;
 import com.planora.backend.repository.TaskRepository;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class GithubAutomationServiceTest {
 
     @Mock
@@ -52,6 +56,9 @@ class GithubAutomationServiceTest {
     @Mock
     private TaskRepository taskRepository;
 
+    @Mock
+    private GithubIssueConversionService githubIssueConversionService;
+
     private GithubAutomationService automationService;
 
     @BeforeEach
@@ -62,7 +69,8 @@ class GithubAutomationServiceTest {
                 notificationService,
                 projectRepository,
                 ruleRepository,
-                taskRepository);
+                taskRepository,
+                githubIssueConversionService);
     }
 
     @Test
@@ -205,5 +213,98 @@ class GithubAutomationServiceTest {
                 this, "planora/app", 17, "Improve sync", "octocat", "feature/task/123-review"));
 
         verify(taskRepository).save(task);
+    }
+
+    @Test
+    void ciFailedCreateTaskRuleLogsRenderedTaskPreviewWithDefaultPriority(CapturedOutput output) {
+        Project project = new Project();
+        project.setId(41L);
+        GithubAutomationRule rule = new GithubAutomationRule(
+                8L,
+                project,
+                GithubTrigger.CI_FAILED,
+                GithubAction.CREATE_TASK,
+                Map.of(
+                        "projectId", "41",
+                        "taskTitle", "CI failure: {workflowName} on {branch} ({commitSha})",
+                        "labelName", "build-failure"));
+
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(project));
+        when(ruleRepository.findByProject_IdInAndTrigger(List.of(41L), GithubTrigger.CI_FAILED))
+                .thenReturn(List.of(rule));
+
+        automationService.onCIFailed(new CIFailedEvent(
+                this, "planora/app", "main", "abcdef123", "Backend checks"));
+
+        org.junit.jupiter.api.Assertions.assertTrue(output.getOut().contains(
+                "title='CI failure: Backend checks on main (abcdef123)'"));
+        org.junit.jupiter.api.Assertions.assertTrue(output.getOut().contains("priority='HIGH'"));
+        org.junit.jupiter.api.Assertions.assertTrue(output.getOut().contains("label='build-failure'"));
+    }
+
+    @Test
+    void issueOpenedCreateTaskRuleImportsIssueWhenRequiredLabelMatches() {
+        Project project = new Project();
+        project.setId(41L);
+        GithubAutomationRule rule = new GithubAutomationRule(
+                12L,
+                project,
+                GithubTrigger.ISSUE_OPENED,
+                GithubAction.CREATE_TASK,
+                Map.of("projectId", "41", "onlyIfLabeled", "bug"));
+        Task task = new Task();
+
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(project));
+        when(ruleRepository.findByProject_IdInAndTrigger(List.of(41L), GithubTrigger.ISSUE_OPENED))
+                .thenReturn(List.of(rule));
+        when(githubIssueConversionService.isAlreadyImported(34L, "planora/app", 41L)).thenReturn(false);
+        when(githubIssueConversionService.convertIssueToTask(any(), org.mockito.Mockito.eq(project)))
+                .thenReturn(task);
+        when(taskRepository.findMaxProjectTaskNumberByProjectId(41L)).thenReturn(6L);
+        when(taskRepository.findMaxBacklogPositionByProjectId(41L)).thenReturn(2);
+
+        automationService.onIssueOpened(new IssueOpenedEvent(
+                this,
+                "planora/app",
+                34,
+                "Broken sync",
+                "Build fails on main",
+                "octocat",
+                List.of("bug", "backend")));
+
+        assertEquals(7L, task.getProjectTaskNumber());
+        assertEquals(3, task.getBacklogPosition());
+        verify(githubIssueConversionService).convertIssueToTask(
+                org.mockito.ArgumentMatchers.argThat(issue ->
+                        issue.getNumber().equals(34)
+                                && issue.getBody().equals("Build fails on main")
+                                && issue.getLabels().stream().anyMatch(label -> label.getName().equals("bug"))),
+                org.mockito.Mockito.eq(project));
+        verify(taskRepository).save(task);
+    }
+
+    @Test
+    void issueOpenedCreateTaskRuleSkipsIssueWithoutConfiguredLabel() {
+        Project project = new Project();
+        project.setId(41L);
+        GithubAutomationRule rule = new GithubAutomationRule(
+                12L,
+                project,
+                GithubTrigger.ISSUE_OPENED,
+                GithubAction.CREATE_TASK,
+                Map.of("projectId", "41", "onlyIfLabeled", "bug"));
+
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(project));
+        when(ruleRepository.findByProject_IdInAndTrigger(List.of(41L), GithubTrigger.ISSUE_OPENED))
+                .thenReturn(List.of(rule));
+
+        automationService.onIssueOpened(new IssueOpenedEvent(
+                this, "planora/app", 34, "Broken sync", "", "octocat", List.of("feature")));
+
+        verifyNoInteractions(githubIssueConversionService);
+        org.mockito.Mockito.verify(taskRepository, org.mockito.Mockito.never()).save(any());
     }
 }

@@ -83,6 +83,19 @@ class GitHubWebhookControllerTest {
               "assignee":{"login":"assigned-user"}
             }
             """;
+    private static final String OPENED_ISSUE_BODY = """
+            {
+              "action":"opened",
+              "repository":{"full_name":"planora/app"},
+              "issue":{
+                "number":34,
+                "title":"Broken sync",
+                "body":"Build fails on main",
+                "labels":[{"name":"bug"},{"name":"backend"}]
+              },
+              "sender":{"login":"octocat"}
+            }
+            """;
     private static final String PUBLISHED_RELEASE_BODY = """
             {
               "action":"published",
@@ -203,7 +216,27 @@ class GitHubWebhookControllerTest {
                 .andExpect(content().string("processed"));
 
         verify(githubNotificationService).notifyIssueEvent(
-                "planora/app", 34, "Broken sync", "assigned", "assigned-user");
+                "planora/app", 34, "Broken sync", "assigned", "assigned-user", "", java.util.List.of());
+    }
+
+    @Test
+    void webhook_dispatchesOpenedIssueWithAutomationPayload() throws Exception {
+        mockMvc.perform(post("/api/github/webhook")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-GitHub-Event", "issues")
+                        .header("X-Hub-Signature-256", signature(OPENED_ISSUE_BODY))
+                        .content(OPENED_ISSUE_BODY))
+                .andExpect(status().isOk())
+                .andExpect(content().string("processed"));
+
+        verify(githubNotificationService).notifyIssueEvent(
+                "planora/app",
+                34,
+                "Broken sync",
+                "opened",
+                "octocat",
+                "Build fails on main",
+                java.util.List.of("bug", "backend"));
     }
 
     @Test

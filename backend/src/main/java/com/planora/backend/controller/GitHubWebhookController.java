@@ -19,6 +19,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Receives GitHub webhook events and applies real-time CI status updates to tasks.
@@ -176,7 +178,9 @@ public class GitHubWebhookController {
                 issueNumber,
                 issue.path("title").asText(""),
                 action,
-                relevantLogin);
+                relevantLogin,
+                issue.path("body").asText(""),
+                issueLabels(issue));
         return ResponseEntity.ok("processed");
     }
 
@@ -267,6 +271,17 @@ public class GitHubWebhookController {
 
     private String loginAt(JsonNode parent, String property) {
         return parent.path(property).path("login").asText("");
+    }
+
+    private List<String> issueLabels(JsonNode issue) {
+        List<String> labels = new ArrayList<>();
+        issue.path("labels").forEach(label -> {
+            String name = label.path("name").asText("").trim();
+            if (!name.isBlank()) {
+                labels.add(name);
+            }
+        });
+        return labels;
     }
 
     // ── HMAC validation ───────────────────────────────────────────────────────────

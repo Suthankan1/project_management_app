@@ -200,7 +200,23 @@ public class GithubNotificationService {
                 this, normalizedRepoFullName, safeText(branch), normalizedCommitSha, safeText(workflowName)));
     }
 
-    public void notifyIssueEvent(String repoFullName, int issueNumber, String issueTitle, String action, String actorGithubLogin) {
+    public void notifyIssueEvent(
+            String repoFullName,
+            int issueNumber,
+            String issueTitle,
+            String action,
+            String actorGithubLogin) {
+        notifyIssueEvent(repoFullName, issueNumber, issueTitle, action, actorGithubLogin, "", List.of());
+    }
+
+    public void notifyIssueEvent(
+            String repoFullName,
+            int issueNumber,
+            String issueTitle,
+            String action,
+            String actorGithubLogin,
+            String issueBody,
+            List<String> labels) {
         ensureDependenciesInjected();
         if (repoFullName == null || repoFullName.isBlank() || issueNumber <= 0 || action == null) {
             return;
@@ -230,7 +246,13 @@ public class GithubNotificationService {
                         notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
                                 recipient, message, link, prefix));
                 applicationEventPublisher.publishEvent(new IssueOpenedEvent(
-                        this, normalizedRepoFullName, issueNumber, safeTitle(issueTitle)));
+                        this,
+                        normalizedRepoFullName,
+                        issueNumber,
+                        safeTitle(issueTitle),
+                        safeText(issueBody),
+                        safeLogin(actorGithubLogin),
+                        labels));
             }
             case "closed" -> {
                 String prefix = "\u2705 Issue closed: #" + issueNumber + " ";
