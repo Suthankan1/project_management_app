@@ -224,6 +224,26 @@ export async function fetchPullRequests(
   return response.json()
 }
 
+export async function fetchPullRequest(
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<GitHubPullRequest> {
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    },
+  )
+  if (response.status === 404) throw new Error('Pull request not found or no access')
+  if (!response.ok) throw new Error('Failed to fetch pull request')
+  return response.json()
+}
+
 export async function fetchCommits(
   token: string,
   owner: string,

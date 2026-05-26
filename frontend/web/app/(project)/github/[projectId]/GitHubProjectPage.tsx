@@ -9,6 +9,9 @@ import {
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { ensureValidToken } from '@/lib/auth';
+import { useGithubPRSocket, type GithubPRUpdate } from '@/hooks/useGithubPRSocket';
+import { StompProvider } from '@/ws/stomp-provider';
 import {
   getProjectGitHubRepo,
   setProjectGitHubRepo,
@@ -17,6 +20,7 @@ import {
   clearGitHubToken,
   fetchRepositoriesWithToken,
   fetchGitHubUser,
+  fetchPullRequest,
   fetchPullRequests,
   fetchCommits,
   fetchIssues,
@@ -490,7 +494,6 @@ function IssueImportModal({ issue, onClose }: { issue: GitHubIssue; onClose: () 
 }
 
 function IssuesPanel({
-  connection,
   issues,
   loading,
   error,
@@ -498,7 +501,6 @@ function IssuesPanel({
   onRequireLogin,
   onRefresh,
 }: {
-  connection: ProjectGitHubConnection;
   issues: GitHubIssue[];
   loading: boolean;
   error: string | null;
@@ -601,6 +603,7 @@ function IssuesPanel({
 }
 
 function ConnectedDashboard({
+  projectId,
   connection,
   prs,
   commits,
@@ -613,7 +616,9 @@ function ConnectedDashboard({
   onRefresh,
   onLogout,
   onChangeRepo,
+  onPRUpdate,
 }: {
+  projectId: string;
   connection: ProjectGitHubConnection;
   prs: GitHubPullRequest[];
   commits: GitHubCommit[];
@@ -626,9 +631,21 @@ function ConnectedDashboard({
   onRefresh: () => void;
   onLogout: () => void;
   onChangeRepo: () => void;
+  onPRUpdate: (update: GithubPRUpdate) => void;
 }) {
   const [activeTab, setActiveTab] = useState<'pullRequests' | 'commits' | 'issues'>('pullRequests');
   const [issueCount, setIssueCount] = useState<number | null>(null);
+  const [newPRNotice, setNewPRNotice] = useState<GithubPRUpdate | null>(null);
+
+  const handlePRUpdate = useCallback((update: GithubPRUpdate) => {
+    if (update.type === 'opened') {
+      setNewPRNotice(update);
+      setActiveTab('pullRequests');
+    }
+    onPRUpdate(update);
+  }, [onPRUpdate]);
+
+  useGithubPRSocket(projectId, handlePRUpdate);
 
   return (
     <motion.div
@@ -678,6 +695,43 @@ function ConnectedDashboard({
       </div>
 
       {/* ── Two-column content ──────────────────────────────────────────── */}
+      <AnimatePresence>
+        {newPRNotice && (
+          <motion.div
+            role="status"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 shadow-sm"
+          >
+            <div className="mt-0.5 rounded-lg bg-blue-100 p-1.5 text-blue-600">
+              <GitPullRequest size={15} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-outfit font-semibold text-slate-800">
+                New PR opened: #{newPRNotice.prNumber} {newPRNotice.prTitle}
+              </p>
+              <a
+                href={newPRNotice.prUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-flex items-center gap-1 text-xs font-outfit font-semibold text-blue-600 hover:underline"
+              >
+                View pull request <ExternalLink size={11} />
+              </a>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNewPRNotice(null)}
+              aria-label="Dismiss new pull request notification"
+              className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-blue-100 hover:text-slate-600"
+            >
+              <X size={15} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
         {([
           { id: 'pullRequests', label: 'Pull Requests' },
@@ -807,7 +861,6 @@ function ConnectedDashboard({
 
         <div className={activeTab === 'issues' ? '' : 'hidden'}>
           <IssuesPanel
-            connection={connection}
             issues={issues}
             loading={loading}
             error={issueError}
@@ -835,6 +888,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   const [prError, setPRError] = useState<string | null>(null);
   const [commitError, setCommitError] = useState<string | null>(null);
   const [issueError, setIssueError] = useState<string | null>(null);
+  const [socketToken, setSocketToken] = useState<string | null>(null);
 
   // Repo modal state
   const [showModal, setShowModal] = useState(false);
@@ -844,7 +898,17 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   const [repoError, setRepoError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     setConnection(getProjectGitHubRepo(projectId));
+    const loadSocketToken = async () => {
+      const token = await ensureValidToken();
+      if (active) setSocketToken(token);
+    };
+    void loadSocketToken();
+
+    return () => {
+      active = false;
+    };
   }, [projectId]);
 
   const loadData = useCallback(async (conn: ProjectGitHubConnection) => {
@@ -951,29 +1015,65 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     setCommits([]);
   };
 
+  const handlePRUpdate = useCallback(async (update: GithubPRUpdate) => {
+    if (!connection) return;
+
+    if (update.type === 'opened') {
+      const token = getGitHubToken();
+      if (!token) return;
+
+      try {
+        const pr = await fetchPullRequest(token, connection.ownerLogin, connection.repoName, update.prNumber);
+        setPRs((current) => [pr, ...current.filter((existing) => existing.number !== pr.number)]);
+        setPRError(null);
+      } catch {
+        // Keep the live banner visible if full PR details cannot be loaded.
+      }
+      return;
+    }
+
+    setPRs((current) => current.map((pr) => {
+      if (pr.number !== update.prNumber) return pr;
+      return {
+        ...pr,
+        state: 'closed',
+        merged_at: update.type === 'merged' ? (pr.merged_at ?? new Date().toISOString()) : null,
+        updated_at: new Date().toISOString(),
+      };
+    }));
+  }, [connection]);
+
   const filteredRepos = allRepos.filter(r =>
     r.full_name.toLowerCase().includes(repoSearch.toLowerCase())
   );
+
+  const connectedDashboard = connection ? (
+    <ConnectedDashboard
+      key={connection.repoFullName}
+      projectId={projectId}
+      connection={connection}
+      prs={prs}
+      commits={commits}
+      issues={issues}
+      loading={loading}
+      prError={prError}
+      commitError={commitError}
+      issueError={issueError}
+      user={user}
+      onRefresh={() => void loadData(connection)}
+      onLogout={() => void handleLogout()}
+      onChangeRepo={handleOpenModal}
+      onPRUpdate={(update) => void handlePRUpdate(update)}
+    />
+  ) : null;
 
   return (
     <div className={`w-full px-6 py-6 ${connection ? '' : 'min-h-[calc(100vh-130px)] flex flex-col items-center justify-center'}`}>
       <AnimatePresence mode="wait">
         {connection ? (
-          <ConnectedDashboard
-              key="dashboard"
-              connection={connection}
-              prs={prs}
-              commits={commits}
-              issues={issues}
-              loading={loading}
-              prError={prError}
-              commitError={commitError}
-              issueError={issueError}
-              user={user}
-              onRefresh={() => void loadData(connection)}
-              onLogout={() => void handleLogout()}
-              onChangeRepo={handleOpenModal}
-            />
+          socketToken ? (
+            <StompProvider token={socketToken}>{connectedDashboard}</StompProvider>
+          ) : connectedDashboard
         ) : (
           <DisconnectedView key="disconnected" onConnect={handleConnectGitHub} />
         )}
