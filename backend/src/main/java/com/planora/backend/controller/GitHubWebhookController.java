@@ -177,15 +177,21 @@ public class GitHubWebhookController {
     }
 
     private ResponseEntity<String> handleRelease(JsonNode body) {
+        if (!"published".equals(body.path("action").asText(""))) {
+            return ResponseEntity.ok("ignored");
+        }
+
         String repoFullName = repositoryFullName(body);
         JsonNode release = body.path("release");
-        if (repoFullName.isBlank() || release.isMissingNode()) {
+        String releaseUrl = release.path("html_url").asText("").trim();
+        if (repoFullName.isBlank() || release.isMissingNode() || releaseUrl.isBlank()) {
             return ResponseEntity.badRequest().body("Missing release repository or payload");
         }
         githubNotificationService.notifyRelease(
                 repoFullName,
                 release.path("tag_name").asText(""),
-                release.path("name").asText(""));
+                release.path("name").asText(""),
+                releaseUrl);
         return ResponseEntity.ok("processed");
     }
 

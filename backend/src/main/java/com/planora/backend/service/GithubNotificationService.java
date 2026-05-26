@@ -16,6 +16,7 @@ import com.planora.backend.event.CIFailedEvent;
 import com.planora.backend.event.IssueLabeledEvent;
 import com.planora.backend.event.IssueOpenedEvent;
 import com.planora.backend.event.PRMergedEvent;
+import com.planora.backend.event.ReleasePublishedEvent;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Task;
 import com.planora.backend.model.TeamMember;
@@ -241,9 +242,24 @@ public class GithubNotificationService {
         }
     }
 
-    public void notifyRelease(String repoFullName, String tagName, String releaseName) {
+    public void notifyRelease(String repoFullName, String tagName, String releaseName, String releaseUrl) {
         ensureDependenciesInjected();
-        // Task 112: wire release notifications.
+        if (repoFullName == null || repoFullName.isBlank()
+                || releaseUrl == null || releaseUrl.isBlank()) {
+            return;
+        }
+
+        String normalizedRepoFullName = repoFullName.trim();
+        String normalizedReleaseUrl = releaseUrl.trim();
+        String prefix = "\uD83D\uDE80 Release published: " + safeText(releaseName) + " (";
+        String message = prefix + safeText(tagName) + ") in " + normalizedRepoFullName;
+        List<Project> projects = projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName);
+        projectMemberRecipients(projects).values().forEach(recipient ->
+                notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                        recipient, message, normalizedReleaseUrl, prefix));
+
+        applicationEventPublisher.publishEvent(new ReleasePublishedEvent(
+                this, normalizedRepoFullName, safeText(tagName), safeText(releaseName), normalizedReleaseUrl));
     }
 
     public List<User> resolveUsersFromGithubLogin(String githubLogin) {

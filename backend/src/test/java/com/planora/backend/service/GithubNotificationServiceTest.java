@@ -22,6 +22,7 @@ import com.planora.backend.event.CIFailedEvent;
 import com.planora.backend.event.IssueLabeledEvent;
 import com.planora.backend.event.IssueOpenedEvent;
 import com.planora.backend.event.PRMergedEvent;
+import com.planora.backend.event.ReleasePublishedEvent;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Task;
 import com.planora.backend.model.Team;
@@ -284,6 +285,41 @@ class GithubNotificationServiceTest {
                 "https://github.com/planora/app/issues/34");
         verify(projectRepository, never()).findByGithubRepoFullNameIgnoreCase(any());
         verify(teamMemberRepository, never()).findByTeamId(any());
+    }
+
+    @Test
+    void notifyRelease_notifiesAllProjectMembersAndPublishesEvent() {
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(firstProject, secondProject));
+        when(teamMemberRepository.findByTeamId(11L)).thenReturn(List.of(member(author), member(recipient)));
+        when(teamMemberRepository.findByTeamId(12L)).thenReturn(List.of(member(recipient)));
+
+        githubNotificationService.notifyRelease(
+                " planora/app ", "v2.0.0", "Planora 2.0", " https://github.com/planora/app/releases/tag/v2.0.0 ");
+
+        String message = "\uD83D\uDE80 Release published: Planora 2.0 (v2.0.0) in planora/app";
+        String link = "https://github.com/planora/app/releases/tag/v2.0.0";
+        String prefix = "\uD83D\uDE80 Release published: Planora 2.0 (";
+        verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                author, message, link, prefix);
+        verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                recipient, message, link, prefix);
+
+        ArgumentCaptor<ReleasePublishedEvent> eventCaptor = ArgumentCaptor.forClass(ReleasePublishedEvent.class);
+        verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+        ReleasePublishedEvent event = eventCaptor.getValue();
+        assertEquals("planora/app", event.getRepoFullName());
+        assertEquals("v2.0.0", event.getTagName());
+        assertEquals("Planora 2.0", event.getReleaseName());
+        assertEquals(link, event.getReleaseUrl());
+    }
+
+    @Test
+    void notifyRelease_ignoresMissingReleaseUrlWithoutPublishingEvent() {
+        githubNotificationService.notifyRelease("planora/app", "v2.0.0", "Planora 2.0", " ");
+
+        verify(projectRepository, never()).findByGithubRepoFullNameIgnoreCase(any());
+        verify(applicationEventPublisher, never()).publishEvent(any());
     }
 
     private User user(Long id, String username) {

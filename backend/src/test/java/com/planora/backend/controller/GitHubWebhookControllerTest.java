@@ -83,6 +83,28 @@ class GitHubWebhookControllerTest {
               "assignee":{"login":"assigned-user"}
             }
             """;
+    private static final String PUBLISHED_RELEASE_BODY = """
+            {
+              "action":"published",
+              "repository":{"full_name":"planora/app"},
+              "release":{
+                "tag_name":"v2.0.0",
+                "name":"Planora 2.0",
+                "html_url":"https://github.com/planora/app/releases/tag/v2.0.0"
+              }
+            }
+            """;
+    private static final String EDITED_RELEASE_BODY = """
+            {
+              "action":"edited",
+              "repository":{"full_name":"planora/app"},
+              "release":{
+                "tag_name":"v2.0.0",
+                "name":"Planora 2.0",
+                "html_url":"https://github.com/planora/app/releases/tag/v2.0.0"
+              }
+            }
+            """;
 
     private MockMvc mockMvc;
     private GithubNotificationService githubNotificationService;
@@ -181,6 +203,38 @@ class GitHubWebhookControllerTest {
 
         verify(githubNotificationService).notifyIssueEvent(
                 "planora/app", 34, "Broken sync", "assigned", "assigned-user");
+    }
+
+    @Test
+    void webhook_dispatchesPublishedReleaseWithGithubReleaseUrl() throws Exception {
+        mockMvc.perform(post("/api/github/webhook")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-GitHub-Event", "release")
+                        .header("X-Hub-Signature-256", signature(PUBLISHED_RELEASE_BODY))
+                        .content(PUBLISHED_RELEASE_BODY))
+                .andExpect(status().isOk())
+                .andExpect(content().string("processed"));
+
+        verify(githubNotificationService).notifyRelease(
+                "planora/app", "v2.0.0", "Planora 2.0",
+                "https://github.com/planora/app/releases/tag/v2.0.0");
+    }
+
+    @Test
+    void webhook_ignoresReleaseActionsOtherThanPublished() throws Exception {
+        mockMvc.perform(post("/api/github/webhook")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-GitHub-Event", "release")
+                        .header("X-Hub-Signature-256", signature(EDITED_RELEASE_BODY))
+                        .content(EDITED_RELEASE_BODY))
+                .andExpect(status().isOk())
+                .andExpect(content().string("ignored"));
+
+        verify(githubNotificationService, never()).notifyRelease(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
