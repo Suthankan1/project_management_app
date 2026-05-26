@@ -29,6 +29,6 @@ public class GithubEventBroadcaster {
     }
 
     public void broadcastTaskBadgeUpdate(Long projectId, Long taskId, GithubTaskBadgePayload payload) {
-        messagingTemplate.convertAndSend("/topic/projects/" + projectId + "/tasks/" + taskId + "/github", payload);
+        messagingTemplate.convertAndSend("/topic/projects/" + projectId + "/github/task-badges", payload);
     }
 }

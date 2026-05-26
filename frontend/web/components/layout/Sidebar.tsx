@@ -158,11 +158,8 @@ export default function Sidebar() {
   const [notifPanelOpen, setNotifPanelOpen] = useState(false);
   const [loadingInbox, setLoadingInbox] = useState(false);
 
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    if (window.innerWidth < 768) return true;
-    return localStorage.getItem('planora:sidebar:collapsed') === 'true';
-  });
+  // Keep the hydration render deterministic; browser preferences are restored after mount.
+  const [collapsed, setCollapsed] = useState(true);
   const [favOpen, setFavOpen] = useState(false);
   const [recentOpen, setRecentOpen] = useState(false);
   const [favSearch, setFavSearch] = useState('');
@@ -170,12 +167,16 @@ export default function Sidebar() {
   const [inboxSearch, setInboxSearch] = useState('');
   const [notifSearch, setNotifSearch] = useState('');
 
-  const [isMobile, setIsMobile] = useState<boolean>(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false
-  );
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     let isCurrentlyMobile = window.innerWidth < 768;
+    const frameId = window.requestAnimationFrame(() => {
+      setIsMobile(isCurrentlyMobile);
+      setCollapsed(
+        isCurrentlyMobile || localStorage.getItem('planora:sidebar:collapsed') === 'true',
+      );
+    });
 
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
@@ -187,7 +188,10 @@ export default function Sidebar() {
     };
 
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   useEffect(() => {

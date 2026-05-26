@@ -11,6 +11,9 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ensureValidToken } from '@/lib/auth';
 import { useGithubPRSocket, type GithubPRUpdate } from '@/hooks/useGithubPRSocket';
+import { useGithubCISocket, type GithubCIUpdate } from '@/hooks/useGithubCISocket';
+import { useGithubIssueSocket, type GithubIssueUpdate } from '@/hooks/useGithubIssueSocket';
+import { useGithubTaskBadgeSocket, type GithubTaskBadgeUpdate } from '@/hooks/useGithubTaskBadgeSocket';
 import { StompProvider } from '@/ws/stomp-provider';
 import {
   getProjectGitHubRepo,
@@ -633,9 +636,24 @@ function ConnectedDashboard({
   onChangeRepo: () => void;
   onPRUpdate: (update: GithubPRUpdate) => void;
 }) {
+  type LiveNotice = {
+    id: string;
+    message: string;
+    href: string;
+    tone: 'info' | 'success' | 'danger';
+  };
+
   const [activeTab, setActiveTab] = useState<'pullRequests' | 'commits' | 'issues'>('pullRequests');
   const [issueCount, setIssueCount] = useState<number | null>(null);
   const [newPRNotice, setNewPRNotice] = useState<GithubPRUpdate | null>(null);
+  const [liveNotices, setLiveNotices] = useState<LiveNotice[]>([]);
+
+  const pushNotice = useCallback((notice: Omit<LiveNotice, 'id'>) => {
+    setLiveNotices((current) => [{
+      ...notice,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    }, ...current].slice(0, 4));
+  }, []);
 
   const handlePRUpdate = useCallback((update: GithubPRUpdate) => {
     if (update.type === 'opened') {
@@ -646,6 +664,27 @@ function ConnectedDashboard({
   }, [onPRUpdate]);
 
   useGithubPRSocket(projectId, handlePRUpdate);
+  useGithubCISocket(projectId, useCallback((update: GithubCIUpdate) => {
+    pushNotice({
+      message: `CI ${update.status}: ${update.workflow} on ${update.branch}`,
+      href: `https://github.com/${connection.repoFullName}/commit/${update.commitSha}/checks`,
+      tone: update.status === 'failure' ? 'danger' : update.status === 'success' ? 'success' : 'info',
+    });
+  }, [connection.repoFullName, pushNotice]));
+  useGithubIssueSocket(projectId, useCallback((update: GithubIssueUpdate) => {
+    pushNotice({
+      message: `Issue ${update.action}: #${update.issueNumber} ${update.issueTitle}`,
+      href: `https://github.com/${connection.repoFullName}/issues/${update.issueNumber}`,
+      tone: update.action === 'closed' ? 'success' : 'info',
+    });
+  }, [connection.repoFullName, pushNotice]));
+  useGithubTaskBadgeSocket(projectId, useCallback((update: GithubTaskBadgeUpdate) => {
+    pushNotice({
+      message: `Task #${update.taskId} linked issue #${update.githubIssueNumber} is ${update.issueState}`,
+      href: `https://github.com/${update.githubRepoFullName}/issues/${update.githubIssueNumber}`,
+      tone: update.issueState === 'closed' ? 'success' : 'info',
+    });
+  }, [pushNotice]));
 
   return (
     <motion.div
@@ -730,6 +769,45 @@ function ConnectedDashboard({
             </button>
           </motion.div>
         )}
+      </AnimatePresence>
+
+      <AnimatePresence initial={false}>
+        {liveNotices.map((notice) => (
+          <motion.div
+            key={notice.id}
+            role="status"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className={`flex items-start gap-3 rounded-2xl border px-4 py-3 shadow-sm ${
+              notice.tone === 'danger'
+                ? 'border-red-100 bg-red-50'
+                : notice.tone === 'success'
+                  ? 'border-emerald-100 bg-emerald-50'
+                  : 'border-slate-200 bg-white'
+            }`}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-outfit font-semibold text-slate-800">{notice.message}</p>
+              <a
+                href={notice.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-flex items-center gap-1 text-xs font-outfit font-semibold text-blue-600 hover:underline"
+              >
+                View on GitHub <ExternalLink size={11} />
+              </a>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLiveNotices((current) => current.filter((item) => item.id !== notice.id))}
+              aria-label="Dismiss GitHub activity notification"
+              className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            >
+              <X size={15} />
+            </button>
+          </motion.div>
+        ))}
       </AnimatePresence>
 
       <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
