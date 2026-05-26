@@ -12,6 +12,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import com.planora.backend.dto.GithubCIUpdatePayload;
+import com.planora.backend.dto.GithubIssueUpdatePayload;
+import com.planora.backend.dto.GithubPRUpdatePayload;
 import com.planora.backend.event.CIFailedEvent;
 import com.planora.backend.event.IssueLabeledEvent;
 import com.planora.backend.event.IssueOpenedEvent;
@@ -40,11 +43,12 @@ public class GithubNotificationService {
     private final TaskRepository taskRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final GithubEventBroadcaster githubEventBroadcaster;
 
     private void ensureDependenciesInjected() {
         if (notificationService == null || userRepository == null
                 || projectRepository == null || taskRepository == null || teamMemberRepository == null
-                || applicationEventPublisher == null) {
+                || applicationEventPublisher == null || githubEventBroadcaster == null) {
             throw new IllegalStateException("GitHub notification dependencies were not injected");
         }
     }
@@ -55,13 +59,15 @@ public class GithubNotificationService {
             return;
         }
 
+        String normalizedRepoFullName = repoFullName.trim();
+        List<Project> projects = projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName);
         Set<Long> authorIds = resolveUsersFromGithubLogin(authorGithubLogin).stream()
                 .map(User::getUserId)
                 .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toSet());
         Map<Long, User> recipients = new LinkedHashMap<>();
 
-        for (Project project : projectRepository.findByGithubRepoFullNameIgnoreCase(repoFullName.trim())) {
+        for (Project project : projects) {
             if (project.getTeam() == null || project.getTeam().getId() == null) {
                 continue;
             }
@@ -75,10 +81,12 @@ public class GithubNotificationService {
 
         String prefix = "\uD83D\uDD00 PR opened: #" + prNumber + " ";
         String message = prefix + safeTitle(prTitle) + " by @" + safeLogin(authorGithubLogin);
-        String link = "https://github.com/" + repoFullName.trim() + "/pull/" + prNumber;
+        String link = "https://github.com/" + normalizedRepoFullName + "/pull/" + prNumber;
         recipients.values().forEach(recipient ->
                 notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
                         recipient, message, link, prefix));
+        broadcastPRUpdate(projects, new GithubPRUpdatePayload(
+                "opened", prNumber, safeTitle(prTitle), link, safeLogin(authorGithubLogin)));
     }
 
     public void notifyPRMerged(String repoFullName, int prNumber, String prTitle, String mergerGithubLogin) {
@@ -88,13 +96,14 @@ public class GithubNotificationService {
         }
 
         String normalizedRepoFullName = repoFullName.trim();
+        List<Project> projects = projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName);
         Set<Long> mergerIds = resolveUsersFromGithubLogin(mergerGithubLogin).stream()
                 .map(User::getUserId)
                 .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toSet());
         Map<Long, User> recipients = new LinkedHashMap<>();
 
-        for (Project project : projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName)) {
+        for (Project project : projects) {
             if (project.getTeam() == null || project.getTeam().getId() == null) {
                 continue;
             }
@@ -112,6 +121,8 @@ public class GithubNotificationService {
         recipients.values().forEach(recipient ->
                 notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
                         recipient, message, link, prefix));
+        broadcastPRUpdate(projects, new GithubPRUpdatePayload(
+                "merged", prNumber, safeTitle(prTitle), link, safeLogin(mergerGithubLogin)));
 
         applicationEventPublisher.publishEvent(
                 new PRMergedEvent(this, normalizedRepoFullName, prNumber, safeTitle(prTitle)));
@@ -146,9 +157,10 @@ public class GithubNotificationService {
 
         String normalizedRepoFullName = repoFullName.trim();
         String normalizedCommitSha = commitSha.trim();
+        List<Project> projects = projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName);
         Map<Long, User> recipients = new LinkedHashMap<>();
 
-        for (Project project : projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName)) {
+        for (Project project : projects) {
             if (project.getTeam() == null || project.getTeam().getId() == null) {
                 continue;
             }
@@ -167,6 +179,8 @@ public class GithubNotificationService {
         recipients.values().forEach(recipient ->
                 notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
                         recipient, message, link, prefix));
+        broadcastCIUpdate(projects, new GithubCIUpdatePayload(
+                safeText(workflowName), safeText(branch), "failure", normalizedCommitSha));
 
         applicationEventPublisher.publishEvent(new CIFailedEvent(
                 this, normalizedRepoFullName, safeText(branch), normalizedCommitSha, safeText(workflowName)));
@@ -177,13 +191,18 @@ public class GithubNotificationService {
         if (repoFullName == null || repoFullName.isBlank() || issueNumber <= 0 || action == null) {
             return;
         }
+        if (!Set.of("opened", "closed", "labeled", "assigned").contains(action)) {
+            return;
+        }
 
         String normalizedRepoFullName = repoFullName.trim();
         String link = "https://github.com/" + normalizedRepoFullName + "/issues/" + issueNumber;
+        List<Project> projects = projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName);
+        GithubIssueUpdatePayload updatePayload = new GithubIssueUpdatePayload(
+                action, issueNumber, safeTitle(issueTitle), safeLogin(actorGithubLogin));
 
         switch (action) {
             case "opened" -> {
-                List<Project> projects = projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName);
                 Set<Long> authorIds = resolveUsersFromGithubLogin(actorGithubLogin).stream()
                         .map(User::getUserId)
                         .filter(java.util.Objects::nonNull)
@@ -200,7 +219,6 @@ public class GithubNotificationService {
                         this, normalizedRepoFullName, issueNumber, safeTitle(issueTitle)));
             }
             case "closed" -> {
-                List<Project> projects = projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName);
                 String prefix = "\u2705 Issue closed: #" + issueNumber + " ";
                 String message = prefix + safeTitle(issueTitle);
                 projectMemberRecipients(projects).values().forEach(recipient ->
@@ -208,7 +226,6 @@ public class GithubNotificationService {
                                 recipient, message, link, prefix));
             }
             case "labeled" -> {
-                List<Project> projects = projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName);
                 Map<Long, User> recipients = new LinkedHashMap<>();
                 for (Project project : projects) {
                     if (project.getId() == null) {
@@ -240,6 +257,7 @@ public class GithubNotificationService {
                 // Ignore issue actions that do not produce Planora notifications.
             }
         }
+        broadcastIssueUpdate(projects, updatePayload);
     }
 
     public void notifyRelease(String repoFullName, String tagName, String releaseName, String releaseUrl) {
@@ -297,5 +315,29 @@ public class GithubNotificationService {
             }
         }
         return recipients;
+    }
+
+    private void broadcastPRUpdate(List<Project> projects, GithubPRUpdatePayload payload) {
+        for (Project project : projects) {
+            if (project.getId() != null) {
+                githubEventBroadcaster.broadcastPRUpdate(project.getId(), payload);
+            }
+        }
+    }
+
+    private void broadcastCIUpdate(List<Project> projects, GithubCIUpdatePayload payload) {
+        for (Project project : projects) {
+            if (project.getId() != null) {
+                githubEventBroadcaster.broadcastCIUpdate(project.getId(), payload);
+            }
+        }
+    }
+
+    private void broadcastIssueUpdate(List<Project> projects, GithubIssueUpdatePayload payload) {
+        for (Project project : projects) {
+            if (project.getId() != null) {
+                githubEventBroadcaster.broadcastIssueUpdate(project.getId(), payload);
+            }
+        }
     }
 }

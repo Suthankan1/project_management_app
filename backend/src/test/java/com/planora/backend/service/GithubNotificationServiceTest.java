@@ -3,6 +3,7 @@ package com.planora.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,6 +19,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import com.planora.backend.dto.GithubCIUpdatePayload;
+import com.planora.backend.dto.GithubIssueUpdatePayload;
+import com.planora.backend.dto.GithubPRUpdatePayload;
 import com.planora.backend.event.CIFailedEvent;
 import com.planora.backend.event.IssueLabeledEvent;
 import com.planora.backend.event.IssueOpenedEvent;
@@ -53,6 +57,9 @@ class GithubNotificationServiceTest {
 
     @Mock
     private ApplicationEventPublisher applicationEventPublisher;
+
+    @Mock
+    private GithubEventBroadcaster githubEventBroadcaster;
 
     @InjectMocks
     private GithubNotificationService githubNotificationService;
@@ -97,6 +104,10 @@ class GithubNotificationServiceTest {
                 recipient, message, link, prefix);
         verify(notificationService, never()).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
                 author, message, link, prefix);
+        GithubPRUpdatePayload updatePayload = new GithubPRUpdatePayload(
+                "opened", 17, "Improve sync", link, "octocat");
+        verify(githubEventBroadcaster).broadcastPRUpdate(41L, updatePayload);
+        verify(githubEventBroadcaster).broadcastPRUpdate(42L, updatePayload);
     }
 
     @Test
@@ -126,6 +137,10 @@ class GithubNotificationServiceTest {
                 recipient, message, link, prefix);
         verify(notificationService, never()).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
                 author, message, link, prefix);
+        GithubPRUpdatePayload updatePayload = new GithubPRUpdatePayload(
+                "merged", 17, "Improve sync", link, "maintainer");
+        verify(githubEventBroadcaster).broadcastPRUpdate(41L, updatePayload);
+        verify(githubEventBroadcaster).broadcastPRUpdate(42L, updatePayload);
 
         ArgumentCaptor<PRMergedEvent> eventCaptor = ArgumentCaptor.forClass(PRMergedEvent.class);
         verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
@@ -190,6 +205,10 @@ class GithubNotificationServiceTest {
                 author, message, link, prefix);
         verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
                 recipient, message, link, prefix);
+        GithubCIUpdatePayload updatePayload = new GithubCIUpdatePayload(
+                "Backend checks", "main", "failure", "abcdef1234567890");
+        verify(githubEventBroadcaster).broadcastCIUpdate(41L, updatePayload);
+        verify(githubEventBroadcaster).broadcastCIUpdate(42L, updatePayload);
 
         ArgumentCaptor<CIFailedEvent> eventCaptor = ArgumentCaptor.forClass(CIFailedEvent.class);
         verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
@@ -226,6 +245,10 @@ class GithubNotificationServiceTest {
                 recipient, message, link, prefix);
         verify(notificationService, never()).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
                 author, message, link, prefix);
+        GithubIssueUpdatePayload updatePayload = new GithubIssueUpdatePayload(
+                "opened", 34, "Broken sync", "octocat");
+        verify(githubEventBroadcaster).broadcastIssueUpdate(41L, updatePayload);
+        verify(githubEventBroadcaster).broadcastIssueUpdate(42L, updatePayload);
 
         ArgumentCaptor<IssueOpenedEvent> eventCaptor = ArgumentCaptor.forClass(IssueOpenedEvent.class);
         verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
@@ -275,6 +298,8 @@ class GithubNotificationServiceTest {
     @Test
     void notifyIssueEvent_assignedTargetsMappedGithubAssigneeOnly() {
         when(userRepository.findByGithubUsernameIgnoreCase("assigned-user")).thenReturn(List.of(recipient));
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(firstProject));
 
         githubNotificationService.notifyIssueEvent(
                 "planora/app", 34, "Broken sync", "assigned", "assigned-user");
@@ -283,8 +308,9 @@ class GithubNotificationServiceTest {
                 recipient,
                 "\uD83D\uDCCB You were assigned to issue #34: Broken sync",
                 "https://github.com/planora/app/issues/34");
-        verify(projectRepository, never()).findByGithubRepoFullNameIgnoreCase(any());
         verify(teamMemberRepository, never()).findByTeamId(any());
+        verify(githubEventBroadcaster).broadcastIssueUpdate(eq(41L), eq(new GithubIssueUpdatePayload(
+                "assigned", 34, "Broken sync", "assigned-user")));
     }
 
     @Test
