@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +25,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class GithubNotificationService {
+
+    private static final Logger log = LoggerFactory.getLogger(GithubNotificationService.class);
 
     private final NotificationService notificationService;
     private final UserRepository userRepository;
@@ -108,7 +112,22 @@ public class GithubNotificationService {
 
     public void notifyReviewRequested(String repoFullName, int prNumber, String prTitle, String reviewerGithubLogin) {
         ensureDependenciesInjected();
-        // Task 109: wire review-request notifications.
+        if (repoFullName == null || repoFullName.isBlank() || prNumber <= 0) {
+            return;
+        }
+
+        List<User> reviewers = resolveUsersFromGithubLogin(reviewerGithubLogin);
+        if (reviewers.isEmpty()) {
+            log.warn("Skipping PR review-request notification: no Planora user mapped to GitHub login '{}'",
+                    safeLogin(reviewerGithubLogin));
+            return;
+        }
+
+        String normalizedRepoFullName = repoFullName.trim();
+        String message = "\uD83D\uDC41 Review requested: #" + prNumber + " "
+                + safeTitle(prTitle) + " in " + normalizedRepoFullName;
+        String link = "https://github.com/" + normalizedRepoFullName + "/pull/" + prNumber;
+        reviewers.forEach(reviewer -> notificationService.createNotification(reviewer, message, link));
     }
 
     public void notifyCIFailed(String repoFullName, String branch, String commitSha, String workflowName) {

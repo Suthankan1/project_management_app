@@ -133,6 +133,35 @@ class GithubNotificationServiceTest {
         verify(applicationEventPublisher, never()).publishEvent(any());
     }
 
+    @Test
+    void notifyReviewRequested_notifiesOnlyUsersMappedToRequestedReviewer() {
+        User secondReviewer = user(3L, "second-reviewer");
+        when(userRepository.findByGithubUsernameIgnoreCase("requested-reviewer"))
+                .thenReturn(List.of(recipient, secondReviewer));
+
+        githubNotificationService.notifyReviewRequested(
+                " planora/app ", 17, "Improve sync", "requested-reviewer");
+
+        String message = "\uD83D\uDC41 Review requested: #17 Improve sync in planora/app";
+        String link = "https://github.com/planora/app/pull/17";
+        verify(notificationService).createNotification(recipient, message, link);
+        verify(notificationService).createNotification(secondReviewer, message, link);
+        verify(projectRepository, never()).findByGithubRepoFullNameIgnoreCase(any());
+        verify(teamMemberRepository, never()).findByTeamId(any());
+    }
+
+    @Test
+    void notifyReviewRequested_skipsNotificationWhenReviewerIsNotMapped() {
+        when(userRepository.findByGithubUsernameIgnoreCase("unknown-reviewer")).thenReturn(List.of());
+
+        githubNotificationService.notifyReviewRequested(
+                "planora/app", 17, "Improve sync", "unknown-reviewer");
+
+        verify(notificationService, never()).createNotification(any(), any(), any());
+        verify(projectRepository, never()).findByGithubRepoFullNameIgnoreCase(any());
+        verify(teamMemberRepository, never()).findByTeamId(any());
+    }
+
     private User user(Long id, String username) {
         User user = new User();
         user.setUserId(id);
