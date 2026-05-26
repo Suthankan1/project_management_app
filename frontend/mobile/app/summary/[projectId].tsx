@@ -17,6 +17,7 @@ import MobileBacklogScreen from '../../src/components/backlog/MobileBacklogScree
 import { useProjectSummary } from '../../src/hooks/useProjectSummary';
 import MobilePagesScreen from '../../src/components/pages/MobilePagesScreen';
 import MobileDocsScreen from '../../src/components/docs/MobileDocsScreen';
+import MobileBurndownScreen from '../../src/components/burndown/MobileBurndownScreen';
 
 /** Height of the nav bar = padding top (8) + title row (56) + tab row (48) + padding bottom (12) */
 const NAV_INNER_HEIGHT = 124; // matches ProjectTopNav.tsx exactly
@@ -115,6 +116,15 @@ export default function ProjectRoute() {
             projectId={numericId}
             projectName={name}
             topOffset={navHeight}
+          />
+        );
+      }
+      if (activeMoreTab === 'burndown') {
+        return (
+          <MobileBurndownScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight + 16}
           />
         );
       }
