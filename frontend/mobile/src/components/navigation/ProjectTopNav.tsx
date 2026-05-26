@@ -1,7 +1,7 @@
-import React, { type ComponentProps, useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import React, { type ComponentProps, useRef, useEffect, useCallback, useState, useMemo, useLayoutEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Platform, Animated, Pressable, useWindowDimensions,
+  Platform, Animated, Easing, Pressable, useWindowDimensions,
 } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
@@ -11,18 +11,31 @@ import { BlurView } from 'expo-blur';
 import { T } from '../../constants/tokens';
 
 const INACTIVE_W = 48;
-const ACTIVE_W = 124;
+const ACTIVE_W = 132;
+const MIN_INACTIVE_W = 32;
+const MIN_ACTIVE_W = 92;
 const ROW_H = 48;
 const TAB_GAP = 8;
 const ICON_SZ = 22;
 const TOP_NAV_SIDE_PADDING = 12;
 const MORE_GRID_COLUMNS = 3;
+const ROW_ANIM_MS = 240;
+const DROPDOWN_ANIM_MS = 260;
+const EXITING_MORE_CLEAR_MS = ROW_ANIM_MS + 80;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-export type ProjectTab = 'summary' | 'backlog' | 'board' | 'chat' | 'more' | string;
+function getLabelWidth(label: string) {
+  return Math.ceil(label.length * 9.2);
+}
+
+function getActiveTabWidth(label: string) {
+  return ICON_SZ + 18 + Math.max(getLabelWidth(label), 44);
+}
+
+export type ProjectTab = 'summary' | 'backlog' | 'board' | 'timeline' | 'chat' | 'more' | string;
 export type MoreTab =
   | 'timeline' | 'calendar' | 'burndown' | 'milestone'
   | 'members' | 'pages' | 'docs' | 'list' | 'report';
@@ -37,12 +50,22 @@ const TABS: { key: ProjectTab; label: string }[] = [
   { key: 'more', label: 'More' },
 ];
 
+const MAIN_TABS = TABS.filter(tab => tab.key !== 'more');
+const MORE_TAB = TABS.find(tab => tab.key === 'more')!;
+
 type MoreItem = {
   key: MoreTab;
   label: string;
   icon: PremiumIconName;
   tint: string;
   tintSoft: string;
+};
+
+type DisplayTab = {
+  id: string;
+  tab: typeof TABS[number];
+  moreItem?: MoreItem;
+  hidden?: boolean;
 };
 
 const MORE_ITEMS: MoreItem[] = [
@@ -58,7 +81,15 @@ const MORE_ITEMS: MoreItem[] = [
 ];
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-function TabIcon({ name, active }: { name: ProjectTab; active: boolean }) {
+function TabIcon({
+  name,
+  active,
+  moreItem,
+}: {
+  name: ProjectTab;
+  active: boolean;
+  moreItem?: MoreItem;
+}) {
   const c = active ? T.primary : T.textSecondary;
   const sw = 2.2;
   const fa = active ? T.primary + '1A' : T.textSecondary + '25';
@@ -105,6 +136,16 @@ function TabIcon({ name, active }: { name: ProjectTab; active: boolean }) {
       <Path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" fill={fa} />
     </Svg>
   );
+  if (moreItem) {
+    return (
+      <MaterialCommunityIcons
+        name={moreItem.icon}
+        size={ICON_SZ}
+        color={active ? moreItem.tint : T.textSecondary}
+      />
+    );
+  }
+
   return (
     <Svg {...p}>
       <Circle cx={5} cy={12} r={1.8} fill={c} stroke="none" />
@@ -116,20 +157,23 @@ function TabIcon({ name, active }: { name: ProjectTab; active: boolean }) {
 
 // ─── Tab Button ───────────────────────────────────────────────────────────────
 function TabBtn({
-  tab, widthAnim, inactiveWidth, activeWidth, active, onPress, hasMoreDot,
+  tab, widthAnim, gapAnim, inactiveWidth, activeWidth, active, hidden, onPress, moreItem,
 }: {
   tab: typeof TABS[number];
   widthAnim: Animated.Value;
+  gapAnim: Animated.Value;
   inactiveWidth: number;
   activeWidth: number;
   active: boolean;
+  hidden?: boolean;
   onPress: () => void;
-  hasMoreDot?: boolean;
+  moreItem?: MoreItem;
 }) {
   const press = useRef(new Animated.Value(1)).current;
+  const label = moreItem?.label ?? tab.label;
   const labelTargetWidth = useMemo(
-    () => Math.min(Math.max(tab.label.length * 8.4, 34), activeWidth - ICON_SZ - 22),
-    [activeWidth, tab.label]
+    () => Math.min(Math.max(getLabelWidth(label), 44), activeWidth - ICON_SZ - 18),
+    [activeWidth, label]
   );
 
   // Fade background early so it feels like a solid pill
@@ -166,6 +210,11 @@ function TabBtn({
     outputRange: [-20, 0],
     extrapolate: 'clamp',
   });
+  const itemOpacity = widthAnim.interpolate({
+    inputRange: [0, Math.max(1, inactiveWidth)],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
 
   const pressIn = useCallback(() =>
     Animated.spring(press, { toValue: 0.9, tension: 700, friction: 14, useNativeDriver: false }).start(), []);
@@ -173,7 +222,12 @@ function TabBtn({
     Animated.spring(press, { toValue: 1, tension: 300, friction: 18, useNativeDriver: false }).start(), []);
 
   return (
-    <Animated.View style={[ns.tabBtn, { width: widthAnim, transform: [{ scale: press }] }]}>
+    <Animated.View
+      pointerEvents={hidden ? 'none' : 'auto'}
+      accessibilityElementsHidden={hidden}
+      importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
+      style={[ns.tabBtn, { width: widthAnim, marginRight: gapAnim, opacity: itemOpacity, transform: [{ scale: press }] }]}
+    >
       {/* Subtle glass background for inactive tabs */}
       <View style={ns.inactiveBg} />
 
@@ -188,25 +242,24 @@ function TabBtn({
           onPressOut={pressOut}
           activeOpacity={1}
           style={ns.touchable}
-          accessibilityLabel={tab.label}
+          accessibilityLabel={label}
           accessibilityRole="tab"
           accessibilityState={{ selected: active }}
         >
           <View style={ns.iconBox}>
             {/* Crossfade icons */}
-            <Animated.View style={[StyleSheet.absoluteFill, { opacity: Animated.subtract(1, activeOp) }]}>
-              <TabIcon name={tab.key} active={false} />
+            <Animated.View style={[StyleSheet.absoluteFill, ns.iconLayer, { opacity: Animated.subtract(1, activeOp) }]}>
+              <TabIcon name={tab.key} active={false} moreItem={moreItem} />
             </Animated.View>
-            <Animated.View style={[StyleSheet.absoluteFill, { opacity: activeOp }]}>
-              <TabIcon name={tab.key} active={true} />
+            <Animated.View style={[StyleSheet.absoluteFill, ns.iconLayer, { opacity: activeOp }]}>
+              <TabIcon name={tab.key} active={true} moreItem={moreItem} />
             </Animated.View>
 
-            {hasMoreDot && !active && <View style={ns.moreDot} />}
           </View>
 
           <Animated.View style={[ns.labelBox, { opacity: activeOp, width: labelWidth, marginLeft: labelMargin }]}>
             <Animated.Text numberOfLines={1} style={[ns.label, { transform: [{ translateX: textX }] }]}>
-              {tab.label}
+              {label}
             </Animated.Text>
           </Animated.View>
         </TouchableOpacity>
@@ -247,7 +300,7 @@ export interface ProjectTopNavProps {
   activeTab: ProjectTab;
   activeMoreTab?: MoreTab;
   onTabChange: (tab: ProjectTab) => void;
-  onMoreTabChange?: (tab: MoreTab) => void;
+  onMoreTabChange?: (tab?: MoreTab) => void;
   onSettingsPress?: () => void;
 }
 
@@ -258,16 +311,77 @@ export default function ProjectTopNav({
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const [moreOpen, setMoreOpen] = useState(false);
+  const activeMoreItem = useMemo(
+    () => MORE_ITEMS.find(item => item.key === activeMoreTab),
+    [activeMoreTab]
+  );
+  const previousMoreItemRef = useRef<MoreItem | undefined>(activeMoreItem);
+  const [exitingMoreItem, setExitingMoreItem] = useState<MoreItem | undefined>();
 
-  const activeIdx = useMemo(() => TABS.findIndex(t => t.key === activeTab), [activeTab]);
+  useLayoutEffect(() => {
+    if (activeMoreItem) {
+      previousMoreItemRef.current = activeMoreItem;
+      setExitingMoreItem(undefined);
+      return undefined;
+    }
+
+    if (!previousMoreItemRef.current) return undefined;
+
+    setExitingMoreItem(previousMoreItemRef.current);
+    previousMoreItemRef.current = undefined;
+
+    const timeout = setTimeout(() => setExitingMoreItem(undefined), EXITING_MORE_CLEAR_MS);
+    return () => clearTimeout(timeout);
+  }, [activeMoreItem]);
+
+  const selectedMoreItem = activeMoreItem ?? exitingMoreItem;
+  const displayTabs = useMemo<DisplayTab[]>(() => {
+    const tabs: DisplayTab[] = MAIN_TABS.map(tab => ({ id: tab.key, tab }));
+
+    if (selectedMoreItem) {
+      tabs.push({
+        id: `more-${selectedMoreItem.key}`,
+        tab: { key: 'more', label: selectedMoreItem.label },
+        moreItem: selectedMoreItem,
+        hidden: moreOpen || !!exitingMoreItem,
+      });
+    }
+
+    tabs.push({ id: 'more-menu', tab: MORE_TAB });
+    return tabs;
+  }, [exitingMoreItem, moreOpen, selectedMoreItem]);
+
+  const activeIdx = useMemo(() => {
+    const idx = displayTabs.findIndex(item => (
+      activeMoreItem && !moreOpen
+        ? item.moreItem?.key === activeMoreItem.key
+        : item.id === 'more-menu' && activeTab === 'more'
+          ? true
+          : !item.moreItem && item.tab.key === activeTab
+    ));
+
+    return idx >= 0 ? idx : 0;
+  }, [activeMoreItem, activeTab, displayTabs, moreOpen]);
   const tabMetrics = useMemo(() => {
     const availableWidth = Math.max(0, screenWidth - TOP_NAV_SIDE_PADDING * 2);
-    const totalGap = TAB_GAP * (TABS.length - 1);
-    const activeWidth = clamp(availableWidth * 0.32, 92, ACTIVE_W);
-    const inactiveWidth = clamp((availableWidth - totalGap - activeWidth) / (TABS.length - 1), 36, INACTIVE_W);
+    const visibleTabCount = displayTabs.filter(item => !item.hidden).length;
+    const totalGap = TAB_GAP * (visibleTabCount - 1);
+    const activeItem = displayTabs[activeIdx];
+    const activeLabel = activeItem?.moreItem?.label ?? activeItem?.tab.label ?? '';
+    const dynamicActiveWidth = Math.max(ACTIVE_W, getActiveTabWidth(activeLabel));
+    const maxActiveWidth = Math.max(
+      MIN_ACTIVE_W,
+      availableWidth - totalGap - MIN_INACTIVE_W * (visibleTabCount - 1)
+    );
+    const activeWidth = clamp(dynamicActiveWidth, MIN_ACTIVE_W, maxActiveWidth);
+    const inactiveWidth = clamp(
+      (availableWidth - totalGap - activeWidth) / (visibleTabCount - 1),
+      MIN_INACTIVE_W,
+      INACTIVE_W
+    );
 
     return { activeWidth, inactiveWidth };
-  }, [screenWidth]);
+  }, [activeIdx, displayTabs, screenWidth]);
 
   const moreGridMetrics = useMemo(() => {
     const horizontalPadding = screenWidth < 360 ? 12 : 16;
@@ -282,20 +396,40 @@ export default function ProjectTopNav({
   }, [screenWidth]);
 
   const tabWidths = useRef(
-    TABS.map((_, i) => new Animated.Value(i === activeIdx ? tabMetrics.activeWidth : tabMetrics.inactiveWidth))
+    Array.from({ length: MAIN_TABS.length + 2 }, (_, i) =>
+      new Animated.Value(i === activeIdx ? tabMetrics.activeWidth : tabMetrics.inactiveWidth)
+    )
+  ).current;
+  const tabGaps = useRef(
+    Array.from({ length: MAIN_TABS.length + 2 }, (_, i) =>
+      new Animated.Value(i < MAIN_TABS.length ? TAB_GAP : 0)
+    )
   ).current;
 
   useEffect(() => {
-    const cfg = { tension: 340, friction: 28, useNativeDriver: false };
+    const cfg = {
+      duration: ROW_ANIM_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    };
+    const lastVisibleIndex = displayTabs.reduce((last, item, i) => item.hidden ? last : i, -1);
+
+    tabWidths.forEach(anim => anim.stopAnimation());
+    tabGaps.forEach(anim => anim.stopAnimation());
+
     Animated.parallel(
-      TABS.map((_, i) =>
-        Animated.spring(tabWidths[i], {
-          toValue: i === activeIdx ? tabMetrics.activeWidth : tabMetrics.inactiveWidth,
+      displayTabs.flatMap((item, i) => [
+        Animated.timing(tabWidths[i], {
+          toValue: item.hidden ? 0 : i === activeIdx ? tabMetrics.activeWidth : tabMetrics.inactiveWidth,
           ...cfg,
-        })
-      )
+        }),
+        Animated.timing(tabGaps[i], {
+          toValue: item.hidden || i === lastVisibleIndex ? 0 : TAB_GAP,
+          ...cfg,
+        }),
+      ])
     ).start();
-  }, [activeIdx, tabMetrics.activeWidth, tabMetrics.inactiveWidth, tabWidths]);
+  }, [activeIdx, displayTabs, tabGaps, tabMetrics.activeWidth, tabMetrics.inactiveWidth, tabWidths]);
 
   const entryY = useRef(new Animated.Value(-80)).current;
   const entryOp = useRef(new Animated.Value(0)).current;
@@ -312,13 +446,34 @@ export default function ProjectTopNav({
   useEffect(() => {
     if (moreOpen) {
       Animated.parallel([
-        Animated.spring(dropdownHeightAnim, { toValue: moreGridMetrics.dropdownHeight, tension: 300, friction: 26, useNativeDriver: false }),
-        Animated.timing(dropdownOp, { toValue: 1, duration: 200, useNativeDriver: true, delay: 50 }),
+        Animated.timing(dropdownHeightAnim, {
+          toValue: moreGridMetrics.dropdownHeight,
+          duration: DROPDOWN_ANIM_MS,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }),
+        Animated.timing(dropdownOp, {
+          toValue: 1,
+          duration: 180,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+          delay: 30,
+        }),
       ]).start();
     } else {
       Animated.parallel([
-        Animated.spring(dropdownHeightAnim, { toValue: 0, tension: 300, friction: 26, useNativeDriver: false }),
-        Animated.timing(dropdownOp, { toValue: 0, duration: 150, useNativeDriver: true }),
+        Animated.timing(dropdownHeightAnim, {
+          toValue: 0,
+          duration: 210,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: false,
+        }),
+        Animated.timing(dropdownOp, {
+          toValue: 0,
+          duration: 130,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
       ]).start();
     }
   }, [dropdownHeightAnim, dropdownOp, moreOpen, moreGridMetrics.dropdownHeight]);
@@ -333,6 +488,11 @@ export default function ProjectTopNav({
       onTabChange(tab);
     }
   }, [moreOpen, onTabChange]);
+  const dropdownTranslateY = dropdownOp.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-10, 0],
+    extrapolate: 'clamp',
+  });
 
   return (
     <>
@@ -378,16 +538,26 @@ export default function ProjectTopNav({
         </View>
 
         <View style={ns.row}>
-          {TABS.map((tab, idx) => (
+          {displayTabs.map((item, idx) => (
             <TabBtn
-              key={tab.key}
-              tab={tab}
+              key={item.id}
+              tab={item.tab}
               widthAnim={tabWidths[idx]}
+              gapAnim={tabGaps[idx]}
               inactiveWidth={tabMetrics.inactiveWidth}
               activeWidth={tabMetrics.activeWidth}
               active={idx === activeIdx}
-              onPress={() => handlePress(tab.key)}
-              hasMoreDot={tab.key === 'more' && !!activeMoreTab}
+              hidden={item.hidden}
+              onPress={() => {
+                if (item.moreItem) {
+                  onMoreTabChange?.(item.moreItem.key);
+                  setMoreOpen(false);
+                  return;
+                }
+
+                handlePress(item.tab.key);
+              }}
+              moreItem={item.moreItem}
             />
           ))}
         </View>
@@ -396,6 +566,7 @@ export default function ProjectTopNav({
         <Animated.View style={{ height: dropdownHeightAnim, overflow: 'hidden' }}>
           <Animated.View style={{
             opacity: dropdownOp,
+            transform: [{ translateY: dropdownTranslateY }],
             paddingHorizontal: moreGridMetrics.horizontalPadding,
             paddingTop: 16,
             paddingBottom: 32,
@@ -416,7 +587,13 @@ export default function ProjectTopNav({
                     style={[
                       ds.cell,
                       { width: moreGridMetrics.cellWidth, height: moreGridMetrics.cellHeight },
-                      isSel && ds.cellSel,
+                      isSel && [
+                        ds.cellSel,
+                        {
+                          backgroundColor: item.tintSoft,
+                          borderColor: `${item.tint}66`,
+                        },
+                      ],
                     ]}
                   >
                     <PremiumMoreIcon item={item} selected={isSel} />
@@ -458,14 +635,14 @@ const ns = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: `${T.primary}0F`,
+    backgroundColor: 'rgba(255,255,255,0.72)',
     borderWidth: 1,
-    borderColor: `${T.primary}1A`,
+    borderColor: T.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
     ...Platform.select({
-      ios: { shadowColor: T.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6 },
+      ios: { shadowColor: '#64748B', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6 },
       android: { elevation: 2 },
     }),
   },
@@ -494,7 +671,6 @@ const ns = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    gap: TAB_GAP,
     justifyContent: 'center',
     height: ROW_H,
     alignItems: 'center',
@@ -539,6 +715,10 @@ const ns = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  iconLayer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   labelBox: {
     justifyContent: 'center',
     overflow: 'hidden',
@@ -548,15 +728,6 @@ const ns = StyleSheet.create({
     fontWeight: '800',
     color: T.primary,
     letterSpacing: 0.2,
-  },
-  moreDot: {
-    position: 'absolute',
-    top: 0,
-    right: -2,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FF453A',
   },
 });
 
@@ -584,10 +755,8 @@ const ds = StyleSheet.create({
     }),
   },
   cellSel: {
-    backgroundColor: T.primary + '10',
-    borderColor: T.primaryMuted + '7A',
     ...Platform.select({
-      ios: { shadowColor: T.primary, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.16, shadowRadius: 20 },
+      ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 16 },
       android: { elevation: 2 },
     }),
   },
@@ -605,9 +774,9 @@ const ds = StyleSheet.create({
     }),
   },
   iconShellSel: {
-    borderColor: 'rgba(255,255,255,0.72)',
+    borderColor: 'rgba(255,255,255,0.22)',
     ...Platform.select({
-      ios: { shadowColor: T.primary, shadowOffset: { width: 0, height: 7 }, shadowOpacity: 0.22, shadowRadius: 16 },
+      ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.08, shadowRadius: 12 },
       android: { elevation: 2 },
     }),
   },

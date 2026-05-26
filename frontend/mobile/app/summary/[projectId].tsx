@@ -14,10 +14,10 @@ import { ChatTabContent } from '../../src/components/chat/ChatTabContent';
 import ProjectBoardScreen from '../../src/components/board/ProjectBoardScreen';
 import ProjectSprintBoardScreen from '../../src/components/board/ProjectSprintBoardScreen';
 import MobileBacklogScreen from '../../src/components/backlog/MobileBacklogScreen';
-import MobileTimelineScreen from '../../src/components/timeline/MobileTimelineScreen';
 import { useProjectSummary } from '../../src/hooks/useProjectSummary';
 import MobilePagesScreen from '../../src/components/pages/MobilePagesScreen';
 import MobileDocsScreen from '../../src/components/docs/MobileDocsScreen';
+import MobileBurndownScreen from '../../src/components/burndown/MobileBurndownScreen';
 
 /** Height of the nav bar = padding top (8) + title row (56) + tab row (48) + padding bottom (12) */
 const NAV_INNER_HEIGHT = 124; // matches ProjectTopNav.tsx exactly
@@ -65,7 +65,12 @@ export default function ProjectRoute() {
     }
   }, []);
 
-  const handleMoreTabChange = useCallback((tab: MoreTab) => {
+  const handleMoreTabChange = useCallback((tab?: MoreTab) => {
+    if (!tab) {
+      setActiveMoreTab(undefined);
+      return;
+    }
+
     setActiveMoreTab(tab);
     setActiveTab(tab); // Make the new dynamic tab visually active
   }, []);
@@ -87,15 +92,6 @@ export default function ProjectRoute() {
   const renderContent = () => {
     // If a "More" sub-tab is active, render it
     if (activeMoreTab) {
-      if (activeMoreTab === 'timeline') {
-        return (
-          <MobileTimelineScreen
-            projectId={numericId}
-            projectName={name}
-            topOffset={navHeight + 16}
-          />
-        );
-      }
       if (activeMoreTab === 'report') {
         return (
           <ReportScreen
@@ -120,6 +116,15 @@ export default function ProjectRoute() {
             projectId={numericId}
             projectName={name}
             topOffset={navHeight}
+          />
+        );
+      }
+      if (activeMoreTab === 'burndown') {
+        return (
+          <MobileBurndownScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight + 16}
           />
         );
       }
@@ -173,14 +178,6 @@ export default function ProjectRoute() {
           />
         ) : (
           <ProjectBoardScreen
-            projectId={numericId}
-            projectName={name}
-            topOffset={navHeight + 16}
-          />
-        );
-      case 'timeline':
-        return (
-          <MobileTimelineScreen
             projectId={numericId}
             projectName={name}
             topOffset={navHeight + 16}

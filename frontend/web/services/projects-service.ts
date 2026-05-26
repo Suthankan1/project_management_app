@@ -63,6 +63,10 @@ export async function deleteProject(projectId: number | string, teamId: number |
   await api.delete(`/api/projects/${projectId}/team/${teamId}`);
 }
 
+export async function leaveProject(projectId: number | string): Promise<void> {
+  await api.post(`/api/projects/${projectId}/leave`);
+}
+
 export async function fetchDocuments(
   projectId: string,
   includeDeleted = false,

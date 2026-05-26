@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { CompatClient, Stomp, IMessage } from '@stomp/stompjs';
+import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
 
 // ── Types ──
 
@@ -40,7 +41,7 @@ export function StompProvider({ token, children }: StompProviderProps) {
 
   useEffect(() => {
     const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-    const wsUrl = backendUrl.replace(/^http/, 'ws');
+    const wsUrl = resolveWebSocketBaseUrl(backendUrl);
     const stompClient = Stomp.client(`${wsUrl}/ws-native`);
     stompClient.debug = () => { };
     stompClient.reconnect_delay = 5000;

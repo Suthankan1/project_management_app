@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -354,6 +355,10 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            "WHERE t.project.id = :projectId AND t.archived = true " +
            "ORDER BY t.archivedAt DESC")
     List<Task> findArchivedByProjectId(@Param("projectId") Long projectId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Task t SET t.sprint = null, t.sprintPosition = null WHERE t.project.id = :projectId")
+    void detachSprintsByProjectId(@Param("projectId") Long projectId);
 
     @org.springframework.data.jpa.repository.Modifying
     @Query("UPDATE Task t SET t.assignee = null WHERE t.assignee.id = :memberId")

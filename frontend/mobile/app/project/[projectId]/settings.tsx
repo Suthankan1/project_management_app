@@ -12,6 +12,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import Svg, { Path, Circle, Rect, Polygon, Line } from 'react-native-svg';
 import { T } from '../../../src/constants/tokens';
 import { projectService, type ProjectDetails, type ProjectType } from '../../../src/services/project-service';
+import { getCurrentUserId } from '../../../src/auth/storage';
 
 // ─── Inline SVG Icons ─────────────────────────────────────────────────────────
 
@@ -60,6 +61,14 @@ const TrashIcon = ({ color = '#EF4444', size = 16 }: { color?: string; size?: nu
     <Path d="M10 11v6" />
     <Path d="M14 11v6" />
     <Path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+  </Svg>
+);
+
+const LeaveIcon = ({ color = '#F97316', size = 22 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+    <Polygon points="16 17 21 12 16 7" />
+    <Line x1={21} y1={12} x2={9} y2={12} />
   </Svg>
 );
 
@@ -179,6 +188,96 @@ function TypeCard({
         </View>
       </TouchableOpacity>
     </Animated.View>
+  );
+}
+
+// ─── Leave confirmation modal ─────────────────────────────────────────────────
+
+function LeaveModal({
+  visible,
+  projectName,
+  onClose,
+  onConfirm,
+  isLeaving,
+}: {
+  visible: boolean;
+  projectName: string;
+  onClose: () => void;
+  onConfirm: () => void;
+  isLeaving: boolean;
+}) {
+  const insets = useSafeAreaInsets();
+
+  const EFFECTS = [
+    'You will be removed from the project team',
+    'Your task assignments will be unassigned',
+    'You will no longer receive project notifications',
+    'An admin can re-invite you later if needed',
+  ];
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={m.overlay}>
+        <TouchableWithoutFeedback onPress={!isLeaving ? onClose : undefined}>
+          <View style={StyleSheet.absoluteFill} />
+        </TouchableWithoutFeedback>
+
+        <View style={[m.sheet, { paddingBottom: insets.bottom + 8 }]}>
+          <View style={m.handle} />
+
+          <View style={m.sheetHeader}>
+            <View style={[m.alertIconWrap, { backgroundColor: '#FFF7ED' }]}>
+              <LeaveIcon color="#F97316" size={26} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={m.sheetTitle}>Leave Project</Text>
+              <Text style={m.sheetSubtitle}>
+                You will lose access to <Text style={{ fontWeight: '700', color: T.textPrimary }}>{projectName}</Text> immediately
+              </Text>
+            </View>
+            {!isLeaving && (
+              <TouchableOpacity onPress={onClose} style={m.closeBtn} activeOpacity={0.7}>
+                <XIcon color={T.textMuted} size={16} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={[m.consequenceBox, { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' }]}>
+            <Text style={[m.consequenceTitle, { color: '#9A3412' }]}>WHAT HAPPENS WHEN YOU LEAVE</Text>
+            {EFFECTS.map((e) => (
+              <View key={e} style={m.consequenceRow}>
+                <View style={[m.consequenceDot, { backgroundColor: '#F97316' }]} />
+                <Text style={[m.consequenceText, { color: '#9A3412' }]}>{e}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={m.actions}>
+            <TouchableOpacity
+              onPress={onClose}
+              disabled={isLeaving}
+              style={[m.btn, m.btnCancel]}
+              activeOpacity={0.75}
+            >
+              <Text style={m.btnCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onConfirm}
+              disabled={isLeaving}
+              style={[m.btn, { backgroundColor: '#F97316', flex: 1 }, isLeaving && m.btnDisabled]}
+              activeOpacity={0.8}
+            >
+              {isLeaving ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <LeaveIcon color="#fff" size={15} />
+              )}
+              <Text style={m.btnDeleteText}>{isLeaving ? 'Leaving…' : 'Leave Project'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -436,6 +535,11 @@ export default function ProjectSettingsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Leave
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+
   const isDirtyGeneral =
     project !== null &&
     (name.trim() !== project.name || (description.trim() !== (project.description ?? '')));
@@ -459,6 +563,10 @@ export default function ProjectSettingsPage() {
   }, [numericId, routeProjectName]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    getCurrentUserId().then(setCurrentUserId).catch(() => {});
+  }, []);
 
   const flashSaved = () => {
     Animated.sequence([
@@ -518,6 +626,23 @@ export default function ProjectSettingsPage() {
       Alert.alert('Delete Failed', msg);
     }
   };
+
+  const handleLeave = async () => {
+    setIsLeaving(true);
+    try {
+      await projectService.leave(numericId);
+      setShowLeaveModal(false);
+      router.dismissAll();
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        'Failed to leave project. Please try again.';
+      setIsLeaving(false);
+      Alert.alert('Leave Failed', msg);
+    }
+  };
+
+  const isOwner = project !== null && currentUserId !== null && project.ownerId === currentUserId;
 
   const displayName = project?.name ?? (Array.isArray(routeProjectName) ? routeProjectName[0] : routeProjectName) ?? 'Project';
 
@@ -701,22 +826,45 @@ export default function ProjectSettingsPage() {
 
               <View style={s.dangerDivider} />
 
-              <View style={s.dangerRow}>
-                <View style={{ flex: 1, marginRight: 12 }}>
-                  <Text style={s.dangerRowTitle}>Delete this project</Text>
-                  <Text style={s.dangerRowDesc}>
-                    Permanently remove this project and all associated data. This cannot be reversed.
-                  </Text>
+              {/* Leave — visible to non-owners only */}
+              {!isOwner && (
+                <View style={s.dangerRow}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <Text style={s.dangerRowTitle}>Leave this project</Text>
+                    <Text style={s.dangerRowDesc}>
+                      Remove yourself from the project team. Your task assignments will be cleared.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setShowLeaveModal(true)}
+                    style={[s.deleteBtn, { borderColor: '#FED7AA', backgroundColor: '#FFF7ED' }]}
+                    activeOpacity={0.8}
+                  >
+                    <LeaveIcon color="#F97316" size={14} />
+                    <Text style={[s.deleteBtnText, { color: '#F97316' }]}>Leave</Text>
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  onPress={() => setShowDeleteModal(true)}
-                  style={s.deleteBtn}
-                  activeOpacity={0.8}
-                >
-                  <TrashIcon color="#EF4444" size={14} />
-                  <Text style={s.deleteBtnText}>Delete</Text>
-                </TouchableOpacity>
-              </View>
+              )}
+
+              {/* Delete — visible to owners only */}
+              {isOwner && (
+                <View style={s.dangerRow}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <Text style={s.dangerRowTitle}>Delete this project</Text>
+                    <Text style={s.dangerRowDesc}>
+                      Permanently remove this project and all associated data. This cannot be reversed.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setShowDeleteModal(true)}
+                    style={s.deleteBtn}
+                    activeOpacity={0.8}
+                  >
+                    <TrashIcon color="#EF4444" size={14} />
+                    <Text style={s.deleteBtnText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
           </ScrollView>
@@ -724,6 +872,13 @@ export default function ProjectSettingsPage() {
       )}
 
       {/* ── Modals ─────────────────────────────────────────────────────── */}
+      <LeaveModal
+        visible={showLeaveModal}
+        projectName={project?.name ?? displayName}
+        onClose={() => !isLeaving && setShowLeaveModal(false)}
+        onConfirm={handleLeave}
+        isLeaving={isLeaving}
+      />
       <DeleteModal
         visible={showDeleteModal}
         projectName={project?.name ?? displayName}
