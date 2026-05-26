@@ -7,6 +7,7 @@ import * as notificationsApi from '@/services/notifications-service';
 import { Notification } from '@/services/notifications-service';
 import { toast } from '@/components/ui/Toast';
 import { AUTH_TOKEN_CHANGED_EVENT, getValidToken } from '@/lib/auth';
+import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
 import { buildSessionCacheKey, getSessionCache, setSessionCache } from '@/lib/session-cache';
 
 interface GlobalNotificationContextType {
@@ -147,7 +148,7 @@ export function GlobalNotificationProvider({ children }: { children: React.React
     isConnectingRef.current = true;
     activeTokenRef.current = token;
 
-    const wsUrl = backendUrl.replace(/^http/, 'ws');
+    const wsUrl = resolveWebSocketBaseUrl(backendUrl);
     const client = new Client({
       brokerURL: `${wsUrl}/ws-native`,
       connectHeaders: { Authorization: `Bearer ${token}` },

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { CompatClient, Stomp } from '@stomp/stompjs';
 import { getValidToken } from '@/lib/auth';
+import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
 
 interface TaskEvent {
   type: 'TASK_CREATED' | 'TASK_UPDATED' | 'TASK_DELETED';
@@ -43,7 +44,7 @@ export function useTaskWebSocket(
     if (!token) return;
 
     const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-    const wsUrl = backendUrl.replace(/^http/, 'ws');
+    const wsUrl = resolveWebSocketBaseUrl(backendUrl);
     const stompClient = Stomp.client(`${wsUrl}/ws-native`);
     stompClient.debug = () => {};
     stompClient.reconnect_delay = 5000;

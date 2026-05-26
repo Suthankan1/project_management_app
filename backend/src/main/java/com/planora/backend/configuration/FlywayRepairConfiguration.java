@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 public class FlywayRepairConfiguration {
 
     @Bean
-    @ConditionalOnProperty(name = "app.flyway.repair-on-startup", havingValue = "true", matchIfMissing = false)
+    @ConditionalOnProperty(name = "app.flyway.repair-on-startup", havingValue = "true", matchIfMissing = true)
     public FlywayMigrationStrategy flywayMigrationStrategy() {
         return flyway -> {
             flyway.repair();
