@@ -15,6 +15,7 @@ import { useGithubCISocket, type GithubCIUpdate } from '@/hooks/useGithubCISocke
 import { useGithubIssueSocket, type GithubIssueUpdate } from '@/hooks/useGithubIssueSocket';
 import { useGithubTaskBadgeSocket, type GithubTaskBadgeUpdate } from '@/hooks/useGithubTaskBadgeSocket';
 import { StompProvider } from '@/ws/stomp-provider';
+import CIStatusBanner from '@/components/github/CIStatusBanner';
 import {
   getProjectGitHubRepo,
   setProjectGitHubRepo,
@@ -646,6 +647,7 @@ function ConnectedDashboard({
   const [activeTab, setActiveTab] = useState<'pullRequests' | 'commits' | 'issues'>('pullRequests');
   const [issueCount, setIssueCount] = useState<number | null>(null);
   const [newPRNotice, setNewPRNotice] = useState<GithubPRUpdate | null>(null);
+  const [latestCIUpdate, setLatestCIUpdate] = useState<GithubCIUpdate | null>(null);
   const [liveNotices, setLiveNotices] = useState<LiveNotice[]>([]);
 
   const pushNotice = useCallback((notice: Omit<LiveNotice, 'id'>) => {
@@ -665,12 +667,8 @@ function ConnectedDashboard({
 
   useGithubPRSocket(projectId, handlePRUpdate);
   useGithubCISocket(projectId, useCallback((update: GithubCIUpdate) => {
-    pushNotice({
-      message: `CI ${update.status}: ${update.workflow} on ${update.branch}`,
-      href: `https://github.com/${connection.repoFullName}/commit/${update.commitSha}/checks`,
-      tone: update.status === 'failure' ? 'danger' : update.status === 'success' ? 'success' : 'info',
-    });
-  }, [connection.repoFullName, pushNotice]));
+    setLatestCIUpdate(update);
+  }, []));
   useGithubIssueSocket(projectId, useCallback((update: GithubIssueUpdate) => {
     pushNotice({
       message: `Issue ${update.action}: #${update.issueNumber} ${update.issueTitle}`,
@@ -734,6 +732,8 @@ function ConnectedDashboard({
       </div>
 
       {/* ── Two-column content ──────────────────────────────────────────── */}
+      <CIStatusBanner update={latestCIUpdate} repoFullName={connection.repoFullName} />
+
       <AnimatePresence>
         {newPRNotice && (
           <motion.div
