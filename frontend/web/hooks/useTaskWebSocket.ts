@@ -19,6 +19,8 @@ interface TaskEvent {
     assignees?: Array<{ id?: number; userId?: number; name?: string; username?: string; photoUrl?: string | null; avatar?: string | null }>;
     startDate: string | null;
     dueDate: string | null;
+    archived?: boolean;
+    archivedAt?: string | null;
   };
   taskId?: number;
 }

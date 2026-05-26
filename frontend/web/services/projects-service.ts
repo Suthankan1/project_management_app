@@ -6,12 +6,25 @@ import type { ProjectType, ProjectMetrics } from '@/types';
 export interface ProjectSummary {
   id: number;
   name: string;
+  projectKey?: string;
   type?: ProjectType;
+  teamId?: number;
+  teamName?: string;
+  ownerId?: number;
+  ownerName?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
   isFavorite?: boolean;
   [key: string]: unknown;
 }
 
 // ── API ──
+
+export async function fetchAllProjects(): Promise<ProjectSummary[]> {
+  const { data } = await api.get<ProjectSummary[]>('/api/projects');
+  return data;
+}
 
 export async function fetchRecentProjects(limit = 10): Promise<ProjectSummary[]> {
   const { data } = await api.get<ProjectSummary[]>('/api/projects/recent', { params: { limit } });
@@ -44,6 +57,14 @@ export async function toggleFavorite(projectId: number | string): Promise<void> 
 export async function updateProjectDetails(projectId: number | string, data: { name?: string; description?: string; type?: string }): Promise<ProjectSummary> {
   const result = await api.put<ProjectSummary>(`/api/projects/${projectId}`, data);
   return result.data;
+}
+
+export async function deleteProject(projectId: number | string, teamId: number | string): Promise<void> {
+  await api.delete(`/api/projects/${projectId}/team/${teamId}`);
+}
+
+export async function leaveProject(projectId: number | string): Promise<void> {
+  await api.post(`/api/projects/${projectId}/leave`);
 }
 
 export async function fetchDocuments(

@@ -48,6 +48,8 @@ export interface Task {
   startDate?: string; // ISO date string
   createdAt?: string;
   updatedAt?: string;
+  archived?: boolean;
+  archivedAt?: string;
   assignee?: Assignee;
   assigneeId?: number;
   assigneeName?: string;
@@ -57,15 +59,20 @@ export interface Task {
   reporterName?: string;
   projectId?: number;
   sprintId?: number;
+  parentTaskId?: number | null;
   labels?: Label[];
   labelId?: number;        // single label ID (one label per task per SRS)
   milestoneId?: number;    // milestone ID (new feature — may be null)
   milestoneName?: string;  // milestone name for display (backend DTO)
   milestoneTitle?: string; // legacy alias for older mapped surfaces
+  githubIssueNumber?: number;
+  githubRepoFullName?: string;
   dependencies?: Dependency[];
   subtasks?: Subtask[];
   commentCount?: number;     // number of comments on this task
   attachmentCount?: number;  // number of attachments on this task
+  ciStatus?: string | null;  // CI/CD pipeline status from GitHub (PASSING | FAILED | RUNNING | null)
+  openPrCount?: number;      // number of open pull requests linked to this task
 }
 
 // Subtask interface
@@ -103,4 +110,3 @@ export interface DateFilter {
   startDate: Date | null;
   endDate: Date | null;
 }
-

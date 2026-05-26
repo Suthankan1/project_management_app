@@ -15,16 +15,13 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Platform, Animated, Dimensions,
+  Platform, Animated, useWindowDimensions,
 } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BAR_WIDTH = SCREEN_WIDTH - 32;
 
 // ─── Tab config ────────────────────────────────────────────────────────────────
 
@@ -251,6 +248,9 @@ function TabButton({
 
 export default function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const sideInset = screenWidth < 360 ? 12 : 16;
+  const barWidth = Math.max(0, screenWidth - sideInset * 2);
 
   const renderTabs = () =>
     TABS.map((tab) => {
@@ -282,20 +282,20 @@ export default function FloatingTabBar({ state, descriptors, navigation }: Botto
       {/* Background dark gradient shade from bottom */}
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.02)', 'rgba(0,0,0,0.06)', 'rgba(0,0,0,0.12)']}
-        style={styles.gradientBg}
         pointerEvents="none"
+        style={styles.gradientBg}
       />
 
       {Platform.OS === 'ios' ? (
         // iOS: real frosted glass via BlurView
-        <BlurView intensity={85} tint="light" style={styles.pill}>
+        <BlurView intensity={85} tint="light" style={[styles.pill, { width: barWidth }]}>
           {/* Extra white overlay for luminosity */}
           <View style={styles.iosOverlay} />
           <View style={styles.tabRow}>{renderTabs()}</View>
         </BlurView>
       ) : (
         // Android: high-opacity white + elevation
-        <View style={[styles.pill, styles.androidGlass]}>
+        <View style={[styles.pill, styles.androidGlass, { width: barWidth }]}>
           <View style={styles.tabRow}>{renderTabs()}</View>
         </View>
       )}
@@ -326,7 +326,6 @@ const styles = StyleSheet.create({
 
   // Floating pill — clean Apple-like proportions
   pill: {
-    width: BAR_WIDTH,
     borderRadius: 32,
     overflow: 'hidden',
     borderWidth: 0.8,
@@ -368,6 +367,7 @@ const styles = StyleSheet.create({
   // Each tab takes equal space
   tabButton: {
     flex: 1,
+    minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 44,
@@ -375,6 +375,7 @@ const styles = StyleSheet.create({
 
   // Inner content — icon + label, perfectly centered, no extra padding
   tabInner: {
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 3,
@@ -422,7 +423,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: 14,
-    width: 60, // ensures enough width for text
+    width: '100%',
+    maxWidth: 60, // keeps the current label proportions on wider screens
   },
 
   tabLabel: {

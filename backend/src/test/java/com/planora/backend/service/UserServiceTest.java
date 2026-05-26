@@ -13,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.Authentication;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -297,6 +298,24 @@ public class UserServiceTest {
 
         assertFalse(result.isSuccess());
         assertEquals("INVALID_CREDENTIALS", result.getErrorCode());
+    }
+
+    @Test
+    void testLoginUser_LocksAfterFiveInvalidCredentialAttempts() {
+        when(authenticationManager.authenticate(any()))
+                .thenThrow(new BadCredentialsException("Bad credentials"));
+
+        for (int i = 0; i < 5; i++) {
+            LoginResponse failedLogin = userService.loginUser(testUser);
+            assertFalse(failedLogin.isSuccess());
+            assertEquals("INVALID_CREDENTIALS", failedLogin.getErrorCode());
+        }
+
+        LoginResponse lockedLogin = userService.loginUser(testUser);
+
+        assertFalse(lockedLogin.isSuccess());
+        assertEquals("ACCOUNT_LOCKED", lockedLogin.getErrorCode());
+        verify(authenticationManager, times(5)).authenticate(any());
     }
 
     @Test

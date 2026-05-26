@@ -1,11 +1,15 @@
 package com.planora.backend.configuration;
 
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -72,8 +76,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         log.info("[WebSocket] CONNECT received with Authorization header: {}", auth != null ? "Present" : "Missing");
 
                         if (auth == null || auth.trim().isEmpty()) {
-                            log.error("[WebSocket] Missing Authorization header");
-                            throw new IllegalArgumentException("Missing Authorization header");
+                            log.warn("[WebSocket] Missing Authorization header");
+                            throw new MessagingException("Missing Authorization header");
                         }
 
                         // Remove "Bearer " prefix if present
@@ -91,33 +95,38 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         User user = userCacheService.resolveUserByEmailOrUsername(email);
                         
                         if (user == null) {
-                            log.error("[WebSocket] User not found in database for email: {}", email);
-                            throw new IllegalArgumentException("User not found in database");
+                            log.warn("[WebSocket] User not found in database for email: {}", email);
+                            throw new MessagingException("User not found for provided token");
                         }
 
                         String username = user.getUsername();
                         
                         if (username == null || username.trim().isEmpty()) {
-                            log.error("[WebSocket] Invalid username in token for user: {}", email);
-                            throw new IllegalArgumentException("Invalid username in token");
+                            log.warn("[WebSocket] Invalid username in token for user: {}", email);
+                            throw new MessagingException("Invalid username in token");
                         }
 
                         String normalizedUsername = username.toLowerCase();
 
                         log.info("[WebSocket] Setting user principal: {}", normalizedUsername);
                         accessor.setUser(new StompPrincipal(normalizedUsername));
-                        accessor.getSessionAttributes().put("username", normalizedUsername);
+                        Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
+                        if (sessionAttributes == null) {
+                            sessionAttributes = new HashMap<>();
+                            accessor.setSessionAttributes(sessionAttributes);
+                        }
+                        sessionAttributes.put("username", normalizedUsername);
                         
                         log.info("[WebSocket] Authentication successful for user: {}", normalizedUsername);
                     } catch (io.jsonwebtoken.ExpiredJwtException e) {
-                        log.error("[WebSocket] Authentication failed: JWT expired");
-                        throw new IllegalArgumentException("JWT expired");
+                        log.warn("[WebSocket] Authentication failed: JWT expired");
+                        throw new MessagingException("JWT expired", e);
                     } catch (io.jsonwebtoken.JwtException | IllegalArgumentException e) {
-                        log.error("[WebSocket] Authentication failed: {}", e.getMessage());
-                        throw new IllegalArgumentException("JWT invalid: " + e.getMessage());
-                    } catch (Exception e) {
+                        log.warn("[WebSocket] Authentication failed: {}", e.getMessage());
+                        throw new MessagingException("Invalid JWT", e);
+                    } catch (RuntimeException e) {
                         log.error("[WebSocket] Unexpected authentication error: {}", e.getMessage(), e);
-                        throw new IllegalArgumentException("WebSocket authentication failed: " + e.getMessage());
+                        throw new MessagingException("Unexpected authentication error", e);
                     }
                 }
 

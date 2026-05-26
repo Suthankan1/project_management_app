@@ -117,6 +117,10 @@ public class SprintService {
         Project project = projectRepository.findById(request.getProId())
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
+        if (sprintRepository.existsByNameIgnoreCaseAndProject_Id(request.getName(), request.getProId())) {
+            throw new ConflictException("A sprint with this name already exists in this project");
+        }
+
         Sprint sprint = new Sprint();
         sprint.setProject(project);
         sprint.setName(request.getName());
@@ -159,7 +163,12 @@ public class SprintService {
 
         requireConfigureBoard(existing.getProId(), currentUserId);
 
-        if (request.getName() != null) existing.setName(request.getName());
+        if (request.getName() != null && !request.getName().equalsIgnoreCase(existing.getName())) {
+            if (sprintRepository.existsByNameIgnoreCaseAndProject_Id(request.getName(), existing.getProId())) {
+                throw new ConflictException("A sprint with this name already exists in this project");
+            }
+            existing.setName(request.getName());
+        }
         if (request.getStartDate() != null) existing.setStartDate(request.getStartDate());
         if (request.getEndDate() != null) existing.setEndDate(request.getEndDate());
         if (request.getGoal() != null) existing.setGoal(request.getGoal());
@@ -186,7 +195,7 @@ public class SprintService {
 
         requireConfigureBoard(existing.getProId(), currentUserId);
 
-        List<Task> sprintTasks = taskRepository.findBySprintId(id);
+        List<Task> sprintTasks = taskRepository.findBySprintIdWithScalars(id);
         if (!sprintTasks.isEmpty()) {
             sprintTasks.forEach(task -> task.setSprint(null));
             taskRepository.saveAll(sprintTasks);
@@ -245,7 +254,7 @@ public class SprintService {
         sprint.setStatus(SprintStatus.COMPLETED);
         sprintRepository.save(sprint);
 
-        List<Task> incomplete = taskRepository.findBySprintId(id)
+        List<Task> incomplete = taskRepository.findBySprintIdWithScalars(id)
                 .stream()
                 .filter(t -> !"DONE".equalsIgnoreCase(t.getStatus()))
                 .collect(Collectors.toList());

@@ -5,7 +5,7 @@ import { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PranoraIcon, PranoraLogo } from '@/components/brand/PranoraLogo';
-import { getUserFromToken } from '@/lib/auth';
+import { ensureValidToken } from '@/lib/auth';
 import styles from './page.module.css';
 
 // --- ICONS ---
@@ -229,9 +229,18 @@ export default function Page() {
   const router = useRouter();
 
   useEffect(() => {
-    if (getUserFromToken()) {
-      router.replace('/dashboard');
-    }
+    let isMounted = true;
+
+    const redirectIfAuthenticated = async () => {
+      if (await ensureValidToken()) {
+        if (isMounted) router.replace('/dashboard');
+      }
+    };
+
+    void redirectIfAuthenticated();
+    return () => {
+      isMounted = false;
+    };
   }, [router]);
 
   return (

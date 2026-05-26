@@ -48,6 +48,18 @@ public class LabelService {
     }
 
     @Transactional
+    public Label findOrCreateLabel(Project project, String name, String color) {
+        return labelRepository.findFirstByProjectIdAndNameIgnoreCaseAndColor(project.getId(), name, color)
+                .orElseGet(() -> labelRepository.save(new Label(name, color, project)));
+    }
+
+    @Transactional
+    public Label findOrCreate(String name, String color, Project project) {
+        return labelRepository.findFirstByProjectIdAndNameIgnoreCase(project.getId(), name)
+                .orElseGet(() -> labelRepository.save(new Label(name, color, project)));
+    }
+
+    @Transactional
     public LabelResponseDTO updateLabel(Long id, LabelRequestDTO request, Long currentUserId) {
         Label label = labelRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Label not found"));

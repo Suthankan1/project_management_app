@@ -12,6 +12,8 @@ import java.util.Optional;
 public interface ProjectAccessRepository extends JpaRepository<ProjectAccess, Long> {
     Optional<ProjectAccess> findByProject_IdAndUser_UserId(Long projectId, Long userId);
 
+    void deleteByProject_Id(Long projectId);
+
     // Returns the N most recently accessed projects for a user, newest first
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"project.team"})
     List<ProjectAccess> findByUser_UserIdOrderByLastAccessedAtDesc(Long userId, Pageable pageable);

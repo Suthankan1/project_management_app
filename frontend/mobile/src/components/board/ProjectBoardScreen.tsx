@@ -17,9 +17,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { T, STATUS_MAP, StatusKey } from '../../constants/tokens';
 import {
+  BoardMember,
   BoardLabel,
   BoardTask,
   KanbanBoardColumn,
@@ -50,6 +53,19 @@ function formatDate(dateString?: string | null) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateInput(dateString?: string | null) {
+  if (!dateString) return null;
+  const date = new Date(`${dateString.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function isOverdue(task: BoardTask) {
   if (!task.dueDate || task.status === 'DONE') return false;
   const due = new Date(task.dueDate);
@@ -76,6 +92,25 @@ function labelStyle(label: BoardLabel) {
     borderColor: `${color}30`,
     color,
   };
+}
+
+function BoardBackdrop() {
+  return (
+    <View pointerEvents="none" style={s.backdrop}>
+      <LinearGradient
+        colors={['rgba(21, 93, 252, 0.16)', 'rgba(34, 197, 94, 0.08)', 'rgba(247, 248, 250, 0)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={s.backdropTop}
+      />
+      <LinearGradient
+        colors={['rgba(139, 92, 246, 0.10)', 'rgba(21, 93, 252, 0.04)', 'rgba(247, 248, 250, 0)']}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={s.backdropBottom}
+      />
+    </View>
+  );
 }
 
 function SearchIcon() {
@@ -114,15 +149,40 @@ function TagIcon({ active }: { active: boolean }) {
   );
 }
 
+function CalendarIcon({ color = '#64748B' }: { color?: string }) {
+  return (
+    <Svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M8 2v4" />
+      <Path d="M16 2v4" />
+      <Path d="M3 10h18" />
+      <Path d="M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+    </Svg>
+  );
+}
+
+function MoreVerticalIcon({ color = T.primary }: { color?: string }) {
+  return (
+    <Svg width={21} height={21} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={5} r={2} fill={color} />
+      <Circle cx={12} cy={12} r={2} fill={color} />
+      <Circle cx={12} cy={19} r={2} fill={color} />
+    </Svg>
+  );
+}
+
 function TaskCard({
   task,
+  onEdit,
   onDelete,
+  onDueDatePress,
   onDragEnd,
   onDragStateChange,
   onDragMove,
 }: {
   task: BoardTask;
+  onEdit: (task: BoardTask) => void;
   onDelete: (task: BoardTask) => void;
+  onDueDatePress: (task: BoardTask) => void;
   onDragEnd: (task: BoardTask, dropX: number, translationX: number) => void;
   onDragStateChange: (active: boolean) => void;
   onDragMove: (screenX: number) => void;
@@ -137,6 +197,7 @@ function TaskCard({
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragActiveRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const resetDragState = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
@@ -197,13 +258,41 @@ function TaskCard({
 
   return (
     <Animated.View
-      {...panResponder.panHandlers}
       style={[
         card.card,
         isDragging && card.cardDragging,
         { transform: [...drag.getTranslateTransform(), { scale: isDragging ? 1.03 : 1 }] },
       ]}
     >
+      <TouchableOpacity hitSlop={10} onPress={() => setMenuOpen((open) => !open)} style={card.iconBtn}>
+        <MoreVerticalIcon />
+      </TouchableOpacity>
+      {menuOpen && (
+        <View style={card.taskMenu}>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            style={card.taskMenuItem}
+            onPress={() => {
+              setMenuOpen(false);
+              onEdit(task);
+            }}
+          >
+            <Text style={card.taskMenuText}>Edit task</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            style={card.taskMenuItem}
+            onPress={() => {
+              setMenuOpen(false);
+              onDelete(task);
+            }}
+          >
+            <Text style={[card.taskMenuText, card.taskMenuDeleteText]}>Delete task</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View {...panResponder.panHandlers} style={card.dragSurface}>
         <View style={card.topRow}>
           {priority && task.priority ? (
             <View style={[card.priority, { backgroundColor: priority.bg, borderColor: `${priority.dot}24` }]}>
@@ -212,14 +301,6 @@ function TaskCard({
             </View>
           ) : <View />}
         </View>
-
-        <TouchableOpacity hitSlop={10} onPress={() => onDelete(task)} style={card.iconBtn}>
-          <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-            <Path d="M3 6h18" />
-            <Path d="M8 6V4h8v2" />
-            <Path d="M19 6l-1 14H6L5 6" />
-          </Svg>
-        </TouchableOpacity>
 
         <Text style={card.title} numberOfLines={3}>{task.title}</Text>
 
@@ -238,7 +319,16 @@ function TaskCard({
               <Text style={card.codeText}>{task.storyPoint} pts</Text>
             </View>
           )}
-          {due && <Text style={[card.dueDate, overdue && card.overdue]}>{due}</Text>}
+          <TouchableOpacity
+            activeOpacity={0.78}
+            onPress={() => onDueDatePress(task)}
+            style={[card.duePill, overdue && card.duePillOverdue, !due && card.duePillEmpty]}
+          >
+            <CalendarIcon color={overdue ? '#DC2626' : due ? '#64748B' : T.primary} />
+            <Text style={[card.dueDate, overdue && card.overdue, !due && card.dueDateEmpty]}>
+              {overdue ? 'Overdue' : due || 'Set date'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {labels.length > 0 && (
@@ -271,6 +361,8 @@ function TaskCard({
             </View>
           )}
         </View>
+
+      </View>
     </Animated.View>
   );
 }
@@ -279,6 +371,8 @@ function BoardColumn({
   column,
   tasks,
   onDeleteTask,
+  onEditTask,
+  onDueDatePress,
   onCreateTask,
   onDeleteColumn,
   onDragTask,
@@ -288,6 +382,8 @@ function BoardColumn({
   column: KanbanBoardColumn;
   tasks: BoardTask[];
   onDeleteTask: (task: BoardTask) => void;
+  onEditTask: (task: BoardTask) => void;
+  onDueDatePress: (task: BoardTask) => void;
   onCreateTask: (column: KanbanBoardColumn) => void;
   onDeleteColumn: (column: KanbanBoardColumn) => void;
   onDragTask: (task: BoardTask, column: KanbanBoardColumn, dropX: number, translationX: number) => void;
@@ -340,7 +436,9 @@ function BoardColumn({
             <TaskCard
               key={task.id}
               task={task}
+              onEdit={onEditTask}
               onDelete={onDeleteTask}
+              onDueDatePress={onDueDatePress}
               onDragStateChange={onDragStateChange}
               onDragMove={onDragMove}
               onDragEnd={(draggedTask, dropX, translationX) => onDragTask(draggedTask, column, dropX, translationX)}
@@ -351,9 +449,207 @@ function BoardColumn({
 
       <TouchableOpacity activeOpacity={0.8} onPress={() => onCreateTask(column)} style={columnStyles.addTaskBtn}>
         <PlusIcon color={T.primary} />
-        <Text style={columnStyles.addTaskText}>Add task</Text>
+        <Text style={columnStyles.addTaskText}>Create</Text>
       </TouchableOpacity>
     </View>
+  );
+}
+
+const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+function buildCalendarCells(monthDate: Date) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  const cells: (Date | null)[] = [];
+
+  for (let index = 0; index < firstDay; index += 1) cells.push(null);
+  for (let day = 1; day <= totalDays; day += 1) cells.push(new Date(year, month, day));
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+function DatePickerModal({
+  visible,
+  task,
+  titleText = 'Due date',
+  subtitleText,
+  selectedDate,
+  monthDate,
+  saving,
+  onChangeMonth,
+  onClose,
+  onSelect,
+  onClear,
+}: {
+  visible: boolean;
+  task: BoardTask | null;
+  titleText?: string;
+  subtitleText?: string;
+  selectedDate?: string | null;
+  monthDate: Date;
+  saving: boolean;
+  onChangeMonth: (date: Date) => void;
+  onClose: () => void;
+  onSelect: (date: string) => void;
+  onClear: () => void;
+}) {
+  const activeDate = selectedDate ?? task?.dueDate?.slice(0, 10) ?? null;
+  const today = formatDateInput(new Date());
+  const monthLabel = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const cells = buildCalendarCells(monthDate);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={dateModal.safe}>
+        <View style={dateModal.sheet}>
+          <View style={dateModal.handle} />
+          <View style={dateModal.header}>
+            <View style={dateModal.headerIcon}>
+              <CalendarIcon color="#FFFFFF" />
+            </View>
+            <View style={dateModal.headerText}>
+              <Text style={dateModal.title}>{titleText}</Text>
+              <Text style={dateModal.subtitle} numberOfLines={1}>{subtitleText || task?.title || 'Task'}</Text>
+            </View>
+          </View>
+
+          <View style={dateModal.monthRow}>
+            <TouchableOpacity
+              activeOpacity={0.78}
+              onPress={() => onChangeMonth(new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1))}
+              style={dateModal.monthBtn}
+            >
+              <Text style={dateModal.monthBtnText}>{'<'}</Text>
+            </TouchableOpacity>
+            <Text style={dateModal.monthTitle}>{monthLabel}</Text>
+            <TouchableOpacity
+              activeOpacity={0.78}
+              onPress={() => onChangeMonth(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1))}
+              style={dateModal.monthBtn}
+            >
+              <Text style={dateModal.monthBtnText}>{'>'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={dateModal.weekRow}>
+            {WEEKDAYS.map((day, index) => (
+              <Text key={`${day}-${index}`} style={dateModal.weekText}>{day}</Text>
+            ))}
+          </View>
+
+          <View style={dateModal.dayGrid}>
+            {cells.map((date, index) => {
+              const value = date ? formatDateInput(date) : '';
+              const isSelected = value && value === activeDate;
+              const isToday = value && value === today;
+              return (
+                <TouchableOpacity
+                  key={`${value}-${index}`}
+                  activeOpacity={date ? 0.76 : 1}
+                  disabled={!date || saving}
+                  onPress={() => date && onSelect(value)}
+                  style={[
+                    dateModal.dayCell,
+                    isToday && dateModal.dayToday,
+                    isSelected && dateModal.daySelected,
+                    !date && dateModal.dayEmpty,
+                  ]}
+                >
+                  <Text style={[
+                    dateModal.dayText,
+                    isToday && dateModal.dayTodayText,
+                    isSelected && dateModal.daySelectedText,
+                  ]}>
+                    {date ? date.getDate() : ''}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={dateModal.actions}>
+            <TouchableOpacity activeOpacity={0.78} disabled={saving} onPress={onClear} style={dateModal.clearBtn}>
+              <Text style={dateModal.clearText}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.78} disabled={saving} onPress={onClose} style={dateModal.doneBtn}>
+              <Text style={dateModal.doneText}>{saving ? 'Saving...' : 'Done'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
+function AssigneePickerModal({
+  visible,
+  members,
+  selectedId,
+  onClose,
+  onSelect,
+}: {
+  visible: boolean;
+  members: BoardMember[];
+  selectedId: number | null;
+  onClose: () => void;
+  onSelect: (id: number | null) => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={modal.safe}>
+        <View style={modal.sheet}>
+          <View style={modal.handle} />
+          <Text style={modal.title}>Assignee</Text>
+          <Text style={modal.subtitle}>Choose who owns this task</Text>
+
+          <TouchableOpacity
+            activeOpacity={0.78}
+            style={[modal.option, selectedId === null && modal.optionActive]}
+            onPress={() => {
+              onSelect(null);
+              onClose();
+            }}
+          >
+            <View style={[modal.optionDot, { backgroundColor: selectedId === null ? T.primary : '#CBD5E1' }]} />
+            <Text style={modal.optionText}>Unassigned</Text>
+            {selectedId === null && <Text style={modal.currentText}>Selected</Text>}
+          </TouchableOpacity>
+
+          {members.map((member) => {
+            const active = selectedId === member.userId;
+            return (
+              <TouchableOpacity
+                key={member.userId}
+                activeOpacity={0.78}
+                style={[modal.option, active && modal.optionActive]}
+                onPress={() => {
+                  onSelect(member.userId);
+                  onClose();
+                }}
+              >
+                <View style={[modal.assigneeAvatar, active && modal.assigneeAvatarActive]}>
+                  <Text style={[modal.assigneeAvatarText, active && modal.assigneeAvatarTextActive]}>{initialsFromName(member.name)}</Text>
+                </View>
+                <Text style={modal.optionText} numberOfLines={1}>{member.name}</Text>
+                {active && <Text style={modal.currentText}>Selected</Text>}
+              </TouchableOpacity>
+            );
+          })}
+
+          {members.length === 0 && (
+            <View style={modal.emptyOption}>
+              <Text style={modal.emptyOptionText}>No members found</Text>
+            </View>
+          )}
+
+          <TouchableOpacity activeOpacity={0.8} onPress={onClose} style={modal.secondaryBtn}>
+            <Text style={modal.secondaryText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </Modal>
   );
 }
 
@@ -371,6 +667,7 @@ export default function ProjectBoardScreen({
     board,
     columns,
     tasks,
+    members,
     loading,
     refreshing,
     error,
@@ -378,6 +675,8 @@ export default function ProjectBoardScreen({
     moveTask,
     createTask,
     deleteTask,
+    updateTaskTitle,
+    updateTaskDueDate,
     createColumn,
     deleteColumn,
   } = useProjectBoard(projectId);
@@ -388,9 +687,18 @@ export default function ProjectBoardScreen({
   const [filterSheet, setFilterSheet] = useState<'assignee' | 'priority' | null>(null);
   const [taskTarget, setTaskTarget] = useState<KanbanBoardColumn | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDueDate, setNewTaskDueDate] = useState<string | null>(null);
+  const [newTaskAssigneeId, setNewTaskAssigneeId] = useState<number | null>(null);
   const [newColumnName, setNewColumnName] = useState('');
+  const [editingTask, setEditingTask] = useState<BoardTask | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showColumnModal, setShowColumnModal] = useState(false);
+  const [showCreateDatePicker, setShowCreateDatePicker] = useState(false);
+  const [showAssigneePicker, setShowAssigneePicker] = useState(false);
+  const [dateTask, setDateTask] = useState<BoardTask | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [savingDate, setSavingDate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isCardDragging, setIsCardDragging] = useState(false);
   const fade = useRef(new Animated.Value(0)).current;
@@ -489,23 +797,58 @@ export default function ProjectBoardScreen({
   const openCreateTask = (column: KanbanBoardColumn) => {
     setTaskTarget(column);
     setNewTaskTitle('');
+    setNewTaskDueDate(null);
+    setNewTaskAssigneeId(null);
     setShowTaskModal(true);
+  };
+
+  const openEditTask = (task: BoardTask) => {
+    setEditingTask(task);
+    setEditTaskTitle(task.title);
+  };
+
+  const openDatePicker = (task: BoardTask) => {
+    const parsed = parseDateInput(task.dueDate);
+    setDateTask(task);
+    setCalendarMonth(parsed || new Date());
+  };
+
+  const changeTaskDueDate = async (dueDate: string | null) => {
+    if (!dateTask) return;
+    setSavingDate(true);
+    try {
+      await updateTaskDueDate(dateTask.id, dueDate);
+      setDateTask(null);
+    } catch {
+      Alert.alert('Date not updated', 'The due date could not be changed.');
+    } finally {
+      setSavingDate(false);
+    }
   };
 
   const submitCreateTask = async () => {
     if (!taskTarget || !newTaskTitle.trim()) return;
     setSubmitting(true);
     try {
-      await createTask(newTaskTitle, taskTarget.status);
+      await createTask({
+        title: newTaskTitle,
+        status: taskTarget.status,
+        dueDate: newTaskDueDate,
+        assigneeId: newTaskAssigneeId,
+      });
       setShowTaskModal(false);
       setTaskTarget(null);
       setNewTaskTitle('');
+      setNewTaskDueDate(null);
+      setNewTaskAssigneeId(null);
     } catch {
       Alert.alert('Task not created', 'Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
+
+  const selectedNewTaskAssignee = members.find((member) => member.userId === newTaskAssigneeId);
 
   const submitCreateColumn = async () => {
     if (!newColumnName.trim()) return;
@@ -582,6 +925,20 @@ export default function ProjectBoardScreen({
     ]);
   };
 
+  const submitEditTask = async () => {
+    if (!editingTask || !editTaskTitle.trim()) return;
+    setSubmitting(true);
+    try {
+      await updateTaskTitle(editingTask.id, editTaskTitle);
+      setEditingTask(null);
+      setEditTaskTitle('');
+    } catch {
+      Alert.alert('Task not updated', 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const confirmDeleteColumn = (column: KanbanBoardColumn) => {
     const tasksInColumn = columnTasks[column.status]?.length ?? 0;
     if (tasksInColumn > 0) return;
@@ -609,6 +966,7 @@ export default function ProjectBoardScreen({
   return (
     <SafeAreaView style={s.safe} edges={topOffset ? ['left', 'right'] : ['top', 'left', 'right']}>
       <StatusBar style="dark" />
+      <BoardBackdrop />
 
       <ScrollView
         style={s.scroll}
@@ -617,18 +975,30 @@ export default function ProjectBoardScreen({
         showsVerticalScrollIndicator={false}
       >
         <Animated.View style={[s.hero, { opacity: fade }]}>
+          <View pointerEvents="none" style={s.glassLayer}>
+            <BlurView intensity={28} tint="light" style={StyleSheet.absoluteFill} />
+            <View style={s.glassWash} />
+          </View>
           <View style={s.heroTop}>
-            <View style={s.boardMark}>
+            <LinearGradient
+              colors={[T.primary, '#4D8BFF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.boardMark}
+            >
               <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
                 <Path d="M4 4h5v16H4z" />
                 <Path d="M10.5 4h4.5v11h-4.5z" />
                 <Path d="M16.5 4H20v14h-3.5z" />
               </Svg>
-            </View>
+            </LinearGradient>
             <View style={s.heroTitleWrap}>
               <Text style={s.eyebrow}>KANBAN BOARD</Text>
               <Text style={s.title} numberOfLines={1}>{projectName || board?.name || 'Board'}</Text>
             </View>
+            <TouchableOpacity activeOpacity={0.84} onPress={() => setShowColumnModal(true)} style={s.heroActionBtn}>
+              <PlusIcon color={T.primary} />
+            </TouchableOpacity>
           </View>
 
           <View style={s.progressWrap}>
@@ -717,6 +1087,8 @@ export default function ProjectBoardScreen({
                   column={column}
                   tasks={columnTasks[column.status] || []}
                   onDeleteTask={confirmDeleteTask}
+                  onEditTask={openEditTask}
+                  onDueDatePress={openDatePicker}
                   onCreateTask={openCreateTask}
                   onDeleteColumn={confirmDeleteColumn}
                   onDragTask={handleDragTask}
@@ -784,6 +1156,45 @@ export default function ProjectBoardScreen({
         </SafeAreaView>
       </Modal>
 
+      <DatePickerModal
+        visible={!!dateTask}
+        task={dateTask}
+        monthDate={calendarMonth}
+        saving={savingDate}
+        onChangeMonth={setCalendarMonth}
+        onClose={() => setDateTask(null)}
+        onSelect={changeTaskDueDate}
+        onClear={() => changeTaskDueDate(null)}
+      />
+
+      <DatePickerModal
+        visible={showCreateDatePicker}
+        task={null}
+        titleText="Task due date"
+        subtitleText={newTaskTitle.trim() || 'New task'}
+        selectedDate={newTaskDueDate}
+        monthDate={calendarMonth}
+        saving={false}
+        onChangeMonth={setCalendarMonth}
+        onClose={() => setShowCreateDatePicker(false)}
+        onSelect={(date) => {
+          setNewTaskDueDate(date);
+          setShowCreateDatePicker(false);
+        }}
+        onClear={() => {
+          setNewTaskDueDate(null);
+          setShowCreateDatePicker(false);
+        }}
+      />
+
+      <AssigneePickerModal
+        visible={showAssigneePicker}
+        members={members}
+        selectedId={newTaskAssigneeId}
+        onClose={() => setShowAssigneePicker(false)}
+        onSelect={setNewTaskAssigneeId}
+      />
+
       <Modal visible={showTaskModal} transparent animationType="slide">
         <SafeAreaView style={modal.safe}>
           <View style={modal.sheet}>
@@ -799,10 +1210,66 @@ export default function ProjectBoardScreen({
               editable={!submitting}
               autoFocus
             />
+            <View style={modal.formRow}>
+              <TouchableOpacity
+                activeOpacity={0.78}
+                onPress={() => {
+                  setCalendarMonth(parseDateInput(newTaskDueDate) || new Date());
+                  setShowCreateDatePicker(true);
+                }}
+                style={modal.formPicker}
+              >
+                <CalendarIcon color={newTaskDueDate ? T.primary : '#64748B'} />
+                <View style={modal.formPickerTextWrap}>
+                  <Text style={modal.formPickerLabel}>Due date</Text>
+                  <Text style={[modal.formPickerValue, newTaskDueDate && modal.formPickerValueActive]}>
+                    {newTaskDueDate ? formatDate(newTaskDueDate) : 'Select date'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.78}
+                onPress={() => setShowAssigneePicker(true)}
+                style={modal.formPicker}
+              >
+                <UserIcon active={!!newTaskAssigneeId} />
+                <View style={modal.formPickerTextWrap}>
+                  <Text style={modal.formPickerLabel}>Assignee</Text>
+                  <Text style={[modal.formPickerValue, selectedNewTaskAssignee && modal.formPickerValueActive]} numberOfLines={1}>
+                    {selectedNewTaskAssignee?.name || 'Unassigned'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity activeOpacity={0.85} disabled={submitting || !newTaskTitle.trim()} onPress={submitCreateTask} style={[modal.primaryBtn, (!newTaskTitle.trim() || submitting) && modal.disabled]}>
               {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={modal.primaryText}>Create task</Text>}
             </TouchableOpacity>
             <TouchableOpacity activeOpacity={0.8} onPress={() => setShowTaskModal(false)} style={modal.secondaryBtn}>
+              <Text style={modal.secondaryText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={!!editingTask} transparent animationType="slide">
+        <SafeAreaView style={modal.safe}>
+          <View style={modal.sheet}>
+            <View style={modal.handle} />
+            <Text style={modal.title}>Edit task</Text>
+            <Text style={modal.subtitle}>Update task title</Text>
+            <TextInput
+              style={modal.input}
+              value={editTaskTitle}
+              onChangeText={setEditTaskTitle}
+              placeholder="Task title"
+              placeholderTextColor="#94A3B8"
+              editable={!submitting}
+              autoFocus
+            />
+            <TouchableOpacity activeOpacity={0.85} disabled={submitting || !editTaskTitle.trim()} onPress={submitEditTask} style={[modal.primaryBtn, (!editTaskTitle.trim() || submitting) && modal.disabled]}>
+              {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={modal.primaryText}>Update task</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => setEditingTask(null)} style={modal.secondaryBtn}>
               <Text style={modal.secondaryText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -853,43 +1320,83 @@ const shadow = Platform.select({
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: T.bgSecondary },
-  scroll: { flex: 1, backgroundColor: T.bgSecondary },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#F7F8FA',
+  },
+  backdropTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 330,
+  },
+  backdropBottom: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 260,
+  },
+  scroll: { flex: 1, backgroundColor: 'transparent' },
   scrollContent: { paddingTop: 4 },
   hero: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    gap: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
+    marginHorizontal: 14,
+    marginTop: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.92)',
+    gap: 6,
+    overflow: 'hidden',
+    ...shadow,
   },
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  glassLayer: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  glassWash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.48)',
+  },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   boardMark: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: T.primary,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroTitleWrap: { flex: 1, minWidth: 0 },
-  eyebrow: { fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 1 },
-  title: { fontSize: 20, fontWeight: '900', color: '#0F172A', marginTop: 2 },
-  progressWrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  progressTrack: { flex: 1, height: 6, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
+  eyebrow: { fontSize: 9, fontWeight: '900', color: '#94A3B8', letterSpacing: 0.9 },
+  title: { fontSize: 17, fontWeight: '900', color: '#0F172A', marginTop: 0, letterSpacing: -0.3 },
+  heroActionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    backgroundColor: 'rgba(239, 246, 255, 0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(191, 219, 254, 0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  progressTrack: { flex: 1, height: 4, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 999, backgroundColor: '#22C55E' },
-  progressText: { fontSize: 11, fontWeight: '800', color: '#64748B' },
-  metricsRow: { flexDirection: 'row', gap: 10 },
+  progressText: { fontSize: 10, fontWeight: '800', color: '#64748B' },
+  metricsRow: { flexDirection: 'row', gap: 8 },
   metric: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
-    paddingVertical: 10,
+    paddingVertical: 4,
     alignItems: 'center',
   },
-  metricValue: { fontSize: 20, fontWeight: '900' },
-  metricLabel: { fontSize: 10, fontWeight: '800', color: '#64748B', letterSpacing: 0.6, textTransform: 'uppercase' },
+  metricValue: { fontSize: 16, fontWeight: '900' },
+  metricLabel: { fontSize: 8, fontWeight: '800', color: '#64748B', letterSpacing: 0.5, textTransform: 'uppercase' },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -901,22 +1408,22 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: 14,
-    backgroundColor: '#F8FAFC',
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(248, 250, 252, 0.82)',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(226, 232, 240, 0.78)',
   },
   searchInput: { flex: 1, fontSize: 13, color: '#0F172A', paddingVertical: 0 },
   filterBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'rgba(248, 250, 252, 0.82)',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(226, 232, 240, 0.78)',
   },
   filterBtnActive: {
     backgroundColor: '#EFF6FF',
@@ -933,14 +1440,14 @@ const s = StyleSheet.create({
   errorText: { fontSize: 12, color: '#991B1B', fontWeight: '700' },
   loadingWrap: { paddingVertical: 34, alignItems: 'center', gap: 10 },
   loadingText: { fontSize: 13, color: '#64748B', fontWeight: '700' },
-  boardRow: { paddingHorizontal: 12, paddingTop: 14, gap: 14, overflow: 'visible' },
+  boardRow: { paddingHorizontal: 14, paddingTop: 14, gap: 14, overflow: 'visible' },
   addColumnCard: {
     minHeight: 360,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: '#BFDBFE',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: 'rgba(248, 251, 255, 0.74)',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
@@ -961,14 +1468,15 @@ const s = StyleSheet.create({
 
 const columnStyles = StyleSheet.create({
   card: {
-    backgroundColor: '#F8F9FB',
-    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(226, 232, 240, 0.95)',
+    borderColor: 'rgba(255, 255, 255, 0.88)',
     overflow: 'visible',
     minHeight: 360,
+    ...shadow,
   },
-  accent: { height: 5 },
+  accent: { height: 5, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1015,14 +1523,14 @@ const columnStyles = StyleSheet.create({
   },
   countText: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
   wipText: { color: '#DC2626' },
-  body: { paddingHorizontal: 12, gap: 10, overflow: 'visible' },
+  body: { paddingHorizontal: 12, gap: 8, overflow: 'visible' },
   emptyState: {
     minHeight: 128,
     borderRadius: 14,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: '#CBD5E1',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,
@@ -1048,15 +1556,17 @@ const columnStyles = StyleSheet.create({
 
 const card = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 13,
-    paddingTop: 14,
-    gap: 10,
+    borderColor: 'rgba(226, 232, 240, 0.72)',
+    padding: 8,
+    paddingTop: 9,
     zIndex: 1,
     ...shadow,
+  },
+  dragSurface: {
+    gap: 5,
   },
   cardDragging: {
     borderColor: T.primary,
@@ -1067,14 +1577,14 @@ const card = StyleSheet.create({
       android: { elevation: 24 },
     }),
   },
-  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 24, paddingRight: 34 },
+  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 17, paddingRight: 34 },
   priority: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 2,
     borderRadius: 999,
     borderWidth: 1,
   },
@@ -1084,40 +1594,67 @@ const card = StyleSheet.create({
     position: 'absolute',
     top: 12,
     right: 12,
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    zIndex: 10,
   },
-  title: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 20 },
-  description: { fontSize: 12, color: '#64748B', lineHeight: 17 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  taskMenu: { position: 'absolute', top: 44, right: 12, width: 148, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingVertical: 6, zIndex: 20, ...shadow },
+  taskMenuItem: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 14 },
+  taskMenuText: { fontSize: 13, fontWeight: '800', color: '#0F172A' },
+  taskMenuDeleteText: { color: '#DC2626' },
+  title: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 17 },
+  description: { fontSize: 12, color: '#64748B', lineHeight: 15 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
   codePill: {
     paddingHorizontal: 7,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: 6,
     backgroundColor: '#EEF2FF',
   },
   codeText: { fontSize: 10, fontWeight: '900', color: '#4338CA' },
+  duePill: {
+    minHeight: 21,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  duePillOverdue: {
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+  },
+  duePillEmpty: {
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+  },
   dueDate: { fontSize: 11, fontWeight: '800', color: '#64748B' },
+  dueDateEmpty: { color: T.primary },
   overdue: { color: '#DC2626' },
-  labelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  labelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
   labelPill: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 2,
     borderRadius: 999,
     borderWidth: 1,
     maxWidth: '100%',
   },
   labelText: { fontSize: 10, fontWeight: '900' },
-  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  assigneeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
+  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  assigneeRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1, minWidth: 0 },
   avatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 23,
+    height: 23,
+    borderRadius: 12,
     backgroundColor: T.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1166,6 +1703,30 @@ const modal = StyleSheet.create({
   optionDot: { width: 11, height: 11, borderRadius: 6 },
   optionText: { flex: 1, fontSize: 14, fontWeight: '800', color: '#0F172A' },
   currentText: { fontSize: 11, fontWeight: '900', color: T.primary },
+  assigneeAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  assigneeAvatarActive: {
+    backgroundColor: T.primary,
+  },
+  assigneeAvatarText: { fontSize: 10, fontWeight: '900', color: '#64748B' },
+  assigneeAvatarTextActive: { color: '#FFFFFF' },
+  emptyOption: {
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyOptionText: { fontSize: 13, fontWeight: '800', color: '#94A3B8' },
   input: {
     minHeight: 48,
     borderRadius: 12,
@@ -1176,6 +1737,22 @@ const modal = StyleSheet.create({
     fontSize: 14,
     color: '#0F172A',
   },
+  formRow: { gap: 10 },
+  formPicker: {
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  formPickerTextWrap: { flex: 1, minWidth: 0 },
+  formPickerLabel: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 0.7, textTransform: 'uppercase' },
+  formPickerValue: { fontSize: 13, fontWeight: '900', color: '#64748B', marginTop: 2 },
+  formPickerValueActive: { color: '#0F172A' },
   primaryBtn: {
     minHeight: 48,
     borderRadius: 12,
@@ -1195,4 +1772,108 @@ const modal = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   secondaryText: { fontSize: 14, fontWeight: '900', color: '#64748B' },
+});
+
+const dateModal = StyleSheet.create({
+  safe: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15, 23, 42, 0.38)' },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 22,
+    gap: 14,
+  },
+  handle: {
+    width: 42,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginBottom: 2,
+  },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: T.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerText: { flex: 1, minWidth: 0 },
+  title: { fontSize: 18, fontWeight: '900', color: '#0F172A' },
+  subtitle: { fontSize: 12, fontWeight: '700', color: '#64748B', marginTop: 2 },
+  monthRow: {
+    minHeight: 44,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  monthBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  monthBtnText: { fontSize: 18, fontWeight: '900', color: '#64748B' },
+  monthTitle: { flex: 1, textAlign: 'center', fontSize: 15, fontWeight: '900', color: '#0F172A' },
+  weekRow: { flexDirection: 'row', gap: 6 },
+  weekText: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '900', color: '#94A3B8' },
+  dayGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  dayCell: {
+    width: '13.45%',
+    aspectRatio: 1,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  dayEmpty: {
+    opacity: 0,
+  },
+  dayToday: {
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+  },
+  daySelected: {
+    borderColor: T.primary,
+    backgroundColor: T.primary,
+  },
+  dayText: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
+  dayTodayText: { color: T.primary },
+  daySelectedText: { color: '#FFFFFF' },
+  actions: { flexDirection: 'row', gap: 10 },
+  clearBtn: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearText: { fontSize: 14, fontWeight: '900', color: '#64748B' },
+  doneBtn: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    backgroundColor: T.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doneText: { fontSize: 14, fontWeight: '900', color: '#FFFFFF' },
 });

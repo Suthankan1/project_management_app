@@ -239,7 +239,7 @@ export default function SelectProjectTypeScreen() {
             </View>
             <Text style={styles.headerTitle}>Select Project Type</Text>
             <Text style={styles.headerSub}>
-              Choose the methodology that best fits your team's workflow.
+              {"Choose the methodology that best fits your team's workflow."}
             </Text>
           </View>
         </Animated.View>

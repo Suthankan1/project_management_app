@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/axios';
-import { getValidToken } from '@/lib/auth';
+import { ensureValidToken } from '@/lib/auth';
 import { validatePassword, PASSWORD_REQUIREMENTS } from '@/lib/passwordValidation';
 
 // Exported so the view component can read human-friendly labels and Tailwind colour classes
@@ -32,9 +32,18 @@ export function useRegisterForm() {
 
   // replace() instead of push() so the browser's Back button can't navigate back to the register page after login
   useEffect(() => {
-    if (getValidToken()) {
-      router.replace('/dashboard');
-    }
+    let isMounted = true;
+
+    const redirectIfAuthenticated = async () => {
+      if (await ensureValidToken()) {
+        if (isMounted) router.replace('/dashboard');
+      }
+    };
+
+    void redirectIfAuthenticated();
+    return () => {
+      isMounted = false;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

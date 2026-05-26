@@ -5,11 +5,13 @@ import com.planora.backend.dto.ProjectResponseDTO;
 import com.planora.backend.dto.UpdateProjectDTO;
 import com.planora.backend.dto.ProjectMetricsDTO;
 import com.planora.backend.exception.ConflictException;
+import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.model.*;
 import com.planora.backend.repository.ProjectAccessRepository;
 import com.planora.backend.repository.ProjectFavoriteRepository;
 import com.planora.backend.repository.ProjectRepository;
 import com.planora.backend.repository.SprintRepository;
+import com.planora.backend.repository.SprintboardRepository;
 import com.planora.backend.repository.TaskRepository;
 import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.TeamRepository;
@@ -38,6 +40,7 @@ public class ProjectService {
     private final ProjectAccessRepository projectAccessRepository;
     private final ProjectFavoriteRepository projectFavoriteRepository;
     private final SprintRepository sprintRepository;
+    private final SprintboardRepository sprintboardRepository;
     private final TaskRepository taskRepository;
 
     // Checks whether a project key is already in use.
@@ -340,6 +343,20 @@ public class ProjectService {
     public void deleteProject(Long projectId, Long teamId, Long userId) {
         Project project = findProjectById(projectId);
         validateOwnerPermission(teamId, userId);
+
+        // Detach tasks from sprints first so sprint rows have no dependents.
+        taskRepository.detachSprintsByProjectId(projectId);
+
+        // Delete sprintboards before sprints (sprintboards FK → sprints).
+        sprintRepository.findByProject_Id(projectId).forEach(sprint ->
+                sprintboardRepository.findBySprintId(sprint.getId()).ifPresent(sprintboardRepository::delete));
+
+        // Bulk DELETE bypasses Hibernate flush ordering so sprints are removed
+        // from the DB before the project DELETE is issued.
+        sprintRepository.deleteByProjectId(projectId);
+
+        projectAccessRepository.deleteByProject_Id(projectId);
+        projectFavoriteRepository.deleteByProject(project);
         projectRepository.delete(project);
     }
 
@@ -415,7 +432,7 @@ public class ProjectService {
     public ProjectMetricsDTO getProjectMetrics(Long projectId) {
         Project project = findProjectById(projectId);
 
-        List<Task> allTasks = taskRepository.findByProjectId(projectId);
+        List<Task> allTasks = taskRepository.findByProjectIdWithScalars(projectId);
 
         // Total tasks in the project.
         Long totalTasks = (long) allTasks.size();
@@ -446,7 +463,7 @@ public class ProjectService {
         Long activeSprintId = null;
         if (activeSprint != null) {
             activeSprintId = activeSprint.getId();
-            List<Task> sprintTasksList = taskRepository.findBySprintId(activeSprint.getId());
+            List<Task> sprintTasksList = taskRepository.findBySprintIdWithScalars(activeSprint.getId());
             Long sprintTasks = (long) sprintTasksList.size();
             Long sprintCompleted = sprintTasksList.stream()
                 .filter(task -> "DONE".equalsIgnoreCase(task.getStatus()))
@@ -468,10 +485,10 @@ public class ProjectService {
     private void validateOwnerPermission(Long teamId, Long userId) {
         TeamMember member = teamMemberRepository
                 .findByTeamIdAndUserUserId(teamId, userId)
-                .orElseThrow(() -> new RuntimeException("User is not a member of this team"));
+                .orElseThrow(() -> new ForbiddenException("You are not a member of this project's team"));
 
         if (member.getRole() != TeamRole.OWNER) {
-            throw new RuntimeException("Only PROJECT OWNER can delete this project");
+            throw new ForbiddenException("Only the project owner can delete this project");
         }
     }
 }

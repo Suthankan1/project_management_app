@@ -36,6 +36,7 @@ export default function CreateTaskModal({
   projectId,
 }: CreateTaskModalProps) {
   const [title, setTitle] = useState('');
+  const [titleLength, setTitleLength] = useState(0);
   const [priority, setPriority] = useState('MEDIUM');
   const [assignee, setAssignee] = useState<number | ''>('');
   const [storyPoint, setStoryPoint] = useState(0);
@@ -76,6 +77,7 @@ export default function CreateTaskModal({
 
   const resetForm = () => {
     setTitle('');
+    setTitleLength(0);
     setPriority('MEDIUM');
     setAssignee('');
     setStoryPoint(0);
@@ -135,12 +137,21 @@ export default function CreateTaskModal({
             <label className="text-[13px] font-bold text-[#344054]">TASK TITLE</label>
             <input
               type="text"
+              maxLength={255}
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setTitleLength(e.target.value.length);
+              }}
               placeholder="e.g. Design new landing page"
               className="w-full px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm focus:ring-2 focus:ring-[#155DFC]/20 focus:outline-none transition-all"
               autoFocus
             />
+            {titleLength > 200 && (
+              <p className="text-xs text-amber-500 mt-1">
+                {255 - titleLength} characters remaining
+              </p>
+            )}
             {error && <p className="text-red-500 text-xs font-medium">{error}</p>}
           </div>
 

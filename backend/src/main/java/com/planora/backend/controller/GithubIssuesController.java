@@ -1,0 +1,158 @@
+package com.planora.backend.controller;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.planora.backend.dto.GithubIssueDTO;
+import com.planora.backend.dto.GithubIssueCreateRequestDTO;
+import com.planora.backend.dto.GithubCommentDTO;
+import com.planora.backend.dto.GithubCommentSyncResponseDTO;
+import com.planora.backend.dto.GithubIssueImportRequestDTO;
+import com.planora.backend.dto.GithubIssueImportResponseDTO;
+import com.planora.backend.dto.GithubLabelDTO;
+import com.planora.backend.exception.GithubAuthenticationException;
+import com.planora.backend.model.User;
+import com.planora.backend.model.UserPrincipal;
+import com.planora.backend.repository.UserRepository;
+import com.planora.backend.service.GithubIssueImportService;
+import com.planora.backend.service.GithubIssueCommentSyncService;
+import com.planora.backend.service.GithubIssuesSyncService;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
+
+@Validated
+@RestController
+@RequestMapping("/api/github")
+public class GithubIssuesController {
+
+    @Autowired
+    private GithubIssuesSyncService githubIssuesSyncService;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private GithubIssueImportService githubIssueImportService;
+
+    @Autowired
+    private GithubIssueCommentSyncService githubIssueCommentSyncService;
+
+    @GetMapping("/issues")
+    public ResponseEntity<List<GithubIssueDTO>> getIssues(
+            @RequestParam String repoFullName,
+            @RequestParam(defaultValue = "all")
+            @Pattern(regexp = "open|closed|all", message = "state must be open, closed, or all")
+            String state,
+            @RequestParam(required = false) String label,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        if (currentUser == null) {
+            throw new GithubAuthenticationException("Authentication is required");
+        }
+
+        User user = userRepository.findById(currentUser.getUserId())
+                .orElseThrow(() -> new GithubAuthenticationException("Authenticated user not found"));
+
+        String accessToken = user.getGithubAccessToken();
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new GithubAuthenticationException("GitHub account is not connected");
+        }
+
+        List<GithubIssueDTO> issues = githubIssuesSyncService.syncIssues(repoFullName, accessToken);
+        List<GithubIssueDTO> filteredIssues = issues.stream()
+                .filter(issue -> "all".equals(state) || state.equalsIgnoreCase(issue.getState()))
+                .filter(issue -> label == null || label.isBlank() || hasLabel(issue, label))
+                .toList();
+
+        return ResponseEntity.ok(filteredIssues);
+    }
+
+    @PostMapping("/issues/import")
+    public ResponseEntity<GithubIssueImportResponseDTO> importIssues(
+            @Valid @RequestBody GithubIssueImportRequestDTO request,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        return ResponseEntity.ok(githubIssueImportService.importIssues(request, getCurrentUser(currentUser)));
+    }
+
+    @PostMapping("/issues/create")
+    public ResponseEntity<GithubIssueDTO> createIssue(
+            @Valid @RequestBody GithubIssueCreateRequestDTO request,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        User user = getCurrentUser(currentUser);
+        String accessToken = user.getGithubAccessToken();
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new GithubAuthenticationException("GitHub account is not connected");
+        }
+        GithubIssueDTO createdIssue = githubIssuesSyncService.createIssue(request, accessToken);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdIssue);
+    }
+
+    @GetMapping("/issues/{owner}/{repo}/labels")
+    public ResponseEntity<List<GithubLabelDTO>> getLabels(
+            @PathVariable String owner,
+            @PathVariable String repo,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        User user = getCurrentUser(currentUser);
+        String accessToken = user.getGithubAccessToken();
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new GithubAuthenticationException("GitHub account is not connected");
+        }
+        return ResponseEntity.ok(githubIssuesSyncService.syncLabels(owner + "/" + repo, accessToken));
+    }
+
+    @GetMapping("/issues/{owner}/{repo}/{issueNumber}/comments")
+    public ResponseEntity<List<GithubCommentDTO>> getIssueComments(
+            @PathVariable String owner,
+            @PathVariable String repo,
+            @PathVariable int issueNumber,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        User user = getCurrentUser(currentUser);
+        String accessToken = user.getGithubAccessToken();
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new GithubAuthenticationException("GitHub account is not connected");
+        }
+        return ResponseEntity.ok(githubIssuesSyncService.fetchIssueComments(
+                owner + "/" + repo, issueNumber, accessToken));
+    }
+
+    @PostMapping("/issues/{issueNumber}/sync-comments")
+    public ResponseEntity<GithubCommentSyncResponseDTO> syncIssueComments(
+            @PathVariable int issueNumber,
+            @RequestParam Long projectId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        return ResponseEntity.ok(githubIssueCommentSyncService.syncComments(
+                projectId, issueNumber, getCurrentUser(currentUser)));
+    }
+
+    private boolean hasLabel(GithubIssueDTO issue, String label) {
+        return issue.getLabels() != null && issue.getLabels().stream()
+                .anyMatch(issueLabel -> issueLabel.getName() != null
+                        && issueLabel.getName().equalsIgnoreCase(label));
+    }
+
+    private User getCurrentUser(UserPrincipal currentUser) {
+        if (currentUser == null) {
+            throw new GithubAuthenticationException("Authentication is required");
+        }
+        return userRepository.findById(currentUser.getUserId())
+                .orElseThrow(() -> new GithubAuthenticationException("Authenticated user not found"));
+    }
+}
