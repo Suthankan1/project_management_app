@@ -32,10 +32,13 @@ import com.planora.backend.model.GithubAutomationRule;
 import com.planora.backend.model.GithubTrigger;
 import com.planora.backend.model.KanbanColumn;
 import com.planora.backend.model.Project;
+import com.planora.backend.model.Sprint;
+import com.planora.backend.model.SprintStatus;
 import com.planora.backend.model.Task;
 import com.planora.backend.repository.GithubAutomationRuleRepository;
 import com.planora.backend.repository.KanbanColumnRepository;
 import com.planora.backend.repository.ProjectRepository;
+import com.planora.backend.repository.SprintRepository;
 import com.planora.backend.repository.TaskRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -52,6 +55,7 @@ public class GithubAutomationService {
     private final ProjectRepository projectRepository;
     private final GithubAutomationRuleRepository githubAutomationRuleRepository;
     private final TaskRepository taskRepository;
+    private final SprintRepository sprintRepository;
     private final GithubIssueConversionService githubIssueConversionService;
 
     @EventListener
@@ -98,19 +102,21 @@ public class GithubAutomationService {
     }
 
     @EventListener
+    @Async
     public void onIssueLabeled(IssueLabeledEvent event) {
-        Map<String, Object> context = issueContext(
-                event.getRepoFullName(), event.getIssueNumber(), event.getIssueTitle());
-        executeRulesForTrigger(GithubTrigger.ISSUE_LABELED, context);
+        executeRulesForTrigger(GithubTrigger.ISSUE_LABELED, Map.of(
+                "repoFullName", event.getRepoFullName(),
+                "issueNumber", event.getIssueNumber(),
+                "labelName", event.getLabelName()));
     }
 
     @EventListener
+    @Async
     public void onReleasePublished(ReleasePublishedEvent event) {
-        Map<String, Object> context = eventContext(event.getRepoFullName());
-        context.put("tagName", event.getTagName());
-        context.put("releaseName", event.getReleaseName());
-        context.put("releaseUrl", event.getReleaseUrl());
-        executeRulesForTrigger(GithubTrigger.RELEASE_PUBLISHED, context);
+        executeRulesForTrigger(GithubTrigger.RELEASE_PUBLISHED, Map.of(
+                "repoFullName", event.getRepoFullName(),
+                "tagName", event.getTagName(),
+                "releaseName", event.getReleaseName()));
     }
 
     /**
@@ -186,6 +192,14 @@ public class GithubAutomationService {
     private void moveTaskToColumn(GithubAutomationRule rule, Map<String, Object> context) {
         if (rule.getTrigger() == GithubTrigger.PR_OPENED) {
             moveTaskFromOpenedPR(rule, context);
+            return;
+        }
+        if (rule.getTrigger() == GithubTrigger.ISSUE_LABELED) {
+            moveTaskFromLabeledIssue(rule, context);
+            return;
+        }
+        if (rule.getTrigger() == GithubTrigger.RELEASE_PUBLISHED) {
+            moveActiveSprintTasksForRelease(rule);
             return;
         }
         log.debug("Dispatching GitHub automation action {} for rule {} with context {}",
@@ -287,6 +301,99 @@ public class GithubAutomationService {
         return keyedBranch.find()
                 ? Optional.of(Long.valueOf(keyedBranch.group(1)))
                 : Optional.empty();
+    }
+
+    private void moveTaskFromLabeledIssue(GithubAutomationRule rule, Map<String, Object> context) {
+        Map<String, String> config = rule.getConfig() == null ? Map.of() : rule.getConfig();
+        Project project = rule.getProject();
+        String configuredProjectId = Objects.toString(config.get("projectId"), "").trim();
+        String ruleProjectId = project == null || project.getId() == null
+                ? ""
+                : project.getId().toString();
+        if (configuredProjectId.isBlank() || !configuredProjectId.equals(ruleProjectId)) {
+            log.warn("Skipping issue-labeled automation rule {} because config projectId must match its project",
+                    rule.getId());
+            return;
+        }
+
+        String configuredLabelName = Objects.toString(config.get("labelName"), "").trim();
+        String appliedLabelName = Objects.toString(context.get("labelName"), "").trim();
+        if (configuredLabelName.isBlank() || !configuredLabelName.equalsIgnoreCase(appliedLabelName)) {
+            log.debug("Skipping issue-labeled automation rule {} because applied label '{}' does not match '{}'",
+                    rule.getId(), appliedLabelName, configuredLabelName);
+            return;
+        }
+
+        String targetColumnName = Objects.toString(config.get("targetColumnName"), "").trim();
+        if (targetColumnName.isBlank()) {
+            log.warn("Skipping issue-labeled automation rule {} because targetColumnName is required", rule.getId());
+            return;
+        }
+
+        String repoFullName = Objects.toString(context.get("repoFullName"), "").trim();
+        int issueNumber = ((Number) context.get("issueNumber")).intValue();
+        List<Task> linkedTasks = taskRepository
+                .findByProjectIdAndGithubIssueNumberAndGithubRepoFullNameIgnoreCase(
+                        project.getId(), (long) issueNumber, repoFullName);
+        Optional<KanbanColumn> targetColumn = kanbanColumnRepository
+                .findFirstByKanban_ProjectIdAndNameIgnoreCase(project.getId(), targetColumnName);
+        if (linkedTasks.isEmpty() || targetColumn.isEmpty()) {
+            log.warn("Skipping issue-labeled automation rule {}: linked issue #{} or column '{}' was not found in project {}",
+                    rule.getId(), issueNumber, targetColumnName, project.getId());
+            return;
+        }
+
+        linkedTasks.stream()
+                .map(Task::getId)
+                .filter(Objects::nonNull)
+                .forEach(taskId -> taskService.updateTaskColumn(taskId, targetColumn.get().getId()));
+        log.info("GitHub automation moved task linked to issue #{} in project {} to column '{}'",
+                issueNumber, project.getId(), targetColumnName);
+    }
+
+    private void moveActiveSprintTasksForRelease(GithubAutomationRule rule) {
+        Map<String, String> config = rule.getConfig() == null ? Map.of() : rule.getConfig();
+        Project project = rule.getProject();
+        String configuredProjectId = Objects.toString(config.get("projectId"), "").trim();
+        String ruleProjectId = project == null || project.getId() == null
+                ? ""
+                : project.getId().toString();
+        if (configuredProjectId.isBlank() || !configuredProjectId.equals(ruleProjectId)) {
+            log.warn("Skipping release automation rule {} because config projectId must match its project",
+                    rule.getId());
+            return;
+        }
+
+        boolean onlyCurrentSprint = Boolean.parseBoolean(config.getOrDefault("onlyCurrentSprint", "true"));
+        if (!onlyCurrentSprint) {
+            log.warn("Skipping release automation rule {} because onlyCurrentSprint=false requires a configured sprint or milestone selector",
+                    rule.getId());
+            return;
+        }
+
+        String targetColumnName = Objects.toString(config.getOrDefault("targetColumnName", "Done"), "Done").trim();
+        if (targetColumnName.isBlank()) {
+            targetColumnName = "Done";
+        }
+        final String resolvedTargetColumnName = targetColumnName;
+        Optional<KanbanColumn> targetColumn = kanbanColumnRepository
+                .findFirstByKanban_ProjectIdAndNameIgnoreCase(project.getId(), resolvedTargetColumnName);
+        Optional<Sprint> activeSprint = sprintRepository.findByProject_Id(project.getId()).stream()
+                .filter(sprint -> sprint.getStatus() == SprintStatus.ACTIVE)
+                .findFirst();
+        if (activeSprint.isEmpty() || targetColumn.isEmpty()) {
+            log.warn("Skipping release automation rule {}: active sprint or column '{}' was not found in project {}",
+                    rule.getId(), resolvedTargetColumnName, project.getId());
+            return;
+        }
+
+        List<Task> sprintTasks = taskRepository.findBySprintId(activeSprint.get().getId());
+        sprintTasks.stream()
+                .map(Task::getId)
+                .filter(Objects::nonNull)
+                .forEach(taskId -> taskService.updateTaskColumn(taskId, targetColumn.get().getId()));
+        log.info("GitHub automation moved {} tasks from active sprint {} in project {} to column '{}' for release",
+                sprintTasks.size(), activeSprint.get().getId(), project.getId(), resolvedTargetColumnName);
     }
 
     private void logCIFailedTaskCreation(GithubAutomationRule rule, Map<String, Object> context) {

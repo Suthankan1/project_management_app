@@ -206,7 +206,7 @@ public class GithubNotificationService {
             String issueTitle,
             String action,
             String actorGithubLogin) {
-        notifyIssueEvent(repoFullName, issueNumber, issueTitle, action, actorGithubLogin, "", List.of());
+        notifyIssueEvent(repoFullName, issueNumber, issueTitle, action, actorGithubLogin, "", List.of(), "", "");
     }
 
     public void notifyIssueEvent(
@@ -217,6 +217,19 @@ public class GithubNotificationService {
             String actorGithubLogin,
             String issueBody,
             List<String> labels) {
+        notifyIssueEvent(repoFullName, issueNumber, issueTitle, action, actorGithubLogin, issueBody, labels, "", "");
+    }
+
+    public void notifyIssueEvent(
+            String repoFullName,
+            int issueNumber,
+            String issueTitle,
+            String action,
+            String actorGithubLogin,
+            String issueBody,
+            List<String> labels,
+            String labelName,
+            String labelColor) {
         ensureDependenciesInjected();
         if (repoFullName == null || repoFullName.isBlank() || issueNumber <= 0 || action == null) {
             return;
@@ -281,7 +294,12 @@ public class GithubNotificationService {
                 recipients.values().forEach(recipient ->
                         notificationService.createNotification(recipient, message, link));
                 applicationEventPublisher.publishEvent(new IssueLabeledEvent(
-                        this, normalizedRepoFullName, issueNumber, safeTitle(issueTitle)));
+                        this,
+                        normalizedRepoFullName,
+                        issueNumber,
+                        safeTitle(issueTitle),
+                        safeText(labelName),
+                        safeText(labelColor)));
             }
             case "assigned" -> {
                 String message = "\uD83D\uDCCB You were assigned to issue #" + issueNumber + ": "

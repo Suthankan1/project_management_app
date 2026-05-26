@@ -180,7 +180,9 @@ public class GitHubWebhookController {
                 action,
                 relevantLogin,
                 issue.path("body").asText(""),
-                issueLabels(issue));
+                issueLabels(issue),
+                body.path("label").path("name").asText(""),
+                body.path("label").path("color").asText(""));
         return ResponseEntity.ok("processed");
     }
 

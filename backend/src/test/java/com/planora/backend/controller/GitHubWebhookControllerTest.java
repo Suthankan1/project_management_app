@@ -96,6 +96,19 @@ class GitHubWebhookControllerTest {
               "sender":{"login":"octocat"}
             }
             """;
+    private static final String LABELED_ISSUE_BODY = """
+            {
+              "action":"labeled",
+              "repository":{"full_name":"planora/app"},
+              "issue":{
+                "number":34,
+                "title":"Broken sync",
+                "labels":[{"name":"ready-for-review","color":"5319e7"}]
+              },
+              "sender":{"login":"octocat"},
+              "label":{"name":"ready-for-review","color":"5319e7"}
+            }
+            """;
     private static final String PUBLISHED_RELEASE_BODY = """
             {
               "action":"published",
@@ -216,7 +229,7 @@ class GitHubWebhookControllerTest {
                 .andExpect(content().string("processed"));
 
         verify(githubNotificationService).notifyIssueEvent(
-                "planora/app", 34, "Broken sync", "assigned", "assigned-user", "", java.util.List.of());
+                "planora/app", 34, "Broken sync", "assigned", "assigned-user", "", java.util.List.of(), "", "");
     }
 
     @Test
@@ -236,7 +249,31 @@ class GitHubWebhookControllerTest {
                 "opened",
                 "octocat",
                 "Build fails on main",
-                java.util.List.of("bug", "backend"));
+                java.util.List.of("bug", "backend"),
+                "",
+                "");
+    }
+
+    @Test
+    void webhook_dispatchesLabeledIssueWithAppliedLabel() throws Exception {
+        mockMvc.perform(post("/api/github/webhook")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-GitHub-Event", "issues")
+                        .header("X-Hub-Signature-256", signature(LABELED_ISSUE_BODY))
+                        .content(LABELED_ISSUE_BODY))
+                .andExpect(status().isOk())
+                .andExpect(content().string("processed"));
+
+        verify(githubNotificationService).notifyIssueEvent(
+                "planora/app",
+                34,
+                "Broken sync",
+                "labeled",
+                "octocat",
+                "",
+                java.util.List.of("ready-for-review"),
+                "ready-for-review",
+                "5319e7");
     }
 
     @Test

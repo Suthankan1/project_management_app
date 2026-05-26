@@ -306,7 +306,16 @@ class GithubNotificationServiceTest {
         when(taskRepository.findByProjectIdAndGithubIssueNumber(41L, 34L))
                 .thenReturn(List.of(importedTask));
 
-        githubNotificationService.notifyIssueEvent("planora/app", 34, "Broken sync", "labeled", "octocat");
+        githubNotificationService.notifyIssueEvent(
+                "planora/app",
+                34,
+                "Broken sync",
+                "labeled",
+                "octocat",
+                "",
+                List.of("ready-for-review"),
+                "ready-for-review",
+                "5319e7");
 
         verify(notificationService).createNotification(
                 recipient,
@@ -316,6 +325,9 @@ class GithubNotificationServiceTest {
         verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
         assertEquals("planora/app", eventCaptor.getValue().getRepoFullName());
         assertEquals(34, eventCaptor.getValue().getIssueNumber());
+        assertEquals("Broken sync", eventCaptor.getValue().getIssueTitle());
+        assertEquals("ready-for-review", eventCaptor.getValue().getLabelName());
+        assertEquals("5319e7", eventCaptor.getValue().getLabelColor());
     }
 
     @Test

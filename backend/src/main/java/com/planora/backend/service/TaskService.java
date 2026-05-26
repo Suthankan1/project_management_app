@@ -28,6 +28,7 @@ import com.planora.backend.dto.TaskResponseDTO.SubtaskDTO;
 import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.Comment;
+import com.planora.backend.model.KanbanColumn;
 import com.planora.backend.model.Label;
 import com.planora.backend.model.Milestone;
 import com.planora.backend.model.Priority;
@@ -40,6 +41,7 @@ import com.planora.backend.model.TeamMember;
 import com.planora.backend.model.TeamRole;
 import com.planora.backend.model.User;
 import com.planora.backend.repository.CommentRepository;
+import com.planora.backend.repository.KanbanColumnRepository;
 import com.planora.backend.repository.LabelRepository;
 import com.planora.backend.repository.MilestoneRepository;
 import com.planora.backend.repository.ProjectRepository;
@@ -57,6 +59,9 @@ public class TaskService {
 
     @Autowired
     private TaskRepository taskRepository;
+
+    @Autowired
+    private KanbanColumnRepository kanbanColumnRepository;
 
     @Autowired
     private ProjectRepository projectRepository;
@@ -909,6 +914,17 @@ public class TaskService {
         checkAndAutoCompleteParent(saved, currentUserId);
 
         return getTaskById(saved.getId());
+    }
+
+    @Transactional
+    public void updateTaskColumn(Long taskId, Long columnId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
+        KanbanColumn column = kanbanColumnRepository.findById(columnId)
+                .orElseThrow(() -> new ResourceNotFoundException("Kanban column not found"));
+        task.setKanbanColumn(column);
+        task.setStatus(column.getStatus());
+        taskRepository.save(task);
     }
 
     /**

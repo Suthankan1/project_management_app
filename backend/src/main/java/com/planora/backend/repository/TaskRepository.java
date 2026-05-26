@@ -20,6 +20,9 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     List<Task> findByProjectIdAndGithubIssueNumber(Long projectId, Long githubIssueNumber);
 
+    List<Task> findByProjectIdAndGithubIssueNumberAndGithubRepoFullNameIgnoreCase(
+            Long projectId, Long githubIssueNumber, String githubRepoFullName);
+
     Optional<Task> findByProjectIdAndProjectTaskNumber(Long projectId, Long projectTaskNumber);
 
     @Query("""
