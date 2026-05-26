@@ -13,11 +13,15 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import com.planora.backend.event.CIFailedEvent;
+import com.planora.backend.event.IssueLabeledEvent;
+import com.planora.backend.event.IssueOpenedEvent;
 import com.planora.backend.event.PRMergedEvent;
 import com.planora.backend.model.Project;
+import com.planora.backend.model.Task;
 import com.planora.backend.model.TeamMember;
 import com.planora.backend.model.User;
 import com.planora.backend.repository.ProjectRepository;
+import com.planora.backend.repository.TaskRepository;
 import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.UserRepository;
 
@@ -32,12 +36,13 @@ public class GithubNotificationService {
     private final NotificationService notificationService;
     private final UserRepository userRepository;
     private final ProjectRepository projectRepository;
+    private final TaskRepository taskRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
 
     private void ensureDependenciesInjected() {
         if (notificationService == null || userRepository == null
-                || projectRepository == null || teamMemberRepository == null
+                || projectRepository == null || taskRepository == null || teamMemberRepository == null
                 || applicationEventPublisher == null) {
             throw new IllegalStateException("GitHub notification dependencies were not injected");
         }
@@ -168,7 +173,72 @@ public class GithubNotificationService {
 
     public void notifyIssueEvent(String repoFullName, int issueNumber, String issueTitle, String action, String actorGithubLogin) {
         ensureDependenciesInjected();
-        // Task 111: wire issue-event notifications.
+        if (repoFullName == null || repoFullName.isBlank() || issueNumber <= 0 || action == null) {
+            return;
+        }
+
+        String normalizedRepoFullName = repoFullName.trim();
+        String link = "https://github.com/" + normalizedRepoFullName + "/issues/" + issueNumber;
+
+        switch (action) {
+            case "opened" -> {
+                List<Project> projects = projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName);
+                Set<Long> authorIds = resolveUsersFromGithubLogin(actorGithubLogin).stream()
+                        .map(User::getUserId)
+                        .filter(java.util.Objects::nonNull)
+                        .collect(Collectors.toSet());
+                Map<Long, User> recipients = projectMemberRecipients(projects);
+                authorIds.forEach(recipients::remove);
+
+                String prefix = "\uD83D\uDC1B Issue opened: #" + issueNumber + " ";
+                String message = prefix + safeTitle(issueTitle) + " by @" + safeLogin(actorGithubLogin);
+                recipients.values().forEach(recipient ->
+                        notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                                recipient, message, link, prefix));
+                applicationEventPublisher.publishEvent(new IssueOpenedEvent(
+                        this, normalizedRepoFullName, issueNumber, safeTitle(issueTitle)));
+            }
+            case "closed" -> {
+                List<Project> projects = projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName);
+                String prefix = "\u2705 Issue closed: #" + issueNumber + " ";
+                String message = prefix + safeTitle(issueTitle);
+                projectMemberRecipients(projects).values().forEach(recipient ->
+                        notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                                recipient, message, link, prefix));
+            }
+            case "labeled" -> {
+                List<Project> projects = projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName);
+                Map<Long, User> recipients = new LinkedHashMap<>();
+                for (Project project : projects) {
+                    if (project.getId() == null) {
+                        continue;
+                    }
+                    for (Task task : taskRepository.findByProjectIdAndGithubIssueNumber(
+                            project.getId(), (long) issueNumber)) {
+                        TeamMember assignee = task.getAssignee();
+                        User user = assignee == null ? null : assignee.getUser();
+                        if (user != null && user.getUserId() != null) {
+                            recipients.putIfAbsent(user.getUserId(), user);
+                        }
+                    }
+                }
+
+                String message = "\uD83C\uDFF7 Issue #" + issueNumber + " labeled in GitHub";
+                recipients.values().forEach(recipient ->
+                        notificationService.createNotification(recipient, message, link));
+                applicationEventPublisher.publishEvent(new IssueLabeledEvent(
+                        this, normalizedRepoFullName, issueNumber, safeTitle(issueTitle)));
+            }
+            case "assigned" -> {
+                String message = "\uD83D\uDCCB You were assigned to issue #" + issueNumber + ": "
+                        + safeTitle(issueTitle);
+                resolveUsersFromGithubLogin(actorGithubLogin).forEach(recipient ->
+                        notificationService.createNotification(recipient, message, link));
+            }
+            default -> {
+                // Ignore issue actions that do not produce Planora notifications.
+            }
+        }
     }
 
     public void notifyRelease(String repoFullName, String tagName, String releaseName) {
@@ -195,5 +265,21 @@ public class GithubNotificationService {
 
     private String safeText(String text) {
         return text == null ? "" : text;
+    }
+
+    private Map<Long, User> projectMemberRecipients(List<Project> projects) {
+        Map<Long, User> recipients = new LinkedHashMap<>();
+        for (Project project : projects) {
+            if (project.getTeam() == null || project.getTeam().getId() == null) {
+                continue;
+            }
+            for (TeamMember member : teamMemberRepository.findByTeamId(project.getTeam().getId())) {
+                User user = member.getUser();
+                if (user != null && user.getUserId() != null) {
+                    recipients.putIfAbsent(user.getUserId(), user);
+                }
+            }
+        }
+        return recipients;
     }
 }

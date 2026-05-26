@@ -19,12 +19,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import com.planora.backend.event.CIFailedEvent;
+import com.planora.backend.event.IssueLabeledEvent;
+import com.planora.backend.event.IssueOpenedEvent;
 import com.planora.backend.event.PRMergedEvent;
 import com.planora.backend.model.Project;
+import com.planora.backend.model.Task;
 import com.planora.backend.model.Team;
 import com.planora.backend.model.TeamMember;
 import com.planora.backend.model.User;
 import com.planora.backend.repository.ProjectRepository;
+import com.planora.backend.repository.TaskRepository;
 import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.UserRepository;
 
@@ -39,6 +43,9 @@ class GithubNotificationServiceTest {
 
     @Mock
     private ProjectRepository projectRepository;
+
+    @Mock
+    private TaskRepository taskRepository;
 
     @Mock
     private TeamMemberRepository teamMemberRepository;
@@ -65,8 +72,10 @@ class GithubNotificationServiceTest {
         secondTeam.setId(12L);
 
         firstProject = new Project();
+        firstProject.setId(41L);
         firstProject.setTeam(firstTeam);
         secondProject = new Project();
+        secondProject.setId(42L);
         secondProject.setTeam(secondTeam);
     }
 
@@ -197,6 +206,84 @@ class GithubNotificationServiceTest {
 
         verify(projectRepository, never()).findByGithubRepoFullNameIgnoreCase(any());
         verify(applicationEventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void notifyIssueEvent_openedNotifiesMembersExceptAuthorAndPublishesEvent() {
+        when(userRepository.findByGithubUsernameIgnoreCase("octocat")).thenReturn(List.of(author));
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(firstProject, secondProject));
+        when(teamMemberRepository.findByTeamId(11L)).thenReturn(List.of(member(author), member(recipient)));
+        when(teamMemberRepository.findByTeamId(12L)).thenReturn(List.of(member(recipient)));
+
+        githubNotificationService.notifyIssueEvent("planora/app", 34, "Broken sync", "opened", "octocat");
+
+        String message = "\uD83D\uDC1B Issue opened: #34 Broken sync by @octocat";
+        String link = "https://github.com/planora/app/issues/34";
+        String prefix = "\uD83D\uDC1B Issue opened: #34 ";
+        verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                recipient, message, link, prefix);
+        verify(notificationService, never()).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                author, message, link, prefix);
+
+        ArgumentCaptor<IssueOpenedEvent> eventCaptor = ArgumentCaptor.forClass(IssueOpenedEvent.class);
+        verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals("planora/app", eventCaptor.getValue().getRepoFullName());
+        assertEquals(34, eventCaptor.getValue().getIssueNumber());
+        assertEquals("Broken sync", eventCaptor.getValue().getIssueTitle());
+    }
+
+    @Test
+    void notifyIssueEvent_closedNotifiesAllProjectMembers() {
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(firstProject));
+        when(teamMemberRepository.findByTeamId(11L)).thenReturn(List.of(member(author), member(recipient)));
+
+        githubNotificationService.notifyIssueEvent("planora/app", 34, "Broken sync", "closed", "octocat");
+
+        String message = "\u2705 Issue closed: #34 Broken sync";
+        String link = "https://github.com/planora/app/issues/34";
+        String prefix = "\u2705 Issue closed: #34 ";
+        verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                author, message, link, prefix);
+        verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                recipient, message, link, prefix);
+    }
+
+    @Test
+    void notifyIssueEvent_labeledNotifiesImportedTaskAssigneeAndPublishesEvent() {
+        Task importedTask = new Task();
+        importedTask.setAssignee(member(recipient));
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(firstProject));
+        when(taskRepository.findByProjectIdAndGithubIssueNumber(41L, 34L))
+                .thenReturn(List.of(importedTask));
+
+        githubNotificationService.notifyIssueEvent("planora/app", 34, "Broken sync", "labeled", "octocat");
+
+        verify(notificationService).createNotification(
+                recipient,
+                "\uD83C\uDFF7 Issue #34 labeled in GitHub",
+                "https://github.com/planora/app/issues/34");
+        ArgumentCaptor<IssueLabeledEvent> eventCaptor = ArgumentCaptor.forClass(IssueLabeledEvent.class);
+        verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals("planora/app", eventCaptor.getValue().getRepoFullName());
+        assertEquals(34, eventCaptor.getValue().getIssueNumber());
+    }
+
+    @Test
+    void notifyIssueEvent_assignedTargetsMappedGithubAssigneeOnly() {
+        when(userRepository.findByGithubUsernameIgnoreCase("assigned-user")).thenReturn(List.of(recipient));
+
+        githubNotificationService.notifyIssueEvent(
+                "planora/app", 34, "Broken sync", "assigned", "assigned-user");
+
+        verify(notificationService).createNotification(
+                recipient,
+                "\uD83D\uDCCB You were assigned to issue #34: Broken sync",
+                "https://github.com/planora/app/issues/34");
+        verify(projectRepository, never()).findByGithubRepoFullNameIgnoreCase(any());
+        verify(teamMemberRepository, never()).findByTeamId(any());
     }
 
     private User user(Long id, String username) {

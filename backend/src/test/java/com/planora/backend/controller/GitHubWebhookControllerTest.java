@@ -74,6 +74,15 @@ class GitHubWebhookControllerTest {
               }
             }
             """;
+    private static final String ASSIGNED_ISSUE_BODY = """
+            {
+              "action":"assigned",
+              "repository":{"full_name":"planora/app"},
+              "issue":{"number":34,"title":"Broken sync"},
+              "sender":{"login":"maintainer"},
+              "assignee":{"login":"assigned-user"}
+            }
+            """;
 
     private MockMvc mockMvc;
     private GithubNotificationService githubNotificationService;
@@ -158,6 +167,20 @@ class GitHubWebhookControllerTest {
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void webhook_dispatchesAssignedIssueUsingAssigneeLogin() throws Exception {
+        mockMvc.perform(post("/api/github/webhook")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-GitHub-Event", "issues")
+                        .header("X-Hub-Signature-256", signature(ASSIGNED_ISSUE_BODY))
+                        .content(ASSIGNED_ISSUE_BODY))
+                .andExpect(status().isOk())
+                .andExpect(content().string("processed"));
+
+        verify(githubNotificationService).notifyIssueEvent(
+                "planora/app", 34, "Broken sync", "assigned", "assigned-user");
     }
 
     @Test

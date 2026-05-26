@@ -155,17 +155,24 @@ public class GitHubWebhookController {
 
     private ResponseEntity<String> handleIssue(JsonNode body) {
         JsonNode issue = body.path("issue");
+        String action = body.path("action").asText("");
         String repoFullName = repositoryFullName(body);
         int issueNumber = issue.path("number").asInt(0);
         if (repoFullName.isBlank() || issueNumber <= 0) {
             return ResponseEntity.badRequest().body("Missing issue repository or number");
         }
+        String relevantLogin = "assigned".equals(action)
+                ? loginAt(body, "assignee")
+                : loginAt(body, "sender");
+        if ("assigned".equals(action) && relevantLogin.isBlank()) {
+            relevantLogin = loginAt(issue, "assignee");
+        }
         githubNotificationService.notifyIssueEvent(
                 repoFullName,
                 issueNumber,
                 issue.path("title").asText(""),
-                body.path("action").asText(""),
-                loginAt(body, "sender"));
+                action,
+                relevantLogin);
         return ResponseEntity.ok("processed");
     }
 
