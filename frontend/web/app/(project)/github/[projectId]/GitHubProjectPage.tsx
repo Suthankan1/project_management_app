@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   GitBranch, Globe, Lock, RefreshCw, Search, X, Check, Link2,
   LogOut, User, ExternalLink, GitPullRequest, ChevronDown, AlertCircle, GitCommit,
-  SlidersHorizontal,
+  SlidersHorizontal, Sparkles, Trash2,
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -16,6 +16,7 @@ import { useGithubIssueSocket, type GithubIssueUpdate } from '@/hooks/useGithubI
 import { useGithubTaskBadgeSocket, type GithubTaskBadgeUpdate } from '@/hooks/useGithubTaskBadgeSocket';
 import { StompProvider } from '@/ws/stomp-provider';
 import CIStatusBanner from '@/components/github/CIStatusBanner';
+import AutomationRuleBuilder from '@/components/github/AutomationRuleBuilder';
 import {
   getProjectGitHubRepo,
   setProjectGitHubRepo,
@@ -28,12 +29,17 @@ import {
   fetchPullRequests,
   fetchCommits,
   fetchIssues,
+  fetchGitHubAutomationRules,
+  deleteGitHubAutomationRule,
   type GitHubRepository,
   type GitHubPullRequest,
   type GitHubCommit,
   type GitHubIssue,
   type GitHubUser,
   type ProjectGitHubConnection,
+  type GithubAutomationRule,
+  type GithubAutomationTrigger,
+  type GithubAutomationAction,
 } from '@/services/githubService';
 import IssueCard from '@/components/github/IssueCard';
 import GitHubMark from '@/components/github/GitHubMark';
@@ -58,6 +64,162 @@ function prStatus(pr: GitHubPullRequest): { label: string; color: string; dot: s
   if (pr.merged_at) return { label: 'Merged', color: 'text-purple-700 bg-purple-50 border-purple-200', dot: 'bg-purple-500' };
   if (pr.state === 'closed') return { label: 'Closed', color: 'text-red-700 bg-red-50 border-red-200', dot: 'bg-red-500' };
   return { label: 'Open', color: 'text-green-700 bg-green-50 border-green-200', dot: 'bg-green-500' };
+}
+
+function automationTriggerLabel(trigger: GithubAutomationTrigger): string {
+  switch (trigger) {
+    case 'PR_MERGED':
+      return 'Pull request merged';
+    case 'PR_OPENED':
+      return 'Pull request opened';
+    case 'CI_FAILED':
+      return 'CI failed';
+    case 'ISSUE_OPENED':
+      return 'Issue opened';
+    case 'ISSUE_LABELED':
+      return 'Issue labeled';
+    case 'RELEASE_PUBLISHED':
+      return 'Release published';
+    default:
+      return trigger;
+  }
+}
+
+function automationActionLabel(action: GithubAutomationAction): string {
+  switch (action) {
+    case 'MOVE_TASK_TO_COLUMN':
+      return 'Move task to column';
+    case 'CREATE_TASK':
+      return 'Create task';
+    case 'SEND_NOTIFICATION':
+      return 'Send notification';
+    default:
+      return action;
+  }
+}
+
+function AutomationRulesPanel({
+  rules,
+  loading,
+  error,
+  onCreate,
+  onDelete,
+  onRefresh,
+}: {
+  rules: GithubAutomationRule[];
+  loading: boolean;
+  error: string | null;
+  onCreate: () => void;
+  onDelete: (ruleId: number) => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-900 text-white">
+            <Sparkles size={16} />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Automation rules</h3>
+            <p className="text-xs text-slate-500">Create GitHub-backed automations for this project.</p>
+          </div>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            Refresh
+          </button>
+          <button
+            type="button"
+            onClick={onCreate}
+            className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-800"
+          >
+            Create rule
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+          <AlertCircle size={15} className="mt-0.5 shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
+
+      {loading && <div className="mt-4 h-28 animate-pulse rounded-2xl bg-slate-100" />}
+
+      {!loading && !error && rules.length === 0 && (
+        <div className="mt-4 flex flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+          <Sparkles size={20} className="text-slate-300" />
+          <p className="text-sm font-semibold text-slate-700">No automation rules yet</p>
+          <p className="max-w-md text-xs text-slate-500">Create a rule to automate GitHub events into task updates, column moves, or notifications.</p>
+        </div>
+      )}
+
+      {!loading && !error && rules.length > 0 && (
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {rules.map((rule) => {
+            const summary =
+              rule.action === 'MOVE_TASK_TO_COLUMN'
+                ? rule.config.targetColumnName
+                  ? `Moves tasks to ${rule.config.targetColumnName}`
+                  : 'Moves tasks to a column'
+                : rule.action === 'CREATE_TASK'
+                  ? [rule.config.taskTitle, rule.config.priority ? `priority ${rule.config.priority.toLowerCase()}` : null, rule.config.labelName ? `label ${rule.config.labelName}` : null]
+                      .filter(Boolean)
+                      .join(' • ') || 'Creates a task'
+                  : 'Sends a notification';
+
+            const triggerDetail =
+              rule.trigger === 'ISSUE_LABELED' && rule.config.labelName
+                ? `Label: ${rule.config.labelName}`
+                : rule.trigger === 'ISSUE_OPENED' && rule.config.onlyIfLabeled
+                  ? `Only if labeled ${rule.config.onlyIfLabeled}`
+                  : null;
+
+            return (
+              <div key={rule.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-500 shadow-sm">
+                    <Sparkles size={16} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                        {automationTriggerLabel(rule.trigger)}
+                      </span>
+                      <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white">
+                        {automationActionLabel(rule.action)}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-slate-900">{summary}</p>
+                    {triggerDetail && <p className="mt-1 text-xs text-slate-500">{triggerDetail}</p>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Delete this automation rule?')) {
+                        onDelete(rule.id);
+                      }
+                    }}
+                    className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-white hover:text-red-600"
+                    aria-label="Delete automation rule"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Disconnected state ────────────────────────────────────────────────────────
@@ -621,6 +783,12 @@ function ConnectedDashboard({
   onLogout,
   onChangeRepo,
   onPRUpdate,
+  automationRules,
+  automationRulesLoading,
+  automationRulesError,
+  onCreateAutomationRule,
+  onDeleteAutomationRule,
+  onRefreshAutomationRules,
 }: {
   projectId: string;
   connection: ProjectGitHubConnection;
@@ -636,6 +804,12 @@ function ConnectedDashboard({
   onLogout: () => void;
   onChangeRepo: () => void;
   onPRUpdate: (update: GithubPRUpdate) => void;
+  automationRules: GithubAutomationRule[];
+  automationRulesLoading: boolean;
+  automationRulesError: string | null;
+  onCreateAutomationRule: () => void;
+  onDeleteAutomationRule: (ruleId: number) => void;
+  onRefreshAutomationRules: () => void;
 }) {
   type LiveNotice = {
     id: string;
@@ -733,6 +907,15 @@ function ConnectedDashboard({
 
       {/* ── Two-column content ──────────────────────────────────────────── */}
       <CIStatusBanner update={latestCIUpdate} repoFullName={connection.repoFullName} />
+
+      <AutomationRulesPanel
+        rules={automationRules}
+        loading={automationRulesLoading}
+        error={automationRulesError}
+        onCreate={onCreateAutomationRule}
+        onDelete={onDeleteAutomationRule}
+        onRefresh={onRefreshAutomationRules}
+      />
 
       <AnimatePresence>
         {newPRNotice && (
@@ -967,6 +1150,10 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   const [commitError, setCommitError] = useState<string | null>(null);
   const [issueError, setIssueError] = useState<string | null>(null);
   const [socketToken, setSocketToken] = useState<string | null>(null);
+  const [automationRules, setAutomationRules] = useState<GithubAutomationRule[]>([]);
+  const [automationRulesLoading, setAutomationRulesLoading] = useState(false);
+  const [automationRulesError, setAutomationRulesError] = useState<string | null>(null);
+  const [showAutomationBuilder, setShowAutomationBuilder] = useState(false);
 
   // Repo modal state
   const [showModal, setShowModal] = useState(false);
@@ -1021,6 +1208,31 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   useEffect(() => {
     if (connection) void loadData(connection);
   }, [connection, loadData]);
+
+  const loadAutomationRules = useCallback(async () => {
+    if (!connection) return;
+
+    setAutomationRulesLoading(true);
+    setAutomationRulesError(null);
+
+    try {
+      const rules = await fetchGitHubAutomationRules(projectId);
+      setAutomationRules(rules);
+    } catch (error) {
+      setAutomationRulesError(error instanceof Error ? error.message : 'Failed to load automation rules');
+    } finally {
+      setAutomationRulesLoading(false);
+    }
+  }, [connection, projectId]);
+
+  useEffect(() => {
+    if (connection) {
+      void loadAutomationRules();
+    } else {
+      setAutomationRules([]);
+      setAutomationRulesError(null);
+    }
+  }, [connection, loadAutomationRules]);
 
   const loadRepos = useCallback(async () => {
     const token = getGitHubToken();
@@ -1091,6 +1303,23 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     setUser(null);
     setPRs([]);
     setCommits([]);
+    setAutomationRules([]);
+    setAutomationRulesError(null);
+    setShowAutomationBuilder(false);
+  };
+
+  const handleAutomationRuleCreated = (rule: GithubAutomationRule) => {
+    setAutomationRules((current) => [rule, ...current.filter((existing) => existing.id !== rule.id)]);
+  };
+
+  const handleDeleteAutomationRule = async (ruleId: number) => {
+    try {
+      await deleteGitHubAutomationRule(projectId, ruleId);
+      setAutomationRules((current) => current.filter((rule) => rule.id !== ruleId));
+    } catch (error) {
+      console.error('Failed to delete GitHub automation rule:', error);
+      setAutomationRulesError(error instanceof Error ? error.message : 'Failed to delete automation rule');
+    }
   };
 
   const handlePRUpdate = useCallback(async (update: GithubPRUpdate) => {
@@ -1142,6 +1371,12 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
       onLogout={() => void handleLogout()}
       onChangeRepo={handleOpenModal}
       onPRUpdate={(update) => void handlePRUpdate(update)}
+      automationRules={automationRules}
+      automationRulesLoading={automationRulesLoading}
+      automationRulesError={automationRulesError}
+      onCreateAutomationRule={() => setShowAutomationBuilder(true)}
+      onDeleteAutomationRule={(ruleId) => void handleDeleteAutomationRule(ruleId)}
+      onRefreshAutomationRules={() => void loadAutomationRules()}
     />
   ) : null;
 
@@ -1168,6 +1403,16 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
             onSelect={handleSelectRepo}
             onClose={() => { setShowModal(false); setRepoSearch(''); }}
             onRefresh={() => void loadRepos()}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showAutomationBuilder && connection && (
+          <AutomationRuleBuilder
+            projectId={projectId}
+            onCreated={handleAutomationRuleCreated}
+            onClose={() => setShowAutomationBuilder(false)}
           />
         )}
       </AnimatePresence>

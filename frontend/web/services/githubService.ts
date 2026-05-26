@@ -81,6 +81,27 @@ export interface ProjectGitHubConnection {
   connectedAt: string
 }
 
+export type GithubAutomationTrigger =
+  | 'PR_MERGED'
+  | 'PR_OPENED'
+  | 'CI_FAILED'
+  | 'ISSUE_OPENED'
+  | 'ISSUE_LABELED'
+  | 'RELEASE_PUBLISHED'
+
+export type GithubAutomationAction =
+  | 'MOVE_TASK_TO_COLUMN'
+  | 'CREATE_TASK'
+  | 'SEND_NOTIFICATION'
+
+export interface GithubAutomationRule {
+  id: number
+  projectId: number
+  trigger: GithubAutomationTrigger
+  action: GithubAutomationAction
+  config: Record<string, string>
+}
+
 interface GitHubApiIssue {
   id: number
   number: number
@@ -310,4 +331,25 @@ export function setProjectGitHubRepo(projectId: string | number, repo: GitHubRep
 export function clearProjectGitHubRepo(projectId: string | number): void {
   if (typeof window === 'undefined') return
   localStorage.removeItem(`github_project_${projectId}`)
+}
+
+export async function fetchGitHubAutomationRules(projectId: string | number): Promise<GithubAutomationRule[]> {
+  const response = await api.get(`/api/projects/${projectId}/automations/github`)
+  return response.data || []
+}
+
+export async function createGitHubAutomationRule(
+  projectId: string | number,
+  payload: {
+    trigger: GithubAutomationTrigger
+    action: GithubAutomationAction
+    config: Record<string, string>
+  },
+): Promise<GithubAutomationRule> {
+  const response = await api.post(`/api/projects/${projectId}/automations/github`, payload)
+  return response.data
+}
+
+export async function deleteGitHubAutomationRule(projectId: string | number, ruleId: number): Promise<void> {
+  await api.delete(`/api/projects/${projectId}/automations/github/${ruleId}`)
 }
