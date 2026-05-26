@@ -43,7 +43,7 @@ export default function LoginScreen() {
   useEffect(() => {
     Animated.spring(cardAnim, {
       toValue: 1,
-      useNativeDriver: Platform.OS !== 'web',
+      useNativeDriver: true,
       tension: 60,
       friction: 10,
       delay: 80,
@@ -56,7 +56,7 @@ export default function LoginScreen() {
       toValue: 0,
       tension: 200,
       friction: 20,
-      useNativeDriver: Platform.OS !== 'web',
+      useNativeDriver: true,
     }).start();
   }, []);
 

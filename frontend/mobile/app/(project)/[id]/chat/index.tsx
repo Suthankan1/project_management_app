@@ -23,14 +23,12 @@ type ChatScreenContentProps = {
 };
 
 export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenContentProps) {
-interface ReactionTarget {
-  message: ChatMessage;
-  anchorY: number;
-  isMe: boolean;
-}
+  interface ReactionTarget {
+    message: ChatMessage;
+    anchorY: number;
+    isMe: boolean;
+  }
 
-export default function ChatScreen() {
-  const { id: projectId } = useLocalSearchParams<{ id: string }>();
   const [showSidebar, setShowSidebar] = useState(true);
   const [showSearch, setShowSearch]   = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
