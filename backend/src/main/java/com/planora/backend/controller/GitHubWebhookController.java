@@ -137,7 +137,11 @@ public class GitHubWebhookController {
 
         switch (action) {
             case "opened" -> githubNotificationService.notifyPROpened(
-                    repoFullName, prNumber, title, loginAt(pullRequest, "user"));
+                    repoFullName,
+                    prNumber,
+                    title,
+                    loginAt(pullRequest, "user"),
+                    pullRequest.path("head").path("ref").asText(""));
             case "closed" -> {
                 if (pullRequest.path("merged").asBoolean(false)) {
                     githubNotificationService.notifyPRMerged(

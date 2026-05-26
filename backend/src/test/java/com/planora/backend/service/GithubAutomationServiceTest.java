@@ -19,13 +19,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.planora.backend.dto.GithubAutomationRuleRequestDTO;
 import com.planora.backend.dto.GithubAutomationRuleResponseDTO;
 import com.planora.backend.event.PRMergedEvent;
+import com.planora.backend.event.PROpenedEvent;
 import com.planora.backend.model.GithubAction;
 import com.planora.backend.model.GithubAutomationRule;
 import com.planora.backend.model.GithubTrigger;
+import com.planora.backend.model.KanbanColumn;
 import com.planora.backend.model.Project;
+import com.planora.backend.model.Task;
 import com.planora.backend.repository.GithubAutomationRuleRepository;
 import com.planora.backend.repository.KanbanColumnRepository;
 import com.planora.backend.repository.ProjectRepository;
+import com.planora.backend.repository.TaskRepository;
 
 @ExtendWith(MockitoExtension.class)
 class GithubAutomationServiceTest {
@@ -45,6 +49,9 @@ class GithubAutomationServiceTest {
     @Mock
     private GithubAutomationRuleRepository ruleRepository;
 
+    @Mock
+    private TaskRepository taskRepository;
+
     private GithubAutomationService automationService;
 
     @BeforeEach
@@ -54,7 +61,8 @@ class GithubAutomationServiceTest {
                 kanbanColumnRepository,
                 notificationService,
                 projectRepository,
-                ruleRepository);
+                ruleRepository,
+                taskRepository);
     }
 
     @Test
@@ -128,5 +136,74 @@ class GithubAutomationServiceTest {
         automationService.deleteRule(41L, 9L);
 
         verify(ruleRepository).delete(rule);
+    }
+
+    @Test
+    void prOpenedMovesReferencedProjectTaskToConfiguredColumn() {
+        Project project = new Project();
+        project.setId(41L);
+        project.setProjectKey("PLN");
+        GithubAutomationRule rule = new GithubAutomationRule(
+                1L,
+                project,
+                GithubTrigger.PR_OPENED,
+                GithubAction.MOVE_TASK_TO_COLUMN,
+                Map.of("columnName", "In Review"));
+        Task task = new Task();
+        task.setProjectTaskNumber(123L);
+        KanbanColumn column = new KanbanColumn();
+        column.setName("In Review");
+        column.setStatus("IN_REVIEW");
+
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(project));
+        when(ruleRepository.findByProject_IdInAndTrigger(List.of(41L), GithubTrigger.PR_OPENED))
+                .thenReturn(List.of(rule));
+        when(taskRepository.findByProjectIdAndProjectTaskNumber(41L, 123L))
+                .thenReturn(Optional.of(task));
+        when(kanbanColumnRepository.findFirstByKanban_ProjectIdAndNameIgnoreCase(41L, "In Review"))
+                .thenReturn(Optional.of(column));
+
+        automationService.onPROpened(new PROpenedEvent(
+                this,
+                "planora/app",
+                17,
+                "Improve sync",
+                "octocat",
+                "feature-planora-123-review"));
+
+        assertEquals(column, task.getKanbanColumn());
+        assertEquals("IN_REVIEW", task.getStatus());
+        verify(taskRepository).save(task);
+    }
+
+    @Test
+    void prOpenedAcceptsTaskSlashBranchReference() {
+        Project project = new Project();
+        project.setId(41L);
+        GithubAutomationRule rule = new GithubAutomationRule(
+                1L,
+                project,
+                GithubTrigger.PR_OPENED,
+                GithubAction.MOVE_TASK_TO_COLUMN,
+                Map.of("column", "In Review"));
+        Task task = new Task();
+        task.setProjectTaskNumber(123L);
+        KanbanColumn column = new KanbanColumn();
+        column.setStatus("IN_REVIEW");
+
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(project));
+        when(ruleRepository.findByProject_IdInAndTrigger(List.of(41L), GithubTrigger.PR_OPENED))
+                .thenReturn(List.of(rule));
+        when(taskRepository.findByProjectIdAndProjectTaskNumber(41L, 123L))
+                .thenReturn(Optional.of(task));
+        when(kanbanColumnRepository.findFirstByKanban_ProjectIdAndNameIgnoreCase(41L, "In Review"))
+                .thenReturn(Optional.of(column));
+
+        automationService.onPROpened(new PROpenedEvent(
+                this, "planora/app", 17, "Improve sync", "octocat", "feature/task/123-review"));
+
+        verify(taskRepository).save(task);
     }
 }

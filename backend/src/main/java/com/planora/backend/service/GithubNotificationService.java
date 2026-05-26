@@ -19,6 +19,7 @@ import com.planora.backend.event.CIFailedEvent;
 import com.planora.backend.event.IssueLabeledEvent;
 import com.planora.backend.event.IssueOpenedEvent;
 import com.planora.backend.event.PRMergedEvent;
+import com.planora.backend.event.PROpenedEvent;
 import com.planora.backend.event.ReleasePublishedEvent;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Task;
@@ -53,7 +54,12 @@ public class GithubNotificationService {
         }
     }
 
-    public void notifyPROpened(String repoFullName, int prNumber, String prTitle, String authorGithubLogin) {
+    public void notifyPROpened(
+            String repoFullName,
+            int prNumber,
+            String prTitle,
+            String authorGithubLogin,
+            String branch) {
         ensureDependenciesInjected();
         if (repoFullName == null || repoFullName.isBlank() || prNumber <= 0) {
             return;
@@ -87,6 +93,14 @@ public class GithubNotificationService {
                         recipient, message, link, prefix));
         broadcastPRUpdate(projects, new GithubPRUpdatePayload(
                 "opened", prNumber, safeTitle(prTitle), link, safeLogin(authorGithubLogin)));
+
+        applicationEventPublisher.publishEvent(new PROpenedEvent(
+                this,
+                normalizedRepoFullName,
+                prNumber,
+                safeTitle(prTitle),
+                safeLogin(authorGithubLogin),
+                safeText(branch)));
     }
 
     public void notifyPRMerged(String repoFullName, int prNumber, String prTitle, String mergerGithubLogin) {

@@ -26,6 +26,7 @@ import com.planora.backend.event.CIFailedEvent;
 import com.planora.backend.event.IssueLabeledEvent;
 import com.planora.backend.event.IssueOpenedEvent;
 import com.planora.backend.event.PRMergedEvent;
+import com.planora.backend.event.PROpenedEvent;
 import com.planora.backend.event.ReleasePublishedEvent;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Task;
@@ -95,7 +96,8 @@ class GithubNotificationServiceTest {
         when(teamMemberRepository.findByTeamId(11L)).thenReturn(List.of(member(author), member(recipient)));
         when(teamMemberRepository.findByTeamId(12L)).thenReturn(List.of(member(recipient)));
 
-        githubNotificationService.notifyPROpened("planora/app", 17, "Improve sync", "octocat");
+        githubNotificationService.notifyPROpened(
+                "planora/app", 17, "Improve sync", "octocat", "feature/planora-123-review");
 
         String message = "\uD83D\uDD00 PR opened: #17 Improve sync by @octocat";
         String link = "https://github.com/planora/app/pull/17";
@@ -108,16 +110,27 @@ class GithubNotificationServiceTest {
                 "opened", 17, "Improve sync", link, "octocat");
         verify(githubEventBroadcaster).broadcastPRUpdate(41L, updatePayload);
         verify(githubEventBroadcaster).broadcastPRUpdate(42L, updatePayload);
+
+        ArgumentCaptor<PROpenedEvent> eventCaptor = ArgumentCaptor.forClass(PROpenedEvent.class);
+        verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+        PROpenedEvent event = eventCaptor.getValue();
+        assertSame(githubNotificationService, event.getSource());
+        assertEquals("planora/app", event.getRepoFullName());
+        assertEquals(17, event.getPrNumber());
+        assertEquals("Improve sync", event.getPrTitle());
+        assertEquals("octocat", event.getAuthorLogin());
+        assertEquals("feature/planora-123-review", event.getBranch());
     }
 
     @Test
     void notifyPROpened_ignoresInvalidRepositoryInput() {
-        githubNotificationService.notifyPROpened(" ", 17, "Improve sync", "octocat");
+        githubNotificationService.notifyPROpened(" ", 17, "Improve sync", "octocat", "task/123");
 
         verify(projectRepository, never()).findByGithubRepoFullNameIgnoreCase(org.mockito.ArgumentMatchers.anyString());
         verify(notificationService, never()).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+        verify(applicationEventPublisher, never()).publishEvent(any());
     }
 
     @Test

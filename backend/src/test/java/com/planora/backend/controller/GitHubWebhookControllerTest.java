@@ -32,7 +32,7 @@ class GitHubWebhookControllerTest {
             {
               "action":"opened",
               "repository":{"full_name":"planora/app"},
-              "pull_request":{"number":17,"title":"Improve sync","user":{"login":"octocat"}}
+              "pull_request":{"number":17,"title":"Improve sync","user":{"login":"octocat"},"head":{"ref":"feature/planora-123-review"}}
             }
             """;
     private static final String MERGED_PR_BODY = """
@@ -131,7 +131,8 @@ class GitHubWebhookControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string("processed"));
 
-        verify(githubNotificationService).notifyPROpened("planora/app", 17, "Improve sync", "octocat");
+        verify(githubNotificationService).notifyPROpened(
+                "planora/app", 17, "Improve sync", "octocat", "feature/planora-123-review");
     }
 
     @Test
@@ -249,6 +250,7 @@ class GitHubWebhookControllerTest {
         verify(githubNotificationService, never()).notifyPROpened(
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString());
     }
