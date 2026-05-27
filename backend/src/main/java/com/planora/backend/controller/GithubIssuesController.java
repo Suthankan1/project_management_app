@@ -10,6 +10,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -83,9 +84,11 @@ public class GithubIssuesController {
     @PostMapping("/issues/import")
     public ResponseEntity<GithubIssueImportResponseDTO> importIssues(
             @Valid @RequestBody GithubIssueImportRequestDTO request,
+            @RequestHeader(value = "X-GitHub-Token", required = false) String githubToken,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        return ResponseEntity.ok(githubIssueImportService.importIssues(request, getCurrentUser(currentUser)));
+        return ResponseEntity.ok(githubIssueImportService.importIssues(
+                request, getCurrentUser(currentUser), githubToken));
     }
 
     @PostMapping("/issues/create")

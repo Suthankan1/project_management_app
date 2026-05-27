@@ -165,12 +165,16 @@ class GithubIssuesControllerTest {
     @Test
     void importIssues_returnsImportedAndSkippedTaskResults() throws Exception {
         when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
-        when(githubIssueImportService.importIssues(any(), org.mockito.ArgumentMatchers.eq(userEntity)))
+        when(githubIssueImportService.importIssues(
+                any(),
+                org.mockito.ArgumentMatchers.eq(userEntity),
+                org.mockito.ArgumentMatchers.eq("browser-token")))
                 .thenReturn(new GithubIssueImportResponseDTO(List.of(101L, 102L), List.of(3)));
 
         mockMvc.perform(post("/api/github/issues/import")
                         .with(user(principal))
                         .with(csrf())
+                        .header("X-GitHub-Token", "browser-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(java.util.Map.of(
                                 "projectId", 10L,

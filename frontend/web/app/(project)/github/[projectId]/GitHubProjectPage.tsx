@@ -18,6 +18,7 @@ import { StompProvider } from '@/ws/stomp-provider';
 import CIStatusBanner from '@/components/github/CIStatusBanner';
 import GitHubAutomationsPanel from '@/components/github/GitHubAutomationsPanel';
 import AutomationRuleBuilder from '@/components/github/AutomationRuleBuilder';
+import ImportIssueModal from '@/components/github/ImportIssueModal';
 import {
   getProjectGitHubRepo,
   setProjectGitHubRepo,
@@ -457,55 +458,9 @@ function SkeletonList() {
 }
 
 // ── Connected dashboard ───────────────────────────────────────────────────────
-function IssueImportModal({ issue, onClose }: { issue: GitHubIssue; onClose: () => void }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[500] flex items-center justify-center p-4"
-      style={{ background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)' }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-[0_24px_80px_rgba(0,0,0,0.18)]"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-outfit font-semibold text-slate-400">Import GitHub issue</p>
-            <h3 className="mt-1 text-base font-outfit font-bold text-slate-800">
-              #{issue.number} {issue.title}
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X size={16} />
-          </button>
-        </div>
-        <p className="mt-4 text-sm font-outfit text-slate-500">
-          Choose import options and create the Planora task in the import workflow.
-        </p>
-        <div className="mt-5 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-outfit font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-          >
-            Close
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-}
-
 function IssuesPanel({
+  projectId,
+  repoFullName,
   issues,
   loading,
   error,
@@ -513,6 +468,8 @@ function IssuesPanel({
   onRequireLogin,
   onRefresh,
 }: {
+  projectId: string;
+  repoFullName: string;
   issues: GitHubIssue[];
   loading: boolean;
   error: string | null;
@@ -521,7 +478,7 @@ function IssuesPanel({
   onRefresh: () => void;
 }) {
   const [selectedIssue, setSelectedIssue] = useState<GitHubIssue | null>(null);
-  const [importedIssueNumbers] = useState<Set<number>>(() => new Set());
+  const [importedIssueNumbers, setImportedIssueNumbers] = useState<Set<number>>(() => new Set());
 
   useEffect(() => {
     onCountChange(issues.length);
@@ -608,7 +565,18 @@ function IssuesPanel({
       )}
 
       <AnimatePresence>
-        {selectedIssue && <IssueImportModal issue={selectedIssue} onClose={() => setSelectedIssue(null)} />}
+        {selectedIssue && (
+          <ImportIssueModal
+            issue={selectedIssue}
+            projectId={projectId}
+            repoFullName={repoFullName}
+            onSuccess={() => {
+              setImportedIssueNumbers(current => new Set(current).add(selectedIssue.number));
+              setSelectedIssue(null);
+            }}
+            onClose={() => setSelectedIssue(null)}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
@@ -983,6 +951,8 @@ function ConnectedDashboard({
 
         <div className={activeTab === 'issues' ? '' : 'hidden'}>
           <IssuesPanel
+            projectId={projectId}
+            repoFullName={connection.repoFullName}
             issues={issues}
             loading={loading}
             error={issueError}
