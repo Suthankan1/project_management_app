@@ -31,6 +31,7 @@ import {
   fetchPullRequests,
   fetchCommits,
   fetchIssues,
+  fetchImportedGitHubIssueNumbers,
   fetchGitHubAutomationRules,
   fetchGitHubAutomationLogs,
   deleteGitHubAutomationRule,
@@ -483,6 +484,24 @@ function IssuesPanel({
   useEffect(() => {
     onCountChange(issues.length);
   }, [issues, onCountChange]);
+
+  useEffect(() => {
+    let active = true;
+
+    void fetchImportedGitHubIssueNumbers(projectId, repoFullName)
+      .then(issueNumbers => {
+        if (active) {
+          setImportedIssueNumbers(current => new Set([...current, ...issueNumbers]));
+        }
+      })
+      .catch(() => {
+        // The issue list remains usable when linked task metadata is unavailable.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [projectId, repoFullName]);
 
   return (
     <div className="flex flex-col gap-4 min-w-0">

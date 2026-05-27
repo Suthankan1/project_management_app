@@ -118,6 +118,11 @@ export interface GithubAutomationLog {
   executedAt: string
 }
 
+interface TaskGithubIssueLink {
+  githubIssueNumber?: number | null
+  githubRepoFullName?: string | null
+}
+
 interface GitHubApiIssue {
   id: number
   number: number
@@ -357,6 +362,19 @@ export async function fetchGitHubAutomationRules(projectId: string | number): Pr
 export async function fetchGitHubAutomationLogs(projectId: string | number): Promise<GithubAutomationLog[]> {
   const response = await api.get(`/api/projects/${projectId}/automations/github/logs`)
   return response.data || []
+}
+
+export async function fetchImportedGitHubIssueNumbers(
+  projectId: string | number,
+  repoFullName: string,
+): Promise<number[]> {
+  const response = await api.get<TaskGithubIssueLink[]>(`/api/tasks/project/${projectId}`)
+  const normalizedRepoName = repoFullName.toLowerCase()
+
+  return response.data
+    .filter(task => task.githubRepoFullName?.toLowerCase() === normalizedRepoName)
+    .map(task => task.githubIssueNumber)
+    .filter((issueNumber): issueNumber is number => typeof issueNumber === 'number')
 }
 
 export async function createGitHubAutomationRule(

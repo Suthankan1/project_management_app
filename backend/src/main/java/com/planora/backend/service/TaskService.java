@@ -1307,7 +1307,9 @@ public class TaskService {
         }
 
         // Map GitHub integration fields (V8)
-        // githubBranch is persisted on the task entity; the rest come from TaskGithubService.
+        // Issue linkage and branch are persisted on the task entity; the rest come from TaskGithubService.
+        dto.setGithubIssueNumber(task.getGithubIssueNumber());
+        dto.setGithubRepoFullName(task.getGithubRepoFullName());
         dto.setGithubBranch(task.getGithubBranch());
         if (githubSummary != null) {
             dto.setGithubPrCount(githubSummary.getPrCount());

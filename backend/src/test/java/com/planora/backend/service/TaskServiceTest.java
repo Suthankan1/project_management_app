@@ -231,6 +231,8 @@ class TaskServiceTest {
     @Test
     void getTasksByProject_batchesDependencyLookup() {
         Task taskOne = buildTask(71L);
+        taskOne.setGithubIssueNumber(34L);
+        taskOne.setGithubRepoFullName("planora/app");
         Task taskTwo = buildTask(72L);
 
         when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
@@ -243,6 +245,8 @@ class TaskServiceTest {
 
         assertEquals(2, result.size());
         assertNotNull(result.getFirst().getDependencies());
+        assertEquals(34L, result.getFirst().getGithubIssueNumber());
+        assertEquals("planora/app", result.getFirst().getGithubRepoFullName());
         verify(taskRepository, times(1)).findDependencyRowsByTaskIds(List.of(71L, 72L));
     }
 
