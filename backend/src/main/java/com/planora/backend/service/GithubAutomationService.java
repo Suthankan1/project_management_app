@@ -1,5 +1,6 @@
 package com.planora.backend.service;
 
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -7,12 +8,11 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.time.LocalDateTime;
 
-import org.springframework.data.domain.PageRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,11 +34,11 @@ import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.GithubAction;
 import com.planora.backend.model.GithubAutomationLog;
 import com.planora.backend.model.GithubAutomationRule;
-import com.planora.backend.model.Label;
 import com.planora.backend.model.GithubTrigger;
 import com.planora.backend.model.KanbanColumn;
-import com.planora.backend.model.Project;
+import com.planora.backend.model.Label;
 import com.planora.backend.model.Priority;
+import com.planora.backend.model.Project;
 import com.planora.backend.model.Sprint;
 import com.planora.backend.model.SprintStatus;
 import com.planora.backend.model.Task;
