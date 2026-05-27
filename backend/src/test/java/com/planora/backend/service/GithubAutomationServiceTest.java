@@ -37,12 +37,16 @@ import com.planora.backend.model.Project;
 import com.planora.backend.model.Sprint;
 import com.planora.backend.model.SprintStatus;
 import com.planora.backend.model.Task;
+import com.planora.backend.model.Team;
+import com.planora.backend.model.TeamMember;
+import com.planora.backend.model.User;
 import com.planora.backend.repository.GithubAutomationLogRepository;
 import com.planora.backend.repository.GithubAutomationRuleRepository;
 import com.planora.backend.repository.KanbanColumnRepository;
 import com.planora.backend.repository.ProjectRepository;
 import com.planora.backend.repository.SprintRepository;
 import com.planora.backend.repository.TaskRepository;
+import com.planora.backend.repository.TeamMemberRepository;
 
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class GithubAutomationServiceTest {
@@ -71,6 +75,9 @@ class GithubAutomationServiceTest {
     @Mock
     private SprintRepository sprintRepository;
 
+        @Mock
+        private TeamMemberRepository teamMemberRepository;
+
     @Mock
     private GithubIssueConversionService githubIssueConversionService;
 
@@ -93,6 +100,7 @@ class GithubAutomationServiceTest {
                 ruleRepository,
                 taskRepository,
                 sprintRepository,
+                teamMemberRepository,
                 githubIssueConversionService,
                 githubEventBroadcaster,
                 labelService,
@@ -108,7 +116,8 @@ class GithubAutomationServiceTest {
                 project,
                 GithubTrigger.PR_MERGED,
                 GithubAction.SEND_NOTIFICATION,
-                Map.of());
+                true,
+                Map.<String, String>of());
 
         when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
                 .thenReturn(List.of(project));
@@ -182,6 +191,7 @@ class GithubAutomationServiceTest {
                 project,
                 GithubTrigger.PR_OPENED,
                 GithubAction.MOVE_TASK_TO_COLUMN,
+                true,
                 Map.of("columnName", "In Review"));
         Task task = new Task();
         task.setId(99L);
@@ -220,6 +230,7 @@ class GithubAutomationServiceTest {
                 project,
                 GithubTrigger.PR_OPENED,
                 GithubAction.MOVE_TASK_TO_COLUMN,
+                true,
                 Map.of("column", "In Review"));
         Task task = new Task();
         task.setId(99L);
@@ -252,6 +263,7 @@ class GithubAutomationServiceTest {
                 project,
                 GithubTrigger.CI_FAILED,
                 GithubAction.CREATE_TASK,
+                true,
                 Map.of("projectId", "41"));
         Task task = new Task();
         task.setProject(project);
@@ -324,6 +336,7 @@ class GithubAutomationServiceTest {
                 project,
                 GithubTrigger.ISSUE_OPENED,
                 GithubAction.CREATE_TASK,
+                true,
                 Map.of("projectId", "41", "onlyIfLabeled", "bug"));
         Task task = new Task();
 
@@ -366,6 +379,7 @@ class GithubAutomationServiceTest {
                 project,
                 GithubTrigger.ISSUE_OPENED,
                 GithubAction.CREATE_TASK,
+                true,
                 Map.of("projectId", "41", "onlyIfLabeled", "bug"));
 
         when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
@@ -389,6 +403,7 @@ class GithubAutomationServiceTest {
                 project,
                 GithubTrigger.ISSUE_LABELED,
                 GithubAction.MOVE_TASK_TO_COLUMN,
+                true,
                 Map.of(
                         "projectId", "41",
                         "labelName", "ready-for-review",
@@ -425,6 +440,7 @@ class GithubAutomationServiceTest {
                 project,
                 GithubTrigger.ISSUE_LABELED,
                 GithubAction.MOVE_TASK_TO_COLUMN,
+                true,
                 Map.of(
                         "projectId", "41",
                         "labelName", "ready-for-review",
@@ -453,6 +469,7 @@ class GithubAutomationServiceTest {
                 project,
                 GithubTrigger.RELEASE_PUBLISHED,
                 GithubAction.MOVE_TASK_TO_COLUMN,
+                true,
                 Map.of("projectId", "41"));
         Sprint activeSprint = new Sprint();
         activeSprint.setId(6L);
@@ -495,6 +512,7 @@ class GithubAutomationServiceTest {
                 project,
                 GithubTrigger.RELEASE_PUBLISHED,
                 GithubAction.MOVE_TASK_TO_COLUMN,
+                true,
                 Map.of("projectId", "41", "onlyCurrentSprint", "false"));
 
         when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
@@ -521,6 +539,7 @@ class GithubAutomationServiceTest {
                 project,
                 GithubTrigger.PR_MERGED,
                 GithubAction.MOVE_TASK_TO_COLUMN,
+                true,
                 Map.of("targetColumnName", "Done"));
         Task task = new Task();
         task.setId(99L);
@@ -549,5 +568,56 @@ class GithubAutomationServiceTest {
                 org.mockito.ArgumentMatchers.eq(99L),
                 org.mockito.ArgumentMatchers.argThat(payload ->
                         payload.getTaskId().equals(99L) && "closed".equals(payload.getIssueState())));
+    }
+
+    @Test
+    void sendNotificationRuleCreatesNotificationForProjectTeamMembers() {
+        Project project = new Project();
+        project.setId(41L);
+        Team team = new Team();
+        team.setId(11L);
+        project.setTeam(team);
+
+        User first = new User();
+        first.setUserId(101L);
+        first.setUsername("alice");
+
+        User second = new User();
+        second.setUserId(102L);
+        second.setUsername("bob");
+
+        TeamMember firstMember = new TeamMember();
+        firstMember.setUser(first);
+        TeamMember secondMember = new TeamMember();
+        secondMember.setUser(second);
+
+        GithubAutomationRule rule = new GithubAutomationRule(
+                21L,
+                project,
+                GithubTrigger.PR_OPENED,
+                GithubAction.SEND_NOTIFICATION,
+                true,
+                Map.<String, String>of());
+
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(project));
+        when(ruleRepository.findByProject_IdInAndTrigger(List.of(41L), GithubTrigger.PR_OPENED))
+                .thenReturn(List.of(rule));
+        when(teamMemberRepository.findByTeamId(11L)).thenReturn(List.of(firstMember, secondMember));
+
+        automationService.onPROpened(new PROpenedEvent(
+                this, "planora/app", 17, "Improve sync", "octocat", "feature/task/123"));
+
+        verify(notificationService).createNotification(
+                first,
+                "GitHub: Pull request #17 was opened - Improve sync",
+                "https://github.com/planora/app/pull/17");
+        verify(notificationService).createNotification(
+                second,
+                "GitHub: Pull request #17 was opened - Improve sync",
+                "https://github.com/planora/app/pull/17");
+        verify(automationLogRepository).save(org.mockito.ArgumentMatchers.argThat(execution ->
+                "SUCCESS".equals(execution.getOutcome())
+                        && execution.getMessage().contains("created 2 notification")));
     }
 }

@@ -42,12 +42,15 @@ import com.planora.backend.model.Priority;
 import com.planora.backend.model.Sprint;
 import com.planora.backend.model.SprintStatus;
 import com.planora.backend.model.Task;
+import com.planora.backend.model.TeamMember;
+import com.planora.backend.model.User;
 import com.planora.backend.repository.GithubAutomationLogRepository;
 import com.planora.backend.repository.GithubAutomationRuleRepository;
 import com.planora.backend.repository.KanbanColumnRepository;
 import com.planora.backend.repository.ProjectRepository;
 import com.planora.backend.repository.SprintRepository;
 import com.planora.backend.repository.TaskRepository;
+import com.planora.backend.repository.TeamMemberRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -65,6 +68,7 @@ public class GithubAutomationService {
     private final GithubAutomationRuleRepository githubAutomationRuleRepository;
     private final TaskRepository taskRepository;
     private final SprintRepository sprintRepository;
+    private final TeamMemberRepository teamMemberRepository;
     private final GithubIssueConversionService githubIssueConversionService;
     private final GithubEventBroadcaster githubEventBroadcaster;
     private final LabelService labelService;
@@ -129,7 +133,8 @@ public class GithubAutomationService {
         executeRulesForTrigger(GithubTrigger.RELEASE_PUBLISHED, Map.of(
                 "repoFullName", event.getRepoFullName(),
                 "tagName", event.getTagName(),
-                "releaseName", event.getReleaseName()));
+                "releaseName", event.getReleaseName(),
+                "releaseUrl", event.getReleaseUrl()));
     }
 
     /**
@@ -219,10 +224,7 @@ public class GithubAutomationService {
                     createdTaskId.ifPresent(taskId -> recordExecution(rule, context, "SUCCESS",
                             "CREATE_TASK action created task " + taskId));
                 }
-                case SEND_NOTIFICATION -> {
-                    sendNotification(rule, context);
-                    recordExecution(rule, context, "SUCCESS", "SEND_NOTIFICATION action dispatched");
-                }
+                case SEND_NOTIFICATION -> sendNotification(rule, context);
             }
         } catch (RuntimeException exception) {
             recordExecution(rule, context, "ERROR", exception.getMessage() == null
@@ -304,8 +306,76 @@ public class GithubAutomationService {
     }
 
     private void sendNotification(GithubAutomationRule rule, Map<String, Object> context) {
-        log.debug("Dispatching GitHub automation action {} for rule {} with context {}",
-                GithubAction.SEND_NOTIFICATION, rule.getId(), context);
+        Project project = rule.getProject();
+        if (project == null || project.getTeam() == null || project.getTeam().getId() == null) {
+            recordExecution(rule, context, "SKIPPED", "SEND_NOTIFICATION skipped: rule project team is unavailable");
+            return;
+        }
+
+        Map<Long, User> recipients = new LinkedHashMap<>();
+        for (TeamMember member : teamMemberRepository.findByTeamId(project.getTeam().getId())) {
+            User user = member.getUser();
+            if (user != null && user.getUserId() != null) {
+                recipients.putIfAbsent(user.getUserId(), user);
+            }
+        }
+
+        if (recipients.isEmpty()) {
+            recordExecution(rule, context, "SKIPPED", "SEND_NOTIFICATION skipped: no team recipients found");
+            return;
+        }
+
+        Map<String, String> config = rule.getConfig() == null ? Map.of() : rule.getConfig();
+        String messageTemplate = Objects.toString(config.get("message"), "").trim();
+        if (messageTemplate.isBlank()) {
+            messageTemplate = defaultNotificationMessage(rule.getTrigger());
+        }
+        String message = renderTemplate(messageTemplate, context);
+        String link = defaultNotificationLink(rule.getTrigger(), context);
+
+        recipients.values().forEach(recipient -> notificationService.createNotification(recipient, message, link));
+        recordExecution(
+                rule,
+                context,
+                "SUCCESS",
+                "SEND_NOTIFICATION created " + recipients.size() + " notification(s)");
+    }
+
+    private String defaultNotificationMessage(GithubTrigger trigger) {
+        return switch (trigger) {
+            case PR_OPENED -> "GitHub: Pull request #{prNumber} was opened - {prTitle}";
+            case PR_MERGED -> "GitHub: Pull request #{prNumber} was merged - {prTitle}";
+            case CI_FAILED -> "GitHub: CI failed for {workflowName} on {branch}";
+            case ISSUE_OPENED -> "GitHub: Issue #{issueNumber} opened - {issueTitle}";
+            case ISSUE_LABELED -> "GitHub: Issue #{issueNumber} labeled with {labelName}";
+            case RELEASE_PUBLISHED -> "GitHub: Release published - {releaseName} ({tagName})";
+        };
+    }
+
+    private String defaultNotificationLink(GithubTrigger trigger, Map<String, Object> context) {
+        String repoFullName = Objects.toString(context.get("repoFullName"), "").trim();
+        if (repoFullName.isBlank()) {
+            return "/dashboard/notifications";
+        }
+
+        return switch (trigger) {
+            case PR_OPENED, PR_MERGED -> "https://github.com/" + repoFullName
+                    + "/pull/" + Objects.toString(context.get("prNumber"), "");
+            case ISSUE_OPENED, ISSUE_LABELED -> "https://github.com/" + repoFullName
+                    + "/issues/" + Objects.toString(context.get("issueNumber"), "");
+            case CI_FAILED -> "https://github.com/" + repoFullName
+                    + "/commit/" + Objects.toString(context.get("commitSha"), "") + "/checks";
+            case RELEASE_PUBLISHED -> {
+                String releaseUrl = Objects.toString(context.get("releaseUrl"), "").trim();
+                if (!releaseUrl.isBlank()) {
+                    yield releaseUrl;
+                }
+                String tagName = Objects.toString(context.get("tagName"), "").trim();
+                yield tagName.isBlank()
+                        ? "https://github.com/" + repoFullName + "/releases"
+                        : "https://github.com/" + repoFullName + "/releases/tag/" + tagName;
+            }
+        };
     }
 
     private Map<String, Object> eventContext(String repoFullName) {
@@ -492,11 +562,17 @@ public class GithubAutomationService {
 
     private String renderTemplate(String template, Map<String, Object> context) {
         return template
+                .replace("{repoFullName}", Objects.toString(context.get("repoFullName"), ""))
+                .replace("{prNumber}", Objects.toString(context.get("prNumber"), ""))
+                .replace("{prTitle}", Objects.toString(context.get("prTitle"), ""))
                 .replace("{workflowName}", Objects.toString(context.get("workflowName"), ""))
                 .replace("{branch}", Objects.toString(context.get("branch"), ""))
                 .replace("{commitSha}", Objects.toString(context.get("commitSha"), ""))
                 .replace("{issueTitle}", Objects.toString(context.get("issueTitle"), ""))
-                .replace("{issueNumber}", Objects.toString(context.get("issueNumber"), ""));
+                .replace("{issueNumber}", Objects.toString(context.get("issueNumber"), ""))
+                .replace("{labelName}", Objects.toString(context.get("labelName"), ""))
+                .replace("{releaseName}", Objects.toString(context.get("releaseName"), ""))
+                .replace("{tagName}", Objects.toString(context.get("tagName"), ""));
     }
 
     private String buildCIFailureDescription(Map<String, Object> context) {

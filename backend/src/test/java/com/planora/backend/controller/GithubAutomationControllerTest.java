@@ -102,6 +102,7 @@ class GithubAutomationControllerTest {
                 41L,
                 GithubTrigger.PR_MERGED,
                 GithubAction.SEND_NOTIFICATION,
+                                true,
                 Map.of("message", "Merged"));
     }
 }

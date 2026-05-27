@@ -1,45 +1,44 @@
 package com.planora.backend.controller;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.List;
-import java.util.Optional;
-import java.time.Instant;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.http.MediaType;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.planora.backend.dto.GithubIssueDTO;
-import com.planora.backend.dto.GithubIssueCreateRequestDTO;
 import com.planora.backend.dto.GithubCommentDTO;
 import com.planora.backend.dto.GithubCommentSyncResponseDTO;
+import com.planora.backend.dto.GithubIssueCreateRequestDTO;
+import com.planora.backend.dto.GithubIssueDTO;
 import com.planora.backend.dto.GithubIssueImportResponseDTO;
 import com.planora.backend.dto.GithubLabelDTO;
 import com.planora.backend.exception.ForbiddenException;
-import com.planora.backend.exception.GithubRateLimitException;
 import com.planora.backend.exception.GithubIssueValidationException;
+import com.planora.backend.exception.GithubRateLimitException;
 import com.planora.backend.exception.GithubRepositoryNotFoundException;
 import com.planora.backend.model.User;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.repository.UserRepository;
-import com.planora.backend.service.GithubIssueImportService;
 import com.planora.backend.service.GithubIssueCommentSyncService;
+import com.planora.backend.service.GithubIssueImportService;
 import com.planora.backend.service.GithubIssuesSyncService;
 import com.planora.backend.service.GithubNotificationService;
 import com.planora.backend.service.JWTService;
