@@ -41,9 +41,11 @@ import com.planora.backend.repository.UserRepository;
 import com.planora.backend.service.GithubIssueImportService;
 import com.planora.backend.service.GithubIssueCommentSyncService;
 import com.planora.backend.service.GithubIssuesSyncService;
+import com.planora.backend.service.GithubNotificationService;
 import com.planora.backend.service.JWTService;
 
 @WebMvcTest(GithubIssuesController.class)
+@SuppressWarnings("unused")
 class GithubIssuesControllerTest {
 
     @Autowired
@@ -54,6 +56,9 @@ class GithubIssuesControllerTest {
 
     @MockitoBean
     private GithubIssuesSyncService githubIssuesSyncService;
+
+        @MockitoBean
+        private GithubNotificationService githubNotificationService;
 
     @MockitoBean
     private GithubIssueImportService githubIssueImportService;
@@ -79,6 +84,7 @@ class GithubIssuesControllerTest {
         userEntity.setUserId(7L);
         userEntity.setUsername("alice");
         userEntity.setEmail("alice@example.com");
+                userEntity.setGithubUsername("octocat");
         userEntity.setGithubAccessToken("github-token");
         principal = new UserPrincipal(userEntity);
     }
@@ -228,6 +234,15 @@ class GithubIssuesControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.number").value(34))
                 .andExpect(jsonPath("$.title").value("Fix login"));
+
+        verify(githubNotificationService).notifyIssueEvent(
+                "planora/app",
+                34,
+                "Fix login",
+                "opened",
+                "octocat",
+                null,
+                List.of());
     }
 
     @Test

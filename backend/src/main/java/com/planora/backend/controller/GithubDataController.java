@@ -1,7 +1,14 @@
 package com.planora.backend.controller;
 
 import com.planora.backend.dto.*;
+import com.planora.backend.exception.GithubAuthenticationException;
+import com.planora.backend.exception.ResourceNotFoundException;
+import com.planora.backend.model.GithubIntegration;
+import com.planora.backend.model.User;
 import com.planora.backend.model.UserPrincipal;
+import com.planora.backend.repository.GithubIntegrationRepository;
+import com.planora.backend.repository.UserRepository;
+import com.planora.backend.service.GithubNotificationService;
 import com.planora.backend.service.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +17,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/github/project/{projectId}")
@@ -20,6 +31,9 @@ public class GithubDataController {
     private final GithubCommitService commitService;
     private final GithubIssueService issueService;
     private final GithubSyncService syncService;
+    private final GithubNotificationService githubNotificationService;
+    private final GithubIntegrationRepository githubIntegrationRepository;
+    private final UserRepository userRepository;
 
     @GetMapping("/pull-requests")
     public ResponseEntity<Page<GithubPrDTO>> getPullRequests(
@@ -80,11 +94,27 @@ public class GithubDataController {
             @Valid @RequestBody GithubCreateIssueRequestDTO request,
             @AuthenticationPrincipal UserPrincipal principal) {
 
+        User currentUser = userRepository.findById(principal.getUserId())
+            .orElseThrow(() -> new GithubAuthenticationException("Authenticated user not found"));
+        GithubIntegration integration = githubIntegrationRepository.findByIdAndProjectId(request.getIntegrationId(), projectId)
+            .orElseThrow(() -> new ResourceNotFoundException("GitHub integration not found"));
         GithubIssueDTO created = issueService.createIssue(
             request.getIntegrationId(),
             request.getTitle(),
             request.getBody(),
             request.getLabels());
+        Integer issueNumber = created.getNumber();
+        githubNotificationService.notifyIssueEvent(
+            integration.getRepositoryFullName(),
+            issueNumber == null ? 0 : issueNumber,
+            created.getTitle(),
+            "opened",
+            resolveActorLogin(currentUser),
+            created.getBody(),
+            request.getLabels() == null ? List.of() : request.getLabels().stream()
+                .filter(Objects::nonNull)
+                .filter(label -> !label.isBlank())
+                .collect(Collectors.toList()));
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -97,5 +127,12 @@ public class GithubDataController {
 
         pullRequestService.linkTaskToPr(prId, request.getTaskId());
         return ResponseEntity.ok().build();
+    }
+
+    private String resolveActorLogin(User user) {
+        if (user.getGithubUsername() != null && !user.getGithubUsername().isBlank()) {
+            return user.getGithubUsername();
+        }
+        return Objects.toString(user.getUsername(), "");
     }
 }

@@ -1,6 +1,8 @@
 package com.planora.backend.controller;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +29,7 @@ import com.planora.backend.exception.GithubAuthenticationException;
 import com.planora.backend.model.User;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.repository.UserRepository;
+import com.planora.backend.service.GithubNotificationService;
 import com.planora.backend.service.GithubIssueImportService;
 import com.planora.backend.service.GithubIssueCommentSyncService;
 import com.planora.backend.service.GithubIssuesSyncService;
@@ -50,6 +53,9 @@ public class GithubIssuesController {
 
     @Autowired
     private GithubIssueCommentSyncService githubIssueCommentSyncService;
+
+    @Autowired
+    private GithubNotificationService githubNotificationService;
 
     @GetMapping("/issues")
     public ResponseEntity<List<GithubIssueDTO>> getIssues(
@@ -102,6 +108,15 @@ public class GithubIssuesController {
             throw new GithubAuthenticationException("GitHub account is not connected");
         }
         GithubIssueDTO createdIssue = githubIssuesSyncService.createIssue(request, accessToken);
+        Integer issueNumber = createdIssue.getNumber();
+        githubNotificationService.notifyIssueEvent(
+            request.getRepoFullName(),
+            issueNumber == null ? 0 : issueNumber,
+            createdIssue.getTitle(),
+            "opened",
+            resolveActorLogin(user),
+            createdIssue.getBody(),
+            extractLabelNames(createdIssue));
         return ResponseEntity.status(HttpStatus.CREATED).body(createdIssue);
     }
 
@@ -157,5 +172,24 @@ public class GithubIssuesController {
         }
         return userRepository.findById(currentUser.getUserId())
                 .orElseThrow(() -> new GithubAuthenticationException("Authenticated user not found"));
+    }
+
+    private String resolveActorLogin(User user) {
+        String githubUsername = user.getGithubUsername();
+        if (githubUsername != null && !githubUsername.isBlank()) {
+            return githubUsername;
+        }
+        return Objects.toString(user.getUsername(), "");
+    }
+
+    private List<String> extractLabelNames(GithubIssueDTO issue) {
+        if (issue.getLabels() == null) {
+            return List.of();
+        }
+        return issue.getLabels().stream()
+                .map(GithubLabelDTO::getName)
+                .filter(Objects::nonNull)
+                .filter(name -> !name.isBlank())
+                .collect(Collectors.toList());
     }
 }
