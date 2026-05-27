@@ -302,11 +302,12 @@ export interface ProjectTopNavProps {
   onTabChange: (tab: ProjectTab) => void;
   onMoreTabChange?: (tab?: MoreTab) => void;
   onSettingsPress?: () => void;
+  onGithubPress?: () => void;
 }
 
 export default function ProjectTopNav({
   projectName,
-  activeTab, activeMoreTab, onTabChange, onMoreTabChange, onSettingsPress,
+  activeTab, activeMoreTab, onTabChange, onMoreTabChange, onSettingsPress, onGithubPress,
 }: ProjectTopNavProps) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
@@ -524,16 +525,31 @@ export default function ProjectTopNav({
             <Text style={ns.titleText} numberOfLines={1}>{projectName || 'Workspace'}</Text>
           </View>
 
-          {onSettingsPress && (
-            <TouchableOpacity
-              onPress={onSettingsPress}
-              style={ns.settingsBtn}
-              activeOpacity={0.7}
-              accessibilityLabel="Project Settings"
-              accessibilityRole="button"
-            >
-              <MaterialCommunityIcons name="cog-outline" size={20} color={T.primary} />
-            </TouchableOpacity>
+          {(onGithubPress || onSettingsPress) && (
+            <View style={ns.actionBtns}>
+              {onGithubPress && (
+                <TouchableOpacity
+                  onPress={onGithubPress}
+                  style={ns.iconBtn}
+                  activeOpacity={0.7}
+                  accessibilityLabel="GitHub"
+                  accessibilityRole="button"
+                >
+                  <MaterialCommunityIcons name="github" size={20} color={T.primary} />
+                </TouchableOpacity>
+              )}
+              {onSettingsPress && (
+                <TouchableOpacity
+                  onPress={onSettingsPress}
+                  style={ns.iconBtn}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Project Settings"
+                  accessibilityRole="button"
+                >
+                  <MaterialCommunityIcons name="cog-outline" size={20} color={T.primary} />
+                </TouchableOpacity>
+              )}
+            </View>
           )}
         </View>
 
@@ -630,6 +646,26 @@ const ns = StyleSheet.create({
   titleContent: {
     flex: 1,
     marginRight: 10,
+  },
+  actionBtns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
+  },
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderWidth: 1,
+    borderColor: T.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: { shadowColor: '#64748B', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6 },
+      android: { elevation: 2 },
+    }),
   },
   settingsBtn: {
     width: 38,
