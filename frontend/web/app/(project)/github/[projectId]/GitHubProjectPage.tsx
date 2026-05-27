@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   GitBranch, Globe, Lock, RefreshCw, Search, X, Check, Link2,
@@ -480,6 +480,25 @@ function IssuesPanel({
 }) {
   const [selectedIssue, setSelectedIssue] = useState<GitHubIssue | null>(null);
   const [importedIssueNumbers, setImportedIssueNumbers] = useState<Set<number>>(() => new Set());
+  const [stateFilter, setStateFilter] = useState<'all' | GitHubIssue['state']>('all');
+  const [labelFilter, setLabelFilter] = useState('');
+
+  const availableLabels = useMemo(
+    () => Array.from(new Set(
+      issues.flatMap(issue => issue.labels.map(label => label.name)).filter(Boolean),
+    )).sort((first, second) => first.localeCompare(second)),
+    [issues],
+  );
+
+  const filteredIssues = useMemo(
+    () => issues.filter(issue =>
+      (stateFilter === 'all' || issue.state === stateFilter)
+      && (!labelFilter || issue.labels.some(label => label.name === labelFilter)),
+    ),
+    [issues, labelFilter, stateFilter],
+  );
+
+  const filtersActive = stateFilter !== 'all' || labelFilter !== '';
 
   useEffect(() => {
     onCountChange(issues.length);
@@ -509,7 +528,9 @@ function IssuesPanel({
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-outfit font-bold text-slate-700">Issues</h2>
           {!loading && !error && (
-            <span className="text-sm text-slate-400 font-outfit">({issues.length})</span>
+            <span className="text-sm text-slate-400 font-outfit">
+              ({filtersActive ? `${filteredIssues.length} of ` : ''}{issues.length})
+            </span>
           )}
         </div>
         <button
@@ -526,12 +547,39 @@ function IssuesPanel({
       <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
         <SlidersHorizontal size={14} className="text-slate-400" />
         <span className="text-xs font-outfit font-semibold text-slate-500">Filters</span>
-        <button disabled className="ml-2 rounded-lg bg-slate-50 px-2.5 py-1 text-xs font-outfit text-slate-400">
-          All states
-        </button>
-        <button disabled className="rounded-lg bg-slate-50 px-2.5 py-1 text-xs font-outfit text-slate-400">
-          All labels
-        </button>
+        <select
+          value={stateFilter}
+          onChange={event => setStateFilter(event.target.value as 'all' | GitHubIssue['state'])}
+          aria-label="Filter issues by state"
+          className="ml-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-outfit font-medium text-slate-600 focus:border-blue-400 focus:outline-none"
+        >
+          <option value="all">All states</option>
+          <option value="open">Open</option>
+          <option value="closed">Closed</option>
+        </select>
+        <select
+          value={labelFilter}
+          onChange={event => setLabelFilter(event.target.value)}
+          aria-label="Filter issues by label"
+          className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-outfit font-medium text-slate-600 focus:border-blue-400 focus:outline-none"
+        >
+          <option value="">All labels</option>
+          {availableLabels.map(label => (
+            <option key={label} value={label}>{label}</option>
+          ))}
+        </select>
+        {filtersActive && (
+          <button
+            type="button"
+            onClick={() => {
+              setStateFilter('all');
+              setLabelFilter('');
+            }}
+            className="ml-auto text-xs font-outfit font-semibold text-blue-600 hover:underline"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {loading && <SkeletonList />}
@@ -570,9 +618,16 @@ function IssuesPanel({
         </div>
       )}
 
-      {!loading && !error && issues.length > 0 && (
+      {!loading && !error && issues.length > 0 && filteredIssues.length === 0 && (
+        <div className="flex flex-col items-center gap-2 py-10">
+          <AlertCircle size={20} className="text-slate-300" />
+          <p className="text-xs text-slate-400 font-outfit">No issues match the selected filters</p>
+        </div>
+      )}
+
+      {!loading && !error && filteredIssues.length > 0 && (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {issues.map(issue => (
+          {filteredIssues.map(issue => (
             <IssueCard
               key={issue.id}
               issue={issue}
