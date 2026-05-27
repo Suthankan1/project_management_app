@@ -171,7 +171,7 @@ export async function fetchPullRequests(
   repo: string,
 ): Promise<GitHubPullRequest[]> {
   const response = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=10&sort=updated&direction=desc`,
+    `https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=50&sort=updated&direction=desc`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -190,7 +190,7 @@ export async function fetchCommits(
   repo: string,
 ): Promise<GitHubCommit[]> {
   const response = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/commits?per_page=10`,
+    `https://api.github.com/repos/${owner}/${repo}/commits?per_page=50`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -250,4 +250,31 @@ export function setProjectGitHubRepo(projectId: string | number, repo: GitHubRep
 export function clearProjectGitHubRepo(projectId: string | number): void {
   if (typeof window === 'undefined') return
   localStorage.removeItem(`github_project_${projectId}`)
+}
+
+// ── Saved GitHub accounts (account picker) ────────────────────────────────────
+
+export interface SavedGitHubAccount {
+  login: string
+  name: string | null
+  avatarUrl: string
+}
+
+const SAVED_ACCOUNTS_KEY = 'planora:github:saved-accounts'
+
+export function getSavedGitHubAccounts(): SavedGitHubAccount[] {
+  if (typeof window === 'undefined') return []
+  try {
+    return JSON.parse(localStorage.getItem(SAVED_ACCOUNTS_KEY) || '[]')
+  } catch {
+    return []
+  }
+}
+
+export function upsertSavedGitHubAccount(account: SavedGitHubAccount): void {
+  const accounts = getSavedGitHubAccounts()
+  const idx = accounts.findIndex(a => a.login === account.login)
+  if (idx >= 0) accounts[idx] = account
+  else accounts.unshift(account) // most-recently-used first
+  localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(accounts))
 }

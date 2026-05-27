@@ -4,7 +4,7 @@
 import { useState, useEffect, useSyncExternalStore, Suspense, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
-import { Menu, Plus, Settings } from 'lucide-react';
+import { Menu, Plus, Settings, Github } from 'lucide-react';
 
 import { useNavigation } from '@/lib/navigation-context';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -191,20 +191,34 @@ function TopBarContent() {
 
         {/* Right Side Actions */}
         <div className="flex items-center gap-4 flex-1 justify-end max-w-[900px] ml-auto">
-          {/* Settings Icon — left of search */}
+          {/* GitHub + Settings Icons */}
           {projectId && (
-            <button
-              onClick={() => router.push(`/project/${projectId}/settings`)}
-              className={`p-2 rounded-lg transition-all shrink-0 ${
-                pathname.includes('/settings')
-                  ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-100'
-                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-              }`}
-              title="Project Settings"
-              aria-label="Project Settings"
-            >
-              <Settings size={18} strokeWidth={pathname.includes('/settings') ? 2.5 : 2} />
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={() => router.push(`/github/${projectId}`)}
+                className={`p-2 rounded-lg transition-all ${
+                  pathname.startsWith('/github')
+                    ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-100'
+                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                }`}
+                title="GitHub"
+                aria-label="GitHub"
+              >
+                <Github size={18} strokeWidth={pathname.startsWith('/github') ? 2.5 : 2} />
+              </button>
+              <button
+                onClick={() => router.push(`/project/${projectId}/settings`)}
+                className={`p-2 rounded-lg transition-all ${
+                  pathname.includes('/settings')
+                    ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-100'
+                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                }`}
+                title="Project Settings"
+                aria-label="Project Settings"
+              >
+                <Settings size={18} strokeWidth={pathname.includes('/settings') ? 2.5 : 2} />
+              </button>
+            </div>
           )}
 
           {/* Global Search Bar - Hidden on small screens to save space */}
