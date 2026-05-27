@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  GitBranch, Globe, Lock, RefreshCw, Search, X, Check, Link2,
+  Bell, GitBranch, Globe, Lock, RefreshCw, Search, X, Check, Link2,
   LogOut, User, ExternalLink, GitPullRequest, ChevronDown, AlertCircle, GitCommit,
   SlidersHorizontal,
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ensureValidToken } from '@/lib/auth';
+import { useGlobalNotifications } from '@/components/providers/GlobalNotificationProvider';
 import { useGithubPRSocket, type GithubPRUpdate } from '@/hooks/useGithubPRSocket';
 import { useGithubCISocket, type GithubCIUpdate } from '@/hooks/useGithubCISocket';
 import { useGithubIssueSocket, type GithubIssueUpdate } from '@/hooks/useGithubIssueSocket';
@@ -47,6 +48,7 @@ import {
 } from '@/services/githubService';
 import IssueCard from '@/components/github/IssueCard';
 import GitHubMark from '@/components/github/GitHubMark';
+import type { Notification } from '@/services/notifications-service';
 
 const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
 
@@ -68,6 +70,35 @@ function prStatus(pr: GitHubPullRequest): { label: string; color: string; dot: s
   if (pr.merged_at) return { label: 'Merged', color: 'text-purple-700 bg-purple-50 border-purple-200', dot: 'bg-purple-500' };
   if (pr.state === 'closed') return { label: 'Closed', color: 'text-red-700 bg-red-50 border-red-200', dot: 'bg-red-500' };
   return { label: 'Open', color: 'text-green-700 bg-green-50 border-green-200', dot: 'bg-green-500' };
+}
+
+function isGitHubRepoNotification(notification: Notification, repoFullName: string): boolean {
+  const normalizedRepo = repoFullName.trim().toLowerCase();
+  if (!normalizedRepo) return false;
+
+  const link = typeof notification.link === 'string' ? notification.link.toLowerCase() : '';
+  return link.includes(`github.com/${normalizedRepo}/`);
+}
+
+type GitHubTabKey = 'pullRequests' | 'commits' | 'issues';
+
+function classifyGitHubNotification(notification: Notification): GitHubTabKey | null {
+  const link = typeof notification.link === 'string' ? notification.link.toLowerCase() : '';
+  const message = typeof notification.message === 'string' ? notification.message.toLowerCase() : '';
+
+  if (link.includes('/pull/') || message.includes('pr opened') || message.includes('pr merged')) {
+    return 'pullRequests';
+  }
+
+  if (link.includes('/commit/') || link.includes('/checks') || message.includes('ci failed')) {
+    return 'commits';
+  }
+
+  if (link.includes('/issues/') || message.includes('issue opened') || message.includes('issue closed') || message.includes('issue #')) {
+    return 'issues';
+  }
+
+  return null;
 }
 
 // ── Disconnected state ────────────────────────────────────────────────────────
@@ -671,6 +702,7 @@ function ConnectedDashboard({
   onLogout,
   onChangeRepo,
   onPRUpdate,
+  onIssueUpdate,
   automationRules,
   automationLogs,
   automationRulesLoading,
@@ -697,6 +729,7 @@ function ConnectedDashboard({
   onLogout: () => void;
   onChangeRepo: () => void;
   onPRUpdate: (update: GithubPRUpdate) => void;
+  onIssueUpdate: (update: GithubIssueUpdate) => void;
   automationRules: GithubAutomationRule[];
   automationLogs: GithubAutomationLog[];
   automationRulesLoading: boolean;
@@ -709,6 +742,7 @@ function ConnectedDashboard({
   onRefreshAutomationRules: () => void;
   onRefreshAutomationLogs: () => void;
 }) {
+  const { notifications: globalNotifications, markAsRead } = useGlobalNotifications();
   type LiveNotice = {
     id: string;
     message: string;
@@ -721,6 +755,38 @@ function ConnectedDashboard({
   const [newPRNotice, setNewPRNotice] = useState<GithubPRUpdate | null>(null);
   const [latestCIUpdate, setLatestCIUpdate] = useState<GithubCIUpdate | null>(null);
   const [liveNotices, setLiveNotices] = useState<LiveNotice[]>([]);
+  const [activityError, setActivityError] = useState<string | null>(null);
+
+  const githubNotifications = useMemo(() => {
+    return globalNotifications
+      .filter((notification) => isGitHubRepoNotification(notification, connection.repoFullName))
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  }, [connection.repoFullName, globalNotifications]);
+
+  const unreadGithubNotificationCount = useMemo(
+    () => githubNotifications.filter((notification) => !notification.read).length,
+    [githubNotifications],
+  );
+
+  const recentGithubNotifications = githubNotifications.filter((notification) => !notification.read).slice(0, 4);
+  const unreadGitHubTabCounts = useMemo(() => {
+    return githubNotifications.reduce<Record<GitHubTabKey, number>>((counts, notification) => {
+      if (notification.read) {
+        return counts;
+      }
+
+      const tabKey = classifyGitHubNotification(notification);
+      if (tabKey) {
+        counts[tabKey] += 1;
+      }
+
+      return counts;
+    }, {
+      pullRequests: 0,
+      commits: 0,
+      issues: 0,
+    });
+  }, [githubNotifications]);
 
   const pushNotice = useCallback((notice: Omit<LiveNotice, 'id'>) => {
     setLiveNotices((current) => [{
@@ -737,24 +803,53 @@ function ConnectedDashboard({
     onPRUpdate(update);
   }, [onPRUpdate]);
 
-  useGithubPRSocket(projectId, handlePRUpdate);
+  const handleSocketError = useCallback((message: string) => {
+    setActivityError(message);
+  }, []);
+
+  useGithubPRSocket(projectId, handlePRUpdate, handleSocketError);
   useGithubCISocket(projectId, useCallback((update: GithubCIUpdate) => {
     setLatestCIUpdate(update);
-  }, []));
+  }, []), handleSocketError);
   useGithubIssueSocket(projectId, useCallback((update: GithubIssueUpdate) => {
     pushNotice({
       message: `Issue ${update.action}: #${update.issueNumber} ${update.issueTitle}`,
       href: `https://github.com/${connection.repoFullName}/issues/${update.issueNumber}`,
       tone: update.action === 'closed' ? 'success' : 'info',
     });
-  }, [connection.repoFullName, pushNotice]));
+    onIssueUpdate(update);
+  }, [connection.repoFullName, pushNotice, onIssueUpdate]), handleSocketError);
   useGithubTaskBadgeSocket(projectId, useCallback((update: GithubTaskBadgeUpdate) => {
     pushNotice({
       message: `Task #${update.taskId} linked issue #${update.githubIssueNumber} is ${update.issueState}`,
       href: `https://github.com/${update.githubRepoFullName}/issues/${update.githubIssueNumber}`,
       tone: update.issueState === 'closed' ? 'success' : 'info',
     });
-  }, [pushNotice]));
+  }, [pushNotice]), handleSocketError);
+
+  const markGitHubNotificationRead = useCallback(async (notificationId: number) => {
+    try {
+      await markAsRead(notificationId);
+      setActivityError(null);
+    } catch (error) {
+      setActivityError(error instanceof Error ? error.message : 'Failed to mark GitHub notification as read.');
+    }
+  }, [markAsRead]);
+
+  const markAllGitHubNotificationsRead = useCallback(async () => {
+    const unreadIds = githubNotifications.filter((notification) => !notification.read).map((notification) => notification.id);
+    if (unreadIds.length === 0) {
+      return;
+    }
+
+    const results = await Promise.allSettled(unreadIds.map((id) => markAsRead(id)));
+    const failedCount = results.filter((result) => result.status === 'rejected').length;
+    if (failedCount > 0) {
+      setActivityError(`Failed to mark ${failedCount} GitHub notification${failedCount === 1 ? '' : 's'} as read.`);
+    } else {
+      setActivityError(null);
+    }
+  }, [githubNotifications, markAsRead]);
 
   return (
     <motion.div
@@ -800,6 +895,93 @@ function ConnectedDashboard({
             Change repo
           </button>
           <AccountDropdown user={user} onLogout={onLogout} onChangeRepo={onChangeRepo} />
+        </div>
+      </div>
+
+      {activityError && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
+          <div className="mt-0.5 rounded-lg bg-amber-100 p-1.5 text-amber-600">
+            <AlertCircle size={15} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-outfit font-semibold text-slate-800">GitHub notifications need attention</p>
+            <p className="text-xs font-outfit text-slate-500">{activityError}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActivityError(null)}
+            className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-amber-100 hover:text-slate-600"
+            aria-label="Dismiss GitHub notification error"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Bell size={15} className="text-slate-500" />
+            <span className="text-sm font-outfit font-bold text-slate-800">GitHub notifications</span>
+            {unreadGithubNotificationCount > 0 && (
+              <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-sm">
+                {unreadGithubNotificationCount > 9 ? '9+' : unreadGithubNotificationCount}
+              </span>
+            )}
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void markAllGitHubNotificationsRead()}
+              disabled={unreadGithubNotificationCount === 0}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-outfit font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40"
+            >
+              Mark all as read
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2">
+          {recentGithubNotifications.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm text-slate-400 font-outfit">
+              No unread GitHub notifications yet.
+            </div>
+          ) : (
+            recentGithubNotifications.map((notification) => {
+              const isUnread = !notification.read;
+              return (
+                <div
+                  key={notification.id}
+                  className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${isUnread ? 'border-blue-100 bg-blue-50/60' : 'border-slate-200 bg-slate-50'}`}
+                >
+                  <div className={`mt-1 h-2.5 w-2.5 rounded-full ${isUnread ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-outfit ${isUnread ? 'font-semibold text-slate-800' : 'font-medium text-slate-600'}`}>
+                      {notification.message}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <a
+                        href={notification.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => void markGitHubNotificationRead(notification.id)}
+                        className="inline-flex items-center gap-1 text-xs font-outfit font-semibold text-blue-600 hover:underline"
+                      >
+                        View on GitHub <ExternalLink size={11} />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => void markGitHubNotificationRead(notification.id)}
+                        className="text-xs font-outfit font-semibold text-slate-500 hover:text-slate-700"
+                      >
+                        Mark read
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -912,7 +1094,16 @@ function ConnectedDashboard({
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
             }`}
           >
-            {tab.label}
+            <span className="inline-flex items-center gap-2">
+              <span>{tab.label}</span>
+              {unreadGitHubTabCounts[tab.id] > 0 && (
+                <span className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                  activeTab === tab.id ? 'bg-white/15 text-white' : 'bg-red-600 text-white'
+                }`}>
+                  {unreadGitHubTabCounts[tab.id] > 9 ? '9+' : unreadGitHubTabCounts[tab.id]}
+                </span>
+              )}
+            </span>
           </button>
         ))}
       </div>
@@ -1112,6 +1303,19 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     setLoading(false);
   }, []);
 
+  const loadIssues = useCallback(async (conn: ProjectGitHubConnection) => {
+    const token = getGitHubToken();
+    if (!token) return;
+
+    try {
+      const latestIssues = await fetchIssues(conn.repoFullName);
+      setIssues(latestIssues);
+      setIssueError(null);
+    } catch (error) {
+      setIssueError(error instanceof Error ? error.message : 'Failed to load issues');
+    }
+  }, []);
+
   // Auto-load data when connection is set
   useEffect(() => {
     if (connection) void loadData(connection);
@@ -1272,8 +1476,10 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
         const pr = await fetchPullRequest(token, connection.ownerLogin, connection.repoName, update.prNumber);
         setPRs((current) => [pr, ...current.filter((existing) => existing.number !== pr.number)]);
         setPRError(null);
-      } catch {
-        // Keep the live banner visible if full PR details cannot be loaded.
+      } catch (error) {
+        setPRError(error instanceof Error
+          ? error.message
+          : `Received PR update #${update.prNumber}, but could not refresh the details.`);
       }
       return;
     }
@@ -1288,6 +1494,12 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
       };
     }));
   }, [connection]);
+
+  const handleIssueUpdate = useCallback(() => {
+    if (!connection) return;
+
+    void loadIssues(connection);
+  }, [connection, loadIssues]);
 
   const filteredRepos = allRepos.filter(r =>
     r.full_name.toLowerCase().includes(repoSearch.toLowerCase())
@@ -1310,6 +1522,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
       onLogout={() => void handleLogout()}
       onChangeRepo={handleOpenModal}
       onPRUpdate={(update) => void handlePRUpdate(update)}
+      onIssueUpdate={(update) => void handleIssueUpdate(update)}
       automationRules={automationRules}
       automationRulesLoading={automationRulesLoading}
       automationRulesError={automationRulesError}
