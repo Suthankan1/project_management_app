@@ -9,11 +9,9 @@ export interface AvailableDestSprint {
 
 interface CompleteSprintModalProps {
   open: boolean;
-  allActiveSprints: Array<{ id: number; sprintName?: string }>;
-  sprintIdToComplete: number | null;
-  onSelectSprint: (id: number) => void;
+  sprintName: string;
   incompleteCount: number;
-  availableDestSprints: AvailableDestSprint[];
+  availableSprints: AvailableDestSprint[];
   destination: number | null;
   onSelectDestination: (sprintId: number | null) => void;
   onComplete: () => void;
@@ -23,11 +21,9 @@ interface CompleteSprintModalProps {
 
 export default function CompleteSprintModal({
   open,
-  allActiveSprints,
-  sprintIdToComplete,
-  onSelectSprint,
+  sprintName,
   incompleteCount,
-  availableDestSprints,
+  availableSprints,
   destination,
   onSelectDestination,
   onComplete,
@@ -42,28 +38,10 @@ export default function CompleteSprintModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-2xl shadow-2xl border border-[#EAECF0] p-6 max-w-md w-full">
         <h3 className="text-lg font-bold text-[#101828] mb-1">Complete Sprint</h3>
-        <p className="text-sm text-[#667085] mb-4">Select the sprint to complete</p>
+        <p className="text-sm text-[#667085] mb-4">
+          Mark <strong className="text-[#101828]">{sprintName}</strong> as completed
+        </p>
 
-        {/* Sprint selector — only shown when multiple active sprints */}
-        {allActiveSprints.length > 1 && (
-          <div className="space-y-2 mb-4">
-            {allActiveSprints.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => onSelectSprint(s.id)}
-                className={`w-full text-left p-3 rounded-xl border text-sm font-medium transition-colors ${
-                  sprintIdToComplete === s.id
-                    ? 'border-[#155DFC] bg-blue-50 text-[#155DFC]'
-                    : 'border-[#EAECF0] text-[#344054] hover:bg-gray-50'
-                }`}
-              >
-                {s.sprintName || `Sprint #${s.id}`}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Incomplete task warning */}
         {hasIncomplete ? (
           <div className="space-y-4">
             <div className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 p-3">
@@ -76,7 +54,6 @@ export default function CompleteSprintModal({
             <div>
               <p className="text-sm font-semibold text-[#344054] mb-2">Move incomplete tasks to:</p>
               <div className="space-y-2">
-                {/* Backlog option */}
                 <label
                   className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
                     destination === null ? 'border-[#155DFC] bg-blue-50' : 'border-[#EAECF0] hover:bg-gray-50'
@@ -84,7 +61,7 @@ export default function CompleteSprintModal({
                 >
                   <input
                     type="radio"
-                    name="dest"
+                    name="backlog-dest"
                     checked={destination === null}
                     onChange={() => onSelectDestination(null)}
                     className="accent-[#155DFC]"
@@ -93,8 +70,7 @@ export default function CompleteSprintModal({
                   <span className="text-sm font-medium text-[#101828]">Backlog</span>
                 </label>
 
-                {/* Other sprints */}
-                {availableDestSprints.map((s) => (
+                {availableSprints.map((s) => (
                   <label
                     key={s.id}
                     className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
@@ -103,7 +79,7 @@ export default function CompleteSprintModal({
                   >
                     <input
                       type="radio"
-                      name="dest"
+                      name="backlog-dest"
                       checked={destination === s.id}
                       onChange={() => onSelectDestination(s.id)}
                       className="accent-[#155DFC]"
@@ -131,7 +107,7 @@ export default function CompleteSprintModal({
           </button>
           <button
             onClick={onComplete}
-            disabled={isLoading || !sprintIdToComplete}
+            disabled={isLoading}
             className="flex-1 rounded-xl bg-[#D92D20] px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-50 hover:bg-[#B42318] transition-colors"
           >
             {isLoading ? 'Completing...' : 'Complete Sprint'}

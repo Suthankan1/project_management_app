@@ -49,10 +49,11 @@ export async function fetchSprintsByProject(projectId: number): Promise<unknown[
 }
 
 /**
- * Complete a sprint — calls the dedicated complete endpoint
+ * Complete a sprint — calls the dedicated complete endpoint.
+ * moveIncompleteTo: null = move to backlog, number = destination sprint ID
  */
-export async function completeSprint(sprintId: number): Promise<void> {
-  await axios.put(`/api/sprints/${sprintId}/complete`);
+export async function completeSprint(sprintId: number, moveIncompleteTo: number | null = null): Promise<void> {
+  await axios.put(`/api/sprints/${sprintId}/complete`, { moveIncompleteTo });
 }
 
 /**

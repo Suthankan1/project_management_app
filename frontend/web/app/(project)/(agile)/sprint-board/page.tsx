@@ -115,7 +115,7 @@ export default function SprintBoardPage() {
   useEffect(() => { hydrate(sprintboard ?? null); }, [sprintboard, hydrate]);
 
   // ── Actions hook ───────────────────────────────────────────────────────────
-  const actions = useSprintBoardActions({ projectIdStr, allBoards, setAllBoards, selectedIdx, activeSprint, sprintboard, board, teamMembers, forceRefresh, applyOptimisticMove, rollbackMove, selectedTaskIds, clearSelection });
+  const actions = useSprintBoardActions({ projectIdStr, allBoards, allActiveSprints, setAllBoards, selectedIdx, activeSprint, sprintboard, board, teamMembers, forceRefresh, applyOptimisticMove, rollbackMove, selectedTaskIds, clearSelection });
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -155,7 +155,7 @@ export default function SprintBoardPage() {
             sprintName={activeSprint?.sprintName || sprintboard.sprintName}
             allActiveSprints={allActiveSprints} selectedIdx={selectedIdx} onSelectSprint={setSelectedIdx}
             filters={filters} onSearchChange={(val) => updateFilters({ search: val })} onFilterChange={updateFilters}
-            onCompleteSprint={() => { actions.setSprintIdToComplete(activeSprint?.id ?? null); actions.setShowCompleteConfirm(true); }}
+            onCompleteSprint={() => activeSprint && void actions.openCompleteModal(activeSprint.id)}
             totalTasks={metrics.totalTasks} doneTasks={metrics.doneTasks} doneStoryPoints={metrics.doneStoryPoints}
             totalStoryPoints={metrics.totalStoryPoints} overdueTasks={metrics.overdueTasks} selectedCount={metrics.selectedCount}
             isLoading={actions.isUpdating} onOpenShortcuts={() => setShowShortcuts(true)}
@@ -172,7 +172,19 @@ export default function SprintBoardPage() {
 
           <div className="flex-1 overflow-x-auto px-3 md:px-5 py-3 snap-x snap-mandatory hide-scrollbar">
             <UndoMoveToast lastMove={lastMove} onUndo={actions.handleUndoMove} />
-            <CompleteSprintModal open={actions.showCompleteConfirm} allActiveSprints={allActiveSprints} sprintIdToComplete={actions.sprintIdToComplete} onSelectSprint={actions.setSprintIdToComplete} onComplete={actions.handleCompleteSprint} onCancel={() => actions.setShowCompleteConfirm(false)} />
+            <CompleteSprintModal
+              open={actions.showCompleteConfirm}
+              allActiveSprints={allActiveSprints}
+              sprintIdToComplete={actions.sprintIdToComplete}
+              onSelectSprint={actions.setSprintIdToComplete}
+              incompleteCount={actions.incompleteCount}
+              availableDestSprints={actions.availableDestSprints}
+              destination={actions.completeDestination}
+              onSelectDestination={actions.setCompleteDestination}
+              onComplete={actions.handleCompleteSprint}
+              onCancel={() => actions.setShowCompleteConfirm(false)}
+              isLoading={actions.isUpdating}
+            />
             {actions.successMsg && <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-[#6CE9A6] bg-[#ECFDF3] px-5 py-2 text-sm font-semibold text-[#027A48]">{actions.successMsg}</div>}
 
             <SprintDragDropProvider tasks={board.columns.flatMap((col) => col.tasks)} onDragEnd={actions.handleDragEnd}>

@@ -28,9 +28,15 @@ export interface LocalSprintTask {
   labels?: Array<{ id: number; name: string; color?: string }>;
 }
 
+export interface AvailableDestSprint {
+  id: number;
+  name: string;
+}
+
 interface UseBacklogCardHandlersArgs {
   sprint: SprintItem;
   projectId: string;
+  availableSprintsForMove?: AvailableDestSprint[];
   onSprintDeleted: (sprintId: number, tasks: TaskItem[]) => void;
   onStatusChange?: (taskId: number, status: string) => void;
   onStoryPointsChange?: (taskId: number, points: number) => void;
@@ -46,6 +52,7 @@ interface UseBacklogCardHandlersArgs {
 export function useBacklogCardHandlers({
   sprint,
   projectId,
+  availableSprintsForMove = [],
   onSprintDeleted,
   onStatusChange,
   onStoryPointsChange,
@@ -68,6 +75,7 @@ export function useBacklogCardHandlers({
 
   const [confirmDeleteSprint, setConfirmDeleteSprint] = useState(false);
   const [confirmCompleteSprint, setConfirmCompleteSprint] = useState(false);
+  const [completeDestination, setCompleteDestination] = useState<number | null>(null);
   const [taskToDeleteId, setTaskToDeleteId] = useState<number | null>(null);
   const [deletingSprintLoading, setDeletingSprintLoading] = useState(false);
   const [completingSprintLoading, setCompletingSprintLoading] = useState(false);
@@ -308,10 +316,17 @@ export function useBacklogCardHandlers({
     }
   };
 
+  const incompleteTaskCount = localTasks.filter((t) => t.status !== 'DONE').length;
+
+  const openCompleteSprintModal = () => {
+    setCompleteDestination(null); // default: backlog
+    setConfirmCompleteSprint(true);
+  };
+
   const doCompleteSprint = async () => {
     setCompletingSprintLoading(true);
     try {
-      await api.put(`/api/sprints/${sprint.id}/complete`);
+      await api.put(`/api/sprints/${sprint.id}/complete`, { moveIncompleteTo: completeDestination });
       setConfirmCompleteSprint(false);
       sprint.status = 'COMPLETED';
       window.dispatchEvent(new CustomEvent('planora:task-updated'));
@@ -348,6 +363,9 @@ export function useBacklogCardHandlers({
     startingSprintLoading, startSprintError,
     confirmDeleteSprint, setConfirmDeleteSprint,
     confirmCompleteSprint, setConfirmCompleteSprint,
+    completeDestination, setCompleteDestination,
+    incompleteTaskCount,
+    availableSprintsForMove,
     taskToDeleteId, setTaskToDeleteId,
     deletingSprintLoading,
     completingSprintLoading,
@@ -372,6 +390,7 @@ export function useBacklogCardHandlers({
     confirmEditSprint,
     saveGoal,
     confirmStartSprint,
+    openCompleteSprintModal,
     doCompleteSprint,
     doDeleteSprint,
   };

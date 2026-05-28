@@ -13,7 +13,9 @@ import EditSprintModal from './backlog-card/EditSprintModal';
 import StartSprintModal from './backlog-card/StartSprintModal';
 import SprintHeader from './backlog-card/SprintHeader';
 import SprintGoalEditor from './backlog-card/SprintGoalEditor';
+import CompleteSprintModal from './CompleteSprintModal';
 import { useBacklogCardHandlers } from './backlog-card/useBacklogCardHandlers';
+import type { AvailableDestSprint } from './backlog-card/useBacklogCardHandlers';
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +24,7 @@ interface BacklogCardProps {
   projectId: string;
   projectKey?: string;
   currentUserRole?: string | null;
+  availableSprintsForMove?: AvailableDestSprint[];
   onDropTask: (taskId: number, sprintId: number, targetIndex?: number) => void;
   onCreateTask: (title: string, sprintId: number) => void;
   onDeleteTask: (taskId: number, sprintId: number) => void;
@@ -44,7 +47,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTask, onCreateTask, onDeleteTask, onToggleTask, onSprintDeleted, onStatusChange, onStoryPointsChange, onAssignTask, onRenameTask, onDueDateChange, projectLabels = [], onCreateLabel, extraStatuses = [], existingSprintNames = [] }: BacklogCardProps) {
+function BacklogCard({ sprint, projectId, projectKey, currentUserRole, availableSprintsForMove = [], onDropTask, onCreateTask, onDeleteTask, onToggleTask, onSprintDeleted, onStatusChange, onStoryPointsChange, onAssignTask, onRenameTask, onDueDateChange, projectLabels = [], onCreateLabel, extraStatuses = [], existingSprintNames = [] }: BacklogCardProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [showCreateTaskBox, setShowCreateTaskBox] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
@@ -59,6 +62,7 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
   const handlers = useBacklogCardHandlers({
     sprint,
     projectId,
+    availableSprintsForMove,
     onSprintDeleted,
     onStatusChange,
     onStoryPointsChange,
@@ -118,7 +122,7 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
         onStartSprint={() => {
           handlers.setShowStartSprintModal(true);
         }}
-        onCompleteSprint={() => handlers.setConfirmCompleteSprint(true)}
+        onCompleteSprint={handlers.openCompleteSprintModal}
         onDeleteSprint={() => handlers.setConfirmDeleteSprint(true)}
         onViewReport={() => handlers.setShowReportModal(true)}
         onNameSave={handlers.handleNameSave}
@@ -360,16 +364,17 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, onDropTas
       onCancel={() => handlers.setConfirmDeleteSprint(false)}
     />
 
-    {/* ── Complete Sprint Confirmation ── */}
-    <ConfirmModal
+    {/* ── Complete Sprint Modal ── */}
+    <CompleteSprintModal
       open={handlers.confirmCompleteSprint}
-      variant="success"
-      title="Complete Sprint"
-      message={`Mark "${sprint.name}" as completed?`}
-      confirmLabel="Complete Sprint"
-      loading={handlers.completingSprintLoading}
-      onConfirm={handlers.doCompleteSprint}
+      sprintName={sprint.name}
+      incompleteCount={handlers.incompleteTaskCount}
+      availableSprints={handlers.availableSprintsForMove}
+      destination={handlers.completeDestination}
+      onSelectDestination={handlers.setCompleteDestination}
+      onComplete={handlers.doCompleteSprint}
       onCancel={() => handlers.setConfirmCompleteSprint(false)}
+      isLoading={handlers.completingSprintLoading}
     />
 
     {/* ── Sprint Report Modal ── */}

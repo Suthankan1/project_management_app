@@ -835,6 +835,9 @@ export default function SprintBacklogPage() {
                           projectId={projectId!}
                           projectKey={projectKey}
                           currentUserRole={currentUserRole}
+                          availableSprintsForMove={sprints
+                            .filter((s) => s.id !== sprint.id && s.status === 'NOT_STARTED')
+                            .map((s) => ({ id: s.id, name: s.name }))}
                           onDropTask={moveTaskToSprint}
                           onCreateTask={createSprintTask}
                           onToggleTask={toggleTaskSelection}
