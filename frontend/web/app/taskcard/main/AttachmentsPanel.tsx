@@ -26,27 +26,27 @@ const AttachmentsPanel: React.FC<AttachmentsPanelProps> = ({ attachments, onRemo
 
   return (
     <div className="mb-8">
-      <h3 className="text-sm font-bold text-gray-800 mb-3">Attachments</h3>
+      <h3 className="text-sm font-bold text-cu-text-primary mb-3">Attachments</h3>
       <div className="space-y-2">
         {attachments.map((att) => (
-          <div key={att.id} className="flex items-center gap-3 p-2.5 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors group">
+          <div key={att.id} className="flex items-center gap-3 p-2.5 border border-cu-border rounded-lg hover:bg-cu-hover transition-colors group">
             <AttachmentIcon contentType={att.contentType} />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">{att.fileName}</p>
-              <p className="text-xs text-gray-400">{formatFileSize(att.fileSize)} · {att.uploadedByName}</p>
+              <p className="text-sm font-medium text-cu-text-primary truncate">{att.fileName}</p>
+              <p className="text-xs text-cu-text-muted">{formatFileSize(att.fileSize)} · {att.uploadedByName}</p>
             </div>
             <a
               href={att.downloadUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
+              className="p-1.5 rounded hover:bg-cu-primary/10 text-cu-text-muted hover:text-cu-primary transition-colors"
               title="Download"
             >
               <Download size={14} />
             </a>
             <button
               onClick={() => onRemove(att.id)}
-              className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
+              className="p-1.5 rounded hover:bg-cu-danger/10 text-cu-text-muted hover:text-cu-danger transition-colors opacity-0 group-hover:opacity-100"
               title="Delete"
             >
               <Trash2 size={14} />

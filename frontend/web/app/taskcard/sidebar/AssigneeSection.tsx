@@ -24,20 +24,20 @@ const AssigneeSection: React.FC<AssigneeSectionProps> = ({ assignee, onUnassign 
 
   return (
     <SidebarField label="Assignee">
-      <div className="flex items-center gap-2 hover:bg-gray-50 p-1 min-h-[44px] sm:min-h-0 -ml-1 rounded group">
-        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold overflow-hidden">
+      <div className="flex items-center gap-2 hover:bg-cu-hover p-1 min-h-[44px] sm:min-h-0 -ml-1 rounded group">
+        <div className="w-6 h-6 rounded-full bg-cu-primary/10 text-cu-primary flex items-center justify-center text-xs font-bold overflow-hidden">
           {picUrl ? (
             <Image src={picUrl} alt={assignee} width={24} height={24} className="w-full h-full object-cover" unoptimized />
           ) : (
             assignee.charAt(0).toUpperCase()
           )}
         </div>
-        <span className="text-sm text-blue-600 flex-1">{assignee}</span>
+        <span className="text-sm text-cu-primary flex-1">{assignee}</span>
         {onUnassign && (
           <button
             onClick={onUnassign}
             title="Remove assignee"
-            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all"
+            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-cu-danger/10 text-cu-text-muted hover:text-cu-danger transition-all"
           >
             <X size={14} />
           </button>

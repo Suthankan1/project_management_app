@@ -13,8 +13,8 @@ interface CommentItemProps {
 }
 
 const CommentItem: React.FC<CommentItemProps> = ({ comment, resolvedPicUrl }) => (
-  <div className="flex gap-3 pb-4 border-b border-gray-100">
-    <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden">
+  <div className="flex gap-3 pb-4 border-b border-cu-border">
+    <div className="w-8 h-8 rounded-full bg-cu-bg-tertiary flex items-center justify-center text-cu-text-primary text-xs font-bold shrink-0 overflow-hidden">
       {resolvedPicUrl ? (
         <Image
           src={resolvedPicUrl}
@@ -30,10 +30,10 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment, resolvedPicUrl }) =>
     </div>
     <div className="flex-1">
       <div className="flex items-center gap-2">
-        <span className="text-sm font-semibold text-gray-800">{comment.authorName}</span>
-        <span className="text-xs text-gray-500">{new Date(comment.createdAt).toLocaleString()}</span>
+        <span className="text-sm font-semibold text-cu-text-primary">{comment.authorName}</span>
+        <span className="text-xs text-cu-text-muted">{new Date(comment.createdAt).toLocaleString()}</span>
       </div>
-      <p className="text-sm text-gray-600 mt-1">{comment.text}</p>
+      <p className="text-sm text-cu-text-secondary mt-1">{comment.text}</p>
     </div>
   </div>
 );

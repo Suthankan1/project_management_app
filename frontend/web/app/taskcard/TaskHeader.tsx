@@ -50,12 +50,12 @@ const TaskHeader: React.FC<TaskHeaderProps> = ({ project, taskId, numericTaskId,
   };
 
   return (
-    <div className="px-4 sm:px-5 py-3 flex items-center justify-between border-b border-[#EAECF0] bg-white/95 backdrop-blur sticky top-0 z-10 flex-shrink-0">
+    <div className="px-4 sm:px-5 py-3 flex items-center justify-between border-b border-cu-border bg-cu-bg/95 backdrop-blur sticky top-0 z-10 flex-shrink-0">
       <div className="flex items-center gap-2 text-sm min-w-0">
-        <Layout size={15} className="text-[#155DFC] flex-shrink-0" />
-        <span className="font-medium text-[#6A7282] truncate">{project}</span>
-        <span className="flex-shrink-0 text-[#9CA3AF]">/</span>
-        <span className="text-[#101828] font-semibold flex-shrink-0">{taskId}</span>
+        <Layout size={15} className="text-cu-primary flex-shrink-0" />
+        <span className="font-medium text-cu-text-secondary truncate">{project}</span>
+        <span className="flex-shrink-0 text-cu-text-muted">/</span>
+        <span className="text-cu-text-primary font-semibold flex-shrink-0">{taskId}</span>
       </div>
 
       <div className="flex items-center gap-1 flex-shrink-0">
@@ -70,18 +70,18 @@ const TaskHeader: React.FC<TaskHeaderProps> = ({ project, taskId, numericTaskId,
                 if (e.key === 'Escape') { setShowTemplateInput(false); setTemplateName(''); }
               }}
               placeholder="Template name…"
-              className="h-8 border border-[#D0D5DD] rounded-lg px-2 text-xs w-40 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC]"
+              className="h-8 border border-cu-border bg-cu-bg text-cu-text-primary rounded-lg px-2 text-xs w-40 focus:outline-none focus:ring-2 focus:ring-cu-primary/20 focus:border-cu-primary"
             />
             <button
               onClick={handleSaveTemplate}
               disabled={savingTemplate || !templateName.trim()}
-              className="h-8 px-2 bg-[#155DFC] text-white rounded-lg text-xs hover:bg-[#0042A8] disabled:opacity-50 transition-colors"
+              className="h-8 px-2 bg-cu-primary text-white rounded-lg text-xs hover:bg-cu-primary-hover disabled:opacity-50 transition-colors"
             >
               {savingTemplate ? '…' : 'Save'}
             </button>
             <button
               onClick={() => { setShowTemplateInput(false); setTemplateName(''); }}
-              className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"
+              className="p-1.5 hover:bg-cu-hover rounded-lg text-cu-text-muted"
             >
               <X size={14} />
             </button>
@@ -90,7 +90,7 @@ const TaskHeader: React.FC<TaskHeaderProps> = ({ project, taskId, numericTaskId,
         <button
           onClick={handleCopyLink}
           title="Copy link"
-          className="p-2 hover:bg-[#F8FAFF] rounded-lg flex items-center gap-1.5 text-[#6A7282] hover:text-[#155DFC] text-xs transition-colors"
+          className="p-2 hover:bg-cu-hover rounded-lg flex items-center gap-1.5 text-cu-text-secondary hover:text-cu-primary text-xs transition-colors"
         >
           {copied ? <Check size={15} className="text-green-500" /> : <Link2 size={15} />}
           <span className="hidden sm:inline">{copied ? 'Copied!' : 'Copy link'}</span>
@@ -98,7 +98,7 @@ const TaskHeader: React.FC<TaskHeaderProps> = ({ project, taskId, numericTaskId,
         <div className="relative">
           <button
             onClick={() => setDropdownOpen((v) => !v)}
-            className="p-2 hover:bg-[#F8FAFF] rounded-lg text-[#6A7282] hover:text-[#155DFC] transition-colors"
+            className="p-2 hover:bg-cu-hover rounded-lg text-cu-text-secondary hover:text-cu-primary transition-colors"
             title="More options"
           >
             <MoreHorizontal size={18} />
@@ -107,12 +107,12 @@ const TaskHeader: React.FC<TaskHeaderProps> = ({ project, taskId, numericTaskId,
             <>
               {/* Full-screen invisible overlay closes the dropdown when the user clicks outside it */}
               <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />
-              <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-[#E5E7EB] rounded-xl shadow-lg z-20 py-1">
+              <div className="absolute right-0 top-full mt-1 w-44 bg-cu-bg border border-cu-border rounded-xl shadow-cu-lg z-20 py-1">
                 <button
                   onClick={openTemplateInput}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#374151] hover:bg-[#F8FAFF] transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-cu-text-primary hover:bg-cu-hover transition-colors"
                 >
-                  <FileText size={15} className="text-gray-400" />
+                  <FileText size={15} className="text-cu-text-muted" />
                   Save as Template
                 </button>
               </div>
@@ -121,7 +121,7 @@ const TaskHeader: React.FC<TaskHeaderProps> = ({ project, taskId, numericTaskId,
         </div>
         <button
           onClick={onClose}
-          className="p-2 hover:bg-[#FFF0F0] rounded-lg text-[#6A7282] hover:text-red-500 transition-colors"
+          className="p-2 hover:bg-cu-danger/10 rounded-lg text-cu-text-secondary hover:text-cu-danger transition-colors"
           title="Close"
         >
           <X size={18} />

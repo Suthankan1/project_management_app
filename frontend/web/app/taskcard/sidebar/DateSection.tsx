@@ -55,20 +55,20 @@ const DateSection: React.FC<DateSectionProps> = ({ dates, onUpdateDueDate, onUpd
     <div className="p-4 space-y-4">
         {dates.dueDate !== undefined && (
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500 font-medium">Due date</span>
+            <span className="text-xs text-cu-text-secondary font-medium">Due date</span>
             {onUpdateDueDate ? (
               <div className="flex flex-col items-end">
                 <div className="flex items-center gap-2">
                   <Popover.Root open={open} onOpenChange={setOpen}>
                     <Popover.Trigger asChild>
-                      <button className="flex items-center gap-2 text-sm text-gray-800 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
-                        <CalendarIcon size={14} className="text-gray-500" />
+                      <button className="flex items-center gap-2 text-sm text-cu-text-primary bg-cu-bg-secondary hover:bg-cu-hover px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded border border-cu-border focus:outline-none focus:ring-2 focus:ring-cu-primary transition-colors">
+                        <CalendarIcon size={14} className="text-cu-text-muted" />
                         {parsedDueDate ? format(parsedDueDate, 'MMM d, yyyy') : 'No date'}
                       </button>
                     </Popover.Trigger>
                     <Popover.Portal>
                       {/* Popover.Portal renders outside the sidebar so overflow:hidden on the modal panel can't clip the calendar */}
-                      <Popover.Content className="z-[10000] p-3 bg-white rounded-xl shadow-xl border border-gray-200" sideOffset={5} align="end">
+                      <Popover.Content className="z-[10000] p-3 bg-cu-bg rounded-xl shadow-cu-xl border border-cu-border" sideOffset={5} align="end">
                         <DayPicker
                           mode="single"
                           selected={parsedDueDate}
@@ -81,7 +81,7 @@ const DateSection: React.FC<DateSectionProps> = ({ dates, onUpdateDueDate, onUpd
                   {parsedDueDate && (
                     <button
                       onClick={() => handleSelect(undefined)}
-                      className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                      className="p-1 rounded-full hover:bg-cu-hover text-cu-text-muted hover:text-cu-text-primary transition-colors"
                       title="Clear date"
                     >
                       <X size={14} />
@@ -95,7 +95,7 @@ const DateSection: React.FC<DateSectionProps> = ({ dates, onUpdateDueDate, onUpd
                 )}
               </div>
             ) : (
-              <span className="text-sm text-gray-800 bg-gray-50 px-2 py-1 rounded border border-gray-100">
+              <span className="text-sm text-cu-text-primary bg-cu-bg-secondary px-2 py-1 rounded border border-cu-border">
                 {parsedDueDate ? format(parsedDueDate, 'MMM d, yyyy') : 'No date'}
               </span>
             )}
@@ -103,30 +103,30 @@ const DateSection: React.FC<DateSectionProps> = ({ dates, onUpdateDueDate, onUpd
         )}
         {dates.startDate !== undefined && (
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500 font-medium">Start date</span>
+            <span className="text-xs text-cu-text-secondary font-medium">Start date</span>
             {onUpdateStartDate ? (
               <div className="flex items-center gap-2">
                 <Popover.Root open={startOpen} onOpenChange={setStartOpen}>
                   <Popover.Trigger asChild>
-                    <button className="flex items-center gap-2 text-sm text-gray-800 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
-                      <CalendarIcon size={14} className="text-gray-500" />
+                    <button className="flex items-center gap-2 text-sm text-cu-text-primary bg-cu-bg-secondary hover:bg-cu-hover px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded border border-cu-border focus:outline-none focus:ring-2 focus:ring-cu-primary transition-colors">
+                      <CalendarIcon size={14} className="text-cu-text-muted" />
                       {parsedStartDate ? format(parsedStartDate, 'MMM d, yyyy') : 'No date'}
                     </button>
                   </Popover.Trigger>
                   <Popover.Portal>
-                    <Popover.Content className="z-[10000] p-3 bg-white rounded-xl shadow-xl border border-gray-200" sideOffset={5} align="end">
+                    <Popover.Content className="z-[10000] p-3 bg-cu-bg rounded-xl shadow-cu-xl border border-cu-border" sideOffset={5} align="end">
                       <DayPicker mode="single" selected={parsedStartDate} onSelect={handleStartSelect} showOutsideDays />
                     </Popover.Content>
                   </Popover.Portal>
                 </Popover.Root>
                 {parsedStartDate && (
-                  <button onClick={() => handleStartSelect(undefined)} className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors" title="Clear date">
+                  <button onClick={() => handleStartSelect(undefined)} className="p-1 rounded-full hover:bg-cu-hover text-cu-text-muted hover:text-cu-text-primary transition-colors" title="Clear date">
                     <X size={14} />
                   </button>
                 )}
               </div>
             ) : (
-              <span className="text-sm text-gray-800 bg-gray-50 px-2 py-1 rounded border border-gray-100">
+              <span className="text-sm text-cu-text-primary bg-cu-bg-secondary px-2 py-1 rounded border border-cu-border">
                 {parsedStartDate ? format(parsedStartDate, 'MMM d, yyyy') : 'No date'}
               </span>
             )}
@@ -134,14 +134,14 @@ const DateSection: React.FC<DateSectionProps> = ({ dates, onUpdateDueDate, onUpd
         )}
         {dates.created && (
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-gray-500 font-medium">Created</span>
-            <span className="text-xs text-gray-600">{new Date(dates.created).toLocaleString()}</span>
+            <span className="text-xs text-cu-text-secondary font-medium">Created</span>
+            <span className="text-xs text-cu-text-primary">{new Date(dates.created).toLocaleString()}</span>
           </div>
         )}
         {dates.updated && (
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-gray-500 font-medium">Updated</span>
-            <span className="text-xs text-gray-600">{new Date(dates.updated).toLocaleString()}</span>
+            <span className="text-xs text-cu-text-secondary font-medium">Updated</span>
+            <span className="text-xs text-cu-text-primary">{new Date(dates.updated).toLocaleString()}</span>
           </div>
         )}
     </div>
