@@ -12,7 +12,18 @@ import { WorkloadEntry } from './types';
 import { WorkloadPieChart } from './WorkloadPieChart';
 import { WorkloadMembersList } from './WorkloadMembersList';
 
-const COLORS = ['#0052CC', '#00875A', '#FF8B00', '#DE350B', '#FFC400', '#6554C0', '#36B37E', '#FF5630', '#2684FF', '#FF991F'];
+const COLORS = [
+  'var(--cu-primary)',
+  'var(--cu-success)',
+  'var(--cu-warning)',
+  'var(--cu-danger)',
+  'var(--cu-warning)',
+  'var(--cu-primary-hover)',
+  'var(--cu-success)',
+  'var(--cu-danger)',
+  'var(--cu-primary-light)',
+  'var(--cu-warning)',
+];
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
 interface UserProfileItem {
@@ -128,19 +139,19 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
   }
 
   return (
-    <MotionWrapper className="relative bg-white/60 backdrop-blur-2xl rounded-2xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 overflow-hidden">
+    <MotionWrapper className="relative bg-cu-bg/90 backdrop-blur-2xl rounded-2xl border border-cu-border shadow-cu-sm hover:shadow-cu-md transition-all duration-300 overflow-hidden">
       {/* Decorative gradient blob background for glass effect */}
-      <div className="absolute top-[-50%] left-[-10%] w-[60%] h-[150%] bg-gradient-to-r from-blue-100/40 to-emerald-50/40 rounded-full blur-3xl -z-10 animate-pulse pointer-events-none" style={{ animationDuration: '8s' }} />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[100%] bg-gradient-to-l from-amber-50/40 to-purple-50/40 rounded-full blur-3xl -z-10 animate-pulse pointer-events-none" style={{ animationDuration: '10s' }} />
+      <div className="absolute top-[-50%] left-[-10%] w-[60%] h-[150%] bg-gradient-to-r from-cu-primary/10 to-cu-success/10 rounded-full blur-3xl -z-10 animate-pulse pointer-events-none" style={{ animationDuration: '8s' }} />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[100%] bg-gradient-to-l from-cu-warning/10 to-cu-primary/10 rounded-full blur-3xl -z-10 animate-pulse pointer-events-none" style={{ animationDuration: '10s' }} />
 
-      <div className="p-5 border-b border-white/50 flex items-center justify-between bg-white/40">
-        <h2 className="font-arimo text-[16px] font-semibold text-[#101828] flex items-center gap-2">
-          <Briefcase size={18} className="text-[#0052CC]" />
+      <div className="p-5 border-b border-cu-border flex items-center justify-between bg-cu-bg-secondary/60">
+        <h2 className="font-arimo text-[16px] font-semibold text-cu-text-primary flex items-center gap-2">
+          <Briefcase size={18} className="text-cu-primary" />
           Team Workload Distribution
         </h2>
       </div>
 
-      <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-white/50">
+      <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-cu-border">
         <WorkloadPieChart 
           projectId={projectId}
           membersLength={members.length}

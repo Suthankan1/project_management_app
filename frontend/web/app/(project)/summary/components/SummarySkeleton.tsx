@@ -6,8 +6,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 // Base Bento Card Skeleton to match the real BentoCard
 export function BentoCardSkeleton({ children, className = "", noPadding = false }: { children?: React.ReactNode, className?: string, noPadding?: boolean }) {
     return (
-        <div className={`flex flex-col bg-white rounded-xl border border-[#E3E8EF] shadow-sm ring-1 ring-black/[0.03] overflow-hidden ${className}`}>
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-gray-50/60 shrink-0">
+        <div className={`flex flex-col bg-cu-bg rounded-xl border border-cu-border shadow-cu-sm ring-1 ring-cu-border-light/60 overflow-hidden ${className}`}>
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-cu-border bg-cu-bg-secondary/70 shrink-0">
                 <Skeleton className="w-4 h-4 rounded-md shrink-0" />
                 <Skeleton className="h-3.5 w-28 rounded-md" />
             </div>
@@ -52,7 +52,7 @@ export function MetricsSkeleton() {
 // 2. Report Button Skeleton
 export function ReportSkeleton() {
     return (
-        <div className="rounded-xl overflow-hidden shadow-sm ring-1 ring-black/[0.03] border border-[#E3E8EF] bg-white h-[64px] flex items-center px-4 justify-between">
+        <div className="rounded-xl overflow-hidden shadow-cu-sm ring-1 ring-cu-border-light/60 border border-cu-border bg-cu-bg h-[64px] flex items-center px-4 justify-between">
              <div className="flex items-center gap-3">
                  <Skeleton className="w-8 h-8 rounded-lg" />
                  <Skeleton className="h-4 w-40" />
@@ -115,7 +115,7 @@ export function ChartSkeleton() {
                     return (
                         <div
                             key={j}
-                            className="w-full rounded-t-sm bg-gray-100/80 animate-pulse"
+                            className="w-full rounded-t-sm bg-cu-bg-tertiary animate-pulse"
                             style={{ height: heights[j % heights.length] }}
                         />
                     );
@@ -136,7 +136,7 @@ export function ListCardSkeleton() {
         <BentoCardSkeleton className="h-[352px]">
              <div className="space-y-3">
                 {[...Array(4)].map((_, i) => (
-                    <div key={i} className="flex items-center gap-3 p-3 bg-gray-50/50 rounded-xl border border-gray-100">
+                    <div key={i} className="flex items-center gap-3 p-3 bg-cu-bg-secondary rounded-xl border border-cu-border">
                         <Skeleton className="w-9 h-9 rounded-lg shrink-0" />
                         <div className="flex-1 space-y-2">
                             <Skeleton className="h-3 w-3/4" />
@@ -177,8 +177,8 @@ export function ChatNotesSkeleton({ isChat = false }: { isChat?: boolean }) {
 // 8. Workload Skeleton
 export function WorkloadSkeleton() {
     return (
-        <div className="bg-white/60 backdrop-blur-2xl rounded-2xl border border-gray-200 overflow-hidden shadow-sm mt-6">
-            <div className="px-5 py-4 border-b border-gray-200 flex items-center gap-2">
+        <div className="bg-cu-bg/90 backdrop-blur-2xl rounded-2xl border border-cu-border overflow-hidden shadow-cu-sm mt-6">
+            <div className="px-5 py-4 border-b border-cu-border flex items-center gap-2 bg-cu-bg-secondary/60">
                 <Skeleton className="w-4 h-4 rounded-md" />
                 <Skeleton className="h-4 w-48" />
             </div>
@@ -190,7 +190,7 @@ export function WorkloadSkeleton() {
                 {/* Members list */}
                 <div className="w-full lg:w-8/12 space-y-3">
                     {[...Array(4)].map((_, i) => (
-                        <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-xl border border-gray-100 gap-4">
+                        <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-cu-bg-secondary rounded-xl border border-cu-border gap-4">
                             <div className="flex items-center gap-3">
                                 <Skeleton className="w-10 h-10 rounded-full" />
                                 <div className="space-y-2">

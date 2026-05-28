@@ -51,19 +51,19 @@ export function BurndownChart({ tasks, sprints }: { tasks: Task[], sprints: Spri
           <SafeChartFrame>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={burndownData} margin={{ top: 4, right: 8, bottom: 0, left: -28 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#6A7282' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: '#6A7282' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E3E8EF', fontSize: '11px' }} />
-                <Legend wrapperStyle={{ fontSize: '10px' }} />
-                <Line type="monotone" dataKey="ideal" name="Ideal" stroke="#98A2B3" strokeDasharray="5 5" dot={false} strokeWidth={1.5} />
-                <Line type="stepAfter" dataKey="remaining" name="Actual" stroke="#0052CC" strokeWidth={2} activeDot={{ r: 4 }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--cu-border)" />
+                <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--cu-text-muted)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 9, fill: 'var(--cu-text-muted)' }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--cu-border)', background: 'var(--cu-bg)', color: 'var(--cu-text-primary)', fontSize: '11px' }} />
+                <Legend wrapperStyle={{ fontSize: '10px', color: 'var(--cu-text-secondary)' }} />
+                <Line type="monotone" dataKey="ideal" name="Ideal" stroke="var(--cu-text-muted)" strokeDasharray="5 5" dot={false} strokeWidth={1.5} />
+                <Line type="stepAfter" dataKey="remaining" name="Actual" stroke="var(--cu-primary)" strokeWidth={2} activeDot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
           </SafeChartFrame>
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
-            <p className="text-[11px] text-gray-400">No active sprint data</p>
+          <div className="absolute inset-0 flex items-center justify-center bg-cu-bg-secondary rounded-lg border border-dashed border-cu-border">
+            <p className="text-[11px] text-cu-text-muted">No active sprint data</p>
           </div>
         )}
       </div>

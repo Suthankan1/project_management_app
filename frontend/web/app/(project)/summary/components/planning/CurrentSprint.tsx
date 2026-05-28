@@ -13,11 +13,11 @@ export function CurrentSprint({ projectId, sprints = [], tasks = [] }: { project
     if (!activeSprint) {
         return (
             <div className="h-full flex flex-col items-center justify-center p-4">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#98A2B3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-3">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-3 text-cu-text-muted">
                     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                 </svg>
-                <p className="text-[14px] text-gray-600 mb-4 text-center">Start a sprint to unleash your team&apos;s tracking capabilities.</p>
-                <button className="px-4 py-2 bg-[#0052CC] text-white font-semibold rounded-lg text-sm hover:bg-[#0047b3] transition-all shadow-sm">
+                <p className="text-[14px] text-cu-text-secondary mb-4 text-center">Start a sprint to unleash your team&apos;s tracking capabilities.</p>
+                <button className="px-4 py-2 bg-cu-primary text-white font-semibold rounded-lg text-sm hover:bg-cu-primary-hover transition-all shadow-cu-sm">
                     Create Sprint
                 </button>
             </div>
@@ -47,24 +47,24 @@ export function CurrentSprint({ projectId, sprints = [], tasks = [] }: { project
     return (
         <div className="h-full flex flex-col">
             <div className="flex justify-between items-center mb-3">
-                <h3 className="text-[16px] text-[#0052CC] font-bold">{activeSprint.name}</h3>
-                <div className={`${isUrgent ? 'bg-[#FFEBE6] text-[#DE350B]' : 'bg-[#E3FCEF] text-[#00875A]'} px-3 py-1.5 rounded-md font-bold text-[12px] shadow-sm`}>
+                <h3 className="text-[16px] text-cu-primary font-bold">{activeSprint.name}</h3>
+                <div className={`${isUrgent ? 'bg-cu-danger/10 text-cu-danger border border-cu-danger/20' : 'bg-cu-success/10 text-cu-success border border-cu-success/20'} px-3 py-1.5 rounded-md font-bold text-[12px] shadow-cu-sm`}>
                     {daysRemainingText}
                 </div>
             </div>
 
             <div className="mb-3">
-                <div className="flex justify-between text-[14px] text-[#4A5565] mb-2">
+                <div className="flex justify-between text-[14px] text-cu-text-secondary mb-2">
                     <span className="font-medium">Points Done: {donePoints} / {totalPoints}</span>
-                    <span className="font-bold text-[#101828]">{percentage}%</span>
+                    <span className="font-bold text-cu-text-primary">{percentage}%</span>
                 </div>
-                <div className="w-full bg-[#F3F4F6] rounded-full h-3 overflow-hidden">
-                    <div className="bg-[#0052CC] h-3 rounded-full transition-all" style={{ width: `${percentage}%` }} />
+                <div className="w-full bg-cu-bg-tertiary rounded-full h-3 overflow-hidden">
+                    <div className="bg-cu-primary h-3 rounded-full transition-all" style={{ width: `${percentage}%` }} />
                 </div>
-                <p className="text-[12px] text-gray-500 mt-2">{completedTasks.length} out of {sprintTasks.length} tasks completed.</p>
+                <p className="text-[12px] text-cu-text-muted mt-2">{completedTasks.length} out of {sprintTasks.length} tasks completed.</p>
             </div>
 
-            <Link href={`/project/${projectId}/sprintboard`} className="mt-auto inline-flex items-center gap-2 text-[#0052CC] text-[14px] font-semibold hover:underline group">
+            <Link href={`/project/${projectId}/sprintboard`} className="mt-auto inline-flex items-center gap-2 text-cu-primary text-[14px] font-semibold hover:underline group">
                 Go to Sprint Board
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="group-hover:translate-x-1 transition-transform">
                     <path d="M3.33334 8H12.6667" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
