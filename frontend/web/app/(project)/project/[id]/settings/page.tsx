@@ -26,6 +26,7 @@ import {
 } from '@/hooks/useProjectContext';
 import { getUserIdFromToken } from '@/lib/auth';
 import CustomFieldsManager from './CustomFieldsManager';
+import NotificationPreferencesPanel from '@/components/settings/NotificationPreferencesPanel';
 type ProjectType = 'AGILE' | 'KANBAN';
 
 interface ProjectData {
@@ -979,6 +980,13 @@ export default function ProjectSettingsPage() {
                 </SectionCard>
 
                 <GitHubAutoTransitionsCard projectId={projectId} />
+
+                <NotificationPreferencesPanel
+                  title="Project notification overrides"
+                  description="Fine-tune which events in this project should notify you, without changing your global defaults."
+                  projectId={projectId}
+                  helperText="These overrides only affect this project. If no project override exists, your global notification defaults still apply."
+                />
 
               </div>
 

@@ -16,6 +16,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import static org.mockito.Mockito.never;
@@ -29,9 +30,11 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import com.planora.backend.dto.NotificationFeedResponseDTO;
+import com.planora.backend.model.NotificationChannel;
 import com.planora.backend.dto.NotificationResponseDTO;
 import com.planora.backend.model.Notification;
 import com.planora.backend.model.User;
+import com.planora.backend.repository.TaskRepository;
 import com.planora.backend.repository.NotificationRepository;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -51,6 +54,12 @@ class NotificationServiceTest {
     @Mock
     private ValueOperations<String, String> valueOperations;
 
+    @Mock
+    private NotificationPreferenceService notificationPreferenceService;
+
+    @Mock
+    private TaskRepository taskRepository;
+
     @InjectMocks
     private NotificationService notificationService;
 
@@ -60,6 +69,9 @@ class NotificationServiceTest {
     @SuppressWarnings("unused")
     void setUp() {
         lenient().when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        lenient().when(notificationPreferenceService.isEnabled(anyLong(), nullable(Long.class), anyString(), eq(NotificationChannel.IN_APP)))
+                .thenReturn(true);
+        lenient().when(taskRepository.findById(anyLong())).thenReturn(Optional.empty());
         recipient = new User();
         recipient.setUserId(15L);
         recipient.setUsername("alice");

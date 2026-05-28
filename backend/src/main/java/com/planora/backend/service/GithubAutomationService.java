@@ -332,8 +332,14 @@ public class GithubAutomationService {
         }
         String message = renderTemplate(messageTemplate, context);
         String link = defaultNotificationLink(rule.getTrigger(), context);
+        Long projectId = project.getId();
 
-        recipients.values().forEach(recipient -> notificationService.createNotification(recipient, message, link));
+        recipients.values().forEach(recipient -> notificationService.createNotification(
+            recipient,
+            projectId,
+            com.planora.backend.model.NotificationEventType.GITHUB_ACTIVITY.name(),
+            message,
+            link));
         recordExecution(
                 rule,
                 context,
@@ -376,19 +382,6 @@ public class GithubAutomationService {
                         : "https://github.com/" + repoFullName + "/releases/tag/" + tagName;
             }
         };
-    }
-
-    private Map<String, Object> eventContext(String repoFullName) {
-        Map<String, Object> context = new LinkedHashMap<>();
-        context.put("repoFullName", repoFullName);
-        return context;
-    }
-
-    private Map<String, Object> issueContext(String repoFullName, int issueNumber, String issueTitle) {
-        Map<String, Object> context = eventContext(repoFullName);
-        context.put("issueNumber", issueNumber);
-        context.put("issueTitle", issueTitle);
-        return context;
     }
 
     private String targetColumnName(GithubAutomationRule rule, Map<String, String> config) {
@@ -618,10 +611,12 @@ public class GithubAutomationService {
     private Optional<Long> importOpenedIssueAsTask(GithubAutomationRule rule, Map<String, Object> context) {
         Map<String, String> config = rule.getConfig() == null ? Map.of() : rule.getConfig();
         Project project = rule.getProject();
+        if (project == null || project.getId() == null) {
+            log.warn("Skipping issue-opened automation rule {} because its project is unavailable", rule.getId());
+            return Optional.empty();
+        }
         String configuredProjectId = Objects.toString(config.get("projectId"), "").trim();
-        String ruleProjectId = project == null || project.getId() == null
-                ? ""
-                : project.getId().toString();
+        String ruleProjectId = project.getId().toString();
         if (configuredProjectId.isBlank() || !configuredProjectId.equals(ruleProjectId)) {
             log.warn("Skipping issue-opened automation rule {} because config projectId must match its project",
                     rule.getId());
@@ -664,7 +659,6 @@ public class GithubAutomationService {
         return Optional.of(saved.getId());
     }
 
-    @SuppressWarnings("unchecked")
     private List<String> issueLabelsFromContext(Map<String, Object> context) {
         Object labels = context.get("labels");
         return labels instanceof List<?> list

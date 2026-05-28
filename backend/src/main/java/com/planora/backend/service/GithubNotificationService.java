@@ -88,9 +88,10 @@ public class GithubNotificationService {
         String prefix = "\uD83D\uDD00 PR opened: #" + prNumber + " ";
         String message = prefix + safeTitle(prTitle) + " by @" + safeLogin(authorGithubLogin);
         String link = "https://github.com/" + normalizedRepoFullName + "/pull/" + prNumber;
+        Long projectId = projects.stream().map(Project::getId).filter(java.util.Objects::nonNull).findFirst().orElse(null);
         recipients.values().forEach(recipient ->
                 notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                        recipient, message, link, prefix));
+                recipient, projectId, com.planora.backend.model.NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix));
         broadcastPRUpdate(projects, new GithubPRUpdatePayload(
                 "opened", prNumber, safeTitle(prTitle), link, safeLogin(authorGithubLogin)));
 
@@ -141,9 +142,10 @@ public class GithubNotificationService {
         String prefix = "\u2705 PR merged: #" + prNumber + " ";
         String message = prefix + safeTitle(prTitle) + " by @" + safeLogin(mergerGithubLogin);
         String link = "https://github.com/" + normalizedRepoFullName + "/pull/" + prNumber;
+        Long projectId = projects.stream().map(Project::getId).filter(java.util.Objects::nonNull).findFirst().orElse(null);
         recipients.values().forEach(recipient ->
                 notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                        recipient, message, link, prefix));
+                recipient, projectId, com.planora.backend.model.NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix));
         broadcastPRUpdate(projects, new GithubPRUpdatePayload(
                 "merged", prNumber, safeTitle(prTitle), link, safeLogin(mergerGithubLogin)));
 
@@ -168,7 +170,17 @@ public class GithubNotificationService {
         String message = "\uD83D\uDC41 Review requested: #" + prNumber + " "
                 + safeTitle(prTitle) + " in " + normalizedRepoFullName;
         String link = "https://github.com/" + normalizedRepoFullName + "/pull/" + prNumber;
-        reviewers.forEach(reviewer -> notificationService.createNotification(reviewer, message, link));
+        Long projectId = projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName).stream()
+            .map(Project::getId)
+            .filter(java.util.Objects::nonNull)
+            .findFirst()
+            .orElse(null);
+        reviewers.forEach(reviewer -> notificationService.createNotification(
+            reviewer,
+            projectId,
+            com.planora.backend.model.NotificationEventType.GITHUB_ACTIVITY.name(),
+            message,
+            link));
     }
 
     public void notifyCIFailed(String repoFullName, String branch, String commitSha, String workflowName) {
@@ -199,9 +211,10 @@ public class GithubNotificationService {
         String prefix = "\u274C CI failed: " + safeText(workflowName) + " on ";
         String message = prefix + safeText(branch) + " (" + shortSha + ")";
         String link = "https://github.com/" + normalizedRepoFullName + "/commit/" + normalizedCommitSha + "/checks";
+        Long projectId = projects.stream().map(Project::getId).filter(java.util.Objects::nonNull).findFirst().orElse(null);
         recipients.values().forEach(recipient ->
                 notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                        recipient, message, link, prefix));
+                recipient, projectId, com.planora.backend.model.NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix));
         broadcastCIUpdate(projects, new GithubCIUpdatePayload(
                 safeText(workflowName), safeText(branch), "failure", normalizedCommitSha));
 
@@ -252,6 +265,7 @@ public class GithubNotificationService {
         List<Project> projects = projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName);
         GithubIssueUpdatePayload updatePayload = new GithubIssueUpdatePayload(
                 action, issueNumber, safeTitle(issueTitle), safeLogin(actorGithubLogin));
+        Long projectId = projects.stream().map(Project::getId).filter(java.util.Objects::nonNull).findFirst().orElse(null);
 
         switch (action) {
             case "opened" -> {
@@ -266,7 +280,7 @@ public class GithubNotificationService {
                 String message = prefix + safeTitle(issueTitle) + " by @" + safeLogin(actorGithubLogin);
                 recipients.values().forEach(recipient ->
                         notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                                recipient, message, link, prefix));
+                        recipient, projectId, com.planora.backend.model.NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix));
                 applicationEventPublisher.publishEvent(new IssueOpenedEvent(
                         this,
                         normalizedRepoFullName,
@@ -281,7 +295,7 @@ public class GithubNotificationService {
                 String message = prefix + safeTitle(issueTitle);
                 projectMemberRecipients(projects).values().forEach(recipient ->
                         notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                                recipient, message, link, prefix));
+                        recipient, projectId, com.planora.backend.model.NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix));
             }
             case "labeled" -> {
                 Map<Long, User> recipients = new LinkedHashMap<>();
@@ -301,7 +315,7 @@ public class GithubNotificationService {
 
                 String message = "\uD83C\uDFF7 Issue #" + issueNumber + " labeled in GitHub";
                 recipients.values().forEach(recipient ->
-                        notificationService.createNotification(recipient, message, link));
+                    notificationService.createNotification(recipient, projectId, com.planora.backend.model.NotificationEventType.GITHUB_ACTIVITY.name(), message, link));
                 applicationEventPublisher.publishEvent(new IssueLabeledEvent(
                         this,
                         normalizedRepoFullName,
@@ -314,7 +328,7 @@ public class GithubNotificationService {
                 String message = "\uD83D\uDCCB You were assigned to issue #" + issueNumber + ": "
                         + safeTitle(issueTitle);
                 resolveUsersFromGithubLogin(actorGithubLogin).forEach(recipient ->
-                        notificationService.createNotification(recipient, message, link));
+                    notificationService.createNotification(recipient, projectId, com.planora.backend.model.NotificationEventType.GITHUB_ACTIVITY.name(), message, link));
             }
             default -> {
                 // Ignore issue actions that do not produce Planora notifications.
@@ -335,9 +349,10 @@ public class GithubNotificationService {
         String prefix = "\uD83D\uDE80 Release published: " + safeText(releaseName) + " (";
         String message = prefix + safeText(tagName) + ") in " + normalizedRepoFullName;
         List<Project> projects = projectRepository.findByGithubRepoFullNameIgnoreCase(normalizedRepoFullName);
+        Long projectId = projects.stream().map(Project::getId).filter(java.util.Objects::nonNull).findFirst().orElse(null);
         projectMemberRecipients(projects).values().forEach(recipient ->
                 notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                        recipient, message, normalizedReleaseUrl, prefix));
+                recipient, projectId, com.planora.backend.model.NotificationEventType.GITHUB_ACTIVITY.name(), message, normalizedReleaseUrl, prefix));
 
         applicationEventPublisher.publishEvent(new ReleasePublishedEvent(
                 this, normalizedRepoFullName, safeText(tagName), safeText(releaseName), normalizedReleaseUrl));
