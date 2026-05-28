@@ -29,7 +29,7 @@ import lombok.Setter;
 public class ChatMessage {
     
     // Reactions are excluded from default serialization to prevent recursive payload expansion.
-    @jakarta.persistence.OneToMany(mappedBy = "message", cascade = jakarta.persistence.CascadeType.ALL, fetch = jakarta.persistence.FetchType.LAZY)
+    @jakarta.persistence.OneToMany(mappedBy = "message", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true, fetch = jakarta.persistence.FetchType.LAZY)
     @JsonIgnore
     private java.util.List<ChatReaction> reactions = new java.util.ArrayList<>();
 
