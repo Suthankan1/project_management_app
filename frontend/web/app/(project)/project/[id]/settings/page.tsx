@@ -17,6 +17,7 @@ import {
   fetchGitHubAutomationRules,
   getProjectGitHubRepo,
   type GithubAutomationAction,
+  type GithubAutomationRule,
   type GithubAutomationTrigger,
   type ProjectGitHubConnection,
 } from '@/services/githubService';
@@ -79,6 +80,24 @@ const QUICK_TEMPLATE_BASE: Array<Omit<QuickTemplateRule, 'config'>> = [
 
 function normalizeColumnName(config: Record<string, string>): string {
   return (config.targetColumnName || config.columnName || config.column || '').trim().toLowerCase();
+}
+
+function buildQuickTemplateConfig(projectId: number, templateKey: QuickTemplateKey): Record<string, string> {
+  if (templateKey === 'prMergedDone') {
+    return { targetColumnName: 'Done' };
+  }
+
+  if (templateKey === 'prOpenedReview') {
+    return { targetColumnName: 'In Review' };
+  }
+
+  return {
+    projectId: String(projectId),
+    taskTitle: 'CI failed: {workflowName} on {branch}',
+    priority: 'HIGH',
+    labelName: 'bug',
+    labelColor: '#d73a4a',
+  };
 }
 
 function matchesTemplate(rule: GithubAutomationRule, templateKey: QuickTemplateKey): boolean {
@@ -161,18 +180,7 @@ function GitHubAutoTransitionsCard({ projectId }: { projectId: number }) {
 
   const templates: QuickTemplateRule[] = QUICK_TEMPLATE_BASE.map((base) => ({
     ...base,
-    config:
-      base.key === 'prMergedDone'
-        ? { targetColumnName: 'Done' }
-        : base.key === 'prOpenedReview'
-          ? { targetColumnName: 'In Review' }
-          : {
-            projectId: String(projectId),
-            taskTitle: 'CI failed: {workflowName} on {branch}',
-            priority: 'HIGH',
-            labelName: 'bug',
-            labelColor: '#d73a4a',
-          },
+    config: buildQuickTemplateConfig(projectId, base.key),
   }));
 
   const refreshConnection = useCallback(() => {
@@ -224,7 +232,6 @@ function GitHubAutoTransitionsCard({ projectId }: { projectId: number }) {
     try {
       if (existingRuleId) {
         await deleteGitHubAutomationRule(projectId, existingRuleId);
-        setRules((prev) => prev.filter((rule) => rule.id !== existingRuleId));
         setRuleByTemplate((prev) => ({ ...prev, [key]: null }));
         toast('Quick automation disabled', 'success');
       } else {
