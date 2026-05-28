@@ -82,6 +82,7 @@ export default function ChatInterface() {
     addTeam,
     isLoading,
     isSocketConnected,
+    isSocketReconnecting,
     error,
     retryConnection,
     roomMentionCounts,
@@ -278,7 +279,7 @@ export default function ChatInterface() {
   const isConnected = isSocketConnected;
   const errorMessage = typeof error === 'string' ? error : String(error ?? '');
   const isReconnectError = errorMessage.toLowerCase().includes('reconnect');
-  const shouldShowErrorBanner = errorMessage.length > 0 && !isReconnectError;
+  const shouldShowErrorBanner = errorMessage.length > 0 && !isReconnectError && !isSocketReconnecting;
 
   /* ── Loading skeleton ── */
   if (isLoading) {
@@ -326,6 +327,7 @@ export default function ChatInterface() {
       <div className={`flex-1 min-h-0 flex flex-col min-w-0 bg-white border-l-0 lg:border-l border-gray-100/60 shadow-sm ${!showChatSidebar ? 'flex w-full' : 'hidden lg:flex'}`}>
         <ChatConnectionBanners
           isConnected={isConnected}
+          isReconnecting={isSocketReconnecting}
           shouldShowErrorBanner={shouldShowErrorBanner}
           error={error}
           onRetry={retryConnection}
@@ -392,7 +394,7 @@ export default function ChatInterface() {
           <ChatInput
             onSendMessage={handleSendMessage}
             onTypingChange={sendTyping}
-            disabled={isLoading || !isConnected || shouldShowErrorBanner}
+            disabled={isLoading || ((!isConnected && !isSocketReconnecting) || shouldShowErrorBanner)}
             placeholder={
               hasSelectedRoom
                 ? `Message #${selectedRoom?.name ?? 'channel'}…`
