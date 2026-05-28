@@ -1862,7 +1862,8 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
       onLogout={() => void handleLogout()}
       onChangeRepo={handleOpenModal}
       onPRUpdate={(update) => void handlePRUpdate(update)}
-      onIssueUpdate={(update) => void handleIssueUpdate(update)}
+      onIssueUpdate={() => void handleIssueUpdate()}
+      canChangeRepo={canChangeRepo}
       automationRules={automationRules}
       automationRulesLoading={automationRulesLoading}
       automationRulesError={automationRulesError}

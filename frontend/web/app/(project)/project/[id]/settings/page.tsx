@@ -18,6 +18,7 @@ import {
   getProjectGitHubRepo,
   type GithubAutomationAction,
   type GithubAutomationTrigger,
+  type GithubAutomationRule,
   type ProjectGitHubConnection,
 } from '@/services/githubService';
 import {
@@ -161,7 +162,7 @@ function GitHubAutoTransitionsCard({ projectId }: { projectId: number }) {
   const templates: QuickTemplateRule[] = QUICK_TEMPLATE_BASE.map((base) => ({
     ...base,
     config:
-      base.key === 'prMergedDone'
+      (base.key === 'prMergedDone'
         ? { targetColumnName: 'Done' }
         : base.key === 'prOpenedReview'
           ? { targetColumnName: 'In Review' }
@@ -171,7 +172,7 @@ function GitHubAutoTransitionsCard({ projectId }: { projectId: number }) {
               priority: 'HIGH',
               labelName: 'bug',
               labelColor: '#d73a4a',
-            },
+            }) as Record<string, string>,
   }));
 
   const refreshConnection = useCallback(() => {
@@ -223,7 +224,6 @@ function GitHubAutoTransitionsCard({ projectId }: { projectId: number }) {
     try {
       if (existingRuleId) {
         await deleteGitHubAutomationRule(projectId, existingRuleId);
-        setRules((prev) => prev.filter((rule) => rule.id !== existingRuleId));
         setRuleByTemplate((prev) => ({ ...prev, [key]: null }));
         toast('Quick automation disabled', 'success');
       } else {
