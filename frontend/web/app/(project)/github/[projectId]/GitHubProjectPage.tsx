@@ -20,6 +20,7 @@ import CIStatusBanner from '@/components/github/CIStatusBanner';
 import GitHubAutomationsPanel from '@/components/github/GitHubAutomationsPanel';
 import AutomationRuleBuilder from '@/components/github/AutomationRuleBuilder';
 import ImportIssueModal from '@/components/github/ImportIssueModal';
+import { Popover } from '@/components/ui';
 import {
   getProjectGitHubRepo,
   setProjectGitHubRepo,
@@ -489,6 +490,74 @@ function SkeletonList() {
   );
 }
 
+type IssueFilterOption = {
+  value: string;
+  label: string;
+};
+
+function IssueFilterDropdown({
+  label,
+  value,
+  options,
+  onChange,
+  ariaLabel,
+}: {
+  label: string;
+  value: string;
+  options: IssueFilterOption[];
+  onChange: (value: string) => void;
+  ariaLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find(option => option.value === value) ?? options[0];
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      align="start"
+      className="w-[min(16rem,calc(100vw-1rem))] overflow-hidden p-0 sm:w-[18rem]"
+      trigger={(
+        <button
+          type="button"
+          aria-label={ariaLabel}
+          className="flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-left text-xs font-outfit font-medium text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-white focus:border-blue-400 focus:outline-none sm:px-3 sm:py-2.5 sm:text-sm"
+        >
+          <span className="min-w-0 truncate">
+            {selected?.label ?? label}
+          </span>
+          <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+      )}
+    >
+      <div className="max-h-64 overflow-auto p-2">
+        {options.map(option => {
+          const isSelected = option.value === value;
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+              className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                isSelected
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <span className="min-w-0 truncate">{option.label}</span>
+              {isSelected && <Check size={14} className="shrink-0" />}
+            </button>
+          );
+        })}
+      </div>
+    </Popover>
+  );
+}
+
 // ── Connected dashboard ───────────────────────────────────────────────────────
 function IssuesPanel({
   projectId,
@@ -555,7 +624,7 @@ function IssuesPanel({
 
   return (
     <div className="flex flex-col gap-4 min-w-0">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-outfit font-bold text-slate-700">Issues</h2>
           {!loading && !error && (
@@ -568,49 +637,68 @@ function IssuesPanel({
           type="button"
           onClick={onRefresh}
           disabled={loading}
-          className="p-2 rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:opacity-40"
+          className="inline-flex items-center justify-center self-start rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:opacity-40 sm:self-auto"
           title="Refresh issues"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
       </div>
 
-      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
-        <SlidersHorizontal size={14} className="text-slate-400" />
-        <span className="text-xs font-outfit font-semibold text-slate-500">Filters</span>
-        <select
-          value={stateFilter}
-          onChange={event => setStateFilter(event.target.value as 'all' | GitHubIssue['state'])}
-          aria-label="Filter issues by state"
-          className="ml-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-outfit font-medium text-slate-600 focus:border-blue-400 focus:outline-none"
-        >
-          <option value="all">All states</option>
-          <option value="open">Open</option>
-          <option value="closed">Closed</option>
-        </select>
-        <select
-          value={labelFilter}
-          onChange={event => setLabelFilter(event.target.value)}
-          aria-label="Filter issues by label"
-          className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-outfit font-medium text-slate-600 focus:border-blue-400 focus:outline-none"
-        >
-          <option value="">All labels</option>
-          {availableLabels.map(label => (
-            <option key={label} value={label}>{label}</option>
-          ))}
-        </select>
-        {filtersActive && (
-          <button
-            type="button"
-            onClick={() => {
-              setStateFilter('all');
-              setLabelFilter('');
-            }}
-            className="ml-auto text-xs font-outfit font-semibold text-blue-600 hover:underline"
-          >
-            Clear
-          </button>
-        )}
+      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal size={14} className="text-slate-400" />
+          <span className="text-xs font-outfit font-semibold uppercase tracking-wide text-slate-500">Filters</span>
+          {filtersActive && (
+            <button
+              type="button"
+              onClick={() => {
+                setStateFilter('all');
+                setLabelFilter('');
+              }}
+              className="ml-auto text-xs font-outfit font-semibold text-blue-600 hover:underline"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
+          <IssueFilterDropdown
+            label="All states"
+            value={stateFilter}
+            ariaLabel="Filter issues by state"
+            onChange={(nextValue) => setStateFilter(nextValue as 'all' | GitHubIssue['state'])}
+            options={[
+              { value: 'all', label: 'All states' },
+              { value: 'open', label: 'Open' },
+              { value: 'closed', label: 'Closed' },
+            ]}
+          />
+          <IssueFilterDropdown
+            label="All labels"
+            value={labelFilter}
+            ariaLabel="Filter issues by label"
+            onChange={setLabelFilter}
+            options={[
+              { value: '', label: 'All labels' },
+              ...availableLabels.map(label => ({ value: label, label })),
+            ]}
+          />
+          <div className="sm:flex sm:justify-end">
+            {filtersActive ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setStateFilter('all');
+                  setLabelFilter('');
+                }}
+                className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-outfit font-semibold text-slate-600 transition-colors hover:bg-slate-50 sm:min-w-[5rem]"
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       {loading && <SkeletonList />}
@@ -918,8 +1006,8 @@ function ConnectedDashboard({
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-4 sm:py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="flex items-center gap-2">
             <Bell size={15} className="text-slate-500" />
             <span className="text-sm font-outfit font-bold text-slate-800">GitHub notifications</span>
@@ -929,12 +1017,12 @@ function ConnectedDashboard({
               </span>
             )}
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex w-full items-stretch gap-2 sm:ml-auto sm:w-auto sm:items-center">
             <button
               type="button"
               onClick={() => void markAllGitHubNotificationsRead()}
               disabled={unreadGithubNotificationCount === 0}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-outfit font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40"
+              className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-outfit font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40 sm:flex-none"
             >
               Mark all as read
             </button>
@@ -952,14 +1040,14 @@ function ConnectedDashboard({
               return (
                 <div
                   key={notification.id}
-                  className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${isUnread ? 'border-blue-100 bg-blue-50/60' : 'border-slate-200 bg-slate-50'}`}
+                  className={`flex flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-start ${isUnread ? 'border-blue-100 bg-blue-50/60' : 'border-slate-200 bg-slate-50'}`}
                 >
                   <div className={`mt-1 h-2.5 w-2.5 rounded-full ${isUnread ? 'bg-blue-600' : 'bg-slate-300'}`} />
                   <div className="min-w-0 flex-1">
                     <p className={`text-sm font-outfit ${isUnread ? 'font-semibold text-slate-800' : 'font-medium text-slate-600'}`}>
                       {notification.message}
                     </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                       <a
                         href={notification.link}
                         target="_blank"

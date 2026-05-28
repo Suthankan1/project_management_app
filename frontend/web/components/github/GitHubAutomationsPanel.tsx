@@ -100,7 +100,7 @@ function logIcon(trigger: GithubAutomationTrigger) {
 
 function EmptyState({ onCreateRule }: { onCreateRule: () => void }) {
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-dashed border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/60 p-8 text-center">
+    <div className="relative overflow-hidden rounded-3xl border border-dashed border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/60 p-6 text-center sm:p-8">
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-900 text-white shadow-lg shadow-slate-900/10">
         <GitHubMark size={34} className="text-white" />
       </div>
@@ -140,9 +140,9 @@ export default function GitHubAutomationsPanel({
   const recentLogs = useMemo(() => logs.slice(0, 10), [logs]);
 
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-3">
+    <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex items-start gap-3 sm:items-center">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
             <GitHubMark size={20} className="text-white" />
           </div>
@@ -151,18 +151,18 @@ export default function GitHubAutomationsPanel({
             <p className="text-sm text-slate-500">Rules, enablement, and execution logs for this project.</p>
           </div>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center">
           <button
             type="button"
             onClick={onRefreshRules}
-            className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 sm:w-auto"
           >
             Refresh Rules
           </button>
           <button
             type="button"
             onClick={onCreateRule}
-            className="rounded-2xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+            className="w-full rounded-2xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 sm:w-auto"
           >
             + Add Rule
           </button>
@@ -198,7 +198,7 @@ export default function GitHubAutomationsPanel({
                   animate={{ opacity: 1, y: 0 }}
                   className="rounded-3xl border border-slate-200 bg-slate-50 p-4 shadow-sm"
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-slate-600 shadow-sm">
                       <triggerStyle.icon size={18} />
                     </div>
@@ -218,7 +218,7 @@ export default function GitHubAutomationsPanel({
                         {rule.enabled ? 'Enabled and actively evaluated.' : 'Disabled and skipped by automation processing.'}
                       </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex w-full shrink-0 items-center justify-between gap-2 sm:w-auto sm:justify-start">
                       <button
                         type="button"
                         onClick={() => onToggleRule(rule.id, !rule.enabled)}
@@ -258,7 +258,7 @@ export default function GitHubAutomationsPanel({
         <button
           type="button"
           onClick={() => setLogsOpen((current) => !current)}
-          className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
+          className="flex w-full flex-col gap-3 px-4 py-4 text-left sm:flex-row sm:items-center sm:justify-between"
         >
           <div>
             <h3 className="text-sm font-semibold text-slate-900">Recent logs</h3>
@@ -316,11 +316,11 @@ export default function GitHubAutomationsPanel({
                     })}
                   </div>
                 )}
-                <div className="mt-4 flex justify-end">
+                <div className="mt-4 flex justify-stretch sm:justify-end">
                   <button
                     type="button"
                     onClick={onRefreshLogs}
-                    className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 sm:w-auto"
                   >
                     Refresh Logs
                   </button>
