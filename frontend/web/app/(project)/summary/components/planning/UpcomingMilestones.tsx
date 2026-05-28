@@ -7,10 +7,10 @@ import { MilestoneResponse } from '@/types';
 
 // Mock status config for the summary view to keep it independent
 const STATUS_BADGES: Record<string, string> = {
-  OPEN: 'bg-blue-50 text-blue-700 border border-blue-100',
-  IN_PROGRESS: 'bg-amber-50 text-amber-700 border border-amber-100',
-  COMPLETED: 'bg-green-50 text-green-700 border border-green-100',
-  CANCELLED: 'bg-gray-50 text-gray-700 border border-gray-100',
+  OPEN: 'bg-cu-primary/10 text-cu-primary border border-cu-primary/20',
+  IN_PROGRESS: 'bg-cu-warning/10 text-cu-warning border border-cu-warning/20',
+  COMPLETED: 'bg-cu-success/10 text-cu-success border border-cu-success/20',
+  CANCELLED: 'bg-cu-bg-secondary text-cu-text-secondary border border-cu-border',
 };
 
 /**
@@ -46,7 +46,7 @@ export function UpcomingMilestones({
   if (isLoading) {
     return (
       <div className="space-y-3">
-        {[1, 2, 3].map(i => <div key={i} className="h-14 bg-gray-50 rounded-lg animate-pulse" />)}
+        {[1, 2, 3].map(i => <div key={i} className="h-14 bg-cu-bg-secondary rounded-lg animate-pulse" />)}
       </div>
     );
   }
@@ -54,7 +54,7 @@ export function UpcomingMilestones({
   return (
     <div className="h-full flex flex-col justify-between">
       {sortedMilestones.length === 0 ? (
-        <p className="text-[13px] text-[#98A2B3] bg-gray-50 p-4 rounded-lg text-center border border-dashed border-gray-200">
+        <p className="text-[13px] text-cu-text-muted bg-cu-bg-secondary p-4 rounded-lg text-center border border-dashed border-cu-border">
           No upcoming milestones.
         </p>
       ) : (
@@ -65,11 +65,11 @@ export function UpcomingMilestones({
             const isOverdue = dueDate && m.status === 'OPEN' && dueDate < today;
 
             return (
-              <div key={m.id} className="p-3 rounded-xl border border-gray-200 bg-white hover:border-blue-200 transition-colors">
+              <div key={m.id} className="p-3 rounded-xl border border-cu-border bg-cu-bg hover:border-cu-primary/35 hover:bg-cu-primary/5 transition-colors">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    <Flag size={13} className={m.status === 'COMPLETED' ? 'text-green-500' : 'text-blue-500'} />
-                    <p className="text-[13px] font-semibold text-gray-800 truncate">{m.name}</p>
+                    <Flag size={13} className={m.status === 'COMPLETED' ? 'text-cu-success' : 'text-cu-primary'} />
+                    <p className="text-[13px] font-semibold text-cu-text-primary truncate">{m.name}</p>
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_BADGES[m.status] || STATUS_BADGES.OPEN}`}>
                     {m.status.replace('_', ' ')}
@@ -77,10 +77,10 @@ export function UpcomingMilestones({
                 </div>
 
                 <div className="mt-2 flex items-center justify-between gap-3 text-[11px]">
-                  <span className={isOverdue ? 'text-red-600 font-semibold' : 'text-gray-500'}>
+                  <span className={isOverdue ? 'text-cu-danger font-semibold' : 'text-cu-text-muted'}>
                     {dueDate ? dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No due date'}
                   </span>
-                  <span className={`font-bold ${isOverdue ? 'text-red-600' : 'text-amber-600'}`}>
+                  <span className={`font-bold ${isOverdue ? 'text-cu-danger' : 'text-cu-warning'}`}>
                     {dueDate ? (isOverdue ? `${Math.abs(daysDiff!)}d overdue` : daysDiff === 0 ? 'Due today' : `In ${daysDiff} days`) : `${m.taskCount} tasks`}
                   </span>
                 </div>
@@ -92,7 +92,7 @@ export function UpcomingMilestones({
       
       <Link
         href={`/milestones?projectId=${projectId}`}
-        className="mt-4 flex items-center justify-center gap-1.5 w-full py-2.5 rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-600 hover:text-white transition-all font-bold text-[12px]"
+        className="mt-4 flex items-center justify-center gap-1.5 w-full py-2.5 rounded-lg border border-cu-primary/20 text-cu-primary bg-cu-primary/10 hover:bg-cu-primary hover:text-white transition-all font-bold text-[12px]"
       >
         Open Milestones
       </Link>

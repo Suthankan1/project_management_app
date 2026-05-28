@@ -7,7 +7,7 @@ interface NotificationFiltersProps {
 
 export function NotificationFilters({ filter, onFilterChange }: NotificationFiltersProps) {
   return (
-    <div className="flex items-center gap-2 bg-slate-50/80 rounded-xl p-1 w-full sm:w-fit border border-slate-100">
+    <div className="flex items-center gap-2 bg-cu-bg-secondary rounded-xl p-1 w-full sm:w-fit border border-cu-border">
       {([
         { key: 'all', label: 'All' },
         { key: 'unread', label: 'Unread' },
@@ -19,8 +19,8 @@ export function NotificationFilters({ filter, onFilterChange }: NotificationFilt
           onClick={() => onFilterChange(option.key)}
           className={`px-4 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0 rounded-lg text-xs font-bold transition-all font-outfit ${
             filter === option.key
-              ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-cu-bg text-cu-primary shadow-cu-sm ring-1 ring-cu-border'
+              : 'text-cu-text-secondary hover:text-cu-text-primary hover:bg-cu-hover'
           }`}
         >
           {option.label}

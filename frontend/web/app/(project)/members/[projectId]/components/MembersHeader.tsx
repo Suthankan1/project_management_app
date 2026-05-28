@@ -7,7 +7,7 @@ export function MembersHeader({ onInviteClick }: MembersHeaderProps) {
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
       <div>
         <h1 className="text-xl sm:text-2xl font-bold">Team Members</h1>
-        <div className="text-sm sm:text-base text-gray-500 mt-1">Manage your team and their permissions</div>
+        <div className="text-sm sm:text-base text-cu-text-muted mt-1">Manage your team and their permissions</div>
       </div>
       <button
         className="flex items-center justify-center gap-1.5 px-4 sm:px-5 py-2 min-h-[44px] rounded-[12px] bg-cu-primary text-white font-medium text-sm sm:text-base shadow-md hover:bg-cu-primary-dark focus:outline-none focus:ring-2 focus:ring-blue-300"

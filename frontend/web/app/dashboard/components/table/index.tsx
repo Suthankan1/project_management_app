@@ -93,7 +93,7 @@ export default function DashboardTable({
             animate={{ opacity: 1, width: '320px', scale: 1 }}
             exit={{ opacity: 0, width: 0, scale: 0.95 }}
             transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full lg:w-[320px] shrink-0 lg:border-l border-gray-100 lg:pl-6 max-lg:pb-6 max-lg:border-b max-lg:mx-auto max-lg:max-w-[400px] bg-white lg:bg-transparent"
+            className="w-full lg:w-[320px] shrink-0 lg:border-l border-cu-border lg:pl-6 max-lg:pb-6 max-lg:border-b max-lg:mx-auto max-lg:max-w-[400px] bg-cu-bg lg:bg-transparent"
           >
             <StatusDonutChart items={filteredItems} onHover={setHoveredSlice} />
           </motion.div>

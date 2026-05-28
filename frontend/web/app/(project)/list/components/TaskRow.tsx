@@ -163,8 +163,8 @@ const TaskRow = React.memo(function TaskRow({
 
   return (
     <div
-      className={`flex items-center gap-2 px-4 min-h-[42px] border-b border-[#EAECF0] cursor-pointer transition-colors group ${
-        selected ? 'bg-[#EFF6FF]' : 'bg-white hover:bg-[#F8FAFF]'
+      className={`flex items-center gap-2 px-4 min-h-[42px] border-b border-cu-border cursor-pointer transition-colors group ${
+        selected ? 'bg-cu-primary/5' : 'bg-cu-bg hover:bg-cu-hover'
       }`}
       onClick={() => { if (!statusOpen && !priorityOpen && !menuOpen && !assigneeOpen && !labelsOpen && !milestoneOpen) onOpenModal(task.id); }}
       onKeyDown={(e) => {
@@ -192,7 +192,7 @@ const TaskRow = React.memo(function TaskRow({
       <div className="w-16 shrink-0 hidden lg:flex items-center relative" ref={priorityRef} onClick={(e) => e.stopPropagation()}>
         <button
           onClick={() => setPriorityOpen((v) => !v)}
-          className="flex items-center gap-1 w-full hover:bg-[#F3F4F6] rounded px-1 py-0.5"
+          className="flex items-center gap-1 w-full hover:bg-cu-hover rounded px-1 py-0.5"
         >
           <PriorityIcon size={12} color={priorityColor} className="shrink-0" />
           <span className="text-[11px] font-medium truncate" style={{ color: priorityColor }}>
@@ -200,7 +200,7 @@ const TaskRow = React.memo(function TaskRow({
           </span>
         </button>
         {priorityOpen && (
-          <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-[#E5E7EB] rounded-xl shadow-lg py-1 min-w-[120px]">
+          <div className="absolute top-full left-0 mt-1 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-lg py-1 min-w-[120px]">
             {PRIORITY_ORDER.map((p) => {
               const pc = PRIORITY_CONFIG[p];
               const Icon = pc.icon;
@@ -208,7 +208,7 @@ const TaskRow = React.memo(function TaskRow({
                 <button
                   key={p}
                   onClick={() => void handlePriorityChange(p)}
-                  className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F9FAFB] transition-colors flex items-center gap-2 ${localPriority === p ? 'font-semibold' : ''}`}
+                  className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-cu-hover transition-colors flex items-center gap-2 ${localPriority === p ? 'font-semibold' : ''}`}
                 >
                   <Icon size={12} color={pc.color} />
                   <span style={{ color: pc.color }}>{pc.label}</span>
@@ -220,7 +220,7 @@ const TaskRow = React.memo(function TaskRow({
       </div>
 
       {/* Title */}
-      <p className="flex-1 min-w-0 text-[13px] font-medium truncate text-[#101828]">
+      <p className="flex-1 min-w-0 text-[13px] font-medium truncate text-cu-text-primary">
         {task.title}
       </p>
 
@@ -234,7 +234,7 @@ const TaskRow = React.memo(function TaskRow({
               setLabelsOpen(true);
             }
           }}
-          className="w-full flex items-center gap-1 hover:bg-[#F3F4F6] rounded px-1.5 py-1"
+          className="w-full flex items-center gap-1 hover:bg-cu-hover rounded px-1.5 py-1"
           aria-label="Edit labels"
         >
           <div className="flex gap-1 overflow-hidden">
@@ -244,16 +244,16 @@ const TaskRow = React.memo(function TaskRow({
                     {l.name}
                   </span>
                 ))
-              : <span className="text-[11px] text-[#9CA3AF]">Tags</span>
+              : <span className="text-[11px] text-cu-text-muted">Tags</span>
             }
           </div>
-          <Plus size={11} className="text-[#98A2B3]" />
+          <Plus size={11} className="text-cu-text-muted" />
         </button>
         {labelsOpen && (
           <div
             ref={labelsMenuRef}
             onKeyDown={(e) => handleDropdownListKeyDown(e, () => setLabelsOpen(false))}
-            className="absolute top-full left-0 mt-1 z-50 bg-white border border-[#E5E7EB] rounded-xl shadow-lg py-1 min-w-[180px] max-h-56 overflow-y-auto"
+            className="absolute top-full left-0 mt-1 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-lg py-1 min-w-[180px] max-h-56 overflow-y-auto"
           >
             {availableLabels.map((label) => {
               const attached = Boolean(task.labels?.some((l) => l.id === label.id));
@@ -264,12 +264,12 @@ const TaskRow = React.memo(function TaskRow({
                     onToggleLabel(task.id, label, !attached);
                     setLabelsOpen(false);
                   }}
-                  className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F9FAFB] flex items-center justify-between gap-2"
+                  className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-cu-hover flex items-center justify-between gap-2"
                 >
                   <span style={hexToLabelStyle(label.color ?? '#6366F1')} className="px-1.5 py-0.5 rounded-full text-[10px] font-medium">
                     {label.name}
                   </span>
-                  {attached ? <span className="text-[#155DFC] text-[11px] font-semibold">Added</span> : null}
+                  {attached ? <span className="text-cu-primary text-[11px] font-semibold">Added</span> : null}
                 </button>
               );
             })}
@@ -287,30 +287,30 @@ const TaskRow = React.memo(function TaskRow({
               setMilestoneOpen(true);
             }
           }}
-          className="w-full text-left hover:bg-[#F3F4F6] rounded px-1.5 py-1"
+          className="w-full text-left hover:bg-cu-hover rounded px-1.5 py-1"
           aria-label="Edit milestone"
         >
           {task.milestoneName
-            ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100 truncate max-w-full">
+            ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-500/10 text-purple-500 border border-purple-500/20 truncate max-w-full">
                 {task.milestoneName}
               </span>
-            : <span className="text-[11px] text-[#9CA3AF]">Milestone</span>
+            : <span className="text-[11px] text-cu-text-muted">Milestone</span>
           }
         </button>
         {milestoneOpen && (
           <div
             ref={milestoneMenuRef}
             onKeyDown={(e) => handleDropdownListKeyDown(e, () => setMilestoneOpen(false))}
-            className="absolute top-full left-0 mt-1 z-50 bg-white border border-[#E5E7EB] rounded-xl shadow-lg py-1 min-w-[180px] max-h-56 overflow-y-auto"
+            className="absolute top-full left-0 mt-1 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-lg py-1 min-w-[180px] max-h-56 overflow-y-auto"
           >
-            <button onClick={() => { onMilestoneChange(task.id, null); setMilestoneOpen(false); }} className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F9FAFB] text-[#667085]">
+            <button onClick={() => { onMilestoneChange(task.id, null); setMilestoneOpen(false); }} className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-cu-hover text-cu-text-muted">
               No milestone
             </button>
             {milestones.map((m) => (
               <button
                 key={m.id}
                 onClick={() => { onMilestoneChange(task.id, m.id); setMilestoneOpen(false); }}
-                className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F9FAFB] text-[#374151]"
+                className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-cu-hover text-cu-text-primary"
               >
                 {m.name}
               </button>
@@ -322,7 +322,7 @@ const TaskRow = React.memo(function TaskRow({
       {/* Assignee */}
       <div className="w-32 shrink-0 hidden md:block relative" ref={assigneeRef} onClick={(e) => e.stopPropagation()}>
         <button
-          className="w-full flex items-center gap-1.5 overflow-hidden hover:bg-[#F3F4F6] rounded px-1.5 py-1"
+          className="w-full flex items-center gap-1.5 overflow-hidden hover:bg-cu-hover rounded px-1.5 py-1"
           onClick={() => setAssigneeOpen((v) => !v)}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') {
@@ -335,19 +335,19 @@ const TaskRow = React.memo(function TaskRow({
           {assignedUsers.length > 0 ? (
             <>
               <AvatarStack users={assignedUsers} size="xs" max={3} />
-              <span className="text-[11px] text-[#374151] truncate">{assignedUsers[0]?.name}{assignedUsers.length > 1 ? ` +${assignedUsers.length - 1}` : ''}</span>
+              <span className="text-[11px] text-cu-text-secondary truncate">{assignedUsers[0]?.name}{assignedUsers.length > 1 ? ` +${assignedUsers.length - 1}` : ''}</span>
             </>
           ) : (
-            <span className="text-[11px] text-[#9CA3AF]">Assignee</span>
+            <span className="text-[11px] text-cu-text-muted">Assignee</span>
           )}
         </button>
         {assigneeOpen && (
           <div
             ref={assigneeMenuRef}
             onKeyDown={(e) => handleDropdownListKeyDown(e, () => setAssigneeOpen(false))}
-            className="absolute top-full left-0 mt-1 z-50 bg-white border border-[#E5E7EB] rounded-xl shadow-lg py-1 min-w-[180px] max-h-56 overflow-y-auto"
+            className="absolute top-full left-0 mt-1 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-lg py-1 min-w-[180px] max-h-56 overflow-y-auto"
           >
-            <button onClick={() => { onAssigneesChange(task.id, []); setAssigneeOpen(false); }} className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F9FAFB] text-[#667085]">
+            <button onClick={() => { onAssigneesChange(task.id, []); setAssigneeOpen(false); }} className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-cu-hover text-cu-text-muted">
               Unassigned
             </button>
             {members.map((member) => (
@@ -360,10 +360,10 @@ const TaskRow = React.memo(function TaskRow({
                   onAssigneesChange(task.id, nextIds);
                   setAssigneeOpen(false);
                 }}
-                className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F9FAFB] text-[#374151] flex items-center justify-between"
+                className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-cu-hover text-cu-text-primary flex items-center justify-between"
               >
                 {member.name}
-                {(task.assignees ?? []).some((person) => person.id === member.id) ? <span className="text-[#155DFC] font-semibold">Added</span> : null}
+                {(task.assignees ?? []).some((person) => person.id === member.id) ? <span className="text-cu-primary font-semibold">Added</span> : null}
               </button>
             ))}
           </div>
@@ -380,13 +380,13 @@ const TaskRow = React.memo(function TaskRow({
           <ChevronDown size={10} className="shrink-0" />
         </button>
         {statusOpen && (
-          <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-[#E5E7EB] rounded-xl shadow-lg py-1 min-w-[130px]">
+          <div className="absolute top-full left-0 mt-1 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-lg py-1 min-w-[130px]">
             {projectStatuses && projectStatuses.length > 0 ? (
               projectStatuses.map((s: { status: string; name: string; color: string }) => (
                 <button
                   key={s.status}
                   onClick={() => { onStatusChange(task.id, s.status); setStatusOpen(false); }}
-                  className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F9FAFB] transition-colors ${task.status === s.status ? 'font-semibold text-[#155DFC]' : 'text-[#374151]'}`}
+                  className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-cu-hover transition-colors ${task.status === s.status ? 'font-semibold text-cu-primary' : 'text-cu-text-primary'}`}
                 >
                   {s.name}
                 </button>
@@ -396,7 +396,7 @@ const TaskRow = React.memo(function TaskRow({
                 <button
                   key={s}
                   onClick={() => { onStatusChange(task.id, s); setStatusOpen(false); }}
-                  className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F9FAFB] transition-colors ${task.status === s ? 'font-semibold text-[#155DFC]' : 'text-[#374151]'}`}
+                  className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-cu-hover transition-colors ${task.status === s ? 'font-semibold text-cu-primary' : 'text-cu-text-primary'}`}
                 >
                   {STATUS_CONFIG[s]?.label ?? s}
                 </button>
@@ -411,8 +411,8 @@ const TaskRow = React.memo(function TaskRow({
         <button
           className={`inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full border ${
             isOverdue
-              ? 'bg-[#FEF3F2] text-[#B42318] border-[#FDA29B]'
-              : 'bg-[#F9FAFB] text-[#344054] border-[#EAECF0]'
+              ? 'bg-red-500/10 text-red-500 border-red-500/30'
+              : 'bg-cu-bg-secondary text-cu-text-secondary border-cu-border'
           }`}
           onClick={() => dateInputRef.current?.showPicker?.() ?? dateInputRef.current?.click()}
           aria-label="Edit due date"
@@ -435,21 +435,21 @@ const TaskRow = React.memo(function TaskRow({
       <div className="w-8 shrink-0 relative" ref={menuRef} onClick={(e) => e.stopPropagation()}>
         <button
           onClick={() => setMenuOpen((v) => !v)}
-          className="p-1 rounded hover:bg-[#F3F4F6] text-[#9CA3AF] transition-colors"
+          className="p-1 rounded hover:bg-cu-hover text-cu-text-muted transition-colors"
         >
           <MoreHorizontal size={14} />
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-[#E5E7EB] rounded-xl shadow-lg py-1 min-w-[120px]">
+          <div className="absolute right-0 top-full mt-1 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-lg py-1 min-w-[120px]">
             <button
               onClick={() => { setMenuOpen(false); onOpenModal(task.id); }}
-              className="w-full text-left px-3 py-1.5 text-[12px] text-[#374151] hover:bg-[#F9FAFB] transition-colors"
+              className="w-full text-left px-3 py-1.5 text-[12px] text-cu-text-primary hover:bg-cu-hover transition-colors"
             >
               Edit
             </button>
             <button
               onClick={() => { setMenuOpen(false); onDelete(task.id); }}
-              className="w-full text-left px-3 py-1.5 text-[12px] text-red-600 hover:bg-red-50 transition-colors"
+              className="w-full text-left px-3 py-1.5 text-[12px] text-cu-danger hover:bg-cu-danger/10 transition-colors"
             >
               Delete
             </button>

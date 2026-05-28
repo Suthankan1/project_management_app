@@ -26,7 +26,7 @@ export default function CoffeeLoader() {
 
     return (
         <div className="flex flex-col items-center justify-center min-h-[40vh] w-full gap-5">
-            <div className="relative flex items-center justify-center w-24 h-24">
+            <div className="relative flex items-center justify-center w-24 h-24 rounded-3xl bg-cu-bg/70 ring-1 ring-cu-border shadow-cu-lg">
                 
                 {/* Stage 1: Coffee Mug & Liquid */}
                 <motion.div 
@@ -40,21 +40,21 @@ export default function CoffeeLoader() {
                     className="absolute inset-0 flex items-center justify-center"
                 >
                     <svg viewBox="0 0 100 100" className="w-[72px] h-[72px] overflow-visible">
-                        {/* Empty Mug Body Outline (Neutral Gray) */}
+                        {/* Empty mug body outline */}
                         <path 
                             d="M 30 20 L 30 75 C 30 85 35 90 45 90 L 55 90 C 65 90 70 85 70 75 L 70 20 Z" 
                             fill="none" 
-                            stroke="#9CA3AF" 
+                            stroke="var(--cu-text-muted)"
                             strokeWidth="4" 
                             strokeLinecap="round" 
                             strokeLinejoin="round" 
                         />
                         
-                        {/* Mug Handle (Neutral Gray) */}
+                        {/* Mug handle */}
                         <path 
                             d="M 70 35 C 85 35 85 65 70 65" 
                             fill="none" 
-                            stroke="#9CA3AF" 
+                            stroke="var(--cu-text-muted)"
                             strokeWidth="4" 
                             strokeLinecap="round" 
                             strokeLinejoin="round" 
@@ -65,10 +65,10 @@ export default function CoffeeLoader() {
                             <path d="M 32 22 L 32 75 C 32 84 36 88 45 88 L 55 88 C 64 88 68 84 68 75 L 68 22 Z" />
                         </clipPath>
 
-                        {/* Liquid Filling Up (Primary Accent - Jira Blue) */}
+                        {/* Liquid filling up */}
                         <g clipPath="url(#mugClip)">
                             <motion.rect 
-                                x="30" y="20" width="40" height="70" fill="#0052CC"
+                                x="30" y="20" width="40" height="70" fill="var(--cu-primary)"
                                 initial={{ scaleY: 0 }}
                                 animate={phase === 'filling' ? { scaleY: 1 } : { scaleY: 1 }}
                                 style={{ originY: 1 }}
@@ -76,7 +76,7 @@ export default function CoffeeLoader() {
                             />
                             {/* Gentle surface pulse width/opacity */}
                             <motion.ellipse 
-                                cx="50" cy="22" rx="18" ry="2" fill="#2684FF"
+                                cx="50" cy="22" rx="18" ry="2" fill="var(--cu-primary-light)"
                                 initial={{ opacity: 0 }}
                                 animate={phase === 'filling' ? { 
                                     opacity: [0, 0, 0.8, 1], 
@@ -91,7 +91,7 @@ export default function CoffeeLoader() {
                             <motion.path
                                 key={i}
                                 d="M 50 0 C 52 5 53 8 50 12 C 47 8 48 5 50 0"
-                                fill="#0052CC"
+                                fill="var(--cu-primary)"
                                 initial={{ y: -15, opacity: 0, scale: 0.5 }}
                                 animate={{ y: 25, opacity: [0, 1, 0], scale: 1 }}
                                 transition={{ 
@@ -105,7 +105,7 @@ export default function CoffeeLoader() {
                     </svg>
                 </motion.div>
 
-                {/* Stage 2: Final Transformation Checkmark (Jira Blue) */}
+                {/* Stage 2: Final transformation checkmark */}
                 <motion.div
                     initial={{ scale: 0, opacity: 0 }}
                     animate={
@@ -121,7 +121,7 @@ export default function CoffeeLoader() {
                          <motion.path 
                             d="M 20 50 L 40 70 L 80 25" 
                             fill="none" 
-                            stroke="#0052CC" 
+                            stroke="var(--cu-primary)"
                             strokeWidth="8" 
                             strokeLinecap="round" 
                             strokeLinejoin="round" 
@@ -140,7 +140,7 @@ export default function CoffeeLoader() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
-                    className="text-[#6A7282] font-arimo text-[14px] font-medium tracking-wide"
+                    className="text-cu-text-secondary font-arimo text-[14px] font-medium tracking-wide"
                 >
                     {phase === 'filling' ? 'Converting coffee to tasks...' : 'System Ready'}
                 </motion.span>

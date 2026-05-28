@@ -41,13 +41,13 @@ const StoryPointSection: React.FC<StoryPointSectionProps> = ({ storyPoint, onUpd
               if (e.key === 'Escape') { setEdited(storyPoint); setIsEditing(false); }
             }}
             autoFocus
-            className="w-20 bg-gray-100 text-gray-700 text-xs font-bold px-2 py-1 rounded-full border-2 border-blue-500 focus:outline-none"
+            className="w-20 bg-cu-bg-secondary text-cu-text-primary text-xs font-bold px-2 py-1 rounded-full border-2 border-cu-primary focus:outline-none"
           />
         </div>
       ) : (
         <span
           onClick={() => onUpdateStoryPoint && setIsEditing(true)}
-          className={`bg-gray-100 text-gray-700 text-xs font-bold px-2 py-1 rounded-full inline-block transition-colors ${onUpdateStoryPoint ? 'cursor-pointer hover:bg-gray-200' : 'cursor-not-allowed opacity-70'}`}
+          className={`bg-cu-bg-secondary text-cu-text-primary text-xs font-bold px-2 py-1 rounded-full inline-block transition-colors ${onUpdateStoryPoint ? 'cursor-pointer hover:bg-cu-bg-tertiary' : 'cursor-not-allowed opacity-70'}`}
         >
           {storyPoint}
         </span>

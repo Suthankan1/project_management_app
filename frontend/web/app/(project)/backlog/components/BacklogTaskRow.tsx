@@ -22,10 +22,10 @@ const PRIORITY_CONFIG: Record<string, { color: string; icon: React.ElementType; 
 };
 
 const STATUS_COLOR: Record<string, string> = {
-    TODO:        'bg-[#F3F4F6] text-[#6A7282]',
-    IN_PROGRESS: 'bg-[#EFF6FF] text-[#1D4ED8]',
-    IN_REVIEW:   'bg-[#FEF3C7] text-[#92400E]',
-    DONE:        'bg-[#DCFCE7] text-[#166534]',
+    TODO:        'bg-cu-bg-tertiary text-cu-text-secondary',
+    IN_PROGRESS: 'bg-cu-primary/10 text-cu-primary',
+    IN_REVIEW:   'bg-amber-400/15 text-amber-500',
+    DONE:        'bg-emerald-500/15 text-emerald-500',
 };
 
 const STATUS_OPTIONS = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
@@ -84,8 +84,8 @@ export default function BacklogTaskRow({
 
     return (
         <div
-            className={`grid grid-cols-[auto_1fr_120px_100px_120px_100px_100px_32px] sm:grid-cols-[auto_1.5fr_140px_110px_130px_110px_120px_32px] items-center gap-x-2 px-3 sm:px-4 min-h-[52px] rounded-lg border border-[#EAECF0] cursor-pointer select-none transition-colors ${
-                selected ? 'bg-[#EFF6FF] border-[#BFDBFE]' : isOverdue ? 'bg-[#FEE2E2] hover:bg-[#FEE2E2]' : 'bg-white hover:bg-[#F8FAFF]'
+            className={`grid grid-cols-[auto_1fr_120px_100px_120px_100px_100px_32px] sm:grid-cols-[auto_1.5fr_140px_110px_130px_110px_120px_32px] items-center gap-x-2 px-3 sm:px-4 min-h-[52px] rounded-lg border cursor-pointer select-none transition-colors ${
+                selected ? 'bg-cu-primary/5 border-cu-primary/30' : isOverdue ? 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10' : 'bg-cu-bg border-cu-border hover:bg-cu-hover'
             }`}
             onClick={() => {
                 if (statusOpen || menuOpen) return;
@@ -104,8 +104,8 @@ export default function BacklogTaskRow({
 
             {/* Title + ID */}
             <div className="min-w-0 flex items-center gap-2 py-2.5">
-                <span className="text-[11px] font-mono text-[#9CA3AF] shrink-0">#{task.id}</span>
-                <p className={`text-[14px] font-medium truncate ${normalizedStatus === 'DONE' ? 'line-through text-[#9CA3AF]' : 'text-[#101828]'}`}>
+                <span className="text-[11px] font-mono text-cu-text-muted shrink-0">#{task.id}</span>
+                <p className={`text-[14px] font-medium truncate ${normalizedStatus === 'DONE' ? 'line-through text-cu-text-muted' : 'text-cu-text-primary'}`}>
                     {task.title}
                 </p>
             </div>
@@ -117,14 +117,14 @@ export default function BacklogTaskRow({
                         {task.labels[0].name}
                     </span>
                 ) : (
-                    <span className="text-[11px] text-[#D1D5DB]">—</span>
+                    <span className="text-[11px] text-cu-text-muted">—</span>
                 )}
             </div>
 
             {/* Priority */}
             <div className="min-w-0 flex items-center gap-1">
                 <PriorityIcon size={13} color={priorityColor} className="shrink-0" />
-                <span className="text-[11px] font-medium text-[#374151] hidden sm:inline">{priorityLabel}</span>
+                <span className="text-[11px] font-medium text-cu-text-primary hidden sm:inline">{priorityLabel}</span>
             </div>
 
             {/* Status */}
@@ -137,12 +137,12 @@ export default function BacklogTaskRow({
                     <ChevronDown size={10} className="shrink-0" />
                 </button>
                 {statusOpen && (
-                    <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-[#E5E7EB] rounded-xl shadow-lg py-1 min-w-[130px]">
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-lg py-1 min-w-[130px]">
                         {STATUS_OPTIONS.map((s) => (
                             <button
                                 key={s}
                                 onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, s); setStatusOpen(false); }}
-                                className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F9FAFB] transition-colors ${normalizedStatus === s ? 'font-semibold text-[#155DFC]' : 'text-[#374151]'}`}
+                                className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-cu-hover transition-colors ${normalizedStatus === s ? 'font-semibold text-cu-primary' : 'text-cu-text-primary'}`}
                             >
                                 {s.replace(/_/g, ' ')}
                             </button>
@@ -156,7 +156,7 @@ export default function BacklogTaskRow({
                 {task.assigneeName ? (
                     <AssigneeAvatar name={task.assigneeName} profilePicUrl={task.assigneePhotoUrl} size={22} />
                 ) : (
-                    <span className="text-[11px] text-[#D1D5DB]">—</span>
+                    <span className="text-[11px] text-cu-text-muted">—</span>
                 )}
             </div>
 
@@ -164,12 +164,12 @@ export default function BacklogTaskRow({
             <div className="min-w-0 flex items-center" onClick={(e) => e.stopPropagation()}>
                 <Popover.Root>
                     <Popover.Trigger asChild>
-                        <button className="text-[11px] text-[#6A7282] hover:text-[#155DFC] bg-transparent border border-transparent hover:border-[#155DFC]/20 hover:bg-[#155DFC]/5 px-2 py-1 rounded transition-colors truncate">
+                        <button className="text-[11px] text-cu-text-muted hover:text-cu-primary bg-transparent border border-transparent hover:border-cu-primary/20 hover:bg-cu-primary/5 px-2 py-1 rounded transition-colors truncate">
                             {task.dueDate ? format(parseISO(task.dueDate), 'MMM d, yyyy') : 'No date'}
                         </button>
                     </Popover.Trigger>
                     <Popover.Portal>
-                        <Popover.Content className="z-[10000] p-3 bg-white rounded-xl shadow-xl border border-gray-200" sideOffset={5}>
+                        <Popover.Content className="z-[10000] p-3 bg-cu-bg rounded-xl shadow-xl border border-cu-border" sideOffset={5}>
                             <DayPicker
                                 mode="single"
                                 selected={task.dueDate ? parseISO(task.dueDate) : undefined}
@@ -185,15 +185,15 @@ export default function BacklogTaskRow({
             <div className="relative" ref={menuRef}>
                 <button
                     onClick={(e) => { e.stopPropagation(); setMenuOpen(m => !m); }}
-                    className="p-1 rounded hover:bg-[#F3F4F6] text-[#9CA3AF] transition-colors"
+                    className="p-1 rounded hover:bg-cu-hover text-cu-text-muted transition-colors"
                 >
                     <MoreHorizontal size={14} />
                 </button>
                 {menuOpen && (
-                    <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-[#E5E7EB] rounded-xl shadow-lg py-1 min-w-[120px]">
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-lg py-1 min-w-[120px]">
                         <button
                             onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onOpenModal(task.id); }}
-                            className="w-full text-left px-3 py-1.5 text-[12px] text-[#374151] hover:bg-[#F9FAFB] transition-colors"
+                            className="w-full text-left px-3 py-1.5 text-[12px] text-cu-text-primary hover:bg-cu-hover transition-colors"
                         >
                             Edit
                         </button>
@@ -205,7 +205,7 @@ export default function BacklogTaskRow({
                                         setMenuOpen(false);
                                         await onArchive?.(task.id);
                                     }}
-                                    className="w-full flex items-center text-left px-3 py-1.5 text-[12px] text-amber-600 hover:bg-[#F9FAFB] transition-colors"
+                                    className="w-full flex items-center text-left px-3 py-1.5 text-[12px] text-amber-500 hover:bg-cu-hover transition-colors"
                                 >
                                     <Archive className="w-4 h-4 mr-2" />
                                     Archive task
@@ -217,7 +217,7 @@ export default function BacklogTaskRow({
                                         setMenuOpen(false);
                                         await onUnarchive?.(task.id);
                                     }}
-                                    className="w-full flex items-center text-left px-3 py-1.5 text-[12px] text-[#374151] hover:bg-[#F9FAFB] transition-colors"
+                                    className="w-full flex items-center text-left px-3 py-1.5 text-[12px] text-cu-text-primary hover:bg-cu-hover transition-colors"
                                 >
                                     <ArchiveRestore className="w-4 h-4 mr-2" />
                                     Unarchive task
@@ -226,7 +226,7 @@ export default function BacklogTaskRow({
                         )}
                         <button
                             onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(task.id); }}
-                            className="w-full text-left px-3 py-1.5 text-[12px] text-red-600 hover:bg-red-50 transition-colors"
+                            className="w-full text-left px-3 py-1.5 text-[12px] text-cu-danger hover:bg-cu-danger/10 transition-colors"
                         >
                             Delete
                         </button>

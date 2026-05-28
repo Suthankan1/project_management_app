@@ -51,12 +51,12 @@ export default function KanbanPage() {
 
   if (!projectId) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="flex items-center justify-center min-h-screen bg-cu-bg">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Missing Project ID</h1>
-          <p className="text-gray-600">
-            Please provide a project ID in the URL: <code className="bg-gray-100 px-2 py-1 rounded">/kanban?projectId=1</code>
+          <AlertCircle className="w-12 h-12 text-cu-danger mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-cu-text-primary mb-2">Missing Project ID</h1>
+          <p className="text-cu-text-secondary">
+            Please provide a project ID in the URL: <code className="bg-cu-bg-tertiary px-2 py-1 rounded">/kanban?projectId=1</code>
           </p>
         </div>
       </div>
@@ -68,9 +68,9 @@ export default function KanbanPage() {
   const progressPercent = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 h-full bg-[#F0F2F5] overflow-hidden">
+    <div className="flex-1 flex flex-col min-w-0 h-full bg-cu-bg-secondary overflow-hidden">
       {/* Premium Header */}
-      <div className="bg-white border-b border-gray-200/80 px-4 md:px-6 py-3 flex-shrink-0">
+      <div className="bg-cu-bg border-b border-cu-border px-4 md:px-6 py-3 flex-shrink-0">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">

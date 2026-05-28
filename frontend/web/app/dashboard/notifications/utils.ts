@@ -2,13 +2,13 @@ import type { Notification } from '@/services/notifications-service';
 import type { TypeTone } from './types';
 
 export const TYPE_TONES: Record<string, TypeTone> = {
-  CHAT: { bg: 'bg-indigo-50', text: 'text-indigo-700' },
-  TASK: { bg: 'bg-blue-50', text: 'text-blue-700' },
-  PAGE: { bg: 'bg-violet-50', text: 'text-violet-700' },
-  PROJECT: { bg: 'bg-cyan-50', text: 'text-cyan-700' },
-  MENTION: { bg: 'bg-amber-50', text: 'text-amber-700' },
-  INFO: { bg: 'bg-slate-100', text: 'text-slate-700' },
-  GENERAL: { bg: 'bg-slate-100', text: 'text-slate-700' },
+  CHAT: { bg: 'bg-indigo-500/10', text: 'text-indigo-500' },
+  TASK: { bg: 'bg-cu-primary/10', text: 'text-cu-primary' },
+  PAGE: { bg: 'bg-violet-500/10', text: 'text-violet-500' },
+  PROJECT: { bg: 'bg-cyan-500/10', text: 'text-cyan-500' },
+  MENTION: { bg: 'bg-amber-500/10', text: 'text-amber-500' },
+  INFO: { bg: 'bg-cu-bg-tertiary', text: 'text-cu-text-secondary' },
+  GENERAL: { bg: 'bg-cu-bg-tertiary', text: 'text-cu-text-secondary' },
 };
 
 export const TASK_LOOKUP_WINDOW = 40;

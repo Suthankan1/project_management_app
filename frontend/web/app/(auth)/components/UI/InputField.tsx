@@ -45,7 +45,7 @@ export default function InputField({
     <div>
       {/* Accessibility: The 'htmlFor' links this label to the input, allowing users 
           to click the text to focus the input. Great for mobile. */}
-      <label htmlFor={id} className="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">
+      <label htmlFor={id} className="block text-xs font-semibold text-cu-text-muted mb-1.5 ml-1">
         {label}
       </label>
       <div className="relative">
@@ -62,7 +62,7 @@ export default function InputField({
           autoCorrect={autoCorrect}
           inputMode={inputMode}
           // The conditional 'pr-11' adds right-padding so the typed text doesn't hide behind the Eye icon.
-          className={`w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-[16px] sm:text-sm${showToggle ? ' pr-11' : ''}`}
+          className={`w-full px-4 py-3 rounded-xl border border-cu-border bg-cu-bg text-cu-text-primary focus:border-cu-primary focus:ring-4 focus:ring-cu-primary/10 outline-none transition-all text-[16px] sm:text-sm placeholder:text-cu-text-muted${showToggle ? ' pr-11' : ''}`}
         />
 
         {/* Render the Eye icon button ONLY if requested and the type is password */}
@@ -70,7 +70,7 @@ export default function InputField({
           <button
             type="button"
             onClick={() => setVisible((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-cu-text-muted hover:text-cu-text-primary"
             tabIndex={-1}
             aria-label={visible ? 'Hide password' : 'Show password'}
           >

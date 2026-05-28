@@ -134,11 +134,11 @@ export default function MonthCalendarView({
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
 
   return (
-    <div className="rounded-xl border border-[#E4E7EC] bg-white overflow-hidden">
+    <div className="rounded-xl border border-cu-border bg-cu-bg overflow-hidden">
       {/* Day-name header */}
-      <div className="grid grid-cols-7 border-b border-[#EAECF0]">
+      <div className="grid grid-cols-7 border-b border-cu-border">
         {DAY_NAMES.map(name => (
-          <div key={name} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[#667085]">
+          <div key={name} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-cu-text-muted">
             {name}
           </div>
         ))}
@@ -164,7 +164,7 @@ export default function MonthCalendarView({
         const eventsAreaH = visibleLaneCount * (LANE_H + LANE_GAP) + (overflow.length ? 18 : 4);
 
         return (
-          <div key={weekIdx} className="border-b border-[#F2F4F7] last:border-b-0">
+          <div key={weekIdx} className="border-b border-cu-border last:border-b-0">
 
             {/* Day-number strip — also the drop targets */}
             <div className="grid grid-cols-7">
@@ -178,9 +178,9 @@ export default function MonthCalendarView({
                   <div
                     key={dropKey}
                     className={[
-                      'border-r border-[#F2F4F7] last:border-r-0 px-2 pt-2 pb-1',
-                      onDayClick ? 'cursor-pointer hover:bg-[#F9FAFB]' : '',
-                      isTarget ? 'bg-[#EFF8FF]' : '',
+                      'border-r border-cu-border last:border-r-0 px-2 pt-2 pb-1',
+                      onDayClick ? 'cursor-pointer hover:bg-cu-hover' : '',
+                      isTarget ? 'bg-cu-primary/5' : '',
                       'transition-colors',
                     ].join(' ')}
                     onClick={() => onDayClick?.(day)}
@@ -193,11 +193,11 @@ export default function MonthCalendarView({
                       setDropTargetKey(null);
                     }}
                   >
-                    <div className={`text-xs font-semibold leading-none ${inMonth ? 'text-[#101828]' : 'text-[#98A2B3]'}`}>
+                    <div className={`text-xs font-semibold leading-none ${inMonth ? 'text-cu-text-primary' : 'text-cu-text-muted'}`}>
                       {day.getDate()}
                     </div>
                     {overflow > 0 && (
-                      <div className="mt-0.5 text-[10px] font-medium text-[#667085]">
+                      <div className="mt-0.5 text-[10px] font-medium text-cu-text-muted">
                         +{overflow} more
                       </div>
                     )}

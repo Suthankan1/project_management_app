@@ -34,8 +34,8 @@ export default function CalendarEventCard({
     : isRangeSegment
       ? `${isRangeSegmentStart ? 'w-[calc(100%+9px)]' : isRangeSegmentEnd ? 'w-[calc(100%+9px)] -ml-[9px]' : 'w-[calc(100%+18px)] -ml-[9px]'}`
       : 'w-full';
-  const taskClasses = `block ${bleedClass} px-2 py-1 text-xs text-[#101828] bg-[#F2F4F7] border border-[#E4E7EC] ${leftBorderClass} ${rightBorderClass} ${rangeRound || 'rounded-md'} ${onClick ? 'cursor-pointer hover:bg-[#EAECF0]' : ''} ${draggable ? 'cursor-grab' : ''}`;
-  const sprintClasses = `block ${bleedClass} px-2 py-1 text-xs font-semibold text-[#175CD3] bg-[#DFF3FF] border border-[#B2DDFF] ${leftBorderClass} ${rightBorderClass} ${rangeRound} ${onClick ? 'cursor-pointer hover:brightness-95' : ''}`;
+  const taskClasses = `block ${bleedClass} px-2 py-1 text-xs text-cu-text-primary bg-cu-bg-tertiary border border-cu-border ${leftBorderClass} ${rightBorderClass} ${rangeRound || 'rounded-md'} ${onClick ? 'cursor-pointer hover:bg-cu-hover' : ''} ${draggable ? 'cursor-grab' : ''}`;
+  const sprintClasses = `block ${bleedClass} px-2 py-1 text-xs font-semibold text-cu-primary bg-cu-primary/10 border border-cu-primary/30 ${leftBorderClass} ${rightBorderClass} ${rangeRound} ${onClick ? 'cursor-pointer hover:brightness-95' : ''}`;
 
   return (
     <div
@@ -50,7 +50,7 @@ export default function CalendarEventCard({
     >
       <div className="truncate">{event.title}</div>
       {!compact && !sprint && event.assignee && (
-        <div className="truncate text-[10px] text-[#667085]">{event.assignee}</div>
+        <div className="truncate text-[10px] text-cu-text-muted">{event.assignee}</div>
       )}
     </div>
   );
