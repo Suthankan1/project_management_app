@@ -1120,9 +1120,6 @@ function ConnectedDashboard({
   const [prPage, setPRPage] = useState(1);
   const [commitPage, setCommitPage] = useState(1);
 
-  const [prPage, setPRPage] = useState(1);
-  const [commitPage, setCommitPage] = useState(1);
-
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -1887,23 +1884,6 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
           socketToken ? (
             <StompProvider token={socketToken}>{connectedDashboard}</StompProvider>
           ) : connectedDashboard
-=======
-          <ConnectedDashboard
-              key="dashboard"
-              connection={connection}
-              prs={prs}
-              commits={commits}
-              issues={issues}
-              loading={loading}
-              prError={prError}
-              commitError={commitError}
-              issueError={issueError}
-              user={user}
-              onRefresh={() => void loadData(connection)}
-              onLogout={() => void handleLogout()}
-              onChangeRepo={handleOpenModal}
-              canChangeRepo={canChangeRepo}
-            />
         ) : (
           <DisconnectedView key="disconnected" onConnect={handleInitiateConnect} onLogout={() => void handleLogout()} isPostLogout={isPostLogout} />
         )}
