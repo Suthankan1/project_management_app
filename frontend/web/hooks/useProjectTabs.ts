@@ -24,7 +24,6 @@ export function useProjectTabs(projectId: string | null, isAgile: boolean) {
       { id: 'dms',        label: 'DMS' },
       { id: 'list',       label: 'List' },
       { id: 'report',     label: 'Report' },
-      { id: 'github',     label: 'GitHub' },
     );
 
     return base;

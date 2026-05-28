@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bell, GitBranch, Globe, Lock, RefreshCw, Search, X, Check, Link2,
   LogOut, User, ExternalLink, GitPullRequest, ChevronDown, AlertCircle, GitCommit,
-  SlidersHorizontal,
+  SlidersHorizontal, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -38,6 +38,8 @@ import {
   fetchGitHubAutomationLogs,
   deleteGitHubAutomationRule,
   setGitHubAutomationRuleEnabled,
+  getSavedGitHubAccounts,
+  upsertSavedGitHubAccount,
   type GitHubRepository,
   type GitHubPullRequest,
   type GitHubCommit,
@@ -46,9 +48,12 @@ import {
   type ProjectGitHubConnection,
   type GithubAutomationRule,
   type GithubAutomationLog,
+  type SavedGitHubAccount,
 } from '@/services/githubService';
 import IssueCard from '@/components/github/IssueCard';
 import GitHubMark from '@/components/github/GitHubMark';
+import { fetchMembers } from '@/services/members-service';
+import { getUserFromToken } from '@/lib/auth';
 import type { Notification } from '@/services/notifications-service';
 
 const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
@@ -103,7 +108,7 @@ function classifyGitHubNotification(notification: Notification): GitHubTabKey | 
 }
 
 // ── Disconnected state ────────────────────────────────────────────────────────
-function DisconnectedView({ onConnect }: { onConnect: () => void }) {
+function DisconnectedView({ onConnect, onLogout, isPostLogout }: { onConnect: () => void; onLogout: () => void; isPostLogout: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -115,31 +120,80 @@ function DisconnectedView({ onConnect }: { onConnect: () => void }) {
       <div className="w-20 h-20 rounded-3xl bg-slate-900 flex items-center justify-center shadow-[0_8px_32px_rgba(0,0,0,0.18)]">
         <GitHubMark size={40} className="text-white" />
       </div>
-      <div className="flex flex-col gap-2">
-        <h2 className="text-xl font-outfit font-bold text-slate-800">Connect to GitHub</h2>
-        <p className="text-sm text-slate-500 font-outfit leading-relaxed">
-          Link this project to a GitHub repository to track pull requests and activity.
-        </p>
-      </div>
-      <div className="flex flex-col gap-2 w-full text-left bg-slate-50 rounded-2xl p-4 border border-slate-100">
-        {['View last 10 pull requests', 'Track open, merged & closed PRs', 'See branch and author details'].map(item => (
-          <div key={item} className="flex items-center gap-2.5">
-            <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-              <Check size={10} className="text-green-600" strokeWidth={3} />
-            </div>
-            <span className="text-sm text-slate-600 font-outfit">{item}</span>
+
+      {isPostLogout ? (
+        <>
+          <div className="flex flex-col gap-2">
+            <h2 className="text-xl font-outfit font-bold text-slate-800">Choose a GitHub account</h2>
+            <p className="text-sm text-slate-500 font-outfit leading-relaxed">
+              You&apos;ll be taken to GitHub to sign in and select which account to connect with.
+              If you have multiple accounts you&apos;ll see an account picker.
+            </p>
           </div>
-        ))}
-      </div>
-      <motion.button
-        onClick={onConnect}
-        whileHover={{ scale: 1.03, y: -1 }}
-        whileTap={{ scale: 0.97 }}
-        className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-slate-900 text-white font-outfit font-bold text-sm shadow-[0_4px_20px_rgba(0,0,0,0.25)] hover:bg-slate-800 transition-colors"
-      >
-        <GitHubMark size={18} className="text-white" />
-        Connect to GitHub
-      </motion.button>
+          <div className="flex flex-col gap-2 w-full text-left bg-blue-50 rounded-2xl p-4 border border-blue-100">
+            <div className="flex items-start gap-2.5">
+              <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+                <User size={9} className="text-blue-600" />
+              </div>
+              <span className="text-sm text-slate-600 font-outfit">
+                Sign in with any GitHub account — your previous account is no longer connected.
+              </span>
+            </div>
+          </div>
+          <motion.button
+            onClick={onConnect}
+            whileHover={{ scale: 1.03, y: -1 }}
+            whileTap={{ scale: 0.97 }}
+            className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-slate-900 text-white font-outfit font-bold text-sm shadow-[0_4px_20px_rgba(0,0,0,0.25)] hover:bg-slate-800 transition-colors"
+          >
+            <GitHubMark size={18} className="text-white" />
+            Choose GitHub account
+          </motion.button>
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-1.5 text-xs font-outfit font-semibold text-red-500 hover:text-red-600 transition-colors"
+          >
+            <LogOut size={13} />
+            Logout from GitHub
+          </button>
+        </>
+      ) : (
+        <>
+          <div className="flex flex-col gap-2">
+            <h2 className="text-xl font-outfit font-bold text-slate-800">Connect to GitHub</h2>
+            <p className="text-sm text-slate-500 font-outfit leading-relaxed">
+              Link this project to a GitHub repository to track pull requests and activity.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 w-full text-left bg-slate-50 rounded-2xl p-4 border border-slate-100">
+            {['View pull requests', 'Track open, merged & closed PRs', 'See branch and author details'].map(item => (
+              <div key={item} className="flex items-center gap-2.5">
+                <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                  <Check size={10} className="text-green-600" strokeWidth={3} />
+                </div>
+                <span className="text-sm text-slate-600 font-outfit">{item}</span>
+              </div>
+            ))}
+          </div>
+          <motion.button
+            onClick={onConnect}
+            whileHover={{ scale: 1.03, y: -1 }}
+            whileTap={{ scale: 0.97 }}
+            className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-slate-900 text-white font-outfit font-bold text-sm shadow-[0_4px_20px_rgba(0,0,0,0.25)] hover:bg-slate-800 transition-colors"
+          >
+            <GitHubMark size={18} className="text-white" />
+            Connect to GitHub
+          </motion.button>
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-1.5 text-xs font-outfit font-semibold text-red-500 hover:text-red-600 transition-colors"
+          >
+            <LogOut size={13} />
+            Logout from GitHub
+          </button>
+        </>
+      )}
+
       {!GITHUB_CLIENT_ID && (
         <p className="text-xs text-amber-600 font-outfit bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
           Set <code className="font-mono">NEXT_PUBLIC_GITHUB_CLIENT_ID</code> to enable GitHub OAuth.
@@ -276,10 +330,12 @@ function AccountDropdown({
   user,
   onLogout,
   onChangeRepo,
+  canChangeRepo,
 }: {
   user: GitHubUser | null;
   onLogout: () => void;
   onChangeRepo: () => void;
+  canChangeRepo: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -353,13 +409,15 @@ function AccountDropdown({
 
             {/* Actions */}
             <div className="py-1.5">
-              <button
-                onClick={() => { setOpen(false); onChangeRepo(); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-outfit font-semibold text-slate-700 hover:bg-slate-50 transition-colors text-left"
-              >
-                <Link2 size={14} className="text-slate-400" />
-                Change repository
-              </button>
+              {canChangeRepo && (
+                <button
+                  onClick={() => { setOpen(false); onChangeRepo(); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-outfit font-semibold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                >
+                  <Link2 size={14} className="text-slate-400" />
+                  Change repository
+                </button>
+              )}
               <button
                 onClick={() => { setOpen(false); onLogout(); }}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-outfit font-semibold text-red-600 hover:bg-red-50 transition-colors text-left"
@@ -476,6 +534,125 @@ function RepoModal({
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+// ── Account picker modal ──────────────────────────────────────────────────────
+function AccountPickerModal({
+  accounts,
+  onSelect,
+  onAddAccount,
+  onClose,
+}: {
+  accounts: SavedGitHubAccount[];
+  onSelect: (login: string) => void;
+  onAddAccount: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[500] flex items-center justify-center p-4"
+      style={{ background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={{ duration: 0.18 }}
+        className="w-full max-w-sm rounded-2xl bg-white shadow-[0_24px_80px_rgba(0,0,0,0.18)] overflow-hidden"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center shrink-0">
+              <GitHubMark size={14} className="text-white" />
+            </div>
+            <h2 className="text-sm font-outfit font-bold text-slate-800">Choose a GitHub account</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* Saved accounts list */}
+        <div className="py-1.5 max-h-[300px] overflow-y-auto">
+          {accounts.map(account => (
+            <button
+              key={account.login}
+              onClick={() => onSelect(account.login)}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group text-left"
+            >
+              <Image
+                src={account.avatarUrl}
+                alt={account.login}
+                width={36}
+                height={36}
+                className="rounded-full flex-shrink-0 ring-2 ring-slate-100"
+                unoptimized
+              />
+              <div className="flex flex-col min-w-0 flex-1">
+                {account.name && (
+                  <span className="text-sm font-outfit font-semibold text-slate-800 truncate leading-tight">
+                    {account.name}
+                  </span>
+                )}
+                <span className="text-xs text-slate-500 font-outfit truncate">@{account.login}</span>
+              </div>
+              <span className="text-xs font-outfit font-semibold text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                Connect →
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Add / use a different account */}
+        <div className="px-4 py-3 border-t border-slate-100">
+          <button
+            onClick={onAddAccount}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 text-sm font-outfit font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors"
+          >
+            <User size={14} className="text-slate-400" />
+            Use a different account
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ── Pagination ────────────────────────────────────────────────────────────────
+const PAGE_SIZE = 5;
+
+function PaginationBar({ page, total, onPrev, onNext }: { page: number; total: number; onPrev: () => void; onNext: () => void }) {
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-3 pt-1">
+      <button
+        onClick={onPrev}
+        disabled={page === 1}
+        className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        <ChevronLeft size={14} />
+      </button>
+      <span className="text-xs font-outfit text-slate-500 tabular-nums">
+        {page} / {totalPages}
+      </span>
+      <button
+        onClick={onNext}
+        disabled={page === totalPages}
+        className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        <ChevronRight size={14} />
+      </button>
+    </div>
   );
 }
 
@@ -802,6 +979,7 @@ function ConnectedDashboard({
   onToggleAutomationRule,
   onRefreshAutomationRules,
   onRefreshAutomationLogs,
+  canChangeRepo,
 }: {
   projectId: string;
   connection: ProjectGitHubConnection;
@@ -829,6 +1007,7 @@ function ConnectedDashboard({
   onToggleAutomationRule: (ruleId: number, enabled: boolean) => void;
   onRefreshAutomationRules: () => void;
   onRefreshAutomationLogs: () => void;
+  canChangeRepo: boolean;
 }) {
   const { notifications: globalNotifications, markAsRead } = useGlobalNotifications();
   type LiveNotice = {
@@ -938,6 +1117,11 @@ function ConnectedDashboard({
       setActivityError(null);
     }
   }, [githubNotifications, markAsRead]);
+  const [prPage, setPRPage] = useState(1);
+  const [commitPage, setCommitPage] = useState(1);
+
+  const [prPage, setPRPage] = useState(1);
+  const [commitPage, setCommitPage] = useState(1);
 
   return (
     <motion.div
@@ -975,14 +1159,16 @@ function ConnectedDashboard({
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
-          <button
-            onClick={onChangeRepo}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors shadow-sm text-xs font-outfit font-semibold text-slate-700"
-          >
-            <Link2 size={13} />
-            Change repo
-          </button>
-          <AccountDropdown user={user} onLogout={onLogout} onChangeRepo={onChangeRepo} />
+          {canChangeRepo && (
+            <button
+              onClick={onChangeRepo}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors shadow-sm text-xs font-outfit font-semibold text-slate-700"
+            >
+              <Link2 size={13} />
+              Change repo
+            </button>
+          )}
+          <AccountDropdown user={user} onLogout={onLogout} onChangeRepo={onChangeRepo} canChangeRepo={canChangeRepo} />
         </div>
       </div>
 
@@ -1238,15 +1424,25 @@ function ConnectedDashboard({
             </div>
           )}
 
-          {!loading && !prError && prs.length > 0 && (
-            <div className="flex flex-col gap-3">
-              {prs.map((pr, i) => (
-                <motion.div key={pr.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                  <PRCard pr={pr} />
-                </motion.div>
-              ))}
-            </div>
-          )}
+          {!loading && !prError && prs.length > 0 && (() => {
+            const start = (prPage - 1) * PAGE_SIZE;
+            const page = prs.slice(start, start + PAGE_SIZE);
+            return (
+              <div className="flex flex-col gap-3">
+                {page.map((pr, i) => (
+                  <motion.div key={pr.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+                    <PRCard pr={pr} />
+                  </motion.div>
+                ))}
+                <PaginationBar
+                  page={prPage}
+                  total={prs.length}
+                  onPrev={() => setPRPage(p => Math.max(1, p - 1))}
+                  onNext={() => setPRPage(p => Math.min(Math.ceil(prs.length / PAGE_SIZE), p + 1))}
+                />
+              </div>
+            );
+          })()}
         </div>
         )}
 
@@ -1290,15 +1486,25 @@ function ConnectedDashboard({
             </div>
           )}
 
-          {!loading && !commitError && commits.length > 0 && (
-            <div className="flex flex-col gap-3">
-              {commits.map((commit, i) => (
-                <motion.div key={commit.sha} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                  <CommitCard commit={commit} />
-                </motion.div>
-              ))}
-            </div>
-          )}
+          {!loading && !commitError && commits.length > 0 && (() => {
+            const start = (commitPage - 1) * PAGE_SIZE;
+            const page = commits.slice(start, start + PAGE_SIZE);
+            return (
+              <div className="flex flex-col gap-3">
+                {page.map((commit, i) => (
+                  <motion.div key={commit.sha} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+                    <CommitCard commit={commit} />
+                  </motion.div>
+                ))}
+                <PaginationBar
+                  page={commitPage}
+                  total={commits.length}
+                  onPrev={() => setCommitPage(p => Math.max(1, p - 1))}
+                  onNext={() => setCommitPage(p => Math.min(Math.ceil(commits.length / PAGE_SIZE), p + 1))}
+                />
+              </div>
+            );
+          })()}
         </div>
         )}
 
@@ -1341,6 +1547,10 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   const [automationRulesError, setAutomationRulesError] = useState<string | null>(null);
   const [automationLogsError, setAutomationLogsError] = useState<string | null>(null);
   const [showAutomationBuilder, setShowAutomationBuilder] = useState(false);
+  const [canChangeRepo, setCanChangeRepo] = useState(false);
+  const [isPostLogout, setIsPostLogout] = useState(false);
+  const [savedAccounts, setSavedAccounts] = useState<SavedGitHubAccount[]>([]);
+  const [showAccountPicker, setShowAccountPicker] = useState(false);
 
   // Repo modal state
   const [showModal, setShowModal] = useState(false);
@@ -1361,6 +1571,23 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     return () => {
       active = false;
     };
+  }, [projectId]);
+
+  // Load saved accounts and clean up any legacy force-relogin flag on mount
+  useEffect(() => {
+    localStorage.removeItem('github_force_relogin');
+    setSavedAccounts(getSavedGitHubAccounts());
+  }, []);
+
+  useEffect(() => {
+    const currentUser = getUserFromToken();
+    if (!currentUser?.userId) return;
+    fetchMembers(projectId)
+      .then(members => {
+        const me = members.find(m => m.userId === currentUser.userId);
+        setCanChangeRepo(me?.role === 'OWNER' || me?.role === 'ADMIN');
+      })
+      .catch(() => {});
   }, [projectId]);
 
   const loadData = useCallback(async (conn: ProjectGitHubConnection) => {
@@ -1387,7 +1614,13 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     if (issueResult.status === 'fulfilled') setIssues(issueResult.value);
     else setIssueError(issueResult.reason instanceof Error ? issueResult.reason.message : 'Failed to load issues');
 
-    if (userResult.status === 'fulfilled') setUser(userResult.value);
+    if (userResult.status === 'fulfilled') {
+      const githubUser = userResult.value;
+      setUser(githubUser);
+      // Persist this account so the picker shows it on next connect
+      upsertSavedGitHubAccount({ login: githubUser.login, name: githubUser.name, avatarUrl: githubUser.avatar_url });
+      setSavedAccounts(getSavedGitHubAccounts());
+    }
     setLoading(false);
   }, []);
 
@@ -1477,21 +1710,41 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleConnectGitHub = () => {
+  // loginHint=undefined  → normal OAuth (uses active GitHub browser session)
+  // loginHint=''         → passes login= to GitHub, always shows the sign-in page
+  // loginHint='username' → tells GitHub to sign in as that specific account
+  const handleConnectGitHub = (loginHint?: string) => {
     if (!GITHUB_CLIENT_ID) {
       alert('GitHub OAuth is not configured.\nPlease set NEXT_PUBLIC_GITHUB_CLIENT_ID.');
       return;
     }
     const redirectUri = `${window.location.origin}/github/callback`;
-    window.location.href =
-      `https://github.com/login/oauth/authorize` +
-      `?client_id=${GITHUB_CLIENT_ID}&scope=repo&state=${projectId}` +
-      `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    const params = new URLSearchParams({
+      client_id: GITHUB_CLIENT_ID,
+      scope: 'repo',
+      state: projectId,
+      redirect_uri: redirectUri,
+    });
+    if (loginHint !== undefined) params.set('login', loginHint);
+    window.location.href = `https://github.com/login/oauth/authorize?${params}`;
+  };
+
+  // Show account picker when saved accounts exist; otherwise go straight to OAuth
+  const handleInitiateConnect = () => {
+    if (savedAccounts.length > 0) {
+      setShowAccountPicker(true);
+    } else {
+      handleConnectGitHub();
+    }
   };
 
   const handleOpenModal = async () => {
     const token = getGitHubToken();
-    if (!token) { handleConnectGitHub(); return; }
+    if (!token) {
+      if (savedAccounts.length > 0) setShowAccountPicker(true);
+      else handleConnectGitHub();
+      return;
+    }
     setShowModal(true);
     await loadRepos();
   };
@@ -1500,6 +1753,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     setProjectGitHubRepo(projectId, repo);
     const newConn = getProjectGitHubRepo(projectId)!;
     setConnection(newConn);
+    setIsPostLogout(false);
     setShowModal(false);
     setRepoSearch('');
     void loadData(newConn);
@@ -1518,6 +1772,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     }
     clearGitHubToken();
     clearProjectGitHubRepo(projectId);
+    setIsPostLogout(true);
     setConnection(null);
     setUser(null);
     setPRs([]);
@@ -1632,8 +1887,25 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
           socketToken ? (
             <StompProvider token={socketToken}>{connectedDashboard}</StompProvider>
           ) : connectedDashboard
+=======
+          <ConnectedDashboard
+              key="dashboard"
+              connection={connection}
+              prs={prs}
+              commits={commits}
+              issues={issues}
+              loading={loading}
+              prError={prError}
+              commitError={commitError}
+              issueError={issueError}
+              user={user}
+              onRefresh={() => void loadData(connection)}
+              onLogout={() => void handleLogout()}
+              onChangeRepo={handleOpenModal}
+              canChangeRepo={canChangeRepo}
+            />
         ) : (
-          <DisconnectedView key="disconnected" onConnect={handleConnectGitHub} />
+          <DisconnectedView key="disconnected" onConnect={handleInitiateConnect} onLogout={() => void handleLogout()} isPostLogout={isPostLogout} />
         )}
       </AnimatePresence>
 
@@ -1658,6 +1930,17 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
             projectId={projectId}
             onCreated={handleAutomationRuleCreated}
             onClose={() => setShowAutomationBuilder(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showAccountPicker && (
+          <AccountPickerModal
+            accounts={savedAccounts}
+            onSelect={login => { setShowAccountPicker(false); handleConnectGitHub(login); }}
+            onAddAccount={() => { setShowAccountPicker(false); handleConnectGitHub(''); }}
+            onClose={() => setShowAccountPicker(false)}
           />
         )}
       </AnimatePresence>

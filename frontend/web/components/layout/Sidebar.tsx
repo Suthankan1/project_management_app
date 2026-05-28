@@ -158,8 +158,21 @@ export default function Sidebar() {
   const [notifPanelOpen, setNotifPanelOpen] = useState(false);
   const [loadingInbox, setLoadingInbox] = useState(false);
 
-  // Keep the hydration render deterministic; browser preferences are restored after mount.
+  // HYDRATION FIX: Both states must start with the same value the server uses.
+  // The server has no access to `window` or `localStorage`, so any lazy
+  // initializer that reads those APIs returns a different value than what the
+  // client computes, causing React's hydration to fail with a tree mismatch.
+  //
+  // Previous (broken) pattern:
+  //   useState(() => typeof window !== 'undefined' ? localStorage.get(...) : true)
+  //   → server: true (window undefined)  |  client: false (localStorage value)
+  //   → React detects the difference and throws a hydration error.
+  //
+  // Fix: initialise with the server-safe defaults (collapsed=true, isMobile=false),
+  // then read the real browser values in a useEffect that only runs on the client,
+  // after React has already committed the hydrated tree.
   const [collapsed, setCollapsed] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   const [favOpen, setFavOpen] = useState(false);
   const [recentOpen, setRecentOpen] = useState(false);
   const [favSearch, setFavSearch] = useState('');
@@ -167,7 +180,16 @@ export default function Sidebar() {
   const [inboxSearch, setInboxSearch] = useState('');
   const [notifSearch, setNotifSearch] = useState('');
 
-  const [isMobile, setIsMobile] = useState(false);
+  // Apply real browser state (window size + persisted preference) after hydration.
+  // Runs once on mount — the existing CSS transition (duration-300) smooths the
+  // visual shift from the SSR default (collapsed) to the persisted value.
+  useEffect(() => {
+    const mobile = window.innerWidth < 768;
+    setIsMobile(mobile);
+    setCollapsed(
+      mobile ? true : localStorage.getItem('planora:sidebar:collapsed') === 'true'
+    );
+  }, []);
 
   useEffect(() => {
     let isCurrentlyMobile = window.innerWidth < 768;
