@@ -19,8 +19,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,12 +30,12 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import com.planora.backend.dto.NotificationFeedResponseDTO;
-import com.planora.backend.model.NotificationChannel;
 import com.planora.backend.dto.NotificationResponseDTO;
 import com.planora.backend.model.Notification;
+import com.planora.backend.model.NotificationChannel;
 import com.planora.backend.model.User;
-import com.planora.backend.repository.TaskRepository;
 import com.planora.backend.repository.NotificationRepository;
+import com.planora.backend.repository.TaskRepository;
 
 import jakarta.persistence.EntityNotFoundException;
 

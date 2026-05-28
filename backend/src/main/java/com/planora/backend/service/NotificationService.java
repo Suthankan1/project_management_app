@@ -17,9 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.planora.backend.dto.NotificationFeedResponseDTO;
 import com.planora.backend.dto.NotificationResponseDTO;
+import com.planora.backend.model.Notification;
 import com.planora.backend.model.NotificationChannel;
 import com.planora.backend.model.NotificationEventType;
-import com.planora.backend.model.Notification;
 import com.planora.backend.model.User;
 import com.planora.backend.repository.NotificationRepository;
 import com.planora.backend.repository.TaskRepository;
