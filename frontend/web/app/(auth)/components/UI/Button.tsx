@@ -29,9 +29,9 @@ export default function Button({
       disabled={isLoading || disabled}
       // Dynamic Tailwind classes. If disabled/loading, we drop the opacity and kill the hover effects.
       className={`w-full font-bold py-3.5 min-h-[44px] rounded-xl transition-all text-white shadow-blue-500/30 shadow-lg active:scale-[0.98] mt-4 flex justify-center items-center
-        ${isLoading || disabled 
-          ? 'bg-blue-400 cursor-not-allowed opacity-70' 
-          : 'bg-blue-600 hover:bg-blue-700'
+        ${isLoading || disabled
+          ? 'bg-cu-primary/60 cursor-not-allowed opacity-70'
+          : 'bg-cu-primary hover:opacity-90'
         }`}
     >
       {children}
