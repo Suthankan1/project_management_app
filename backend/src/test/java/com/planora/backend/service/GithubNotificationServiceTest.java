@@ -28,6 +28,7 @@ import com.planora.backend.event.IssueOpenedEvent;
 import com.planora.backend.event.PRMergedEvent;
 import com.planora.backend.event.PROpenedEvent;
 import com.planora.backend.event.ReleasePublishedEvent;
+import com.planora.backend.model.NotificationEventType;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Task;
 import com.planora.backend.model.Team;
@@ -103,9 +104,9 @@ class GithubNotificationServiceTest {
         String link = "https://github.com/planora/app/pull/17";
         String prefix = "\uD83D\uDD00 PR opened: #17 ";
         verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                recipient, message, link, prefix);
+                recipient, 41L, NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix);
         verify(notificationService, never()).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                author, message, link, prefix);
+                author, 41L, NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix);
         GithubPRUpdatePayload updatePayload = new GithubPRUpdatePayload(
                 "opened", 17, "Improve sync", link, "octocat");
         verify(githubEventBroadcaster).broadcastPRUpdate(41L, updatePayload);
@@ -148,9 +149,9 @@ class GithubNotificationServiceTest {
         String link = "https://github.com/planora/app/pull/17";
         String prefix = "\u2705 PR merged: #17 ";
         verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                recipient, message, link, prefix);
+                recipient, 41L, NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix);
         verify(notificationService, never()).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                author, message, link, prefix);
+                author, 41L, NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix);
         GithubPRUpdatePayload updatePayload = new GithubPRUpdatePayload(
                 "merged", 17, "Improve sync", link, "maintainer");
         verify(githubEventBroadcaster).broadcastPRUpdate(41L, updatePayload);
@@ -179,15 +180,26 @@ class GithubNotificationServiceTest {
         User secondReviewer = user(3L, "second-reviewer");
         when(userRepository.findByGithubUsernameIgnoreCase("requested-reviewer"))
                 .thenReturn(List.of(recipient, secondReviewer));
+        when(projectRepository.findByGithubRepoFullNameIgnoreCase("planora/app"))
+                .thenReturn(List.of(firstProject));
 
         githubNotificationService.notifyReviewRequested(
                 " planora/app ", 17, "Improve sync", "requested-reviewer");
 
         String message = "\uD83D\uDC41 Review requested: #17 Improve sync in planora/app";
         String link = "https://github.com/planora/app/pull/17";
-        verify(notificationService).createNotification(recipient, message, link);
-        verify(notificationService).createNotification(secondReviewer, message, link);
-        verify(projectRepository, never()).findByGithubRepoFullNameIgnoreCase(any());
+        verify(notificationService).createNotification(
+                recipient,
+                41L,
+                NotificationEventType.GITHUB_ACTIVITY.name(),
+                message,
+                link);
+        verify(notificationService).createNotification(
+                secondReviewer,
+                41L,
+                NotificationEventType.GITHUB_ACTIVITY.name(),
+                message,
+                link);
         verify(teamMemberRepository, never()).findByTeamId(any());
     }
 
@@ -217,9 +229,9 @@ class GithubNotificationServiceTest {
         String link = "https://github.com/planora/app/commit/abcdef1234567890/checks";
         String prefix = "\u274C CI failed: Backend checks on ";
         verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                author, message, link, prefix);
+                author, 41L, NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix);
         verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                recipient, message, link, prefix);
+                recipient, 41L, NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix);
         GithubCIUpdatePayload updatePayload = new GithubCIUpdatePayload(
                 "Backend checks", "main", "failure", "abcdef1234567890");
         verify(githubEventBroadcaster).broadcastCIUpdate(41L, updatePayload);
@@ -264,9 +276,9 @@ class GithubNotificationServiceTest {
         String link = "https://github.com/planora/app/issues/34";
         String prefix = "\uD83D\uDC1B Issue opened: #34 ";
         verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                recipient, message, link, prefix);
+                recipient, 41L, NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix);
         verify(notificationService, never()).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                author, message, link, prefix);
+                author, 41L, NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix);
         GithubIssueUpdatePayload updatePayload = new GithubIssueUpdatePayload(
                 "opened", 34, "Broken sync", "octocat");
         verify(githubEventBroadcaster).broadcastIssueUpdate(41L, updatePayload);
@@ -294,9 +306,9 @@ class GithubNotificationServiceTest {
         String link = "https://github.com/planora/app/issues/34";
         String prefix = "\u2705 Issue closed: #34 ";
         verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                author, message, link, prefix);
+                author, 41L, NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix);
         verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                recipient, message, link, prefix);
+                recipient, 41L, NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix);
     }
 
     @Test
@@ -321,6 +333,8 @@ class GithubNotificationServiceTest {
 
         verify(notificationService).createNotification(
                 recipient,
+                41L,
+                NotificationEventType.GITHUB_ACTIVITY.name(),
                 "\uD83C\uDFF7 Issue #34 labeled in GitHub",
                 "https://github.com/planora/app/issues/34");
         ArgumentCaptor<IssueLabeledEvent> eventCaptor = ArgumentCaptor.forClass(IssueLabeledEvent.class);
@@ -343,6 +357,8 @@ class GithubNotificationServiceTest {
 
         verify(notificationService).createNotification(
                 recipient,
+                41L,
+                NotificationEventType.GITHUB_ACTIVITY.name(),
                 "\uD83D\uDCCB You were assigned to issue #34: Broken sync",
                 "https://github.com/planora/app/issues/34");
         verify(teamMemberRepository, never()).findByTeamId(any());
@@ -364,9 +380,9 @@ class GithubNotificationServiceTest {
         String link = "https://github.com/planora/app/releases/tag/v2.0.0";
         String prefix = "\uD83D\uDE80 Release published: Planora 2.0 (";
         verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                author, message, link, prefix);
+                author, 41L, NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix);
         verify(notificationService).createNotificationIfNotDuplicateByLinkAndMessagePrefix(
-                recipient, message, link, prefix);
+                recipient, 41L, NotificationEventType.GITHUB_ACTIVITY.name(), message, link, prefix);
 
         ArgumentCaptor<ReleasePublishedEvent> eventCaptor = ArgumentCaptor.forClass(ReleasePublishedEvent.class);
         verify(applicationEventPublisher).publishEvent(eventCaptor.capture());

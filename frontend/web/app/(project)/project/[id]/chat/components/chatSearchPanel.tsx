@@ -5,8 +5,10 @@ import { Search } from 'lucide-react';
 
 interface ChatSearchResult {
   messageId: number;
-  highlightedContent: string;
-  senderName: string;
+  highlightedContent?: string;
+  content?: string;
+  senderName?: string;
+  sender?: string;
   deepLinkUrl: string;
   roomId?: number | null;
   timestamp?: string | null;
@@ -76,15 +78,15 @@ export function ChatSearchPanel({
                   className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100"
                   role="option"
                   aria-selected="false"
-                  aria-label={`Message from ${result.senderName}`}
+                  aria-label={`Message from ${result.senderName ?? result.sender ?? 'unknown'}`}
                 >
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500 bg-blue-50 border border-blue-100 rounded-full px-2 py-0.5">
                       {result.roomId ? 'ROOM' : 'CHAT'}
                     </span>
-                    <span className="text-[11px] font-semibold text-gray-600">{result.senderName}</span>
+                    <span className="text-[11px] font-semibold text-gray-600">{result.senderName ?? result.sender}</span>
                   </div>
-                  <p className="text-[12.5px] text-gray-700 truncate">{result.highlightedContent}</p>
+                  <p className="text-[12.5px] text-gray-700 truncate">{result.highlightedContent ?? result.content}</p>
                 </button>
               ))}
             </div>

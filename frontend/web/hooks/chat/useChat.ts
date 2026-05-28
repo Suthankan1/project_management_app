@@ -12,6 +12,7 @@ import { useChatSearch } from './useChatSearch';
 import { useChatUnread } from './useChatUnread';
 import {
   DEFAULT_FEATURE_FLAGS,
+  CHAT_RECONNECT_ERROR,
   initializeChatState,
   restoreSelectionState,
 } from './useChat.internal';
@@ -181,18 +182,29 @@ export const useChat = (projectId: string) => {
     [currentUser, setMessages, setRoomMessages, setPrivateMessages, setThreadMessages],
   );
 
+  const canSendRealtime = useCallback((): boolean => {
+    if (realtimeConnected && !realtimeReconnecting) {
+      return true;
+    }
+
+    setError(CHAT_RECONNECT_ERROR);
+    return false;
+  }, [realtimeConnected, realtimeReconnecting]);
+
   const sendMessage = useCallback(
     (content: string, recipient?: string | null) => {
+      if (!canSendRealtime()) return;
       msgSend(content, currentUser, stompSend, trackTelemetry, recipient);
     },
-    [currentUser, msgSend, stompSend, trackTelemetry],
+    [currentUser, msgSend, stompSend, trackTelemetry, canSendRealtime],
   );
 
   const sendRoomMessage = useCallback(
     (content: string, roomId: number) => {
+      if (!canSendRealtime()) return;
       msgSendRoom(content, roomId, currentUser, stompSend, trackTelemetry);
     },
-    [currentUser, msgSendRoom, stompSend, trackTelemetry],
+    [currentUser, msgSendRoom, stompSend, trackTelemetry, canSendRealtime],
   );
 
   const editMessage = useCallback(

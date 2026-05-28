@@ -32,6 +32,7 @@ import com.planora.backend.model.GithubTrigger;
 import com.planora.backend.model.KanbanColumn;
 import com.planora.backend.model.Label;
 import com.planora.backend.model.Priority;
+import com.planora.backend.model.NotificationEventType;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Sprint;
 import com.planora.backend.model.SprintStatus;
@@ -609,10 +610,14 @@ class GithubAutomationServiceTest {
 
         verify(notificationService).createNotification(
                 first,
+                41L,
+                NotificationEventType.GITHUB_ACTIVITY.name(),
                 "GitHub: Pull request #17 was opened - Improve sync",
                 "https://github.com/planora/app/pull/17");
         verify(notificationService).createNotification(
                 second,
+                41L,
+                NotificationEventType.GITHUB_ACTIVITY.name(),
                 "GitHub: Pull request #17 was opened - Improve sync",
                 "https://github.com/planora/app/pull/17");
         verify(automationLogRepository).save(org.mockito.ArgumentMatchers.argThat(execution ->
