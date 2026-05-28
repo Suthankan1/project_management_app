@@ -120,20 +120,17 @@ export function GlobalNotificationProvider({ children }: { children: React.React
 
   const loadInitialData = useCallback(async () => {
     try {
-      const [notifs, count] = await Promise.all([
-        notificationsApi.fetchNotifications(),
-        notificationsApi.fetchUnreadCount(),
-      ]);
-      setNotifications(notifs);
-      setUnreadCount(count);
-      seenNotificationIdsRef.current = new Set(notifs.map((notif) => notif.id));
+      const feed = await notificationsApi.fetchNotifications();
+      setNotifications(feed.notifications);
+      setUnreadCount(feed.unreadCount);
+      seenNotificationIdsRef.current = new Set(feed.notifications.map((notif) => notif.id));
       const cacheKey = notificationsCacheKeyRef.current;
       if (cacheKey) {
         setSessionCache<NotificationsCachePayload>(
           cacheKey,
           {
-            notifications: notifs,
-            unreadCount: count,
+            notifications: feed.notifications,
+            unreadCount: feed.unreadCount,
           },
           NOTIFICATIONS_CACHE_TTL_MS,
         );
@@ -246,7 +243,6 @@ export function GlobalNotificationProvider({ children }: { children: React.React
           const isOnRelevantPage = isOnRelevantRoute(currentPath, currentQuery, targetPath);
 
           if (!isOnRelevantPage) {
-            setUnreadCount((prev) => prev + 1);
             toast(newNotif.message, 'info', 5000);
           } else {
             // If we're on the relevant page, we can instantly mark it as read behind the scenes
@@ -254,6 +250,13 @@ export function GlobalNotificationProvider({ children }: { children: React.React
             setNotifications((prev) =>
               prev.map((n) => (n.id === newNotif.id ? { ...n, read: true } : n))
             );
+          }
+        });
+
+        client.subscribe('/user/queue/notifications-badge', (payload) => {
+          const newCount = Number(payload.body);
+          if (!isNaN(newCount)) {
+            setUnreadCount(newCount);
           }
         });
       },

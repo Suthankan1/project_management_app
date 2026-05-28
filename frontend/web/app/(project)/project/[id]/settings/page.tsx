@@ -18,7 +18,6 @@ import {
   getProjectGitHubRepo,
   type GithubAutomationAction,
   type GithubAutomationTrigger,
-  type GithubAutomationRule,
   type ProjectGitHubConnection,
 } from '@/services/githubService';
 import {
@@ -162,17 +161,17 @@ function GitHubAutoTransitionsCard({ projectId }: { projectId: number }) {
   const templates: QuickTemplateRule[] = QUICK_TEMPLATE_BASE.map((base) => ({
     ...base,
     config:
-      (base.key === 'prMergedDone'
+      base.key === 'prMergedDone'
         ? { targetColumnName: 'Done' }
         : base.key === 'prOpenedReview'
           ? { targetColumnName: 'In Review' }
           : {
-              projectId: String(projectId),
-              taskTitle: 'CI failed: {workflowName} on {branch}',
-              priority: 'HIGH',
-              labelName: 'bug',
-              labelColor: '#d73a4a',
-            }) as Record<string, string>,
+            projectId: String(projectId),
+            taskTitle: 'CI failed: {workflowName} on {branch}',
+            priority: 'HIGH',
+            labelName: 'bug',
+            labelColor: '#d73a4a',
+          },
   }));
 
   const refreshConnection = useCallback(() => {
@@ -224,6 +223,7 @@ function GitHubAutoTransitionsCard({ projectId }: { projectId: number }) {
     try {
       if (existingRuleId) {
         await deleteGitHubAutomationRule(projectId, existingRuleId);
+        setRules((prev) => prev.filter((rule) => rule.id !== existingRuleId));
         setRuleByTemplate((prev) => ({ ...prev, [key]: null }));
         toast('Quick automation disabled', 'success');
       } else {
@@ -588,15 +588,15 @@ function TypeChangeModal({
   const fromAgile = currentType === 'AGILE';
   const warnings = fromAgile
     ? [
-        'Sprint history is preserved but not visible in Kanban mode',
-        'Burndown charts and velocity tracking will be unavailable',
-        'Active sprints will remain but cannot be managed',
-      ]
+      'Sprint history is preserved but not visible in Kanban mode',
+      'Burndown charts and velocity tracking will be unavailable',
+      'Active sprints will remain but cannot be managed',
+    ]
     : [
-        'Your board will be restructured for sprint-based workflow',
-        'You can now create sprints and plan agile iterations',
-        'Burndown charts and velocity tracking become available',
-      ];
+      'Your board will be restructured for sprint-based workflow',
+      'You can now create sprints and plan agile iterations',
+      'Burndown charts and velocity tracking become available',
+    ];
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -828,7 +828,7 @@ export default function ProjectSettingsPage() {
     <>
       <div className="min-h-full bg-slate-50/70">
 
-{/* ── Loading ───────────────────────────────────────────────── */}
+        {/* ── Loading ───────────────────────────────────────────────── */}
         {loading && (
           <div className="flex flex-col items-center gap-3 py-20">
             <Loader2 size={26} className="animate-spin text-slate-300" />
@@ -907,11 +907,10 @@ export default function ProjectSettingsPage() {
                     <button
                       type="button"
                       onClick={() => setSelectedType('AGILE')}
-                      className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
-                        selectedType === 'AGILE'
+                      className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${selectedType === 'AGILE'
                           ? 'border-blue-500 bg-blue-50/70 shadow-sm'
                           : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -933,11 +932,10 @@ export default function ProjectSettingsPage() {
                     <button
                       type="button"
                       onClick={() => setSelectedType('KANBAN')}
-                      className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
-                        selectedType === 'KANBAN'
+                      className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${selectedType === 'KANBAN'
                           ? 'border-blue-500 bg-blue-50/70 shadow-sm'
                           : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -1001,10 +999,10 @@ export default function ProjectSettingsPage() {
                           label: 'Created',
                           value: project.createdAt
                             ? new Date(project.createdAt).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              })
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })
                             : undefined,
                         },
                         { label: 'Team', value: project.teamName },

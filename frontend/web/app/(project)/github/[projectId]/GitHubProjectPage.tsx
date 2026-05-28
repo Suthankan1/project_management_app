@@ -719,11 +719,10 @@ function IssueFilterDropdown({
                 onChange(option.value);
                 setOpen(false);
               }}
-              className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                isSelected
+              className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${isSelected
                   ? 'bg-slate-900 text-white'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
+                }`}
             >
               <span className="min-w-0 truncate">{option.label}</span>
               {isSelected && <Check size={14} className="shrink-0" />}
@@ -1133,9 +1132,8 @@ function ConnectedDashboard({
           <span className="text-xs font-outfit font-bold text-white truncate max-w-[220px]">
             {connection.repoFullName}
           </span>
-          <span className={`flex items-center gap-1 text-[10px] font-outfit px-1.5 py-0.5 rounded-full ${
-            connection.private ? 'bg-slate-700 text-slate-300' : 'bg-blue-500/20 text-blue-300'
-          }`}>
+          <span className={`flex items-center gap-1 text-[10px] font-outfit px-1.5 py-0.5 rounded-full ${connection.private ? 'bg-slate-700 text-slate-300' : 'bg-blue-500/20 text-blue-300'
+            }`}>
             {connection.private ? <Lock size={8} /> : <Globe size={8} />}
             {connection.private ? 'Private' : 'Public'}
           </span>
@@ -1318,13 +1316,12 @@ function ConnectedDashboard({
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            className={`flex items-start gap-3 rounded-2xl border px-4 py-3 shadow-sm ${
-              notice.tone === 'danger'
+            className={`flex items-start gap-3 rounded-2xl border px-4 py-3 shadow-sm ${notice.tone === 'danger'
                 ? 'border-red-100 bg-red-50'
                 : notice.tone === 'success'
                   ? 'border-emerald-100 bg-emerald-50'
                   : 'border-slate-200 bg-white'
-            }`}
+              }`}
           >
             <div className="min-w-0 flex-1">
               <p className="text-sm font-outfit font-semibold text-slate-800">{notice.message}</p>
@@ -1359,18 +1356,16 @@ function ConnectedDashboard({
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`rounded-xl px-4 py-2 text-sm font-outfit font-semibold transition-colors ${
-              activeTab === tab.id
+            className={`rounded-xl px-4 py-2 text-sm font-outfit font-semibold transition-colors ${activeTab === tab.id
                 ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
-            }`}
+              }`}
           >
             <span className="inline-flex items-center gap-2">
               <span>{tab.label}</span>
               {unreadGitHubTabCounts[tab.id] > 0 && (
-                <span className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                  activeTab === tab.id ? 'bg-white/15 text-white' : 'bg-red-600 text-white'
-                }`}>
+                <span className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${activeTab === tab.id ? 'bg-white/15 text-white' : 'bg-red-600 text-white'
+                  }`}>
                   {unreadGitHubTabCounts[tab.id] > 9 ? '9+' : unreadGitHubTabCounts[tab.id]}
                 </span>
               )}
@@ -1386,61 +1381,61 @@ function ConnectedDashboard({
           <div className="flex flex-col gap-3 min-w-0">
             <div className="flex items-center gap-2">
               <GitPullRequest size={15} className="text-slate-500 shrink-0" />
-            <h2 className="text-sm font-outfit font-bold text-slate-700">
-              Pull Requests
-              {!loading && !prError && (
-                <span className="ml-1.5 text-slate-400 font-normal">({prs.length})</span>
-              )}
-            </h2>
-            <a
-              href={`https://github.com/${connection.repoFullName}/pulls`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline shrink-0"
-            >
-              GitHub <ExternalLink size={10} />
-            </a>
+              <h2 className="text-sm font-outfit font-bold text-slate-700">
+                Pull Requests
+                {!loading && !prError && (
+                  <span className="ml-1.5 text-slate-400 font-normal">({prs.length})</span>
+                )}
+              </h2>
+              <a
+                href={`https://github.com/${connection.repoFullName}/pulls`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline shrink-0"
+              >
+                GitHub <ExternalLink size={10} />
+              </a>
+            </div>
+
+            {loading && <SkeletonList />}
+
+            {!loading && prError && (
+              <div className="flex flex-col items-center gap-2 py-10 text-center">
+                <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
+                  <AlertCircle size={16} className="text-red-500" />
+                </div>
+                <p className="text-xs text-slate-500 font-outfit">{prError}</p>
+                <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
+              </div>
+            )}
+
+            {!loading && !prError && prs.length === 0 && (
+              <div className="flex flex-col items-center gap-2 py-10">
+                <GitPullRequest size={20} className="text-slate-300" />
+                <p className="text-xs text-slate-400 font-outfit">No pull requests found</p>
+              </div>
+            )}
+
+            {!loading && !prError && prs.length > 0 && (() => {
+              const start = (prPage - 1) * PAGE_SIZE;
+              const page = prs.slice(start, start + PAGE_SIZE);
+              return (
+                <div className="flex flex-col gap-3">
+                  {page.map((pr, i) => (
+                    <motion.div key={pr.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+                      <PRCard pr={pr} />
+                    </motion.div>
+                  ))}
+                  <PaginationBar
+                    page={prPage}
+                    total={prs.length}
+                    onPrev={() => setPRPage(p => Math.max(1, p - 1))}
+                    onNext={() => setPRPage(p => Math.min(Math.ceil(prs.length / PAGE_SIZE), p + 1))}
+                  />
+                </div>
+              );
+            })()}
           </div>
-
-          {loading && <SkeletonList />}
-
-          {!loading && prError && (
-            <div className="flex flex-col items-center gap-2 py-10 text-center">
-              <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
-                <AlertCircle size={16} className="text-red-500" />
-              </div>
-              <p className="text-xs text-slate-500 font-outfit">{prError}</p>
-              <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
-            </div>
-          )}
-
-          {!loading && !prError && prs.length === 0 && (
-            <div className="flex flex-col items-center gap-2 py-10">
-              <GitPullRequest size={20} className="text-slate-300" />
-              <p className="text-xs text-slate-400 font-outfit">No pull requests found</p>
-            </div>
-          )}
-
-          {!loading && !prError && prs.length > 0 && (() => {
-            const start = (prPage - 1) * PAGE_SIZE;
-            const page = prs.slice(start, start + PAGE_SIZE);
-            return (
-              <div className="flex flex-col gap-3">
-                {page.map((pr, i) => (
-                  <motion.div key={pr.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                    <PRCard pr={pr} />
-                  </motion.div>
-                ))}
-                <PaginationBar
-                  page={prPage}
-                  total={prs.length}
-                  onPrev={() => setPRPage(p => Math.max(1, p - 1))}
-                  onNext={() => setPRPage(p => Math.min(Math.ceil(prs.length / PAGE_SIZE), p + 1))}
-                />
-              </div>
-            );
-          })()}
-        </div>
         )}
 
         {/* ── Right: Commits ───────────────────────────────────────── */}
@@ -1448,61 +1443,61 @@ function ConnectedDashboard({
           <div className="flex flex-col gap-3 min-w-0">
             <div className="flex items-center gap-2">
               <GitCommit size={15} className="text-slate-500 shrink-0" />
-            <h2 className="text-sm font-outfit font-bold text-slate-700">
-              Commits
-              {!loading && !commitError && (
-                <span className="ml-1.5 text-slate-400 font-normal">({commits.length})</span>
-              )}
-            </h2>
-            <a
-              href={`https://github.com/${connection.repoFullName}/commits`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline shrink-0"
-            >
-              GitHub <ExternalLink size={10} />
-            </a>
+              <h2 className="text-sm font-outfit font-bold text-slate-700">
+                Commits
+                {!loading && !commitError && (
+                  <span className="ml-1.5 text-slate-400 font-normal">({commits.length})</span>
+                )}
+              </h2>
+              <a
+                href={`https://github.com/${connection.repoFullName}/commits`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline shrink-0"
+              >
+                GitHub <ExternalLink size={10} />
+              </a>
+            </div>
+
+            {loading && <SkeletonList />}
+
+            {!loading && commitError && (
+              <div className="flex flex-col items-center gap-2 py-10 text-center">
+                <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
+                  <AlertCircle size={16} className="text-red-500" />
+                </div>
+                <p className="text-xs text-slate-500 font-outfit">{commitError}</p>
+                <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
+              </div>
+            )}
+
+            {!loading && !commitError && commits.length === 0 && (
+              <div className="flex flex-col items-center gap-2 py-10">
+                <GitCommit size={20} className="text-slate-300" />
+                <p className="text-xs text-slate-400 font-outfit">No commits found</p>
+              </div>
+            )}
+
+            {!loading && !commitError && commits.length > 0 && (() => {
+              const start = (commitPage - 1) * PAGE_SIZE;
+              const page = commits.slice(start, start + PAGE_SIZE);
+              return (
+                <div className="flex flex-col gap-3">
+                  {page.map((commit, i) => (
+                    <motion.div key={commit.sha} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+                      <CommitCard commit={commit} />
+                    </motion.div>
+                  ))}
+                  <PaginationBar
+                    page={commitPage}
+                    total={commits.length}
+                    onPrev={() => setCommitPage(p => Math.max(1, p - 1))}
+                    onNext={() => setCommitPage(p => Math.min(Math.ceil(commits.length / PAGE_SIZE), p + 1))}
+                  />
+                </div>
+              );
+            })()}
           </div>
-
-          {loading && <SkeletonList />}
-
-          {!loading && commitError && (
-            <div className="flex flex-col items-center gap-2 py-10 text-center">
-              <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
-                <AlertCircle size={16} className="text-red-500" />
-              </div>
-              <p className="text-xs text-slate-500 font-outfit">{commitError}</p>
-              <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
-            </div>
-          )}
-
-          {!loading && !commitError && commits.length === 0 && (
-            <div className="flex flex-col items-center gap-2 py-10">
-              <GitCommit size={20} className="text-slate-300" />
-              <p className="text-xs text-slate-400 font-outfit">No commits found</p>
-            </div>
-          )}
-
-          {!loading && !commitError && commits.length > 0 && (() => {
-            const start = (commitPage - 1) * PAGE_SIZE;
-            const page = commits.slice(start, start + PAGE_SIZE);
-            return (
-              <div className="flex flex-col gap-3">
-                {page.map((commit, i) => (
-                  <motion.div key={commit.sha} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                    <CommitCard commit={commit} />
-                  </motion.div>
-                ))}
-                <PaginationBar
-                  page={commitPage}
-                  total={commits.length}
-                  onPrev={() => setCommitPage(p => Math.max(1, p - 1))}
-                  onNext={() => setCommitPage(p => Math.min(Math.ceil(commits.length / PAGE_SIZE), p + 1))}
-                />
-              </div>
-            );
-          })()}
-        </div>
         )}
 
         <div className={activeTab === 'issues' ? '' : 'hidden'}>
@@ -1584,7 +1579,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
         const me = members.find(m => m.userId === currentUser.userId);
         setCanChangeRepo(me?.role === 'OWNER' || me?.role === 'ADMIN');
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [projectId]);
 
   const loadData = useCallback(async (conn: ProjectGitHubConnection) => {
@@ -1704,7 +1699,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     router.replace(`/github/${projectId}`);
     setShowModal(true);
     void loadRepos();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // loginHint=undefined  → normal OAuth (uses active GitHub browser session)
@@ -1862,8 +1857,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
       onLogout={() => void handleLogout()}
       onChangeRepo={handleOpenModal}
       onPRUpdate={(update) => void handlePRUpdate(update)}
-      onIssueUpdate={() => void handleIssueUpdate()}
-      canChangeRepo={canChangeRepo}
+      onIssueUpdate={(update) => void handleIssueUpdate(update)}
       automationRules={automationRules}
       automationRulesLoading={automationRulesLoading}
       automationRulesError={automationRulesError}

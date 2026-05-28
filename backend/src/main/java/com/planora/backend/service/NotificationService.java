@@ -1,16 +1,19 @@
 // Service layer for notification operations: creation, deduplication, retrieval, and status updates.
 package com.planora.backend.service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.planora.backend.dto.NotificationFeedResponseDTO;
 import com.planora.backend.dto.NotificationResponseDTO;
 import com.planora.backend.model.Notification;
 import com.planora.backend.model.User;
@@ -26,6 +29,12 @@ public class NotificationService {
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
+    private static final Duration UNREAD_COUNT_TTL = Duration.ofSeconds(30);
+    private static final String UNREAD_COUNT_KEY_PREFIX = "notifications:unread-count:";
 
     // =====================================================
     // NOTIFICATION CREATION & DEDUPLICATION
@@ -61,6 +70,8 @@ public class NotificationService {
                 "/queue/notifications",
                 dto
         );
+
+        refreshUnreadCount(recipient);
     }
 
     /**
@@ -125,10 +136,12 @@ public class NotificationService {
     // NOTIFICATION RETRIEVAL & STATUS UPDATES
     // =====================================================
 
-    // Retrieves all notifications for a specific user, ordered by creation date descending.
-    public List<NotificationResponseDTO> getUserNotifications(Long userId) {
-        return notificationRepository.findByRecipientUserIdOrderByCreatedAtDesc(userId)
-                .stream()
+    // Retrieves all notifications for a specific user together with the unread count.
+    public NotificationFeedResponseDTO getUserNotificationFeed(Long userId) {
+        List<NotificationRepository.NotificationFeedRow> rows = notificationRepository.findNotificationFeedByRecipientUserId(userId);
+
+        List<NotificationResponseDTO> notifications = rows.stream()
+                .map(NotificationRepository.NotificationFeedRow::getNotification)
                 .map(n -> NotificationResponseDTO.builder()
                         .id(n.getId())
                         .message(n.getMessage())
@@ -137,11 +150,32 @@ public class NotificationService {
                         .createdAt(n.getCreatedAt())
                         .build())
                 .collect(Collectors.toList());
+
+        Long unreadCountValue = rows.isEmpty() ? null : rows.get(0).getUnreadCount();
+        long unreadCount = unreadCountValue == null ? 0L : unreadCountValue;
+        cacheUnreadCount(userId, unreadCount);
+
+        return NotificationFeedResponseDTO.builder()
+                .notifications(notifications)
+                .unreadCount(unreadCount)
+                .build();
     }
 
     // Gets the total count of unread notifications for a user.
     public long getUnreadCount(Long userId) {
-        return notificationRepository.countByRecipientUserIdAndIsReadFalse(userId);
+        String cacheKey = unreadCountCacheKey(userId);
+        try {
+            String cached = stringRedisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                return Long.parseLong(cached);
+            }
+        } catch (RuntimeException ex) {
+            // Redis is a cache, not a source of truth. Fall back to the database.
+        }
+
+        long count = notificationRepository.countByRecipientUserIdAndIsReadFalse(userId);
+        cacheUnreadCount(userId, count);
+        return count;
     }
 
     // Marks a specific notification as read, ensuring the user owns the notification.
@@ -156,22 +190,74 @@ public class NotificationService {
         
         notification.setRead(true);
         notificationRepository.save(notification);
+
+        refreshUnreadCount(notification.getRecipient());
     }
 
     // Marks all unread notifications as read for a specific user.
     @Transactional
     public void markAllAsRead(Long userId) {
-        List<Notification> unread = notificationRepository.findByRecipientUserIdOrderByCreatedAtDesc(userId)
-            .stream()
-            .filter(n -> !n.isRead())
-            .collect(Collectors.toList());
+        List<Notification> unread = notificationRepository.findByRecipientUserIdAndIsReadFalseOrderByCreatedAtDesc(userId);
+
+        if (unread.isEmpty()) {
+            return;
+        }
+
+        User recipient = unread.get(0).getRecipient();
         
         unread.forEach(n -> n.setRead(true));
         notificationRepository.saveAll(unread);
+
+        refreshUnreadCount(recipient);
     }
 
     // Deletes a notification by its ID.
+    @Transactional
     public void deleteNotification(Long id) {
-        notificationRepository.deleteById(id);
+        Notification notification = notificationRepository.findById(id).orElse(null);
+        if (notification == null) {
+            return;
+        }
+
+        User recipient = notification.getRecipient();
+        notificationRepository.delete(notification);
+
+        refreshUnreadCount(recipient);
+    }
+
+    private long refreshUnreadCount(User recipient) {
+        evictUnreadCountCache(recipient.getUserId());
+        long unreadCount = notificationRepository.countByRecipientUserIdAndIsReadFalse(recipient.getUserId());
+        cacheUnreadCount(recipient.getUserId(), unreadCount);
+        sendUnreadCountUpdate(recipient, unreadCount);
+        return unreadCount;
+    }
+
+    private void evictUnreadCountCache(Long userId) {
+        try {
+            stringRedisTemplate.delete(unreadCountCacheKey(userId));
+        } catch (RuntimeException ex) {
+            // If Redis is unavailable, the database remains authoritative.
+        }
+    }
+
+    private void cacheUnreadCount(Long userId, long unreadCount) {
+        try {
+            stringRedisTemplate.opsForValue().set(unreadCountCacheKey(userId), Long.toString(unreadCount), UNREAD_COUNT_TTL);
+        } catch (RuntimeException ex) {
+            // If Redis is down, keep serving the live value.
+        }
+    }
+
+    private void sendUnreadCountUpdate(User recipient, long unreadCount) {
+        messagingTemplate.convertAndSendToUser(
+                recipient.getUsername().toLowerCase(Locale.ROOT),
+                "/queue/notifications-badge",
+                Long.toString(unreadCount)
+        );
+    }
+
+    private String unreadCountCacheKey(Long userId) {
+        return UNREAD_COUNT_KEY_PREFIX + userId;
     }
 }
