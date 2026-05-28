@@ -22,14 +22,14 @@ export function NavRow({
       onClick={onClick}
       className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all duration-150 text-left relative group ${
         active 
-          ? 'bg-cu-primary/8 text-cu-primary font-semibold' 
-          : 'text-cu-text-secondary hover:bg-cu-hover hover:text-cu-text-primary'
+          ? 'bg-cu-sidebar-active text-cu-sidebar-text-bright font-semibold shadow-sm ring-1 ring-white/5' 
+          : 'text-cu-sidebar-text hover:bg-cu-sidebar-hover hover:text-cu-sidebar-text-bright'
       }`}
     >
       {active && (
         <motion.div
           layoutId="sidebarActiveIndicator"
-          className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-cu-primary rounded-r-full"
+          className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-cu-primary rounded-r-full shadow-[0_0_14px_rgba(21,93,252,0.42)]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         />
@@ -75,14 +75,14 @@ export function FolderNavRow({
       href={href}
       className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all duration-150 relative group ${
         active 
-          ? 'bg-cu-primary/8 text-cu-primary font-semibold' 
-          : 'text-cu-text-secondary hover:bg-cu-hover hover:text-cu-text-primary'
+          ? 'bg-cu-sidebar-active text-cu-sidebar-text-bright font-semibold shadow-sm ring-1 ring-white/5' 
+          : 'text-cu-sidebar-text hover:bg-cu-sidebar-hover hover:text-cu-sidebar-text-bright'
       }`}
     >
       {active && (
         <motion.div
           layoutId="sidebarActiveIndicatorFolder"
-          className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-cu-primary rounded-r-full"
+          className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-cu-primary rounded-r-full shadow-[0_0_14px_rgba(21,93,252,0.42)]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         />
@@ -99,7 +99,7 @@ export function FolderNavRow({
         {label}
       </span>
       {badge !== undefined && badge > 0 && !collapsed && (
-        <span className="ml-auto bg-cu-bg-tertiary text-cu-text-secondary text-[11px] px-1.5 py-0.5 rounded min-w-[20px] text-center font-medium">
+        <span className="ml-auto bg-cu-sidebar-hover text-cu-sidebar-text text-[11px] px-1.5 py-0.5 rounded min-w-[20px] text-center font-medium">
           {badge}
         </span>
       )}
@@ -115,13 +115,13 @@ export function SectionHeader({ label, collapsed, expanded, badge, onToggle }: {
     <button onClick={onToggle} className="w-full flex items-center gap-2 px-2.5 py-1.5 mb-0.5 group">
       <svg
         width="9" height="9" viewBox="0 0 10 10" fill="none"
-        className="text-cu-text-muted flex-shrink-0 transition-transform duration-200"
+        className="text-cu-sidebar-text flex-shrink-0 transition-transform duration-200"
         style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
       >
         <path d="M3.5 2L6.5 5L3.5 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       <span
-        className="text-[10.5px] font-bold text-cu-text-muted uppercase tracking-widest whitespace-nowrap overflow-hidden transition-all duration-300"
+        className="text-[10.5px] font-bold text-cu-sidebar-text uppercase tracking-widest whitespace-nowrap overflow-hidden transition-all duration-300"
         style={{
           maxWidth: collapsed ? '0px' : '150px',
           opacity: collapsed ? 0 : 1,

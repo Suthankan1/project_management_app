@@ -444,7 +444,7 @@ export default function Sidebar() {
     <>
       {/* Mobile Backdrop Overlay - Full screen blur to cover everything */}
       <div
-        className={`md:hidden fixed inset-0 z-[9998] bg-slate-900/35 backdrop-blur-xl transition-all duration-300 ease-in-out ${isMobile && !collapsed ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        className={`md:hidden fixed inset-0 z-[9998] bg-slate-950/55 backdrop-blur-xl transition-all duration-300 ease-in-out ${isMobile && !collapsed ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
         onClick={() => {
           setCollapsed(true);
@@ -469,14 +469,14 @@ export default function Sidebar() {
         }}
       >
         <div
-          className={`bg-[#F9FAFB] transition-all duration-300 ease-in-out ${isMobile ? 'relative h-full' : 'fixed left-0 top-0 h-screen z-[9999]'} pointer-events-auto`}
+          className={`bg-cu-sidebar transition-all duration-300 ease-in-out ${isMobile ? 'relative h-full' : 'fixed left-0 top-0 h-screen z-[9999]'} pointer-events-auto`}
           style={{
             width: isMobile ? '260px' : (collapsed ? '64px' : '240px'),
             transform: isMobile && collapsed ? 'translateX(-100%)' : 'translateX(0)',
             opacity: isMobile && collapsed ? 0.5 : 1,
           }}
         >
-          <div className="relative h-full bg-[#F9FAFB] border-r border-cu-border flex flex-col w-[260px] md:w-[inherit]">
+          <div className="relative h-full bg-cu-sidebar border-r border-cu-sidebar-border flex flex-col w-[260px] md:w-[inherit] shadow-[10px_0_30px_rgba(15,23,42,0.06)]">
             <SidebarHeader collapsed={collapsed} onToggle={toggleCollapsed} />
             <CollapseButton collapsed={collapsed} onToggle={toggleCollapsed} />
 
@@ -611,18 +611,18 @@ export default function Sidebar() {
             <div className="px-3 py-4 flex flex-col gap-3 animate-pulse">
               {[1, 2, 3].map(i => (
                 <div key={i} className="flex gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-gray-100 flex-shrink-0" />
+                  <div className="w-7 h-7 rounded-full bg-cu-bg-tertiary flex-shrink-0" />
                   <div className="flex-1 flex flex-col gap-1.5">
-                    <div className="h-2 w-20 bg-gray-100 rounded" />
-                    <div className="h-2 w-32 bg-gray-100 rounded" />
-                    <div className="h-2 w-24 bg-gray-100 rounded" />
+                    <div className="h-2 w-20 bg-cu-bg-tertiary rounded" />
+                    <div className="h-2 w-32 bg-cu-bg-tertiary rounded" />
+                    <div className="h-2 w-24 bg-cu-bg-tertiary rounded" />
                   </div>
                 </div>
               ))}
             </div>
           ) : filteredInboxItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+              <div className="w-10 h-10 rounded-full bg-cu-bg-tertiary text-cu-text-secondary flex items-center justify-center mb-3">
                 <InboxIcon size={18} />
               </div>
               <span className="text-[12px] font-medium text-cu-text-muted">

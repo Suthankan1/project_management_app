@@ -31,10 +31,10 @@ interface CreateTaskModalProps {
 }
 
 const PRIORITY_OPTIONS = [
-  { value: 'LOW', label: 'Low', color: 'bg-[#ECFDF3] text-[#027A48] border-[#A6F4C5]' },
-  { value: 'MEDIUM', label: 'Medium', color: 'bg-[#FFFAEB] text-[#B54708] border-[#FEDF89]' },
-  { value: 'HIGH', label: 'High', color: 'bg-[#FEF3F2] text-[#B42318] border-[#FECDCA]' },
-  { value: 'CRITICAL', label: 'Critical', color: 'bg-[#FEE4E2] text-[#912018] border-[#FDA29B]' },
+  { value: 'LOW', label: 'Low', color: 'bg-cu-success/10 text-cu-success border-cu-success/30' },
+  { value: 'MEDIUM', label: 'Medium', color: 'bg-cu-warning/10 text-cu-warning border-cu-warning/30' },
+  { value: 'HIGH', label: 'High', color: 'bg-orange-500/10 text-orange-500 border-orange-500/30' },
+  { value: 'CRITICAL', label: 'Critical', color: 'bg-cu-danger/10 text-cu-danger border-cu-danger/30' },
 ];
 
 const FIBONACCI = [0, 1, 2, 3, 5, 8, 13, 21];
@@ -142,9 +142,9 @@ export default function CreateTaskModal({
 
   return (
     <div className="fixed inset-0 bg-[#00000040] z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 fade-in duration-200">
+      <div className="bg-cu-bg rounded-2xl shadow-cu-xl border border-cu-border max-w-md w-full overflow-hidden animate-in zoom-in-95 fade-in duration-200">
         {/* Header */}
-        <div className="bg-[#155DFC] px-6 py-4">
+        <div className="bg-cu-primary px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Plus size={20} className="text-white" />
@@ -162,7 +162,7 @@ export default function CreateTaskModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Title */}
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054]">TASK TITLE</label>
+            <label className="text-[13px] font-bold text-cu-text-primary">TASK TITLE</label>
             <input
               type="text"
               maxLength={255}
@@ -172,7 +172,7 @@ export default function CreateTaskModal({
                 setTitleLength(e.target.value.length);
               }}
               placeholder="e.g. Design new landing page"
-              className="w-full px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm focus:ring-2 focus:ring-[#155DFC]/20 focus:outline-none transition-all"
+              className="w-full px-4 py-3 bg-cu-bg-secondary border border-cu-border rounded-xl text-sm text-cu-text-primary focus:ring-2 focus:ring-cu-primary/20 focus:outline-none transition-all"
               autoFocus
             />
             {titleLength > 200 && (
@@ -185,11 +185,11 @@ export default function CreateTaskModal({
 
           {/* Status */}
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054]">STATUS</label>
+            <label className="text-[13px] font-bold text-cu-text-primary">STATUS</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm text-[#475467] focus:ring-2 focus:ring-[#155DFC]/20 focus:outline-none transition-all appearance-none"
+              className="w-full px-4 py-3 bg-cu-bg-secondary border border-cu-border rounded-xl text-sm text-cu-text-secondary focus:ring-2 focus:ring-cu-primary/20 focus:outline-none transition-all appearance-none"
             >
               {statuses.map((s) => (
                 <option key={s.status} value={s.status}>{s.name}</option>
@@ -199,7 +199,7 @@ export default function CreateTaskModal({
 
           {/* Priority */}
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054]">PRIORITY</label>
+            <label className="text-[13px] font-bold text-cu-text-primary">PRIORITY</label>
             <div className="flex gap-2 flex-wrap">
               {PRIORITY_OPTIONS.map((opt) => (
                 <button
@@ -220,7 +220,7 @@ export default function CreateTaskModal({
 
           {/* Story Points (Fibonacci) */}
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054] flex items-center gap-2">
+            <label className="text-[13px] font-bold text-cu-text-primary flex items-center gap-2">
               <Hash size={14} className="text-[#98A2B3]" /> STORY POINTS
             </label>
             <div className="flex gap-1.5 flex-wrap">
@@ -243,13 +243,13 @@ export default function CreateTaskModal({
 
           {/* Assignee */}
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054] flex items-center gap-2">
+            <label className="text-[13px] font-bold text-cu-text-primary flex items-center gap-2">
               <User size={14} className="text-[#98A2B3]" /> ASSIGNEE
             </label>
             <select
               value={assignee}
               onChange={(e) => setAssignee(e.target.value ? parseInt(e.target.value, 10) : '')}
-              className="w-full px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm text-[#475467] focus:ring-2 focus:ring-[#155DFC]/20 focus:outline-none transition-all appearance-none"
+              className="w-full px-4 py-3 bg-cu-bg-secondary border border-cu-border rounded-xl text-sm text-cu-text-secondary focus:ring-2 focus:ring-cu-primary/20 focus:outline-none transition-all appearance-none"
               disabled={loadingMembers}
             >
               <option value="">Select Assignee (optional)</option>
@@ -261,7 +261,7 @@ export default function CreateTaskModal({
 
           {/* Labels */}
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054]">LABELS</label>
+            <label className="text-[13px] font-bold text-cu-text-primary">LABELS</label>
             <LabelPicker
               projectId={projectId}
               selectedLabels={selectedLabels}
@@ -271,12 +271,12 @@ export default function CreateTaskModal({
 
           {/* Due Date */}
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054]">DUE DATE (optional)</label>
+            <label className="text-[13px] font-bold text-cu-text-primary">DUE DATE (optional)</label>
             <input
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm text-[#475467] focus:ring-2 focus:ring-[#155DFC]/20 focus:outline-none transition-all"
+              className="w-full px-4 py-3 bg-cu-bg-secondary border border-cu-border rounded-xl text-sm text-cu-text-secondary focus:ring-2 focus:ring-cu-primary/20 focus:outline-none transition-all"
             />
           </div>
 

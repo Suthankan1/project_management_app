@@ -12,7 +12,7 @@ export function SidebarHeader({
 }) {
   return (
     <div
-      className="h-[60px] flex items-center flex-shrink-0 border-b border-cu-border/50"
+      className="h-[60px] flex items-center flex-shrink-0 border-b border-cu-sidebar-border"
       style={{ 
         paddingLeft: collapsed ? '0' : '16px',
         justifyContent: collapsed ? 'center' : 'flex-start'
@@ -59,7 +59,7 @@ export function CollapseButton({
     <button
       onClick={onToggle}
       title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      className="hidden md:flex absolute top-[18px] right-[-12px] z-[200] w-[24px] h-[24px] items-center justify-center rounded-full bg-white border border-slate-200 shadow-md text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:shadow-lg hover:scale-110 transition-all duration-200 active:scale-95"
+      className="hidden md:flex absolute top-[18px] right-[-12px] z-[200] w-[24px] h-[24px] items-center justify-center rounded-full bg-cu-bg border border-cu-sidebar-border shadow-md text-cu-sidebar-text hover:text-cu-primary hover:border-cu-primary/40 hover:shadow-lg hover:scale-110 transition-all duration-200 active:scale-95"
     >
       <svg 
         width="12" 
