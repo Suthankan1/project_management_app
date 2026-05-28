@@ -83,6 +83,60 @@ export interface ProjectGitHubConnection {
   connectedAt: string
 }
 
+export type GithubAutomationTrigger =
+  | 'PR_MERGED'
+  | 'PR_OPENED'
+  | 'CI_FAILED'
+  | 'ISSUE_OPENED'
+  | 'ISSUE_LABELED'
+  | 'RELEASE_PUBLISHED'
+
+export type GithubAutomationAction =
+  | 'MOVE_TASK_TO_COLUMN'
+  | 'CREATE_TASK'
+  | 'SEND_NOTIFICATION'
+
+export interface GithubAutomationRule {
+  id: number
+  projectId: number
+  trigger: GithubAutomationTrigger
+  action: GithubAutomationAction
+  enabled: boolean
+  config: Record<string, string>
+}
+
+export type GithubAutomationOutcome = 'SUCCESS' | 'SKIPPED' | 'ERROR'
+
+export interface GithubAutomationLog {
+  id: number
+  ruleId: number
+  trigger: GithubAutomationTrigger
+  action: GithubAutomationAction
+  context: string
+  outcome: GithubAutomationOutcome
+  message: string
+  executedAt: string
+}
+
+interface TaskGithubIssueLink {
+  githubIssueNumber?: number | null
+  githubRepoFullName?: string | null
+}
+
+interface GitHubApiIssue {
+  id: number
+  number: number
+  title: string
+  body: string | null
+  state: 'open' | 'closed'
+  labels: Array<{ name: string; color: string }>
+  assignees: Array<{ login: string; avatar_url: string }>
+  created_at: string
+  updated_at: string
+  html_url: string
+  comments: number
+}
+
 export async function fetchRepositories(): Promise<GitHubRepository[]> {
   const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080'
 
@@ -115,24 +169,52 @@ export async function fetchIssues(
   state: 'open' | 'closed' | 'all' = 'all',
   label?: string,
 ): Promise<GitHubIssue[]> {
-  try {
-    const { data } = await api.get<GitHubIssue[]>('/api/github/issues', {
-      params: {
-        repoFullName,
-        state,
-        ...(label?.trim() ? { label: label.trim() } : {}),
-      },
-    })
-    return data
-  } catch (error) {
-    const response = (error as {
-      response?: { status?: number; data?: { message?: string; error?: string } };
-    }).response
-    if (response?.status === 401) throw new Error('Connect GitHub to view issues.')
-    if (response?.status === 404) throw new Error('Repository not found or unavailable.')
-    if (response?.status === 429) throw new Error('GitHub rate limit exceeded. Try again later.')
-    throw new Error(response?.data?.message || response?.data?.error || 'Failed to load issues.')
+  const token = getGitHubToken()
+  if (!token) {
+    throw new Error('Connect GitHub to view issues.')
   }
+
+  const response = await fetch(
+    `https://api.github.com/repos/${repoFullName}/issues?state=${state}&per_page=100${label?.trim() ? `&labels=${encodeURIComponent(label.trim())}` : ''}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    },
+  )
+
+  if (response.status === 401) {
+    throw new Error('Connect GitHub to view issues.')
+  }
+
+  if (response.status === 404) {
+    throw new Error('Repository not found or unavailable.')
+  }
+
+  if (response.status === 429) {
+    throw new Error('GitHub rate limit exceeded. Try again later.')
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as { message?: string }
+    throw new Error(body.message || 'Failed to load issues.')
+  }
+
+  const issues = await response.json() as GitHubApiIssue[]
+  return issues.map(issue => ({
+    id: issue.id,
+    number: issue.number,
+    title: issue.title,
+    body: issue.body ?? undefined,
+    state: issue.state,
+    labels: issue.labels,
+    assignees: issue.assignees,
+    createdAt: issue.created_at,
+    updatedAt: issue.updated_at,
+    htmlUrl: issue.html_url,
+    comments: issue.comments,
+  }))
 }
 
 export async function fetchRepositoriesWithToken(token: string): Promise<GitHubRepository[]> {
@@ -181,6 +263,26 @@ export async function fetchPullRequests(
   )
   if (response.status === 404) throw new Error('Repository not found or no access')
   if (!response.ok) throw new Error('Failed to fetch pull requests')
+  return response.json()
+}
+
+export async function fetchPullRequest(
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<GitHubPullRequest> {
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    },
+  )
+  if (response.status === 404) throw new Error('Pull request not found or no access')
+  if (!response.ok) throw new Error('Failed to fetch pull request')
   return response.json()
 }
 
@@ -250,6 +352,56 @@ export function setProjectGitHubRepo(projectId: string | number, repo: GitHubRep
 export function clearProjectGitHubRepo(projectId: string | number): void {
   if (typeof window === 'undefined') return
   localStorage.removeItem(`github_project_${projectId}`)
+}
+
+export async function fetchGitHubAutomationRules(projectId: string | number): Promise<GithubAutomationRule[]> {
+  const response = await api.get(`/api/projects/${projectId}/automations/github`)
+  return response.data || []
+}
+
+export async function fetchGitHubAutomationLogs(projectId: string | number): Promise<GithubAutomationLog[]> {
+  const response = await api.get(`/api/projects/${projectId}/automations/github/logs`)
+  return response.data || []
+}
+
+export async function fetchImportedGitHubIssueNumbers(
+  projectId: string | number,
+  repoFullName: string,
+): Promise<number[]> {
+  const response = await api.get<TaskGithubIssueLink[]>(`/api/tasks/project/${projectId}`)
+  const normalizedRepoName = repoFullName.toLowerCase()
+
+  return response.data
+    .filter(task => task.githubRepoFullName?.toLowerCase() === normalizedRepoName)
+    .map(task => task.githubIssueNumber)
+    .filter((issueNumber): issueNumber is number => typeof issueNumber === 'number')
+}
+
+export async function createGitHubAutomationRule(
+  projectId: string | number,
+  payload: {
+    trigger: GithubAutomationTrigger
+    action: GithubAutomationAction
+    config: Record<string, string>
+  },
+): Promise<GithubAutomationRule> {
+  const response = await api.post(`/api/projects/${projectId}/automations/github`, payload)
+  return response.data
+}
+
+export async function deleteGitHubAutomationRule(projectId: string | number, ruleId: number): Promise<void> {
+  await api.delete(`/api/projects/${projectId}/automations/github/${ruleId}`)
+}
+
+export async function setGitHubAutomationRuleEnabled(
+  projectId: string | number,
+  ruleId: number,
+  enabled: boolean,
+): Promise<GithubAutomationRule> {
+  const response = await api.patch(`/api/projects/${projectId}/automations/github/${ruleId}/enabled`, null, {
+    params: { enabled },
+  })
+  return response.data
 }
 
 // ── Saved GitHub accounts (account picker) ────────────────────────────────────

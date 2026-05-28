@@ -2,19 +2,32 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   AlertTriangle, Trash2, LogOut, Settings2,
   Layers, FileText, Shield, Loader2, CheckCircle2,
-  X, Info,
+  X, Info, ArrowRight, Github,
 } from 'lucide-react';
 import * as projectsApi from '@/services/projects-service';
 import { toast } from '@/components/ui';
+import GitHubMark from '@/components/github/GitHubMark';
+import {
+  createGitHubAutomationRule,
+  deleteGitHubAutomationRule,
+  fetchGitHubAutomationRules,
+  getProjectGitHubRepo,
+  type GithubAutomationAction,
+  type GithubAutomationRule,
+  type GithubAutomationTrigger,
+  type ProjectGitHubConnection,
+} from '@/services/githubService';
 import {
   setScopedProjectValue,
   removeScopedProjectValue,
 } from '@/hooks/useProjectContext';
 import { getUserIdFromToken } from '@/lib/auth';
 import CustomFieldsManager from './CustomFieldsManager';
+import NotificationPreferencesPanel from '@/components/settings/NotificationPreferencesPanel';
 type ProjectType = 'AGILE' | 'KANBAN';
 
 interface ProjectData {
@@ -28,6 +41,271 @@ interface ProjectData {
   ownerId?: number;
   ownerName?: string;
   createdAt?: string;
+}
+
+type QuickTemplateKey = 'prMergedDone' | 'ciFailedBug' | 'prOpenedReview';
+
+interface QuickTemplateRule {
+  key: QuickTemplateKey;
+  label: string;
+  description: string;
+  trigger: GithubAutomationTrigger;
+  action: GithubAutomationAction;
+  config: Record<string, string>;
+}
+
+const QUICK_TEMPLATE_BASE: Array<Omit<QuickTemplateRule, 'config'>> = [
+  {
+    key: 'prMergedDone',
+    label: 'Move task to Done when PR is merged',
+    description: 'Creates a PR_MERGED -> MOVE_TASK_TO_COLUMN rule targeting Done.',
+    trigger: 'PR_MERGED',
+    action: 'MOVE_TASK_TO_COLUMN',
+  },
+  {
+    key: 'ciFailedBug',
+    label: 'Create bug task when CI fails',
+    description: 'Creates a CI_FAILED -> CREATE_TASK rule with default bug settings.',
+    trigger: 'CI_FAILED',
+    action: 'CREATE_TASK',
+  },
+  {
+    key: 'prOpenedReview',
+    label: 'Move task to In Review when PR is opened',
+    description: 'Creates a PR_OPENED -> MOVE_TASK_TO_COLUMN rule targeting In Review.',
+    trigger: 'PR_OPENED',
+    action: 'MOVE_TASK_TO_COLUMN',
+  },
+];
+
+function normalizeColumnName(config: Record<string, string>): string {
+  return (config.targetColumnName || config.columnName || config.column || '').trim().toLowerCase();
+}
+
+function buildQuickTemplateConfig(projectId: number, templateKey: QuickTemplateKey): Record<string, string> {
+  if (templateKey === 'prMergedDone') {
+    return { targetColumnName: 'Done' };
+  }
+
+  if (templateKey === 'prOpenedReview') {
+    return { targetColumnName: 'In Review' };
+  }
+
+  return {
+    projectId: String(projectId),
+    taskTitle: 'CI failed: {workflowName} on {branch}',
+    priority: 'HIGH',
+    labelName: 'bug',
+    labelColor: '#d73a4a',
+  };
+}
+
+function matchesTemplate(rule: GithubAutomationRule, templateKey: QuickTemplateKey): boolean {
+  switch (templateKey) {
+    case 'prMergedDone':
+      return (
+        rule.trigger === 'PR_MERGED'
+        && rule.action === 'MOVE_TASK_TO_COLUMN'
+        && normalizeColumnName(rule.config) === 'done'
+      );
+    case 'ciFailedBug':
+      return rule.trigger === 'CI_FAILED' && rule.action === 'CREATE_TASK';
+    case 'prOpenedReview':
+      return (
+        rule.trigger === 'PR_OPENED'
+        && rule.action === 'MOVE_TASK_TO_COLUMN'
+        && normalizeColumnName(rule.config) === 'in review'
+      );
+    default:
+      return false;
+  }
+}
+
+function QuickSetupToggleRow({
+  label,
+  description,
+  enabled,
+  disabled,
+  busy,
+  onToggle,
+}: {
+  label: string;
+  description: string;
+  enabled: boolean;
+  disabled: boolean;
+  busy: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-slate-900">{label}</p>
+          <p className="mt-1 text-xs text-slate-500">{description}</p>
+        </div>
+        <button
+          type="button"
+          disabled={disabled || busy}
+          onClick={onToggle}
+          className={[
+            'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border px-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+            enabled ? 'justify-end border-emerald-300 bg-emerald-500' : 'justify-start border-slate-200 bg-slate-200',
+          ].join(' ')}
+          aria-label={enabled ? `Disable ${label}` : `Enable ${label}`}
+          aria-checked={enabled}
+          role="switch"
+        >
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm">
+            {busy ? <Loader2 size={12} className="animate-spin text-slate-500" /> : null}
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function GitHubAutoTransitionsCard({ projectId }: { projectId: number }) {
+  const [connection, setConnection] = useState<ProjectGitHubConnection | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [ruleByTemplate, setRuleByTemplate] = useState<Record<QuickTemplateKey, number | null>>({
+    prMergedDone: null,
+    ciFailedBug: null,
+    prOpenedReview: null,
+  });
+  const [busyByTemplate, setBusyByTemplate] = useState<Record<QuickTemplateKey, boolean>>({
+    prMergedDone: false,
+    ciFailedBug: false,
+    prOpenedReview: false,
+  });
+
+  const templates: QuickTemplateRule[] = QUICK_TEMPLATE_BASE.map((base) => ({
+    ...base,
+    config: buildQuickTemplateConfig(projectId, base.key),
+  }));
+
+  const refreshConnection = useCallback(() => {
+    setConnection(getProjectGitHubRepo(projectId));
+  }, [projectId]);
+
+  const refreshRules = useCallback(async () => {
+    setLoading(true);
+    try {
+      const fetched = await fetchGitHubAutomationRules(projectId);
+
+      const next: Record<QuickTemplateKey, number | null> = {
+        prMergedDone: null,
+        ciFailedBug: null,
+        prOpenedReview: null,
+      };
+
+      for (const key of Object.keys(next) as QuickTemplateKey[]) {
+        const match = fetched.find((rule) => matchesTemplate(rule, key));
+        next[key] = match ? match.id : null;
+      }
+
+      setRuleByTemplate(next);
+    } catch {
+      toast('Failed to load GitHub automation quick setup', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    refreshConnection();
+    void refreshRules();
+
+    const onStorage = () => refreshConnection();
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [refreshConnection, refreshRules]);
+
+  const setBusy = (key: QuickTemplateKey, value: boolean) => {
+    setBusyByTemplate((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleToggle = async (template: QuickTemplateRule) => {
+    const key = template.key;
+    const existingRuleId = ruleByTemplate[key];
+
+    setBusy(key, true);
+    try {
+      if (existingRuleId) {
+        await deleteGitHubAutomationRule(projectId, existingRuleId);
+        setRuleByTemplate((prev) => ({ ...prev, [key]: null }));
+        toast('Quick automation disabled', 'success');
+      } else {
+        const created = await createGitHubAutomationRule(projectId, {
+          trigger: template.trigger,
+          action: template.action,
+          config: template.config,
+        });
+        setRuleByTemplate((prev) => ({ ...prev, [key]: created.id }));
+        toast('Quick automation enabled', 'success');
+      }
+    } catch {
+      toast('Failed to update quick automation rule', 'error');
+    } finally {
+      setBusy(key, false);
+    }
+  };
+
+  const hasGitHubConnection = Boolean(connection?.repoFullName);
+
+  return (
+    <SectionCard
+      title="GitHub Auto-Transitions"
+      description="Quick Setup for the most common GitHub workflow rules"
+      icon={<Github size={15} />}
+    >
+      <div className="space-y-4">
+        {!hasGitHubConnection && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600" />
+              <div>
+                <p className="text-sm font-semibold text-amber-900">GitHub not connected</p>
+                <p className="mt-0.5 text-xs text-amber-700">
+                  Connect a GitHub repository for this project to make auto-transitions meaningful.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <GitHubMark size={14} className="text-slate-700" />
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Quick Setup</p>
+          </div>
+
+          <div className="space-y-3">
+            {templates.map((template) => (
+              <QuickSetupToggleRow
+                key={template.key}
+                label={template.label}
+                description={template.description}
+                enabled={Boolean(ruleByTemplate[template.key])}
+                disabled={loading || !hasGitHubConnection}
+                busy={busyByTemplate[template.key]}
+                onToggle={() => void handleToggle(template)}
+              />
+            ))}
+          </div>
+
+          <div className="mt-4 border-t border-slate-200 pt-3">
+            <Link
+              href={`/github/${projectId}`}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline"
+            >
+              Advanced: Manage all rules
+              <ArrowRight size={14} />
+            </Link>
+          </div>
+        </div>
+      </div>
+    </SectionCard>
+  );
 }
 
 // ── Section card shell ─────────────────────────────────────────────────────────
@@ -318,15 +596,15 @@ function TypeChangeModal({
   const fromAgile = currentType === 'AGILE';
   const warnings = fromAgile
     ? [
-        'Sprint history is preserved but not visible in Kanban mode',
-        'Burndown charts and velocity tracking will be unavailable',
-        'Active sprints will remain but cannot be managed',
-      ]
+      'Sprint history is preserved but not visible in Kanban mode',
+      'Burndown charts and velocity tracking will be unavailable',
+      'Active sprints will remain but cannot be managed',
+    ]
     : [
-        'Your board will be restructured for sprint-based workflow',
-        'You can now create sprints and plan agile iterations',
-        'Burndown charts and velocity tracking become available',
-      ];
+      'Your board will be restructured for sprint-based workflow',
+      'You can now create sprints and plan agile iterations',
+      'Burndown charts and velocity tracking become available',
+    ];
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -558,7 +836,7 @@ export default function ProjectSettingsPage() {
     <>
       <div className="min-h-full bg-slate-50/70">
 
-{/* ── Loading ───────────────────────────────────────────────── */}
+        {/* ── Loading ───────────────────────────────────────────────── */}
         {loading && (
           <div className="flex flex-col items-center gap-3 py-20">
             <Loader2 size={26} className="animate-spin text-slate-300" />
@@ -637,11 +915,10 @@ export default function ProjectSettingsPage() {
                     <button
                       type="button"
                       onClick={() => setSelectedType('AGILE')}
-                      className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
-                        selectedType === 'AGILE'
+                      className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${selectedType === 'AGILE'
                           ? 'border-blue-500 bg-blue-50/70 shadow-sm'
                           : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -663,11 +940,10 @@ export default function ProjectSettingsPage() {
                     <button
                       type="button"
                       onClick={() => setSelectedType('KANBAN')}
-                      className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
-                        selectedType === 'KANBAN'
+                      className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${selectedType === 'KANBAN'
                           ? 'border-blue-500 bg-blue-50/70 shadow-sm'
                           : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -710,6 +986,15 @@ export default function ProjectSettingsPage() {
                   <CustomFieldsManager projectId={projectId} />
                 </SectionCard>
 
+                <GitHubAutoTransitionsCard projectId={projectId} />
+
+                <NotificationPreferencesPanel
+                  title="Project notification overrides"
+                  description="Fine-tune which events in this project should notify you, without changing your global defaults."
+                  projectId={projectId}
+                  helperText="These overrides only affect this project. If no project override exists, your global notification defaults still apply."
+                />
+
               </div>
 
               {/* ── Right column (2/5) ── Identity + Danger Zone ─── */}
@@ -729,10 +1014,10 @@ export default function ProjectSettingsPage() {
                           label: 'Created',
                           value: project.createdAt
                             ? new Date(project.createdAt).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              })
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })
                             : undefined,
                         },
                         { label: 'Team', value: project.teamName },

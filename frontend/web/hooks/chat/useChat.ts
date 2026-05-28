@@ -11,8 +11,8 @@ import { useChatReactions } from './useChatReactions';
 import { useChatSearch } from './useChatSearch';
 import { useChatUnread } from './useChatUnread';
 import {
-  CHAT_RECONNECT_ERROR,
   DEFAULT_FEATURE_FLAGS,
+  CHAT_RECONNECT_ERROR,
   initializeChatState,
   restoreSelectionState,
 } from './useChat.internal';
@@ -43,7 +43,13 @@ export const useChat = (projectId: string) => {
   const [error, setError] = useState('');
   const [hasRestoredSelection, setHasRestoredSelection] = useState(false);
   const hasRestoredSelectionRef = useRef(false);
-  const { realtimeConnected, subscribeRealtime, sendRealtime } = useGlobalNotifications();
+  const {
+    realtimeConnected,
+    realtimeReconnecting,
+    subscribeRealtime,
+    sendRealtime,
+    retryRealtimeConnection,
+  } = useGlobalNotifications();
   const msg = useChatMessages(projectId);
   const rm = useChatRooms(projectId);
   const presence = useChatPresence(projectId);
@@ -87,7 +93,7 @@ export const useChat = (projectId: string) => {
   const isStompConnected = useCallback(() => realtimeConnected, [realtimeConnected]);
   const stompSend = useCallback(
     (destination: string, body: string) => {
-      sendRealtime(destination, body);
+      sendRealtime(destination, body, { queueWhenDisconnected: true });
     },
     [sendRealtime],
   );
@@ -176,26 +182,29 @@ export const useChat = (projectId: string) => {
     [currentUser, setMessages, setRoomMessages, setPrivateMessages, setThreadMessages],
   );
 
+  const canSendRealtime = useCallback((): boolean => {
+    if (realtimeConnected && !realtimeReconnecting) {
+      return true;
+    }
+
+    setError(CHAT_RECONNECT_ERROR);
+    return false;
+  }, [realtimeConnected, realtimeReconnecting]);
+
   const sendMessage = useCallback(
     (content: string, recipient?: string | null) => {
-      if (!isStompConnected()) {
-        setError(CHAT_RECONNECT_ERROR);
-        return;
-      }
+      if (!canSendRealtime()) return;
       msgSend(content, currentUser, stompSend, trackTelemetry, recipient);
     },
-    [currentUser, msgSend, stompSend, trackTelemetry, isStompConnected],
+    [currentUser, msgSend, stompSend, trackTelemetry, canSendRealtime],
   );
 
   const sendRoomMessage = useCallback(
     (content: string, roomId: number) => {
-      if (!isStompConnected()) {
-        setError(CHAT_RECONNECT_ERROR);
-        return;
-      }
+      if (!canSendRealtime()) return;
       msgSendRoom(content, roomId, currentUser, stompSend, trackTelemetry);
     },
-    [currentUser, msgSendRoom, stompSend, trackTelemetry, isStompConnected],
+    [currentUser, msgSendRoom, stompSend, trackTelemetry, canSendRealtime],
   );
 
   const editMessage = useCallback(
@@ -489,9 +498,10 @@ export const useChat = (projectId: string) => {
     addTeam,
     isLoading,
     isSocketConnected,
+    isSocketReconnecting: realtimeReconnecting,
     error,
     roomMentionCounts: unread.roomMentionCounts,
     teamMentionCount: unread.teamMentionCount,
-    retryConnection: () => window.location.reload(),
+    retryConnection: retryRealtimeConnection,
   };
 };

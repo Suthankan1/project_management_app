@@ -8,6 +8,7 @@ import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -15,6 +16,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class GlobalSearchService {
+    private static final int SEARCH_LIMIT = 5;
+    private static final int MESSAGE_EXCERPT_RADIUS = 45;
+    private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     private final TaskRepository taskRepository;
     private final DocumentRepository documentRepository;
@@ -37,6 +41,8 @@ public class GlobalSearchService {
                     .tasks(List.of())
                     .documents(List.of())
                     .members(List.of())
+                    .projects(List.of())
+                    .messages(List.of())
                     .build();
         }
 
@@ -47,6 +53,7 @@ public class GlobalSearchService {
                     .documents(List.of())
                     .members(List.of())
                     .projects(List.of())
+                    .messages(List.of())
                     .build();
         }
 
@@ -66,11 +73,16 @@ public class GlobalSearchService {
         List<GlobalSearchResponseDTO.ProjectSearchResultDTO> projects = searchProjects(
                 normalizedQuery, projectIds);
 
+        // Search chat messages by message content
+        List<GlobalSearchResponseDTO.MessageSearchResultDTO> messages = searchMessages(
+                normalizedQuery, projectIds);
+
         return GlobalSearchResponseDTO.builder()
                 .tasks(tasks)
                 .documents(documents)
                 .members(members)
                 .projects(projects)
+                .messages(messages)
                 .build();
     }
 
@@ -190,6 +202,92 @@ public class GlobalSearchService {
                         .type(GlobalSearchResponseDTO.SearchResultType.PROJECT)
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Search chat messages by content.
+     */
+    private List<GlobalSearchResponseDTO.MessageSearchResultDTO> searchMessages(
+            String query, List<Long> projectIds) {
+        List<Object[]> results = entityManager.createQuery(
+                        "SELECT m, COALESCE(NULLIF(u.fullName, ''), NULLIF(u.username, ''), m.sender) " +
+                                "FROM ChatMessage m " +
+                                "LEFT JOIN User u ON (LOWER(u.username) = LOWER(m.sender) OR LOWER(u.email) = LOWER(m.sender)) " +
+                                "WHERE m.projectId IN :projectIds " +
+                                "AND m.parentMessageId IS NULL " +
+                                "AND COALESCE(m.deleted, false) = false " +
+                                "AND LOWER(COALESCE(m.content, '')) LIKE LOWER(CONCAT('%', :q, '%')) " +
+                                "ORDER BY m.timestamp DESC",
+                        Object[].class)
+                .setParameter("projectIds", projectIds)
+                .setParameter("q", query)
+                .setMaxResults(SEARCH_LIMIT)
+                .getResultList();
+
+        return results.stream()
+                .map(row -> {
+                    ChatMessage message = (ChatMessage) row[0];
+                    String senderName = Objects.toString(row[1], message.getSender());
+                    Long roomOrProjectId = message.getRoomId() != null ? message.getRoomId() : message.getProjectId();
+
+                    return GlobalSearchResponseDTO.MessageSearchResultDTO.builder()
+                            .messageId(message.getId())
+                            .highlightedContent(buildMessageExcerpt(message.getContent(), query))
+                            .senderName(senderName)
+                            .timestamp(message.getTimestamp() != null ? message.getTimestamp().format(TIMESTAMP_FORMATTER) : null)
+                            .roomOrProjectId(roomOrProjectId)
+                            .projectId(message.getProjectId())
+                            .roomId(message.getRoomId())
+                            .deepLinkUrl(buildMessageDeepLink(message))
+                            .type(GlobalSearchResponseDTO.SearchResultType.MESSAGE)
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    private String buildMessageDeepLink(ChatMessage message) {
+        StringBuilder deepLink = new StringBuilder("/project/")
+                .append(message.getProjectId())
+                .append("/chat?messageId=")
+                .append(message.getId());
+
+        if (message.getRoomId() != null) {
+            deepLink.append("&roomId=").append(message.getRoomId());
+        } else if (message.getRecipient() != null && !message.getRecipient().isBlank()) {
+            deepLink.append("&with=").append(message.getRecipient().toLowerCase());
+        } else {
+            deepLink.append("&view=team");
+        }
+
+        return deepLink.toString();
+    }
+
+    private String buildMessageExcerpt(String content, String query) {
+        if (content == null || content.isBlank()) {
+            return "";
+        }
+        if (query == null || query.isBlank()) {
+            return content.length() <= 120 ? content : content.substring(0, 117) + "...";
+        }
+
+        String normalizedContent = content.toLowerCase();
+        String normalizedQuery = query.toLowerCase();
+        int hitIndex = normalizedContent.indexOf(normalizedQuery);
+        if (hitIndex < 0) {
+            return content.length() <= 120 ? content : content.substring(0, 117) + "...";
+        }
+
+        int start = Math.max(0, hitIndex - MESSAGE_EXCERPT_RADIUS);
+        int end = Math.min(content.length(), hitIndex + query.length() + MESSAGE_EXCERPT_RADIUS);
+        String snippet = content.substring(start, end).replace('\n', ' ').trim();
+
+        if (start > 0) {
+            snippet = "..." + snippet;
+        }
+        if (end < content.length()) {
+            snippet = snippet + "...";
+        }
+        return snippet;
     }
 
     private List<Long> resolveProjectScope(Long projectId, Long userId) {

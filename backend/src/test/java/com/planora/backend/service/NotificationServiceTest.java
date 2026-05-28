@@ -16,19 +16,26 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
+import com.planora.backend.dto.NotificationFeedResponseDTO;
 import com.planora.backend.dto.NotificationResponseDTO;
 import com.planora.backend.model.Notification;
+import com.planora.backend.model.NotificationChannel;
 import com.planora.backend.model.User;
 import com.planora.backend.repository.NotificationRepository;
+import com.planora.backend.repository.TaskRepository;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -41,13 +48,30 @@ class NotificationServiceTest {
     @Mock
     private SimpMessagingTemplate messagingTemplate;
 
+    @Mock
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Mock
+    private ValueOperations<String, String> valueOperations;
+
+    @Mock
+    private NotificationPreferenceService notificationPreferenceService;
+
+    @Mock
+    private TaskRepository taskRepository;
+
     @InjectMocks
     private NotificationService notificationService;
 
     private User recipient;
 
     @BeforeEach
+    @SuppressWarnings("unused")
     void setUp() {
+        lenient().when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        lenient().when(notificationPreferenceService.isEnabled(anyLong(), nullable(Long.class), anyString(), eq(NotificationChannel.IN_APP)))
+                .thenReturn(true);
+        lenient().when(taskRepository.findById(anyLong())).thenReturn(Optional.empty());
         recipient = new User();
         recipient.setUserId(15L);
         recipient.setUsername("alice");
@@ -61,6 +85,7 @@ class NotificationServiceTest {
             toSave.setId(101L);
             return toSave;
         });
+        when(notificationRepository.countByRecipientUserIdAndIsReadFalse(15L)).thenReturn(1L);
 
         notificationService.createNotification(recipient, "You were mentioned", "/project/8/chat");
 
@@ -77,6 +102,11 @@ class NotificationServiceTest {
                 eq("/queue/notifications"),
                 any(NotificationResponseDTO.class)
         );
+        verify(messagingTemplate).convertAndSendToUser(
+            eq("alice"),
+            eq("/queue/notifications-badge"),
+            eq("1")
+        );
     }
 
     @Test
@@ -88,6 +118,7 @@ class NotificationServiceTest {
             toSave.setId(102L);
             return toSave;
         });
+        when(notificationRepository.countByRecipientUserIdAndIsReadFalse(15L)).thenReturn(1L);
 
         notificationService.createNotification(recipient, "Realtime alert", "/project/10/chat");
 
@@ -95,6 +126,11 @@ class NotificationServiceTest {
                 eq("alicemixedcase"),
                 eq("/queue/notifications"),
                 any(NotificationResponseDTO.class)
+        );
+        verify(messagingTemplate).convertAndSendToUser(
+            eq("alicemixedcase"),
+            eq("/queue/notifications-badge"),
+            eq("1")
         );
     }
 
@@ -108,6 +144,7 @@ class NotificationServiceTest {
             toSave.setId(111L);
             return toSave;
         });
+        when(notificationRepository.countByRecipientUserIdAndIsReadFalse(15L)).thenReturn(1L);
 
         notificationService.createNotificationIfNotDuplicate(recipient, "New task assigned", "/taskcard?taskId=10");
 
@@ -116,6 +153,7 @@ class NotificationServiceTest {
         );
         verify(notificationRepository).save(any(Notification.class));
         verify(messagingTemplate).convertAndSendToUser(eq("alice"), eq("/queue/notifications"), any(NotificationResponseDTO.class));
+        verify(messagingTemplate).convertAndSendToUser(eq("alice"), eq("/queue/notifications-badge"), eq("1"));
     }
 
     @Test
@@ -141,6 +179,7 @@ class NotificationServiceTest {
             toSave.setId(222L);
             return toSave;
         });
+        when(notificationRepository.countByRecipientUserIdAndIsReadFalse(15L)).thenReturn(1L);
 
         boolean created = notificationService.createNotificationIfNotDuplicateSince(
                 recipient,
@@ -152,6 +191,7 @@ class NotificationServiceTest {
         assertTrue(created);
         verify(notificationRepository).save(any(Notification.class));
         verify(messagingTemplate).convertAndSendToUser(eq("alice"), eq("/queue/notifications"), any(NotificationResponseDTO.class));
+        verify(messagingTemplate).convertAndSendToUser(eq("alice"), eq("/queue/notifications-badge"), eq("1"));
     }
 
     @Test
@@ -174,7 +214,22 @@ class NotificationServiceTest {
     }
 
     @Test
-    void getUserNotifications_mapsEntitiesToDtos() {
+    void createNotificationIfNotDuplicateByLinkAndMessagePrefix_skipsRepeatedEvent() {
+        String prefix = "\uD83D\uDD00 PR opened: #17 ";
+        String link = "https://github.com/planora/app/pull/17";
+        when(notificationRepository.existsByRecipientUserIdAndLinkAndMessageStartingWith(
+            15L, link, prefix)).thenReturn(true);
+
+        boolean created = notificationService.createNotificationIfNotDuplicateByLinkAndMessagePrefix(
+                recipient, prefix + "Improve sync by @octocat", link, prefix);
+
+        assertFalse(created);
+        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
+    }
+
+    @Test
+    void getUserNotificationFeed_mapsEntitiesToDtosAndUnreadCount() {
         Notification first = new Notification();
         first.setId(1L);
         first.setRecipient(recipient);
@@ -191,15 +246,21 @@ class NotificationServiceTest {
         second.setRead(true);
         second.setCreatedAt(LocalDateTime.parse("2026-04-04T09:00:00"));
 
-        when(notificationRepository.findByRecipientUserIdOrderByCreatedAtDesc(15L)).thenReturn(List.of(first, second));
+        NotificationRepository.NotificationFeedRow firstRow = org.mockito.Mockito.mock(NotificationRepository.NotificationFeedRow.class);
+        NotificationRepository.NotificationFeedRow secondRow = org.mockito.Mockito.mock(NotificationRepository.NotificationFeedRow.class);
+        when(firstRow.getNotification()).thenReturn(first);
+        when(firstRow.getUnreadCount()).thenReturn(1L);
+        when(secondRow.getNotification()).thenReturn(second);
+        when(notificationRepository.findNotificationFeedByRecipientUserId(15L)).thenReturn(List.of(firstRow, secondRow));
 
-        List<NotificationResponseDTO> dtos = notificationService.getUserNotifications(15L);
+        NotificationFeedResponseDTO feed = notificationService.getUserNotificationFeed(15L);
 
-        assertEquals(2, dtos.size());
-        assertEquals(1L, dtos.get(0).getId());
-        assertEquals("m1", dtos.get(0).getMessage());
-        assertFalse(dtos.get(0).isRead());
-        assertTrue(dtos.get(1).isRead());
+        assertEquals(2, feed.getNotifications().size());
+        assertEquals(1L, feed.getNotifications().get(0).getId());
+        assertEquals("m1", feed.getNotifications().get(0).getMessage());
+        assertFalse(feed.getNotifications().get(0).isRead());
+        assertTrue(feed.getNotifications().get(1).isRead());
+        assertEquals(1L, feed.getUnreadCount());
     }
 
     @Test
@@ -210,11 +271,13 @@ class NotificationServiceTest {
         notification.setRead(false);
 
         when(notificationRepository.findById(80L)).thenReturn(Optional.of(notification));
+        when(notificationRepository.countByRecipientUserIdAndIsReadFalse(15L)).thenReturn(0L);
 
         notificationService.markAsRead(80L, 15L);
 
         assertTrue(notification.isRead());
         verify(notificationRepository).save(notification);
+        verify(messagingTemplate).convertAndSendToUser(eq("alice"), eq("/queue/notifications-badge"), eq("0"));
     }
 
     @Test
@@ -235,7 +298,9 @@ class NotificationServiceTest {
     void markAsRead_throwsWhenNotificationMissing() {
         when(notificationRepository.findById(anyLong())).thenReturn(Optional.empty());
 
-        assertThrows(EntityNotFoundException.class, () -> notificationService.markAsRead(999L, 15L));
+        EntityNotFoundException ex = assertThrows(EntityNotFoundException.class,
+                () -> notificationService.markAsRead(999L, 15L));
+        assertEquals("Notification not found", ex.getMessage());
     }
 
     @Test
@@ -248,12 +313,13 @@ class NotificationServiceTest {
         read.setRecipient(recipient);
         read.setRead(true);
 
-        when(notificationRepository.findByRecipientUserIdOrderByCreatedAtDesc(15L)).thenReturn(List.of(unread, read));
+        when(notificationRepository.findByRecipientUserIdAndIsReadFalseOrderByCreatedAtDesc(15L)).thenReturn(List.of(unread));
+        when(notificationRepository.countByRecipientUserIdAndIsReadFalse(15L)).thenReturn(0L);
 
         notificationService.markAllAsRead(15L);
 
         assertTrue(unread.isRead());
-        assertTrue(read.isRead());
         verify(notificationRepository, times(1)).saveAll(List.of(unread));
+        verify(messagingTemplate).convertAndSendToUser(eq("alice"), eq("/queue/notifications-badge"), eq("0"));
     }
 }

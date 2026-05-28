@@ -15,12 +15,14 @@ public class GlobalSearchResponseDTO {
     private List<DocumentSearchResultDTO> documents;
     private List<MemberSearchResultDTO> members;
     private List<ProjectSearchResultDTO> projects;
+    private List<MessageSearchResultDTO> messages;
 
     public enum SearchResultType {
         TASK,
         DOCUMENT,
         MEMBER,
-        PROJECT
+        PROJECT,
+        MESSAGE
     }
 
     @Data
@@ -70,6 +72,22 @@ public class GlobalSearchResponseDTO {
         private String title;
         private String subtitle;
         private String url;
+        private SearchResultType type;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class MessageSearchResultDTO {
+        private Long messageId;
+        private String highlightedContent;
+        private String senderName;
+        private String timestamp;
+        private Long roomOrProjectId;
+        private Long projectId;
+        private Long roomId;
+        private String deepLinkUrl;
         private SearchResultType type;
     }
 }
