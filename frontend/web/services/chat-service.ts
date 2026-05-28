@@ -105,11 +105,11 @@ export async function searchChatMessages(
   projectId: string,
   query: string,
 ): Promise<ChatSearchResult[]> {
-  const { data } = await api.get<ChatSearchResult[]>(
-    `/api/projects/${projectId}/chat/search`,
-    { params: { q: query } },
+  const { data } = await api.get<{ messages: ChatSearchResult[] }>(
+    '/api/search',
+    { params: { q: query, projectId } },
   );
-  return data;
+  return data.messages || [];
 }
 
 // â”€â”€ Members / Users â”€â”€

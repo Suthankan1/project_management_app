@@ -258,8 +258,7 @@ export async function fetchKanbanBoard(projectId: number): Promise<KanbanBoardRe
         wipLimit: (col.wipLimit as number) || 0,
       })),
     };
-  } catch (error) {
-    console.error('Error fetching kanban board:', error);
+  } catch {
     return null;
   }
 }

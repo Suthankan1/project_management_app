@@ -26,6 +26,7 @@ export default function ChatInterface() {
   const loadedRoomRef = useRef<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [targetMessageId, setTargetMessageId] = useState<number | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -82,6 +83,7 @@ export default function ChatInterface() {
     addTeam,
     isLoading,
     isSocketConnected,
+    isSocketReconnecting,
     error,
     retryConnection,
     roomMentionCounts,
@@ -161,36 +163,33 @@ export default function ChatInterface() {
   const executeSearch = async () => { await searchMessages(searchQuery); };
 
   const jumpToSearchResult = async (result: {
-    context: string;
+    messageId: number;
+    deepLinkUrl: string;
     roomId?: number | null;
-    sender?: string;
-    recipient?: string | null;
   }) => {
-    const aliases = new Set(currentUserAliases.map((a) => a.toLowerCase()));
-    aliases.add(currentUser.toLowerCase());
+    const deepLink = new URL(result.deepLinkUrl, 'https://planora.local');
+    const roomId = deepLink.searchParams.get('roomId');
+    const withUser = deepLink.searchParams.get('with');
 
-    if (result.context === 'ROOM' && result.roomId) {
-      selectRoom(result.roomId);
-      await loadRoomHistory(result.roomId);
-      trackTelemetry('chat_search_result_opened', 'room', `roomId=${result.roomId}`);
-      return;
-    }
-
-    if (result.context === 'PRIVATE') {
-      const sender = (result.sender || '').toLowerCase();
-      const recipient = (result.recipient || '').toLowerCase();
-      const partner = aliases.has(sender) ? recipient : sender;
-      if (partner) {
-        selectPrivateUser(partner);
-        await loadPrivateHistory(partner);
-        trackTelemetry('chat_search_result_opened', 'private', `partner=${partner}`);
+    if (roomId) {
+      const parsedRoomId = Number(roomId);
+      if (Number.isFinite(parsedRoomId) && parsedRoomId > 0) {
+        selectRoom(parsedRoomId);
+        await loadRoomHistory(parsedRoomId);
+        trackTelemetry('chat_search_result_opened', 'room', `roomId=${parsedRoomId}`);
       }
-      return;
+    } else if (withUser) {
+      const partner = withUser.toLowerCase();
+      selectPrivateUser(partner);
+      await loadPrivateHistory(partner);
+      trackTelemetry('chat_search_result_opened', 'private', `partner=${partner}`);
+    } else {
+      selectRoom(null);
+      selectPrivateUser(null);
+      trackTelemetry('chat_search_result_opened', 'team');
     }
 
-    selectRoom(null);
-    selectPrivateUser(null);
-    trackTelemetry('chat_search_result_opened', 'team');
+    setTargetMessageId(result.messageId);
   };
 
   const roomTyping = hasSelectedRoom && selectedRoomId !== null ? (roomTypingUsers[selectedRoomId] || []) : [];
@@ -278,7 +277,7 @@ export default function ChatInterface() {
   const isConnected = isSocketConnected;
   const errorMessage = typeof error === 'string' ? error : String(error ?? '');
   const isReconnectError = errorMessage.toLowerCase().includes('reconnect');
-  const shouldShowErrorBanner = errorMessage.length > 0 && !isReconnectError;
+  const shouldShowErrorBanner = errorMessage.length > 0 && !isReconnectError && !isSocketReconnecting;
 
   /* ── Loading skeleton ── */
   if (isLoading) {
@@ -326,6 +325,7 @@ export default function ChatInterface() {
       <div className={`flex-1 min-h-0 flex flex-col min-w-0 bg-white border-l-0 lg:border-l border-gray-100/60 shadow-sm ${!showChatSidebar ? 'flex w-full' : 'hidden lg:flex'}`}>
         <ChatConnectionBanners
           isConnected={isConnected}
+          isReconnecting={isSocketReconnecting}
           shouldShowErrorBanner={shouldShowErrorBanner}
           error={error}
           onRetry={retryConnection}
@@ -371,6 +371,7 @@ export default function ChatInterface() {
           <ChatMessages
             projectId={projectId}
             messages={filteredMessages}
+            targetMessageId={targetMessageId}
             currentUser={currentUser}
             currentUserAliases={currentUserAliases}
             isPrivateChat={isPrivateChat}
@@ -392,7 +393,7 @@ export default function ChatInterface() {
           <ChatInput
             onSendMessage={handleSendMessage}
             onTypingChange={sendTyping}
-            disabled={isLoading || !isConnected || shouldShowErrorBanner}
+            disabled={isLoading || ((!isConnected && !isSocketReconnecting) || shouldShowErrorBanner)}
             placeholder={
               hasSelectedRoom
                 ? `Message #${selectedRoom?.name ?? 'channel'}…`

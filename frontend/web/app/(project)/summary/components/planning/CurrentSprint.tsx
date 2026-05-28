@@ -64,7 +64,7 @@ export function CurrentSprint({ projectId, sprints = [], tasks = [] }: { project
                 <p className="text-[12px] text-cu-text-muted mt-2">{completedTasks.length} out of {sprintTasks.length} tasks completed.</p>
             </div>
 
-            <Link href={`/project/${projectId}/sprintboard`} className="mt-auto inline-flex items-center gap-2 text-cu-primary text-[14px] font-semibold hover:underline group">
+            <Link href={`/sprint-board?projectId=${projectId}`} className="mt-auto inline-flex items-center gap-2 text-cu-primary text-[14px] font-semibold hover:underline group">
                 Go to Sprint Board
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="group-hover:translate-x-1 transition-transform">
                     <path d="M3.33334 8H12.6667" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />

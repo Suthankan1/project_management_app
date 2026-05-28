@@ -189,16 +189,22 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
               isSearchLoading={isSearchLoading}
               searchResults={searchResults}
               onOpenResult={async (result) => {
-                const aliases = new Set([currentUser.toLowerCase(), ...currentUserAliases.map(a => a.toLowerCase())]);
-                if (result.context === 'ROOM' && result.roomId) {
-                  selectRoom(result.roomId);
-                  await loadRoomHistory(result.roomId);
+                const deepLink = new URL(result.deepLinkUrl, 'https://planora.local');
+                const roomId = deepLink.searchParams.get('roomId');
+                const withUser = deepLink.searchParams.get('with');
+
+                if (roomId) {
+                  const parsedRoomId = Number(roomId);
+                  if (Number.isFinite(parsedRoomId) && parsedRoomId > 0) {
+                    selectRoom(parsedRoomId);
+                    await loadRoomHistory(parsedRoomId);
+                    setShowSearch(false);
+                  }
+                } else if (withUser) {
+                  const partner = withUser.toLowerCase();
+                  selectPrivateUser(partner);
+                  await loadPrivateHistory(partner);
                   setShowSearch(false);
-                } else if (result.context === 'PRIVATE') {
-                  const sender    = (result.sender    || '').toLowerCase();
-                  const recipient = (result.recipient || '').toLowerCase();
-                  const partner   = aliases.has(sender) ? recipient : sender;
-                  if (partner) { selectPrivateUser(partner); await loadPrivateHistory(partner); setShowSearch(false); }
                 }
               }}
             />

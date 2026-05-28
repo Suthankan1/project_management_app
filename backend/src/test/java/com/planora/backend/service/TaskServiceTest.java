@@ -6,6 +6,7 @@ import com.planora.backend.dto.TaskResponseDTO;
 import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.Comment;
+import com.planora.backend.model.KanbanColumn;
 import com.planora.backend.model.Priority;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Task;
@@ -15,6 +16,7 @@ import com.planora.backend.model.TeamRole;
 import com.planora.backend.model.User;
 import com.planora.backend.model.Milestone;
 import com.planora.backend.repository.CommentRepository;
+import com.planora.backend.repository.KanbanColumnRepository;
 import com.planora.backend.repository.LabelRepository;
 import com.planora.backend.repository.ProjectRepository;
 import com.planora.backend.repository.SprintRepository;
@@ -60,6 +62,8 @@ class TaskServiceTest {
 
     @Mock
     private TaskRepository taskRepository;
+    @Mock
+    private KanbanColumnRepository kanbanColumnRepository;
     @Mock
     private ProjectRepository projectRepository;
     @Mock
@@ -227,6 +231,8 @@ class TaskServiceTest {
     @Test
     void getTasksByProject_batchesDependencyLookup() {
         Task taskOne = buildTask(71L);
+        taskOne.setGithubIssueNumber(34L);
+        taskOne.setGithubRepoFullName("planora/app");
         Task taskTwo = buildTask(72L);
 
         when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
@@ -239,6 +245,8 @@ class TaskServiceTest {
 
         assertEquals(2, result.size());
         assertNotNull(result.getFirst().getDependencies());
+        assertEquals(34L, result.getFirst().getGithubIssueNumber());
+        assertEquals("planora/app", result.getFirst().getGithubRepoFullName());
         verify(taskRepository, times(1)).findDependencyRowsByTaskIds(List.of(71L, 72L));
     }
 
@@ -691,5 +699,21 @@ class TaskServiceTest {
         taskService.updateTask(1300L, request, 500L);
 
         assertNull(task.getMilestone());
+    }
+
+    @Test
+    void updateTaskColumn_setsColumnStatusAndPersistsTask() {
+        Task task = buildTask(1400L);
+        KanbanColumn column = new KanbanColumn();
+        column.setId(7L);
+        column.setStatus("IN_REVIEW");
+        when(taskRepository.findById(1400L)).thenReturn(Optional.of(task));
+        when(kanbanColumnRepository.findById(7L)).thenReturn(Optional.of(column));
+
+        taskService.updateTaskColumn(1400L, 7L);
+
+        assertEquals(column, task.getKanbanColumn());
+        assertEquals("IN_REVIEW", task.getStatus());
+        verify(taskRepository).save(task);
     }
 }

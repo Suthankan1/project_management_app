@@ -2,6 +2,7 @@ package com.planora.backend.repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -19,6 +20,11 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
             Long projectId, Long githubIssueNumber, String githubRepoFullName);
 
     List<Task> findByProjectIdAndGithubIssueNumber(Long projectId, Long githubIssueNumber);
+
+    List<Task> findByProjectIdAndGithubIssueNumberAndGithubRepoFullNameIgnoreCase(
+            Long projectId, Long githubIssueNumber, String githubRepoFullName);
+
+    Optional<Task> findByProjectIdAndProjectTaskNumber(Long projectId, Long projectTaskNumber);
 
     @Query("""
            SELECT t FROM Task t

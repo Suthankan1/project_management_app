@@ -44,12 +44,14 @@ export interface ChatFeatureFlags {
 
 export interface ChatSearchResult {
   messageId: number;
-  sender: string;
-  content: string;
+  highlightedContent: string;
+  senderName: string;
   timestamp?: string | null;
-  context: 'TEAM' | 'ROOM' | 'PRIVATE';
+  deepLinkUrl: string;
+  type: 'MESSAGE' | string;
+  roomOrProjectId: number;
+  projectId: number;
   roomId?: number | null;
-  recipient?: string | null;
 }
 
 export interface DirectChatSummary {
