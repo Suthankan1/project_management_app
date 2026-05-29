@@ -83,11 +83,18 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             log.warn("Rate limit exceeded for key={}", key);
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType("application/json");
-            if (isProjectInviteRequest(request)) {
-                response.getWriter().write("{\"message\":\"Too many invitations sent, try again in 1 hour\"}");
-            } else {
-                response.getWriter().write("{\"error\":\"Too many requests. Please try again later.\"}");
-            }
+            String message = isProjectInviteRequest(request)
+                ? "Too many invitations sent, try again in 1 hour"
+                : "Too many requests. Please try again later.";
+            com.planora.backend.dto.ApiErrorResponse errorResponse = new com.planora.backend.dto.ApiErrorResponse(
+                java.time.LocalDateTime.now().toString(),
+                HttpStatus.TOO_MANY_REQUESTS.value(),
+                "RATE_LIMIT",
+                message,
+                request.getRequestURI(),
+                null
+            );
+            response.getWriter().write(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(errorResponse));
         }
     }
 

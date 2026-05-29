@@ -1,5 +1,7 @@
 package com.planora.backend.controller;
 
+import com.planora.backend.dto.ApiErrorResponse;
+import com.planora.backend.dto.ApiFieldError;
 import com.planora.backend.exception.ConflictException;
 import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.GithubAuthenticationException;
@@ -8,6 +10,7 @@ import com.planora.backend.exception.GithubRateLimitException;
 import com.planora.backend.exception.GithubRepositoryNotFoundException;
 import com.planora.backend.exception.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,9 +24,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,85 +36,95 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleResourceNotFound(ResourceNotFoundException ex) {
-        return buildError(HttpStatus.NOT_FOUND, ex.getMessage(), null);
+    public ResponseEntity<ApiErrorResponse> handleResourceNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", ex.getMessage(), request);
     }
 
     @ExceptionHandler(ForbiddenException.class)
-    public ResponseEntity<Map<String, Object>> handleForbidden(ForbiddenException ex) {
-        return buildError(HttpStatus.FORBIDDEN, ex.getMessage(), null);
+    public ResponseEntity<ApiErrorResponse> handleForbidden(ForbiddenException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.FORBIDDEN, "FORBIDDEN", ex.getMessage(), request);
     }
 
     @ExceptionHandler(GithubAuthenticationException.class)
-    public ResponseEntity<Map<String, Object>> handleGithubAuthentication(GithubAuthenticationException ex) {
-        return buildError(HttpStatus.UNAUTHORIZED, ex.getMessage(), null);
+    public ResponseEntity<ApiErrorResponse> handleGithubAuthentication(GithubAuthenticationException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", ex.getMessage(), request);
     }
 
     @ExceptionHandler(GithubRateLimitException.class)
-    public ResponseEntity<Map<String, Object>> handleGithubRateLimit(GithubRateLimitException ex) {
-        return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), null);
+    public ResponseEntity<ApiErrorResponse> handleGithubRateLimit(GithubRateLimitException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMIT", ex.getMessage(), request);
     }
 
     @ExceptionHandler(GithubRepositoryNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleGithubRepositoryNotFound(GithubRepositoryNotFoundException ex) {
-        return buildError(HttpStatus.NOT_FOUND, ex.getMessage(), null);
+    public ResponseEntity<ApiErrorResponse> handleGithubRepositoryNotFound(GithubRepositoryNotFoundException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", ex.getMessage(), request);
     }
 
     @ExceptionHandler(GithubIssueValidationException.class)
-    public ResponseEntity<Map<String, Object>> handleGithubIssueValidation(GithubIssueValidationException ex) {
-        return buildError(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), null);
+    public ResponseEntity<ApiErrorResponse> handleGithubIssueValidation(GithubIssueValidationException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.UNPROCESSABLE_ENTITY, "VALIDATION_ERROR", ex.getMessage(), request);
     }
 
     @ExceptionHandler(ConflictException.class)
-    public ResponseEntity<Map<String, Object>> handleConflict(ConflictException ex) {
-        return buildError(HttpStatus.CONFLICT, ex.getMessage(), null);
+    public ResponseEntity<ApiErrorResponse> handleConflict(ConflictException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.CONFLICT, "CONFLICT", ex.getMessage(), request);
     }
 
     @ExceptionHandler(EntityNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleEntityNotFound(EntityNotFoundException ex) {
-        return buildError(HttpStatus.NOT_FOUND, ex.getMessage(), null);
+    public ResponseEntity<ApiErrorResponse> handleEntityNotFound(EntityNotFoundException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", ex.getMessage(), request);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
-        return buildError(HttpStatus.FORBIDDEN, ex.getMessage(), null);
+    public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.FORBIDDEN, "FORBIDDEN", ex.getMessage(), request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
-        List<Map<String, String>> validationErrors = new ArrayList<>();
+    public ResponseEntity<ApiErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+        List<ApiFieldError> validationErrors = new ArrayList<>();
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
-            Map<String, String> fieldError = new HashMap<>();
-            fieldError.put("field", error.getField());
-            fieldError.put("message", error.getDefaultMessage());
-            validationErrors.add(fieldError);
+            validationErrors.add(new ApiFieldError(error.getField(), error.getDefaultMessage()));
         }
-        return buildError(HttpStatus.BAD_REQUEST, "Validation failed", validationErrors);
+        ApiErrorResponse body = new ApiErrorResponse(
+            LocalDateTime.now().toString(),
+            HttpStatus.BAD_REQUEST.value(),
+            "VALIDATION_ERROR",
+            "Validation failed",
+            request.getRequestURI(),
+            validationErrors
+        );
+        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<Map<String, Object>> handleConstraintViolation(ConstraintViolationException ex) {
-        List<Map<String, String>> validationErrors = new ArrayList<>();
-        for (jakarta.validation.ConstraintViolation<?> violation : ex.getConstraintViolations()) {
-            Map<String, String> fieldError = new HashMap<>();
-            String path = violation.getPropertyPath().toString();
-            String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
-            fieldError.put("field", field);
-            fieldError.put("message", violation.getMessage());
-            validationErrors.add(fieldError);
-        }
-        return buildError(HttpStatus.BAD_REQUEST, "Validation failed", validationErrors);
+    public ResponseEntity<ApiErrorResponse> handleConstraintViolation(ConstraintViolationException ex, HttpServletRequest request) {
+        List<ApiFieldError> validationErrors = new ArrayList<>();
+        ex.getConstraintViolations().forEach(violation -> {
+            String propertyPath = violation.getPropertyPath().toString();
+            String field = propertyPath.substring(propertyPath.lastIndexOf('.') + 1);
+            validationErrors.add(new ApiFieldError(field, violation.getMessage()));
+        });
+        ApiErrorResponse body = new ApiErrorResponse(
+            LocalDateTime.now().toString(),
+            HttpStatus.BAD_REQUEST.value(),
+            "VALIDATION_ERROR",
+            "Validation failed",
+            request.getRequestURI(),
+            validationErrors
+        );
+        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<Map<String, Object>> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
-        return buildError(HttpStatus.BAD_REQUEST, "Invalid request payload", null);
+    public ResponseEntity<ApiErrorResponse> handleHttpMessageNotReadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Invalid request payload", request);
     }
 
     @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<Map<String, Object>> handleRuntime(RuntimeException ex) {
+    public ResponseEntity<ApiErrorResponse> handleRuntime(RuntimeException ex, HttpServletRequest request) {
         log.error("Internal Server Error (RuntimeException): ", ex);
-        return buildError(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), null);
+        return buildError(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", ex.getMessage(), request);
     }
 
     @ExceptionHandler(AsyncRequestNotUsableException.class)
@@ -122,25 +133,25 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleNoResourceFound(NoResourceFoundException ex) {
-        return buildError(HttpStatus.NOT_FOUND, "Resource not found", null);
+    public ResponseEntity<ApiErrorResponse> handleNoResourceFound(NoResourceFoundException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource not found", request);
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
+    public ResponseEntity<ApiErrorResponse> handleGeneric(Exception ex, HttpServletRequest request) {
         log.error("Unhandled Exception: ", ex);
-        return buildError(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred", null);
+        return buildError(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "An unexpected error occurred", request);
     }
 
-    private ResponseEntity<Map<String, Object>> buildError(HttpStatus status, String message, Object details) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", LocalDateTime.now().toString());
-        body.put("status", status.value());
-        body.put("error", status.getReasonPhrase());
-        body.put("message", message);
-        if (details != null) {
-            body.put("details", details);
-        }
+    private ResponseEntity<ApiErrorResponse> buildError(HttpStatus status, String errorCode, String message, HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+            LocalDateTime.now().toString(),
+            status.value(),
+            errorCode,
+            message,
+            request.getRequestURI(),
+            null
+        );
         return new ResponseEntity<>(body, status);
     }
 }

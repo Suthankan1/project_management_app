@@ -335,7 +335,7 @@ class TaskControllerTest {
                         .content(objectMapper.writeValueAsString(invalidReq)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validation failed"))
-                .andExpect(jsonPath("$.details").isArray());
+                .andExpect(jsonPath("$.fieldErrors").isArray());
     }
 
     @Test
