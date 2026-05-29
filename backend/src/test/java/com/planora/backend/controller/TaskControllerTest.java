@@ -319,4 +319,36 @@ class TaskControllerTest {
         mockMvc.perform(patch("/api/tasks1/assign/5").with(csrf()))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    @WithMockUserPrincipal
+    void createTask_invalidPayload_returns400() throws Exception {
+        TaskRequestDTO invalidReq = new TaskRequestDTO();
+        invalidReq.setTitle(""); // Blank title (fails @NotBlank on OnCreate)
+        invalidReq.setProjectId(-5L); // Negative project ID
+        invalidReq.setStoryPoint(2000); // Exceeds max 999
+        invalidReq.setRecurrenceRule("INVALID_RULE"); // Invalid recurrence rule pattern
+
+        mockMvc.perform(post("/api/tasks")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.details").isArray());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void updateTask_invalidPayload_returns400() throws Exception {
+        TaskRequestDTO invalidReq = new TaskRequestDTO();
+        invalidReq.setStoryPoint(-10); // fails @Min(0)
+
+        mockMvc.perform(put("/api/tasks/1")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
 }

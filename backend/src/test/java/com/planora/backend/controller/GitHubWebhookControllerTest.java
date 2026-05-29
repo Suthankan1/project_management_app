@@ -333,11 +333,9 @@ class GitHubWebhookControllerTest {
 
     @Test
     void webhook_rejectsDeliveriesWhenSecretIsNotConfigured() throws Exception {
-        CiStatusResolver ciStatusResolver = mock(CiStatusResolver.class);
-        TaskGithubService taskGithubService = mock(TaskGithubService.class);
         GitHubWebhookController controller = new GitHubWebhookController(
-                ciStatusResolver,
-                taskGithubService,
+                mock(CiStatusResolver.class),
+                mock(TaskGithubService.class),
                 githubNotificationService,
                 new ObjectMapper()
         );

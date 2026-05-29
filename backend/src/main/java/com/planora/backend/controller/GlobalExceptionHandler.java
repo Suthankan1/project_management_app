@@ -93,7 +93,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<Map<String, Object>> handleConstraintViolation(ConstraintViolationException ex) {
-        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), null);
+        List<Map<String, String>> validationErrors = new ArrayList<>();
+        for (jakarta.validation.ConstraintViolation<?> violation : ex.getConstraintViolations()) {
+            Map<String, String> fieldError = new HashMap<>();
+            String path = violation.getPropertyPath().toString();
+            String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
+            fieldError.put("field", field);
+            fieldError.put("message", violation.getMessage());
+            validationErrors.add(fieldError);
+        }
+        return buildError(HttpStatus.BAD_REQUEST, "Validation failed", validationErrors);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
