@@ -38,17 +38,17 @@ export function LeadTimeChart({ tasks }: { tasks: Task[] }) {
           <SafeChartFrame>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -28 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#6A7282' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                <YAxis tick={{ fontSize: 9, fill: '#6A7282' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E3E8EF', fontSize: '11px' }} />
-                <Line type="monotone" dataKey="avgDays" name="Avg Days" stroke="#FF8B00" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--cu-border)" />
+                <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--cu-text-muted)' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 9, fill: 'var(--cu-text-muted)' }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--cu-border)', background: 'var(--cu-bg)', color: 'var(--cu-text-primary)', fontSize: '11px' }} />
+                <Line type="monotone" dataKey="avgDays" name="Avg Days" stroke="var(--cu-warning)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
               </LineChart>
             </ResponsiveContainer>
           </SafeChartFrame>
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
-            <p className="text-[11px] text-gray-400">Not enough data</p>
+          <div className="absolute inset-0 flex items-center justify-center bg-cu-bg-secondary rounded-lg border border-dashed border-cu-border">
+            <p className="text-[11px] text-cu-text-muted">Not enough data</p>
           </div>
         )}
       </div>

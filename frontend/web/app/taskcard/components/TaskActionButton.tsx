@@ -10,7 +10,7 @@ interface TaskActionButtonProps {
 const TaskActionButton: React.FC<TaskActionButtonProps> = ({ icon, label, onClick }) => (
   <button
     onClick={onClick}
-    className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[38px] min-w-[44px] bg-white border border-[#E5E7EB] hover:bg-[#F0F5FF] hover:border-[#155DFC] rounded-xl text-[12px] font-semibold text-[#344054] hover:text-[#155DFC] transition-all shadow-sm"
+    className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[38px] min-w-[44px] bg-cu-bg border border-cu-border hover:bg-cu-primary/5 hover:border-cu-primary/40 rounded-xl text-[12px] font-semibold text-cu-text-primary hover:text-cu-primary transition-all shadow-cu-sm"
   >
     {icon} {label}
   </button>

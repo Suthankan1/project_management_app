@@ -10,9 +10,9 @@ import PortfolioMetrics from '@/components/portfolio/PortfolioMetrics';
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function healthInfo(score: number) {
-  if (score >= 75) return { label: 'Healthy',  color: '#6BC950', bg: '#E6F9E0' };
-  if (score >= 50) return { label: 'At Risk',  color: '#FF9F43', bg: '#FFF3E0' };
-  return              { label: 'Critical', color: '#FF5C5C', bg: '#FFE5E5' };
+  if (score >= 75) return { label: 'Healthy',  color: 'var(--cu-success)', bg: 'var(--cu-success-light)' };
+  if (score >= 50) return { label: 'At Risk',  color: 'var(--cu-warning)', bg: 'var(--cu-warning-light)' };
+  return              { label: 'Critical', color: 'var(--cu-danger)', bg: 'var(--cu-danger-light)' };
 }
 
 // ── Add-project panel ─────────────────────────────────────────────────────────
@@ -35,50 +35,49 @@ function AddProjectPanel({
     <motion.div
       initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.18 }}
-      className="bg-white rounded-xl border border-[#E8E8ED] shadow-[0_4px_16px_rgba(0,0,0,0.08)] overflow-hidden mt-2">
+      className="bg-cu-bg rounded-xl border border-cu-border shadow-cu-md overflow-hidden mt-2">
 
       {/* Search */}
-      <div className="p-3 border-b border-[#F0F0F5]">
+      <div className="p-3 border-b border-cu-border">
         <input
           autoFocus
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search projects…"
-          className="w-full rounded-lg px-3 py-1.5 text-xs text-[#1A1A2E] placeholder-[#9CA3AF] outline-none"
-          style={{ background: '#F7F8FA', border: '1px solid #E8E8ED' }}
+          className="w-full rounded-lg px-3 py-1.5 text-xs text-cu-text-primary placeholder-cu-text-muted outline-none bg-cu-bg-secondary border border-cu-border focus:border-cu-primary"
         />
       </div>
 
       {/* Project list */}
       <div className="max-h-52 overflow-y-auto">
         {filtered.length === 0 ? (
-          <p className="text-center text-[#9CA3AF] text-xs py-6">
+          <p className="text-center text-cu-text-muted text-xs py-6">
             {available.length === 0 ? 'All projects already added' : 'No projects found'}
           </p>
         ) : filtered.map(p => (
           <button key={p.id} onClick={() => onAdd(p.id)}
             disabled={adding === p.id}
-            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#F7F8FA] transition-colors text-left disabled:opacity-60">
+            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-cu-hover transition-colors text-left disabled:opacity-60">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
               style={{ background: `${portfolioColor}18`, color: portfolioColor }}>
               {p.name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[#1A1A2E] text-sm font-medium truncate">{p.name}</p>
-              {p.projectKey && <p className="text-[#9CA3AF] text-xs">{p.projectKey}</p>}
+              <p className="text-cu-text-primary text-sm font-medium truncate">{p.name}</p>
+              {p.projectKey && <p className="text-cu-text-muted text-xs">{p.projectKey}</p>}
             </div>
             <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold"
               style={{
-                background: p.type === 'AGILE' ? '#EBF2FF' : '#E6F9E0',
-                color:      p.type === 'AGILE' ? '#155DFC' : '#6BC950',
+                background: p.type === 'AGILE' ? 'var(--cu-primary-light)' : 'var(--cu-success-light)',
+                color:      p.type === 'AGILE' ? 'var(--cu-primary)' : 'var(--cu-success)',
               }}>
               {p.type === 'AGILE' ? 'Sprint' : 'Kanban'}
             </span>
             <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
               {adding === p.id ? (
-                <div className="w-3.5 h-3.5 rounded-full border-2 border-[#155DFC]/30 border-t-[#155DFC] animate-spin" />
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-cu-primary/30 border-t-cu-primary animate-spin" />
               ) : (
-                <span className="text-[#155DFC] font-bold text-lg leading-none">+</span>
+                <span className="text-cu-primary font-bold text-lg leading-none">+</span>
               )}
             </div>
           </button>
@@ -86,8 +85,8 @@ function AddProjectPanel({
       </div>
 
       {/* Close */}
-      <div className="border-t border-[#F0F0F5] px-4 py-2.5 flex justify-end">
-        <button onClick={onClose} className="text-xs text-[#6B6F7B] hover:text-[#1A1A2E] transition-colors">
+      <div className="border-t border-cu-border px-4 py-2.5 flex justify-end">
+        <button onClick={onClose} className="text-xs text-cu-text-secondary hover:text-cu-text-primary transition-colors">
           Close
         </button>
       </div>
@@ -106,31 +105,31 @@ function ProjectRow({
   removing: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-[#F7F8FA] transition-colors group">
+    <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-cu-hover transition-colors group">
       <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
         style={{ background: `${color}18`, color }}>
         {project.name.charAt(0).toUpperCase()}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[#1A1A2E] text-sm font-medium truncate">{project.name}</p>
-        <p className="text-[#9CA3AF] text-xs">{project.projectKey} · {project.teamName ?? project.type}</p>
+        <p className="text-cu-text-primary text-sm font-medium truncate">{project.name}</p>
+        <p className="text-cu-text-muted text-xs">{project.projectKey} · {project.teamName ?? project.type}</p>
       </div>
       <span className="flex-shrink-0 px-2 py-0.5 rounded-md text-[10px] font-semibold"
         style={{
-          background: project.type === 'AGILE' ? '#EBF2FF' : '#E6F9E0',
-          color:      project.type === 'AGILE' ? '#155DFC' : '#6BC950',
+          background: project.type === 'AGILE' ? 'var(--cu-primary-light)' : 'var(--cu-success-light)',
+          color:      project.type === 'AGILE' ? 'var(--cu-primary)' : 'var(--cu-success)',
         }}>
         {project.type === 'AGILE' ? 'Sprint' : 'Kanban'}
       </span>
       <button
         onClick={onRemove}
         disabled={removing}
-        className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-all hover:bg-[#FFE5E5] disabled:opacity-40"
+        className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-all hover:bg-cu-danger-light disabled:opacity-40"
         title="Remove from portfolio">
         {removing ? (
-          <div className="w-3 h-3 rounded-full border-2 border-[#FF5C5C]/30 border-t-[#FF5C5C] animate-spin" />
+          <div className="w-3 h-3 rounded-full border-2 border-cu-danger/30 border-t-cu-danger animate-spin" />
         ) : (
-          <span className="text-[#FF5C5C] text-xs font-bold leading-none">✕</span>
+          <span className="text-cu-danger text-xs font-bold leading-none">✕</span>
         )}
       </button>
     </div>
@@ -213,15 +212,15 @@ export default function PortfolioDetailPage() {
 
   if (loading) return (
     <div className="w-full flex items-center justify-center py-24">
-      <div className="w-8 h-8 rounded-full border-2 border-[#155DFC]/20 border-t-[#155DFC] animate-spin" />
+      <div className="w-8 h-8 rounded-full border-2 border-cu-primary/20 border-t-cu-primary animate-spin" />
     </div>
   );
 
   if (error || !portfolio) return (
     <div className="w-full flex flex-col items-center justify-center py-24 text-center">
-      <p className="text-[#6B6F7B] text-sm mb-3">{error || 'Portfolio not found'}</p>
+      <p className="text-cu-text-secondary text-sm mb-3">{error || 'Portfolio not found'}</p>
       <button onClick={() => router.push('/portfolios')}
-        className="text-[#155DFC] text-sm hover:underline">← Back to portfolios</button>
+        className="text-cu-primary text-sm hover:underline">← Back to portfolios</button>
     </div>
   );
 
@@ -235,14 +234,14 @@ export default function PortfolioDetailPage() {
 
       {/* Back */}
       <motion.button onClick={() => router.push('/portfolios')}
-        className="flex items-center gap-1.5 text-[#6B6F7B] hover:text-[#1A1A2E] text-sm transition-colors mb-6 group"
+        className="flex items-center gap-1.5 text-cu-text-secondary hover:text-cu-text-primary text-sm transition-colors mb-6 group"
         initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}>
         <span className="transition-transform group-hover:-translate-x-0.5">←</span>
         Portfolios
       </motion.button>
 
       {/* Hero card */}
-      <motion.div className="bg-white rounded-2xl border border-[#E8E8ED] shadow-sm overflow-hidden mb-6"
+      <motion.div className="bg-cu-bg rounded-2xl border border-cu-border shadow-cu-sm overflow-hidden mb-6"
         initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
         <div className="h-1.5" style={{ background: portfolio.color }} />
         <div className="p-6">
@@ -250,11 +249,11 @@ export default function PortfolioDetailPage() {
             <div className="flex items-start gap-3 min-w-0">
               {portfolio.emoji && <span className="text-3xl leading-none flex-shrink-0">{portfolio.emoji}</span>}
               <div className="min-w-0">
-                <h1 className="text-xl font-bold text-[#1A1A2E] leading-tight">{portfolio.name}</h1>
+                <h1 className="text-xl font-bold text-cu-text-primary leading-tight">{portfolio.name}</h1>
                 {portfolio.description && (
-                  <p className="text-[#6B6F7B] text-sm mt-1 max-w-xl">{portfolio.description}</p>
+                  <p className="text-cu-text-secondary text-sm mt-1 max-w-xl">{portfolio.description}</p>
                 )}
-                <p className="text-[#9CA3AF] text-xs mt-1.5">by {portfolio.ownerName}</p>
+                <p className="text-cu-text-muted text-xs mt-1.5">by {portfolio.ownerName}</p>
               </div>
             </div>
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl flex-shrink-0"
@@ -267,10 +266,10 @@ export default function PortfolioDetailPage() {
 
           <div>
             <div className="flex justify-between items-center mb-1.5">
-              <span className="text-[#9CA3AF] text-xs">Overall completion</span>
-              <span className="text-[#6B6F7B] text-xs font-medium">{completionPct}%</span>
+              <span className="text-cu-text-muted text-xs">Overall completion</span>
+              <span className="text-cu-text-secondary text-xs font-medium">{completionPct}%</span>
             </div>
-            <div className="h-2 rounded-full bg-[#F0F0F5] overflow-hidden">
+            <div className="h-2 rounded-full bg-cu-bg-tertiary overflow-hidden">
               <motion.div className="h-full rounded-full"
                 style={{ background: portfolio.color }}
                 initial={{ width: 0 }}
@@ -284,7 +283,7 @@ export default function PortfolioDetailPage() {
       {/* Metrics */}
       <motion.div className="mb-6"
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-        <h2 className="text-[#9CA3AF] text-xs font-semibold uppercase tracking-widest mb-3">Metrics</h2>
+        <h2 className="text-cu-text-muted text-xs font-semibold uppercase tracking-widest mb-3">Metrics</h2>
         <PortfolioMetrics portfolio={portfolio} />
       </motion.div>
 
@@ -294,13 +293,13 @@ export default function PortfolioDetailPage() {
 
         {/* Section header */}
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[#9CA3AF] text-xs font-semibold uppercase tracking-widest">
+          <h2 className="text-cu-text-muted text-xs font-semibold uppercase tracking-widest">
             Projects ({portfolio.projectCount})
           </h2>
           <button
             onClick={() => setShowAddPanel(v => !v)}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90 active:scale-95"
-            style={{ background: showAddPanel ? '#6B6F7B' : '#155DFC' }}>
+            style={{ background: showAddPanel ? 'var(--cu-text-secondary)' : 'var(--cu-primary)' }}>
             {showAddPanel ? '✕ Close' : '+ Add Project'}
           </button>
         </div>
@@ -319,7 +318,7 @@ export default function PortfolioDetailPage() {
         </AnimatePresence>
 
         {/* Project list */}
-        <div className="bg-white rounded-2xl border border-[#E8E8ED] shadow-sm overflow-hidden mt-2">
+        <div className="bg-cu-bg rounded-2xl border border-cu-border shadow-cu-sm overflow-hidden mt-2">
           {portfolio.projects && portfolio.projects.length > 0 ? (
             <div className="p-2 grid grid-cols-1 md:grid-cols-2 gap-0.5">
               {portfolio.projects.map((proj, i) => (
@@ -338,10 +337,10 @@ export default function PortfolioDetailPage() {
             </div>
           ) : (
             <div className="py-12 text-center">
-              <p className="text-[#9CA3AF] text-sm mb-2">No projects yet</p>
+              <p className="text-cu-text-muted text-sm mb-2">No projects yet</p>
               <button
                 onClick={() => setShowAddPanel(true)}
-                className="text-[#155DFC] text-sm hover:underline">
+                className="text-cu-primary text-sm hover:underline">
                 + Add your first project
               </button>
             </div>

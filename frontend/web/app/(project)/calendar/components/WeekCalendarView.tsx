@@ -32,12 +32,12 @@ export default function WeekCalendarView({ currentDate, events, onDayClick, onEv
   const dateKey = (d: Date) => d.toISOString().slice(0, 10);
 
   return (
-    <div className="rounded-xl border border-[#E4E7EC] bg-white">
-      <div className="grid grid-cols-7 border-b border-[#EAECF0]">
+    <div className="rounded-xl border border-cu-border bg-cu-bg">
+      <div className="grid grid-cols-7 border-b border-cu-border">
         {weekDays.map((day, idx) => (
           <div key={day.toISOString()} className="px-3 py-2">
-            <div className="text-xs uppercase tracking-wide text-[#667085]">{DAY_NAMES[idx]}</div>
-            <div className="text-sm font-semibold text-[#101828]">{day.getDate()}</div>
+            <div className="text-xs uppercase tracking-wide text-cu-text-muted">{DAY_NAMES[idx]}</div>
+            <div className="text-sm font-semibold text-cu-text-primary">{day.getDate()}</div>
           </div>
         ))}
       </div>
@@ -51,7 +51,7 @@ export default function WeekCalendarView({ currentDate, events, onDayClick, onEv
           return (
             <div
               key={day.toISOString()}
-              className={`min-h-[340px] border-r border-[#F2F4F7] p-2 align-top transition-colors${onDayClick ? ' cursor-pointer hover:bg-[#F9FAFB]' : ''}${isDropTarget ? ' bg-[#EFF8FF]' : ''}`}
+              className={`min-h-[340px] border-r border-cu-border p-2 align-top transition-colors${onDayClick ? ' cursor-pointer hover:bg-cu-hover' : ''}${isDropTarget ? ' bg-cu-primary/5' : ''}`}
               onClick={() => onDayClick?.(day)}
               onDragOver={(e) => { if (draggedId) { e.preventDefault(); setDropTargetDate(key); } }}
               onDragLeave={() => setDropTargetDate(null)}
@@ -82,7 +82,7 @@ export default function WeekCalendarView({ currentDate, events, onDayClick, onEv
                 );
               })}
                 {dayEvents.length === 0 && (
-                  <div className="rounded-md border border-dashed border-[#E4E7EC] px-2 py-3 text-center text-xs text-[#98A2B3]">
+                  <div className="rounded-md border border-dashed border-cu-border px-2 py-3 text-center text-xs text-cu-text-muted">
                     No items
                   </div>
                 )}

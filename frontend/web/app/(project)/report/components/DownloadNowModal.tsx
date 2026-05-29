@@ -1,9 +1,5 @@
 'use client';
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  DownloadNowModal.tsx  ·  Format picker + instant download modal
-// ══════════════════════════════════════════════════════════════════════════════
-
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -11,39 +7,43 @@ import {
   CheckCircle2, Loader2, AlertTriangle,
 } from 'lucide-react';
 import { downloadProjectReport } from '@/services/report-download-service';
+import { useTheme } from '@/components/providers/ThemeProvider';
 
 type DlState = 'idle' | 'loading' | 'done' | 'error';
 type Format  = 'pdf' | 'excel' | 'both';
 
 interface Props {
-  open:         boolean;
-  onClose:      () => void;
-  projectId:    number;
-  projectName:  string;
+  open:        boolean;
+  onClose:     () => void;
+  projectId:   number;
+  projectName: string;
 }
 
 const FORMAT_OPTIONS: {
   id: Format; label: string; ext: string; desc: string;
-  color: string; bg: string; Icon: React.ElementType;
+  color: string; bg: string; bgDark: string; Icon: React.ElementType;
 }[] = [
   {
-    id: 'pdf', label: 'PDF Report',      ext: '.pdf',      desc: 'Print-ready branded document',
-    color: '#DC2626', bg: '#FFF5F5',     Icon: FileText,
+    id: 'pdf',   label: 'PDF Report',     ext: '.pdf',       desc: 'Print-ready branded document',
+    color: '#DC2626', bg: '#FFF5F5', bgDark: 'rgba(220,38,38,0.12)', Icon: FileText,
   },
   {
-    id: 'excel', label: 'Excel Workbook', ext: '.xlsx',     desc: 'Multi-sheet color-coded spreadsheet',
-    color: '#16A34A', bg: '#F0FDF4',     Icon: Table2,
+    id: 'excel', label: 'Excel Workbook', ext: '.xlsx',      desc: 'Multi-sheet color-coded spreadsheet',
+    color: '#16A34A', bg: '#F0FDF4', bgDark: 'rgba(22,163,74,0.12)', Icon: Table2,
   },
   {
-    id: 'both', label: 'Both Formats',   ext: 'PDF + XLSX', desc: 'Complete download package',
-    color: '#155DFC', bg: '#EBF2FF',     Icon: Sparkles,
+    id: 'both',  label: 'Both Formats',   ext: 'PDF + XLSX', desc: 'Complete download package',
+    color: '#155DFC', bg: '#EBF2FF', bgDark: 'rgba(21,93,252,0.12)', Icon: Sparkles,
   },
 ];
 
 export default function DownloadNowModal({ open, onClose, projectId, projectName }: Props) {
-  const [format, setFormat]     = useState<Format>('both');
-  const [pdfState, setPdf]      = useState<DlState>('idle');
-  const [xlState, setXl]        = useState<DlState>('idle');
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
+  const [format, setFormat] = useState<Format>('both');
+  const [pdfState, setPdf]  = useState<DlState>('idle');
+  const [xlState, setXl]    = useState<DlState>('idle');
 
   const isLoading = pdfState === 'loading' || xlState === 'loading';
   const doPdf     = format === 'pdf'   || format === 'both';
@@ -68,17 +68,11 @@ export default function DownloadNowModal({ open, onClose, projectId, projectName
     if (doExcel) setXl('loading');
 
     try {
-      if (doPdf) {
-        await downloadProjectReport(projectId, 'pdf');
-        setPdf('done');
-      }
+      if (doPdf) { await downloadProjectReport(projectId, 'pdf'); setPdf('done'); }
     } catch { setPdf('error'); }
 
     try {
-      if (doExcel) {
-        await downloadProjectReport(projectId, 'excel');
-        setXl('done');
-      }
+      if (doExcel) { await downloadProjectReport(projectId, 'excel'); setXl('done'); }
     } catch { setXl('error'); }
 
     setTimeout(() => { setPdf('idle'); setXl('idle'); }, 8000);
@@ -94,17 +88,13 @@ export default function DownloadNowModal({ open, onClose, projectId, projectName
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={handleClose}
             className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[3px]"
           />
 
-          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, y: 40, scale: 0.96 }}
             animate={{ opacity: 1, y: 0,  scale: 1 }}
@@ -115,9 +105,9 @@ export default function DownloadNowModal({ open, onClose, projectId, projectName
             <div
               className="pointer-events-auto w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl"
               style={{
-                background: 'rgba(255,255,255,0.92)',
+                background:     isDark ? 'rgba(11,17,32,0.97)' : 'rgba(255,255,255,0.92)',
                 backdropFilter: 'blur(24px) saturate(200%)',
-                border: '1px solid rgba(255,255,255,0.6)',
+                border:         `1px solid ${isDark ? 'rgba(39,52,73,0.8)' : 'rgba(255,255,255,0.6)'}`,
               }}
             >
               {/* Header */}
@@ -145,7 +135,7 @@ export default function DownloadNowModal({ open, onClose, projectId, projectName
 
               {/* Body */}
               <div className="px-6 py-5">
-                <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-4">
+                <p className="text-[11px] font-bold uppercase tracking-widest mb-4" style={{ color: isDark ? '#64748B' : '#9CA3AF' }}>
                   Choose Report Format
                 </p>
 
@@ -161,9 +151,9 @@ export default function DownloadNowModal({ open, onClose, projectId, projectName
                         whileTap={{ scale: 0.97 }}
                         className="relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 text-center cursor-pointer transition-all duration-150"
                         style={{
-                          background:   selected ? f.bg    : '#FAFAFA',
-                          borderColor:  selected ? f.color : '#E5E7EB',
-                          boxShadow:    selected ? `0 4px 16px ${f.color}22` : 'none',
+                          background:  selected ? (isDark ? f.bgDark : f.bg) : (isDark ? '#0F1724' : '#FAFAFA'),
+                          borderColor: selected ? f.color : (isDark ? '#273449' : '#E5E7EB'),
+                          boxShadow:   selected ? `0 4px 16px ${f.color}22` : 'none',
                         }}
                       >
                         <AnimatePresence>
@@ -185,7 +175,7 @@ export default function DownloadNowModal({ open, onClose, projectId, projectName
                           <f.Icon size={16} style={{ color: selected ? '#fff' : f.color }} />
                         </div>
                         <p className="text-[11px] font-bold leading-tight"
-                           style={{ color: selected ? f.color : '#374151' }}>
+                           style={{ color: selected ? f.color : (isDark ? '#CBD5E1' : '#374151') }}>
                           {f.label}
                         </p>
                         <span
@@ -194,7 +184,7 @@ export default function DownloadNowModal({ open, onClose, projectId, projectName
                         >
                           {f.ext}
                         </span>
-                        <p className="text-[10px] text-[#9CA3AF] leading-snug">{f.desc}</p>
+                        <p className="text-[10px] leading-snug" style={{ color: isDark ? '#64748B' : '#9CA3AF' }}>{f.desc}</p>
                       </motion.button>
                     );
                   })}
@@ -213,14 +203,14 @@ export default function DownloadNowModal({ open, onClose, projectId, projectName
                       : currentState === 'error'
                         ? 'linear-gradient(135deg,#DC2626,#EF4444)'
                         : isLoading
-                          ? '#E5E7EB'
+                          ? (isDark ? '#1E293B' : '#E5E7EB')
                           : 'linear-gradient(135deg,#155DFC 0%,#4D8BFF 100%)',
-                    color: isLoading && !allDone ? '#9CA3AF' : '#fff',
+                    color:     isLoading && !allDone ? (isDark ? '#475569' : '#9CA3AF') : '#fff',
                     boxShadow: isLoading ? 'none' : '0 4px 20px rgba(21,93,252,0.35)',
                   }}
                 >
                   {isLoading ? (
-                    <><Loader2 size={15} className="animate-spin" style={{ color: '#9CA3AF' }} /> Generating…</>
+                    <><Loader2 size={15} className="animate-spin" style={{ color: isDark ? '#475569' : '#9CA3AF' }} /> Generating…</>
                   ) : allDone ? (
                     <><CheckCircle2 size={15} /> Downloaded Successfully!</>
                   ) : currentState === 'error' ? (

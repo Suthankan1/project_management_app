@@ -44,6 +44,15 @@ public class GithubIssueImportService {
 
     @Transactional
     public GithubIssueImportResponseDTO importIssues(GithubIssueImportRequestDTO request, User currentUser) {
+        return importIssues(request, currentUser, null);
+    }
+
+    @Transactional
+    public GithubIssueImportResponseDTO importIssues(
+            GithubIssueImportRequestDTO request,
+            User currentUser,
+            String requestGithubToken
+    ) {
         Project project = projectRepository.findById(request.getProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
@@ -53,7 +62,9 @@ public class GithubIssueImportService {
             throw new ForbiddenException("User is not a member of this project");
         }
 
-        String token = currentUser.getGithubAccessToken();
+        String token = requestGithubToken == null || requestGithubToken.isBlank()
+                ? currentUser.getGithubAccessToken()
+                : requestGithubToken;
         if (token == null || token.isBlank()) {
             throw new GithubAuthenticationException("GitHub account is not connected");
         }

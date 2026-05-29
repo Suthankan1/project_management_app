@@ -37,7 +37,7 @@ export function DueTasks({ tasks = [] }: { tasks?: Task[] }) {
   return (
     <div className="h-full">
       {upcomingTasks.length === 0 ? (
-        <p className="font-arimo text-[13px] text-[#98A2B3] bg-gray-50 p-4 rounded-lg text-center border border-dashed border-gray-200">
+        <p className="font-arimo text-[13px] text-cu-text-muted bg-cu-bg-secondary p-4 rounded-lg text-center border border-dashed border-cu-border">
           No tasks due in the next 5 days.
         </p>
       ) : (
@@ -48,26 +48,26 @@ export function DueTasks({ tasks = [] }: { tasks?: Task[] }) {
             const dueLabel = daysDiff === 0 ? 'Due Today' : `In ${daysDiff} day${daysDiff > 1 ? 's' : ''}`;
             
             const dueColorClass = daysDiff === 0
-              ? 'bg-red-50 text-red-700 border border-red-100'
+              ? 'bg-cu-danger/10 text-cu-danger border border-cu-danger/20'
               : daysDiff <= 2
-                ? 'bg-amber-50 text-amber-700 border border-amber-100'
-                : 'bg-blue-50 text-blue-700 border border-blue-100';
+                ? 'bg-cu-warning/10 text-cu-warning border border-cu-warning/20'
+                : 'bg-cu-primary/10 text-cu-primary border border-cu-primary/20';
 
             return (
-              <div key={task.id} className="p-2.5 rounded-xl border border-gray-200 bg-white hover:border-blue-200 transition-colors">
+              <div key={task.id} className="p-2.5 rounded-xl border border-cu-border bg-cu-bg hover:border-cu-primary/35 hover:bg-cu-primary/5 transition-colors">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    <Clock size={13} className="text-blue-500 shrink-0" />
-                    <p className="font-arimo text-[13px] font-semibold text-gray-800 truncate">{task.title}</p>
+                    <Clock size={13} className="text-cu-primary shrink-0" />
+                    <p className="font-arimo text-[13px] font-semibold text-cu-text-primary truncate">{task.title}</p>
                   </div>
                   <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${dueColorClass}`}>
                     {dueLabel}
                   </span>
                 </div>
                 
-                <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-gray-500">
+                <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-cu-text-muted">
                   <div className="flex items-center gap-2 truncate">
-                    <span className="font-bold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">TSK-{task.id}</span>
+                    <span className="font-bold text-cu-text-secondary bg-cu-bg-secondary px-1.5 py-0.5 rounded border border-cu-border-light">TSK-{task.id}</span>
                     <span className="truncate">{task.assigneeName || 'Unassigned'}</span>
                   </div>
                   <span className="whitespace-nowrap">{dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>

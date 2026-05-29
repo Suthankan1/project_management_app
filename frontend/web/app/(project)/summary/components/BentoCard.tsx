@@ -25,13 +25,13 @@ export function BentoCard({
 }: BentoCardProps) {
   return (
     <div
-      className={`h-full w-full flex flex-col bg-white rounded-xl border border-[#E3E8EF] shadow-sm ring-1 ring-black/[0.03] overflow-hidden transition-shadow duration-200 hover:shadow-md group ${className}`}
+      className={`h-full w-full flex flex-col bg-cu-bg rounded-xl border border-cu-border shadow-cu-sm ring-1 ring-cu-border-light/60 overflow-hidden transition-shadow duration-200 hover:shadow-cu-md group ${className}`}
     >
       {/* Drag handle header - used by react-grid-layout */}
-      <div className="bento-drag-handle flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/60 shrink-0 cursor-grab active:cursor-grabbing select-none">
+      <div className="bento-drag-handle flex items-center justify-between px-4 py-3 border-b border-cu-border bg-cu-bg-secondary/70 shrink-0 cursor-grab active:cursor-grabbing select-none">
         <div className="flex items-center gap-2 min-w-0">
-          {icon && <span className="shrink-0 flex items-center">{icon}</span>}
-          <h3 className="font-arimo text-[14px] font-semibold text-[#101828] truncate">{title}</h3>
+          {icon && <span className="shrink-0 flex items-center text-cu-primary">{icon}</span>}
+          <h3 className="font-arimo text-[14px] font-semibold text-cu-text-primary truncate">{title}</h3>
         </div>
         
         <div className="flex items-center gap-2 shrink-0">
@@ -47,9 +47,9 @@ export function BentoCard({
             height="14"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#C4C9D4"
+            stroke="currentColor"
             strokeWidth="2"
-            className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-cu-text-muted"
           >
             <path d="M9 3h2v2H9zM13 3h2v2h-2zM9 7h2v2H9zM13 7h2v2h-2zM9 11h2v2H9zM13 11h2v2h-2z" />
           </svg>

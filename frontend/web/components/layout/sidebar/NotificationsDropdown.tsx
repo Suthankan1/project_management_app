@@ -23,8 +23,8 @@ function formatRelativeTime(timestamp?: string | null): string {
 function NotificationDropdownItem({ item, onClick }: { item: Notification; onClick: () => void }) {
   return (
     <div
-      className={`group flex items-start gap-2.5 px-3 py-2.5 hover:bg-cu-hover transition-colors cursor-pointer ${
-        !item.read ? 'bg-blue-50/30' : ''
+      className={`group flex items-start gap-2.5 px-3 py-2.5 transition-colors cursor-pointer border-b border-cu-border-light last:border-b-0 ${
+        !item.read ? 'bg-cu-primary/5 hover:bg-cu-primary/10' : 'hover:bg-cu-hover'
       }`}
       onClick={onClick}
     >
@@ -45,7 +45,7 @@ function NotificationDropdownItem({ item, onClick }: { item: Notification; onCli
         </div>
       </div>
       {!item.read && (
-        <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0" />
+        <div className="w-2 h-2 rounded-full bg-cu-primary shadow-[0_0_8px_rgba(21,93,252,0.45)] mt-2 flex-shrink-0" />
       )}
     </div>
   );
@@ -89,7 +89,7 @@ export function NotificationsDropdown({
   return (
     <div
       data-sidebar-dropdown
-      className="bg-white rounded-xl border border-cu-border shadow-2xl shadow-black/10 overflow-hidden flex flex-col"
+      className="bg-cu-bg rounded-xl border border-cu-border shadow-2xl shadow-black/20 overflow-hidden flex flex-col"
       style={{
         position: 'fixed',
         top: fixedTop,

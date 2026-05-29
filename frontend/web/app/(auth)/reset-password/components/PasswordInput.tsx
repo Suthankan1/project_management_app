@@ -22,13 +22,13 @@ export default function PasswordInput({
 
   return (
     <div>
-      <label className="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">
+      <label className="block text-xs font-semibold text-cu-text-muted mb-1.5 ml-1">
         {label}
       </label>
       <div className="relative">
         <input
           type={showPassword ? 'text' : 'password'}
-          className="w-full px-4 py-3 pr-11 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-[16px] sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="w-full px-4 py-3 pr-11 rounded-xl border border-cu-border bg-cu-bg text-cu-text-primary placeholder:text-cu-text-muted focus:border-cu-primary focus:ring-4 focus:ring-cu-primary/10 outline-none transition-all text-[16px] sm:text-sm disabled:bg-cu-bg-secondary disabled:cursor-not-allowed"
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -39,7 +39,7 @@ export default function PasswordInput({
         <button
           type="button"
           aria-label={showPassword ? 'Hide password' : 'Show password'}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-cu-text-muted hover:text-cu-text-primary transition-colors disabled:opacity-50"
           onClick={() => setShowPassword((v) => !v)}
           disabled={disabled}
           tabIndex={-1}

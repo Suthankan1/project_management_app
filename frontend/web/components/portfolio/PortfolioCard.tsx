@@ -5,9 +5,9 @@ import Link from 'next/link';
 import type { Portfolio } from '@/services/portfolioService';
 
 function healthInfo(score: number) {
-  if (score >= 75) return { color: '#6BC950', bg: '#E6F9E0' };
-  if (score >= 50) return { color: '#FF9F43', bg: '#FFF3E0' };
-  return              { color: '#FF5C5C', bg: '#FFE5E5' };
+  if (score >= 75) return { color: 'var(--cu-success)', bg: 'var(--cu-success-light)' };
+  if (score >= 50) return { color: 'var(--cu-warning)', bg: 'var(--cu-warning-light)' };
+  return              { color: 'var(--cu-danger)', bg: 'var(--cu-danger-light)' };
 }
 
 interface Props {
@@ -30,7 +30,7 @@ export default function PortfolioCard({ portfolio, index }: Props) {
       whileHover={{ y: -2, transition: { duration: 0.18 } }}
     >
       <Link href={`/portfolios/${portfolio.id}`}>
-        <div className="bg-white rounded-2xl border border-[#E8E8ED] overflow-hidden cursor-pointer group transition-shadow hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
+        <div className="bg-cu-bg rounded-2xl border border-cu-border overflow-hidden cursor-pointer group transition-all hover:border-cu-primary/35 hover:shadow-cu-md">
 
           {/* Color accent bar */}
           <div className="h-1" style={{ background: portfolio.color }} />
@@ -43,11 +43,11 @@ export default function PortfolioCard({ portfolio, index }: Props) {
                   <span className="text-2xl leading-none flex-shrink-0">{portfolio.emoji}</span>
                 )}
                 <div className="min-w-0">
-                  <h3 className="font-semibold text-[#1A1A2E] text-sm leading-tight truncate">
+                  <h3 className="font-semibold text-cu-text-primary text-sm leading-tight truncate">
                     {portfolio.name}
                   </h3>
                   {portfolio.description && (
-                    <p className="text-[#9CA3AF] text-xs mt-0.5 line-clamp-1">{portfolio.description}</p>
+                    <p className="text-cu-text-muted text-xs mt-0.5 line-clamp-1">{portfolio.description}</p>
                   )}
                 </div>
               </div>
@@ -66,9 +66,9 @@ export default function PortfolioCard({ portfolio, index }: Props) {
                 { label: 'Members',  value: portfolio.totalMembers ?? '—' },
               ].map(stat => (
                 <div key={stat.label}
-                  className="bg-[#F7F8FA] rounded-lg px-2 py-2 text-center border border-[#F0F0F5]">
-                  <div className="text-[#1A1A2E] font-bold text-sm leading-none">{stat.value}</div>
-                  <div className="text-[#9CA3AF] text-[10px] mt-1">{stat.label}</div>
+                  className="bg-cu-bg-secondary rounded-lg px-2 py-2 text-center border border-cu-border">
+                  <div className="text-cu-text-primary font-bold text-sm leading-none">{stat.value}</div>
+                  <div className="text-cu-text-muted text-[10px] mt-1">{stat.label}</div>
                 </div>
               ))}
             </div>
@@ -76,10 +76,10 @@ export default function PortfolioCard({ portfolio, index }: Props) {
             {/* Progress bar */}
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[#9CA3AF] text-[10px]">Completion</span>
-                <span className="text-[#6B6F7B] text-[10px] font-medium">{completionPct}%</span>
+                <span className="text-cu-text-muted text-[10px]">Completion</span>
+                <span className="text-cu-text-secondary text-[10px] font-medium">{completionPct}%</span>
               </div>
-              <div className="h-1.5 rounded-full bg-[#F0F0F5] overflow-hidden">
+              <div className="h-1.5 rounded-full bg-cu-bg-tertiary overflow-hidden">
                 <motion.div
                   className="h-full rounded-full"
                   style={{ background: portfolio.color }}

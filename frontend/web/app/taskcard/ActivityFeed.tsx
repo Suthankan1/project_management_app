@@ -35,17 +35,17 @@ const ACTIVITY_ICONS: Record<string, string> = {
 };
 
 const ACTIVITY_COLORS: Record<string, string> = {
-  TASK_CREATED:     'bg-blue-100 border-blue-300',
-  STATUS_CHANGED:   'bg-purple-100 border-purple-300',
-  PRIORITY_CHANGED: 'bg-orange-100 border-orange-300',
-  ASSIGNEE_CHANGED: 'bg-teal-100 border-teal-300',
-  SUBTASK_ADDED:    'bg-green-100 border-green-300',
-  SUBTASK_COMPLETED:'bg-green-100 border-green-300',
-  COMMENT_ADDED:    'bg-blue-50 border-blue-200',
-  ATTACHMENT_ADDED: 'bg-yellow-100 border-yellow-300',
-  ATTACHMENT_DELETED:'bg-red-100 border-red-300',
-  LABEL_ADDED:      'bg-pink-100 border-pink-300',
-  LABEL_REMOVED:    'bg-pink-100 border-pink-300',
+  TASK_CREATED:     'bg-cu-primary/10 border-cu-primary/30',
+  STATUS_CHANGED:   'bg-violet-500/10 border-violet-500/30',
+  PRIORITY_CHANGED: 'bg-cu-warning/10 border-cu-warning/30',
+  ASSIGNEE_CHANGED: 'bg-cu-info/10 border-cu-info/30',
+  SUBTASK_ADDED:    'bg-cu-success/10 border-cu-success/30',
+  SUBTASK_COMPLETED:'bg-cu-success/10 border-cu-success/30',
+  COMMENT_ADDED:    'bg-cu-primary/5 border-cu-primary/20',
+  ATTACHMENT_ADDED: 'bg-cu-warning/10 border-cu-warning/30',
+  ATTACHMENT_DELETED:'bg-cu-danger/10 border-cu-danger/30',
+  LABEL_ADDED:      'bg-violet-500/10 border-violet-500/30',
+  LABEL_REMOVED:    'bg-violet-500/10 border-violet-500/30',
 };
 
 const ActivityFeed: React.FC<ActivityFeedProps> = ({ taskId }) => {
@@ -66,24 +66,24 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ taskId }) => {
 
   if (loading) {
     return (
-      <div className="mt-4 text-center py-8 text-gray-400 text-sm">Loading activity...</div>
+      <div className="mt-4 text-center py-8 text-cu-text-muted text-sm">Loading activity...</div>
     );
   }
 
   if (activities.length === 0) {
     return (
-      <div className="mt-4 text-center py-10 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-        <p className="text-gray-500 text-sm font-medium mb-1">No activity yet</p>
-        <p className="text-gray-400 text-xs">Changes to this task will appear here.</p>
+      <div className="mt-4 text-center py-10 bg-cu-bg-secondary rounded-lg border border-dashed border-cu-border">
+        <p className="text-cu-text-secondary text-sm font-medium mb-1">No activity yet</p>
+        <p className="text-cu-text-muted text-xs">Changes to this task will appear here.</p>
       </div>
     );
   }
 
   return (
-    <div className="mt-4 relative pl-5 border-l-2 border-gray-100 space-y-5">
+    <div className="mt-4 relative pl-5 border-l-2 border-cu-border space-y-5">
       {activities.map((activity) => {
         const icon = ACTIVITY_ICONS[activity.activityType] ?? '•';
-        const colorClass = ACTIVITY_COLORS[activity.activityType] ?? 'bg-gray-100 border-gray-300';
+        const colorClass = ACTIVITY_COLORS[activity.activityType] ?? 'bg-cu-bg-secondary border-cu-border';
         return (
           <div key={activity.id} className="relative">
             {/* Timeline dot */}
@@ -91,10 +91,10 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ taskId }) => {
               {icon}
             </div>
             <div className="flex items-baseline gap-2 mb-0.5 flex-wrap">
-              <span className="text-sm font-semibold text-gray-800">{activity.actorName}</span>
-              <span className="text-xs text-gray-400">{timeAgo(activity.createdAt)}</span>
+              <span className="text-sm font-semibold text-cu-text-primary">{activity.actorName}</span>
+              <span className="text-xs text-cu-text-muted">{timeAgo(activity.createdAt)}</span>
             </div>
-            <p className="text-sm text-gray-600 bg-gray-50 rounded px-3 py-1.5 border border-gray-100">
+            <p className="text-sm text-cu-text-secondary bg-cu-bg-secondary rounded px-3 py-1.5 border border-cu-border">
               {activity.description}
             </p>
           </div>

@@ -10,7 +10,7 @@ export default function NotificationsLayout({
 }) {
   return (
     <FullLayout>
-      <main className="flex-1 overflow-y-auto bg-[#F7F8FA]">
+      <main className="flex-1 overflow-y-auto bg-cu-bg-secondary">
         {children}
       </main>
     </FullLayout>

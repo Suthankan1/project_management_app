@@ -67,13 +67,13 @@ export function ChatSearchPanel({
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.resultRow} onPress={() => onOpenResult(item)}>
             <View style={styles.resultHeader}>
-              <Text style={styles.sender}>{item.sender}</Text>
+              <Text style={styles.sender}>{item.senderName}</Text>
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>{item.context}</Text>
+                <Text style={styles.badgeText}>{item.roomId ? 'ROOM' : 'CHAT'}</Text>
               </View>
               <Text style={styles.time}>{formatTime(item.timestamp)}</Text>
             </View>
-            <Text style={styles.content} numberOfLines={2}>{item.content}</Text>
+            <Text style={styles.content} numberOfLines={2}>{item.highlightedContent}</Text>
           </TouchableOpacity>
         )}
         ListEmptyComponent={

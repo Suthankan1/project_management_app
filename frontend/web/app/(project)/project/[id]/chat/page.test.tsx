@@ -98,6 +98,7 @@ const createChatState = (overrides: Record<string, unknown> = {}) => ({
   addTeam: jest.fn(),
   isLoading: false,
   isSocketConnected: true,
+  isSocketReconnecting: false,
   error: '',
   retryConnection: jest.fn(),
   roomMentionCounts: {},
@@ -141,6 +142,21 @@ describe('chat page', () => {
     expect(retryConnection).toHaveBeenCalledTimes(1);
   });
 
+  it('shows reconnecting banner and keeps the composer enabled during retries', () => {
+    mockedUseChat.mockReturnValue(
+      createChatState({
+        isSocketConnected: false,
+        isSocketReconnecting: true,
+      })
+    );
+
+    render(<ChatInterface />);
+
+    expect(screen.getByText('Reconnecting...')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('chat-input')).toHaveAttribute('data-disabled', 'false');
+  });
+
   it('shows error banner and keeps chat input disabled while error exists', () => {
     const retryConnection = jest.fn();
     mockedUseChat.mockReturnValue(
@@ -164,13 +180,14 @@ describe('chat page', () => {
     mockedUseChat.mockReturnValue(
       createChatState({
         isSocketConnected: false,
+        isSocketReconnecting: true,
         error: 'Realtime chat is reconnecting. Please wait a moment and try again.',
       })
     );
 
     render(<ChatInterface />);
 
-    expect(screen.getByText('Disconnected — messages may not be delivered')).toBeInTheDocument();
+    expect(screen.getByText('Reconnecting...')).toBeInTheDocument();
     expect(screen.queryByText('Retry the connection to continue chatting.')).not.toBeInTheDocument();
   });
 

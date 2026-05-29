@@ -63,14 +63,14 @@ export function ProjectNote({ projectId, defaultNote = '' }: { projectId: number
         {/* Floating Controls */}
         <div className="absolute top-2 right-3 z-10 flex items-center gap-2">
           {!isEditing && parsedDefault.author && (
-            <span className="text-[10px] text-gray-400 italic hidden sm:block">
-              Last edited by <span className="font-semibold text-gray-500">{parsedDefault.author}</span>
+            <span className="text-[10px] text-cu-text-muted italic hidden sm:block">
+              Last edited by <span className="font-semibold text-cu-text-secondary">{parsedDefault.author}</span>
             </span>
           )}
           <button
             onClick={isEditing ? handleSave : () => setIsEditing(true)}
             disabled={isSaving}
-            className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-md border shadow-sm transition-all ${isEditing ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}`}
+            className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-md border shadow-cu-sm transition-all ${isEditing ? 'bg-cu-warning/10 text-cu-warning border-cu-warning/20' : 'bg-cu-bg-secondary text-cu-text-secondary border-cu-border hover:bg-cu-hover hover:text-cu-text-primary'}`}
           >
             {isEditing ? (isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />) : <Edit3 size={12} />}
             {isEditing ? (isSaving ? 'Saving...' : 'Save') : 'Edit'}
@@ -83,14 +83,14 @@ export function ProjectNote({ projectId, defaultNote = '' }: { projectId: number
             value={note}
             onChange={e => setNote(e.target.value)}
             placeholder="Jot down important rules, goals, or notes for this project..."
-            className="absolute inset-0 w-full h-full px-4 pt-11 pb-4 resize-none bg-amber-50/20 text-[13px] font-arimo text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-200 border-none transition-all custom-scrollbar"
+            className="absolute inset-0 w-full h-full px-4 pt-11 pb-4 resize-none bg-cu-warning/5 text-[13px] font-arimo text-cu-text-primary placeholder:text-cu-text-muted focus:outline-none focus:ring-2 focus:ring-cu-warning/20 border-none transition-all custom-scrollbar"
           />
         ) : (
           <div
-            className="absolute inset-0 w-full h-full px-4 pt-11 pb-4 overflow-y-auto text-[13px] font-arimo text-gray-800 whitespace-pre-wrap cursor-text hover:bg-gray-50/50 transition-colors custom-scrollbar"
+            className="absolute inset-0 w-full h-full px-4 pt-11 pb-4 overflow-y-auto text-[13px] font-arimo text-cu-text-primary whitespace-pre-wrap cursor-text hover:bg-cu-hover transition-colors custom-scrollbar"
             onClick={() => setIsEditing(true)}
           >
-            {note || <span className="text-gray-400 italic">Click to write a shared project note or summary...</span>}
+            {note || <span className="text-cu-text-muted italic">Click to write a shared project note or summary...</span>}
           </div>
         )}
       </div>

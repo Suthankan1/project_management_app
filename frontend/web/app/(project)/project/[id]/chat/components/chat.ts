@@ -81,11 +81,13 @@ export interface ChatFeatureFlags {
 
 export interface ChatSearchResult {
   messageId: number;
-  sender: string;
-  content: string;
-  context: 'TEAM' | 'ROOM' | 'PRIVATE' | string;
+  highlightedContent: string;
+  senderName: string;
+  type: 'MESSAGE' | string;
+  roomOrProjectId: number;
+  projectId: number;
   roomId?: number | null;
-  recipient?: string | null;
+  deepLinkUrl: string;
   timestamp?: string | null;
 }
 
