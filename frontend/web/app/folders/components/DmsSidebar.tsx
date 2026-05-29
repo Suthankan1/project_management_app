@@ -44,18 +44,18 @@ export default function DmsSidebar({
         `w-full block text-left px-3 py-2 rounded-md text-sm transition-colors ${
             active
                 ? danger
-                    ? 'bg-[#FEE4E2] text-[#B42318]'
-                    : 'bg-[#EEF4FF] text-[#004EEB]'
+                    ? 'bg-cu-danger-light text-cu-danger'
+                    : 'bg-cu-primary-light text-cu-primary'
                 : danger
-                ? 'text-[#475467] hover:bg-[#FEF3F2] hover:text-[#B42318]'
-                : 'text-[#475467] hover:bg-[#F2F4F7]'
+                ? 'text-cu-text-secondary hover:bg-cu-danger-light hover:text-cu-danger'
+                : 'text-cu-text-secondary hover:bg-cu-hover'
         }`;
 
     return (
-        <aside className="col-span-12 lg:col-span-3 xl:col-span-2 border-r border-[#E6E8EC] bg-[#FAFBFC] p-4 flex flex-col gap-4">
+        <aside className="col-span-12 lg:col-span-3 xl:col-span-2 border-r border-cu-border bg-cu-bg-secondary p-4 flex flex-col gap-4">
             {/* ---- View Nav ---- */}
             <div>
-                <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-[#667085] mb-2">Views</h2>
+                <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-cu-text-secondary mb-2">Views</h2>
                 <nav className="space-y-1">
                     <Link
                         href={withProjectId('/folders/view-all')}
@@ -98,10 +98,10 @@ export default function DmsSidebar({
 
             {/* ---- Folder list ---- */}
             <div>
-                <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-[#667085] mb-2">Folders</h2>
+                <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-cu-text-secondary mb-2">Folders</h2>
                 <div className="space-y-1">
                     {folders.length === 0 && (
-                        <p className="text-xs text-[#98A2B3] px-3 py-2 italic">No folders yet</p>
+                        <p className="text-xs text-cu-text-tertiary px-3 py-2 italic">No folders yet</p>
                     )}
                     {folders.map((folder) => (
                         <div key={folder.id} className="group flex items-center gap-1">
@@ -109,7 +109,9 @@ export default function DmsSidebar({
                                 onClick={() => setSelectedFolderId(folder.id)}
                                 disabled={isTrashMode}
                                 className={`flex-1 text-left px-3 py-2 rounded-md text-sm inline-flex items-center gap-2 ${
-                                    selectedFolderId === folder.id ? 'bg-[#EEF4FF] text-[#004EEB]' : 'text-[#475467] hover:bg-[#F2F4F7]'
+                                    selectedFolderId === folder.id
+                                        ? 'bg-cu-primary-light text-cu-primary'
+                                        : 'text-cu-text-secondary hover:bg-cu-hover'
                                 } disabled:opacity-50`}
                             >
                                 <Folder size={14} />
@@ -118,7 +120,7 @@ export default function DmsSidebar({
                             {!isTrashMode && (
                                 <button
                                     onClick={() => onDeleteFolder(folder)}
-                                    className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-transparent text-[#98A2B3] hover:text-[#B42318] hover:border-[#FECACA] hover:bg-[#FEF3F2] opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-transparent text-cu-text-tertiary hover:text-cu-danger hover:border-cu-danger/30 hover:bg-cu-danger-light opacity-0 group-hover:opacity-100 transition-opacity"
                                     title="Delete folder"
                                 >
                                     <Trash2 size={14} />
@@ -131,13 +133,13 @@ export default function DmsSidebar({
 
             {/* ---- Create folder ---- */}
             {!isTrashMode && (
-                <div className="rounded-lg border border-[#D0D5DD] bg-white p-3">
-                    <div className="flex items-center rounded-md border border-[#D0D5DD] bg-white overflow-hidden">
+                <div className="rounded-lg border border-cu-border bg-cu-bg p-3">
+                    <div className="flex items-center rounded-md border border-cu-border bg-cu-bg overflow-hidden">
                         <input
                             value={newFolderName}
                             onChange={(e) => setNewFolderName(e.target.value)}
                             placeholder="New folder name…"
-                            className="flex-1 h-[36px] px-3 text-sm border-0 focus:outline-none"
+                            className="flex-1 h-[36px] px-3 text-sm bg-transparent text-cu-text-primary placeholder:text-cu-text-tertiary border-0 focus:outline-none"
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                     void onCreateFolder();
@@ -147,7 +149,7 @@ export default function DmsSidebar({
                         <button
                             onClick={() => void onCreateFolder()}
                             disabled={busy}
-                            className="h-8 w-8 inline-flex items-center justify-center border-l border-[#D0D5DD] hover:bg-[#F9FAFB] disabled:opacity-60 disabled:cursor-not-allowed"
+                            className="h-8 w-8 inline-flex items-center justify-center border-l border-cu-border text-cu-text-secondary hover:bg-cu-hover disabled:opacity-60 disabled:cursor-not-allowed"
                             title="Add folder"
                         >
                             <Plus size={16} />
@@ -157,13 +159,13 @@ export default function DmsSidebar({
             )}
 
             {/* ---- Stats ---- */}
-            <div className="mt-auto rounded-md border border-[#E6E8EC] bg-white p-3 text-xs text-[#667085]">
-                <p className="font-semibold text-[#101828] truncate mb-0.5">
+            <div className="mt-auto rounded-md border border-cu-border bg-cu-bg p-3 text-xs text-cu-text-secondary">
+                <p className="font-semibold text-cu-text-primary truncate mb-0.5">
                     {projectName ?? `Project #${projectId}`}
                 </p>
-                <p className="text-[#98A2B3] mb-2">Project documents</p>
-                <p>Folders: <span className="font-semibold text-[#101828]">{folderCount}</span></p>
-                <p className="mt-0.5">Documents: <span className="font-semibold text-[#101828]">{filteredDocumentCount}</span></p>
+                <p className="text-cu-text-tertiary mb-2">Project documents</p>
+                <p>Folders: <span className="font-semibold text-cu-text-primary">{folderCount}</span></p>
+                <p className="mt-0.5">Documents: <span className="font-semibold text-cu-text-primary">{filteredDocumentCount}</span></p>
             </div>
         </aside>
     );

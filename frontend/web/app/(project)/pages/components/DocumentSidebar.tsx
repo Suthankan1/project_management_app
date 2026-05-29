@@ -48,7 +48,7 @@ export default function DocumentSidebar({
             href={projectId ? `/pages/${item.id}?projectId=${projectId}` : `/pages/${item.id}`}
             className={`group flex items-center justify-between py-2.5 px-2 min-h-[44px] lg:min-h-0 lg:py-1.5 rounded-md text-sm transition-colors ${
               isSelected
-                ? 'bg-blue-50 text-blue-700 font-medium'
+                ? 'bg-blue-50 dark:bg-cu-primary-light text-blue-700 dark:text-cu-primary font-medium'
                 : 'text-gray-700 hover:bg-gray-100'
             }`}
             style={{ paddingLeft: `${depth * 16 + 8}px` }}
@@ -57,7 +57,7 @@ export default function DocumentSidebar({
               {hasChildren ? (
                 <button
                   onClick={(e) => toggleFolder(e, String(item.id))}
-                  className="mr-1 p-0.5 rounded text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="mr-1 p-0.5 rounded text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-cu-primary"
                 >
                   {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </button>
@@ -66,9 +66,9 @@ export default function DocumentSidebar({
               )}
               
               {hasChildren ? (
-                <Folder size={16} className={`flex-shrink-0 mr-2 ${isSelected ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'}`} />
+                <Folder size={16} className={`flex-shrink-0 mr-2 ${isSelected ? 'text-blue-500 dark:text-cu-primary' : 'text-gray-400 group-hover:text-gray-500'}`} />
               ) : (
-                <FileText size={16} className={`flex-shrink-0 mr-2 ${isSelected ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'}`} />
+                <FileText size={16} className={`flex-shrink-0 mr-2 ${isSelected ? 'text-blue-500 dark:text-cu-primary' : 'text-gray-400 group-hover:text-gray-500'}`} />
               )}
               
               <span className="truncate">{item.title}</span>
@@ -87,14 +87,14 @@ export default function DocumentSidebar({
   };
 
   return (
-    <div className="flex flex-col w-full lg:w-[280px] h-full bg-[#f8fafc] border-r border-gray-200 flex-shrink-0 font-sans">
+    <div className="flex flex-col w-full lg:w-[280px] h-full bg-cu-bg-secondary border-r border-gray-200 flex-shrink-0 font-sans">
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-bold text-gray-600 uppercase tracking-wider">Project Pages</h2>
           <button
             onClick={onCreateClick}
-            className="p-2 min-h-[44px] min-w-[44px] lg:min-h-0 lg:min-w-0 lg:p-1.5 bg-white border border-gray-200 rounded-md shadow-sm text-gray-600 hover:text-blue-600 hover:border-blue-300 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-center"
+            className="p-2 min-h-[44px] min-w-[44px] lg:min-h-0 lg:min-w-0 lg:p-1.5 bg-white border border-gray-200 rounded-md shadow-sm text-gray-600 hover:text-blue-600 dark:hover:text-cu-primary hover:border-blue-300 dark:hover:border-cu-primary/40 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cu-primary flex items-center justify-center"
             title="Create new page"
           >
             <Plus size={16} />
@@ -111,7 +111,7 @@ export default function DocumentSidebar({
             placeholder="Search documents..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-400 transition-shadow"
+            className="w-full pl-8 pr-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cu-primary focus:border-transparent placeholder:text-gray-400 transition-shadow"
           />
         </div>
       </div>
@@ -123,7 +123,7 @@ export default function DocumentSidebar({
             <p>No documents found.</p>
             <button 
               onClick={onCreateClick}
-              className="mt-2 text-blue-600 hover:underline font-medium"
+              className="mt-2 text-blue-600 dark:text-cu-primary hover:underline font-medium"
             >
               Create the first page
             </button>

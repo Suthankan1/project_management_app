@@ -285,7 +285,7 @@ export default function ChatInterface() {
   }
 
   return (
-    <div className="flex bg-[#F7F8FA] overflow-hidden h-full min-h-0 pb-[calc(3.75rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+    <div className="flex h-full min-h-0 overflow-hidden bg-cu-bg-secondary pb-[calc(3.75rem+env(safe-area-inset-bottom,0px))] md:pb-0">
 
       {/* ── Sidebar ── */}
       <div className={showChatSidebar ? 'flex w-full lg:w-auto' : 'hidden lg:flex'}>
@@ -322,7 +322,7 @@ export default function ChatInterface() {
       </div>
 
       {/* ── Main chat area ── */}
-      <div className={`flex-1 min-h-0 flex flex-col min-w-0 bg-white border-l-0 lg:border-l border-gray-100/60 shadow-sm ${!showChatSidebar ? 'flex w-full' : 'hidden lg:flex'}`}>
+      <div className={`flex-1 min-h-0 flex flex-col min-w-0 bg-cu-bg border-l-0 lg:border-l border-cu-border shadow-cu-sm ${!showChatSidebar ? 'flex w-full' : 'hidden lg:flex'}`}>
         <ChatConnectionBanners
           isConnected={isConnected}
           isReconnecting={isSocketReconnecting}
@@ -357,12 +357,12 @@ export default function ChatInterface() {
         <div className="flex-1 min-h-0 flex flex-col">
           {!selectedUser && !hasSelectedRoom && displayMessages.length === 0 && !isLoading && (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6">
-              <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center">
-                <MessageCircle size={28} className="text-blue-400" strokeWidth={1.5} />
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-cu-primary/20 bg-cu-primary/10">
+                <MessageCircle size={28} className="text-cu-primary" strokeWidth={1.5} />
               </div>
               <div>
-                <h3 className="text-[15px] font-semibold text-gray-800">Select a conversation</h3>
-                <p className="text-[13px] text-gray-400 mt-1">Choose a channel or direct message from the sidebar to start chatting.</p>
+                <h3 className="text-[15px] font-semibold text-cu-text-primary">Select a conversation</h3>
+                <p className="mt-1 text-[13px] text-cu-text-muted">Choose a channel or direct message from the sidebar to start chatting.</p>
               </div>
             </div>
           )}
@@ -396,10 +396,10 @@ export default function ChatInterface() {
             disabled={isLoading || ((!isConnected && !isSocketReconnecting) || shouldShowErrorBanner)}
             placeholder={
               hasSelectedRoom
-                ? `Message #${selectedRoom?.name ?? 'channel'}…`
+                ? `Message #${selectedRoom?.name ?? 'channel'}...`
                 : selectedUser
-                ? `Message ${selectedUser}…`
-                : 'Message team…'
+                ? `Message ${selectedUser}...`
+                : 'Message team...'
             }
             enableMentions={!selectedUser}
             mentionCandidates={mentionCandidates}
@@ -407,7 +407,7 @@ export default function ChatInterface() {
         </div>
       </div>
 
-      {/* ── Thread panel ── */}
+      {/* Thread panel */}
       <div className="hidden lg:flex">
         <AnimatePresence>
           {activeThreadRoot && (
@@ -453,15 +453,15 @@ export default function ChatInterface() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ duration: 0.25, ease: 'easeInOut' }}
-              className="absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl"
+              className="absolute right-0 top-0 h-full w-full max-w-xl bg-cu-bg shadow-cu-xl"
             >
-              <div className="flex items-center justify-end border-b border-gray-200 px-4 py-3">
+              <div className="flex items-center justify-end border-b border-cu-border px-4 py-3">
                 <button
                   type="button"
                   onClick={() => {
                     closeThread();
                   }}
-                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="rounded-md border border-cu-border px-3 py-1.5 text-sm font-medium text-cu-text-secondary transition-colors hover:bg-cu-hover hover:text-cu-text-primary"
                 >
                   Close
                 </button>

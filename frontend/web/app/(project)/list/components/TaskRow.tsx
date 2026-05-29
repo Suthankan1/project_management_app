@@ -180,7 +180,7 @@ const TaskRow = React.memo(function TaskRow({
           type="checkbox"
           checked={selected}
           onChange={() => onToggleSelect?.(task.id)}
-          className="h-4 w-4 rounded border-[#D0D5DD] text-[#155DFC] focus:ring-[#155DFC]/20 cursor-pointer"
+          className="h-4 w-4 rounded border-cu-border accent-cu-primary cursor-pointer"
           aria-label={`Select ${task.title}`}
         />
       </div>

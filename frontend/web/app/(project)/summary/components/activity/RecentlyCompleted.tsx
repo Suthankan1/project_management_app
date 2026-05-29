@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Task } from '@/types';
 import { CheckCircle2, Trophy } from 'lucide-react';
 import Image from 'next/image';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+import { getInitials, resolveSummaryAvatarUrl } from '../avatar-utils';
 
 /**
  * Formats date into "time ago" string.
@@ -21,6 +20,31 @@ function formatTimeAgo(dateString?: string | Date) {
   if (diffInMins < 60) return `${diffInMins}m ago`;
   if (diffInHours < 24) return `${diffInHours}h ago`;
   return `${diffInDays}d ago`;
+}
+
+function CompletedTaskAvatar({ name, photoUrl }: { name?: string | null; photoUrl?: string | null }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const initials = getInitials(name);
+
+  return (
+    <div className="w-9 h-9 rounded-full bg-cu-bg-secondary flex items-center justify-center border-2 border-cu-bg shadow-cu-sm overflow-hidden shrink-0">
+      {photoUrl && !imageFailed ? (
+        <Image
+          src={photoUrl}
+          alt={name ? `${name} avatar` : 'Assignee avatar'}
+          width={36}
+          height={36}
+          className="h-9 w-9 object-cover"
+          unoptimized
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <span className="text-[11px] font-extrabold text-cu-text-secondary">
+          {initials}
+        </span>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -50,25 +74,16 @@ export function RecentlyCompleted({ tasks = [] }: { tasks?: Task[] }) {
       ) : (
         <div className="flex flex-col gap-2.5 relative z-10">
           {completedTasks.map((task, i) => {
-            const photoUrlRaw = task.assigneePhotoUrl || task.assignee?.avatar || task.assignee?.profilePicUrl;
-            const photoUrl = photoUrlRaw && !photoUrlRaw.startsWith('http') 
-              ? `${API_BASE_URL}${photoUrlRaw.startsWith('/') ? '' : '/'}${photoUrlRaw}` 
-              : photoUrlRaw;
+            const photoUrl = resolveSummaryAvatarUrl(
+              task.assigneePhotoUrl || task.assignee?.avatar || task.assignee?.profilePicUrl
+            );
 
             return (
               <div key={task.id} className="group flex items-center gap-3 p-2.5 bg-cu-bg rounded-xl border border-cu-border hover:shadow-cu-md hover:border-cu-success/25 hover:bg-cu-success/5 transition-all">
                 <span className="w-5 font-arimo text-[10px] font-black text-cu-text-muted text-center">#{i + 1}</span>
                 
                 {/* Assignee Avatar */}
-                <div className="w-9 h-9 rounded-full bg-cu-bg-secondary flex items-center justify-center border-2 border-cu-bg shadow-cu-sm overflow-hidden shrink-0">
-                  {photoUrl ? (
-                    <Image src={photoUrl} alt="Avatar" width={36} height={36} className="object-cover" />
-                  ) : (
-                    <span className="text-[11px] font-extrabold text-cu-text-secondary">
-                      {(task.assigneeName || 'U').substring(0, 2).toUpperCase()}
-                    </span>
-                  )}
-                </div>
+                <CompletedTaskAvatar name={task.assigneeName} photoUrl={photoUrl} />
                 
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-bold text-cu-text-primary truncate group-hover:text-cu-success transition-colors">{task.title}</p>

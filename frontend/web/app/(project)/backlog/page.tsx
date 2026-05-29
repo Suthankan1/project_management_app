@@ -127,19 +127,19 @@ export default function BacklogPage() {
     }
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 overflow-y-auto custom-scrollbar touch-pan-y px-4 sm:px-6 lg:px-8 pb-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex flex-col h-full overflow-y-auto custom-scrollbar touch-pan-y px-4 sm:px-6 lg:px-8 pb-6 bg-[radial-gradient(circle_at_top_left,rgba(21,93,252,0.08),transparent_28%),linear-gradient(180deg,var(--cu-bg-secondary),var(--cu-bg-secondary))]" style={{ WebkitOverflowScrolling: 'touch' }}>
             <div className="w-full max-w-[1400px] mx-auto">
             {/* ── Header ── */}
-            <div className="sticky-section-header glass-panel border border-[#E4E7EC] rounded-2xl px-4 sm:px-6 py-4 mb-4 flex items-center justify-between gap-3 flex-wrap flex-shrink-0 z-40">
+            <div className="sticky-section-header border border-cu-border rounded-2xl px-4 sm:px-6 py-4 mb-4 flex items-center justify-between gap-3 flex-wrap flex-shrink-0 z-40 bg-cu-bg/90 backdrop-blur shadow-cu-sm">
                 <div>
-                    <h1 className="text-[20px] sm:text-2xl font-bold text-[#101828]">Product Backlog</h1>
-                    <p className="text-[12px] sm:text-[13px] text-[#6A7282] mt-0.5">
+                    <h1 className="text-[20px] sm:text-2xl font-bold text-cu-text-primary">Product Backlog</h1>
+                    <p className="text-[12px] sm:text-[13px] text-cu-text-secondary mt-0.5">
                         {tasks.length} issue{tasks.length !== 1 ? 's' : ''}
                     </p>
                 </div>
                 <button
                     onClick={() => setShowCreateModal(true)}
-                    className="hidden sm:flex items-center gap-2 h-10 px-4 bg-[#155DFC] text-white text-[13px] font-semibold rounded-xl hover:bg-[#0042A8] transition-colors shadow-sm"
+                    className="hidden sm:flex items-center gap-2 h-10 px-4 bg-cu-primary text-white text-[13px] font-semibold rounded-xl hover:bg-cu-primary-hover transition-colors shadow-sm"
                 >
                     <Plus size={15} />
                     Create Task
@@ -161,7 +161,7 @@ export default function BacklogPage() {
 
             {/* ── Error ── */}
             {error && (
-                <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 mb-4">
+                <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/25 rounded-xl text-red-500 mb-4">
                     <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                     <div>
                         <p className="font-semibold text-sm">Error loading backlog</p>
@@ -172,16 +172,16 @@ export default function BacklogPage() {
 
             {/* ── Backlog section(s) ── */}
             {groupedTasks.map(group => (
-              <div key={group.label} className="bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden mb-4 shadow-sm">
+              <div key={group.label} className="bg-cu-bg rounded-2xl border border-cu-border overflow-hidden mb-4 shadow-cu-sm">
                 <button
                     onClick={() => toggleGroup(group.label)}
-                    className="sticky-section-header w-full flex items-center gap-3 px-4 py-3 border-b border-[#E5E7EB] hover:bg-[#F9FAFB] transition-colors"
+                    className="sticky-section-header w-full flex items-center gap-3 px-4 py-3 border-b border-cu-border bg-cu-bg/95 hover:bg-cu-hover transition-colors"
                 >
-                    <span className="text-[13px] font-semibold text-[#374151]">{group.label}</span>
-                    <span className="text-[11px] font-semibold text-[#9CA3AF] bg-[#F3F4F6] px-2 py-0.5 rounded-full">
+                    <span className="text-[13px] font-semibold text-cu-text-primary">{group.label}</span>
+                    <span className="text-[11px] font-semibold text-cu-text-tertiary bg-cu-bg-tertiary px-2 py-0.5 rounded-full">
                         {group.items.length}
                     </span>
-                    <span className="ml-auto text-[#9CA3AF]">
+                    <span className="ml-auto text-cu-text-tertiary">
                         {collapsedGroups[group.label] ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
                     </span>
                 </button>
@@ -204,7 +204,7 @@ export default function BacklogPage() {
                             ) : (
                                 <div className="flex flex-col gap-[5px] p-3 sm:p-4">
                                     {/* Table header */}
-                                    <div className="hidden sm:grid grid-cols-[auto_1.5fr_140px_110px_130px_110px_120px_32px] items-center gap-x-2 px-3 sm:px-4 text-[10px] font-semibold uppercase tracking-wider text-[#9CA3AF] mb-1">
+                                    <div className="hidden sm:grid grid-cols-[auto_1.5fr_140px_110px_130px_110px_120px_32px] items-center gap-x-2 px-3 sm:px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-cu-text-muted mb-1 rounded-lg bg-cu-bg-secondary border border-cu-border-light">
                                         <span className="w-3.5" />
                                         <span>Title</span>
                                         <span>Label</span>
@@ -231,7 +231,7 @@ export default function BacklogPage() {
                                     ))}
                                 </div>
                             )}
-                            <div className="px-3 py-2">
+                            <div className="px-3 py-2 border-t border-cu-border-light">
                                 {showInlineCreate ? (
                                     <div className="flex items-center gap-1.5">
                                         <div className="flex-1">
@@ -257,7 +257,7 @@ export default function BacklogPage() {
                                                     }
                                                 }}
                                                 placeholder="Task title…"
-                                                className="w-full text-[13px] px-3 py-1.5 border border-[#D1D5DB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#155DFC]"
+                                                className="w-full text-[13px] px-3 py-1.5 border border-cu-border rounded-xl focus:outline-none focus:ring-2 focus:ring-cu-primary bg-cu-bg text-cu-text-primary"
                                             />
                                             {inlineTitleLength > 200 && (
                                                 <p className="text-xs text-amber-500 mt-1">
@@ -274,14 +274,14 @@ export default function BacklogPage() {
                                                 }
                                                 setShowInlineCreate(false);
                                             }}
-                                            className="p-1.5 rounded-lg bg-[#155DFC] text-white hover:bg-[#0042A8] transition-colors"
+                                            className="p-1.5 rounded-lg bg-cu-primary text-white hover:bg-cu-primary-hover transition-colors"
                                             title="Create (Enter)"
                                         >
                                             <CornerDownLeft size={14} />
                                         </button>
                                         <button
                                             onClick={() => { setInlineTitle(''); setInlineTitleLength(0); setShowInlineCreate(false); }}
-                                            className="p-1.5 rounded-lg text-[#6A7282] hover:bg-[#F3F4F6] transition-colors"
+                                            className="p-1.5 rounded-lg text-cu-text-secondary hover:bg-cu-hover transition-colors"
                                         >
                                             <X size={14} />
                                         </button>
@@ -289,7 +289,7 @@ export default function BacklogPage() {
                                 ) : (
                                     <button
                                         onClick={() => setShowInlineCreate(true)}
-                                        className="flex items-center gap-2 w-full px-4 py-2.5 text-[13px] text-[#6A7282] hover:text-[#155DFC] hover:bg-[#F8FAFF] rounded-xl border border-dashed border-[#D1D5DB] hover:border-[#155DFC] transition-colors"
+                                        className="flex items-center gap-2 w-full px-4 py-2.5 text-[13px] text-cu-text-secondary hover:text-cu-primary hover:bg-cu-primary/10 rounded-xl border border-dashed border-cu-border hover:border-cu-primary/60 transition-colors"
                                     >
                                         <Plus size={15} />
                                         Add task
@@ -306,14 +306,14 @@ export default function BacklogPage() {
                 <div className="mt-6">
                     <div className="flex items-center gap-2 mb-3 px-2">
                         <Archive className="w-4 h-4 text-amber-500" />
-                        <h3 className="text-sm font-medium text-muted-foreground">
+                        <h3 className="text-sm font-medium text-cu-text-secondary">
                             Archived Tasks ({archivedTasks.length})
                         </h3>
                     </div>
                     {archivedLoading ? (
-                        <div className="text-sm text-muted-foreground px-4 py-2">Loading...</div>
+                        <div className="text-sm text-cu-text-secondary px-4 py-2">Loading...</div>
                     ) : archivedTasks.length === 0 ? (
-                        <div className="text-sm text-muted-foreground px-4 py-8 text-center">
+                        <div className="text-sm text-cu-text-secondary px-4 py-8 text-center">
                             No archived tasks
                         </div>
                     ) : (
@@ -340,15 +340,15 @@ export default function BacklogPage() {
 
             {/* ── Bulk action floating bar ── */}
             {selectedIds.size > 0 && (
-                <div className="fixed bottom-24 sm:bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-2 px-4 py-2.5 bg-[#101828] text-white rounded-2xl shadow-2xl">
+                <div className="fixed bottom-24 sm:bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-2 px-4 py-2.5 bg-cu-bg text-cu-text-primary border border-cu-border rounded-2xl shadow-2xl">
                     <span className="text-[13px] font-medium">{selectedIds.size} selected</span>
-                    <button onClick={handleBulkDone} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#16A34A] rounded-xl text-[12px] font-medium hover:bg-green-700 transition-colors">
+                    <button onClick={handleBulkDone} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-[12px] font-medium hover:bg-emerald-700 transition-colors">
                         <Check size={13} /> Mark Done
                     </button>
-                    <button onClick={handleBulkDelete} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 rounded-xl text-[12px] font-medium hover:bg-red-700 transition-colors">
+                    <button onClick={handleBulkDelete} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-xl text-[12px] font-medium hover:bg-red-700 transition-colors">
                         <Trash2 size={13} /> Delete
                     </button>
-                    <button onClick={() => setSelectedIds(new Set())} className="p-1.5 rounded-xl hover:bg-white/10 transition-colors">
+                    <button onClick={() => setSelectedIds(new Set())} className="p-1.5 rounded-xl text-cu-text-secondary hover:text-cu-text-primary hover:bg-cu-hover transition-colors">
                         <X size={14} />
                     </button>
                 </div>

@@ -5,4 +5,6 @@ export interface ProjectSummary {
   isFavorite?: boolean;
   type: 'AGILE' | 'KANBAN' | string;
   lastAccessedAt?: string;
+  completedTasks?: number;
+  totalTasks?: number;
 }

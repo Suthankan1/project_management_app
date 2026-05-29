@@ -28,13 +28,13 @@ export default function BacklogTaskDetail({
         <div className="flex flex-col gap-4">
             {/* Status selector */}
             <div>
-                <p className="text-[11px] text-[#9CA3AF] mb-2 font-medium uppercase tracking-wide">Status</p>
+                <p className="text-[11px] text-cu-text-muted mb-2 font-medium uppercase tracking-wide">Status</p>
                 <div className="flex gap-2 flex-wrap">
                     {STATUS_OPTIONS.map((s) => (
                         <button
                             key={s}
                             onClick={() => onStatusChange(task.id, s)}
-                            className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${task.status === s ? 'border-[#155DFC] bg-[#EFF6FF] text-[#1D4ED8] font-semibold' : 'border-[#E5E7EB] text-[#6A7282] hover:border-[#155DFC]'}`}
+                            className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${task.status === s ? 'border-cu-primary/50 bg-cu-primary/10 text-cu-primary font-semibold' : 'border-cu-border text-cu-text-secondary hover:border-cu-primary/60 hover:bg-cu-hover'}`}
                         >
                             {s.replace(/_/g, ' ')}
                         </button>
@@ -42,24 +42,24 @@ export default function BacklogTaskDetail({
                 </div>
             </div>
             {task.priority && (
-                <p className="text-[11px] font-medium text-[#6A7282]">
+                <p className="text-[11px] font-medium text-cu-text-secondary">
                     {PRIORITY_CONFIG[task.priority]?.label ?? task.priority} priority
                 </p>
             )}
             {task.description && (
-                <p className="text-[14px] text-[#374151] leading-relaxed">{task.description}</p>
+                <p className="text-[14px] text-cu-text-primary leading-relaxed">{task.description}</p>
             )}
             <div className="grid grid-cols-2 gap-3">
                 {task.assigneeName && (
-                    <div className="bg-[#F9FAFB] rounded-xl p-3">
-                        <p className="text-[11px] text-[#9CA3AF] mb-1">Assignee</p>
-                        <p className="text-[13px] font-medium text-[#101828]">{task.assigneeName}</p>
+                    <div className="bg-cu-bg-secondary rounded-xl p-3">
+                        <p className="text-[11px] text-cu-text-muted mb-1">Assignee</p>
+                        <p className="text-[13px] font-medium text-cu-text-primary">{task.assigneeName}</p>
                     </div>
                 )}
                 {task.dueDate && (
-                    <div className="bg-[#F9FAFB] rounded-xl p-3">
-                        <p className="text-[11px] text-[#9CA3AF] mb-1">Due Date</p>
-                        <p className="text-[13px] font-medium text-[#101828]">
+                    <div className="bg-cu-bg-secondary rounded-xl p-3">
+                        <p className="text-[11px] text-cu-text-muted mb-1">Due Date</p>
+                        <p className="text-[13px] font-medium text-cu-text-primary">
                             {new Date(task.dueDate).toLocaleDateString()}
                         </p>
                     </div>
@@ -68,20 +68,20 @@ export default function BacklogTaskDetail({
             <div className="flex gap-2">
                 <button
                     onClick={() => { onMarkDone(task.id); onClose(); }}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#16A34A] text-white rounded-xl font-medium text-[14px] active:scale-[0.98] transition-transform"
+                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl font-medium text-[14px] active:scale-[0.98] hover:bg-emerald-700 transition-all"
                 >
                     <Check size={16} />
                     Mark as Done
                 </button>
                 <button
                     onClick={() => { onOpenModal(task.id); onClose(); }}
-                    className="px-4 py-3 border border-[#E5E7EB] text-[#374151] rounded-xl font-medium text-[14px] hover:bg-[#F9FAFB] transition-colors"
+                    className="px-4 py-3 border border-cu-border text-cu-text-primary rounded-xl font-medium text-[14px] hover:bg-cu-hover transition-colors"
                 >
                     Edit
                 </button>
                 <button
                     onClick={() => { onDelete(task.id); onClose(); }}
-                    className="px-4 py-3 border border-red-200 text-red-600 rounded-xl font-medium text-[14px] hover:bg-red-50 transition-colors"
+                    className="px-4 py-3 border border-red-500/25 text-red-500 rounded-xl font-medium text-[14px] hover:bg-red-500/10 transition-colors"
                 >
                     <Trash2 size={15} />
                 </button>

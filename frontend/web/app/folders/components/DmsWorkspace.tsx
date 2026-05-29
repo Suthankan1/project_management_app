@@ -35,8 +35,8 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-full bg-[#F7F8FA]">
-                <Loader2 className="h-6 w-6 animate-spin text-[#155DFC]" />
+            <div className="flex items-center justify-center h-full bg-cu-bg-secondary">
+                <Loader2 className="h-6 w-6 animate-spin text-cu-primary" />
             </div>
         );
     }
@@ -44,8 +44,8 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
     if (!projectId) {
         return (
             <div className="flex flex-col items-center justify-center h-[60vh] gap-3 text-center">
-                <p className="text-sm font-medium text-[#344054]">No project selected</p>
-                <p className="text-xs text-[#667085] max-w-xs">
+                <p className="text-sm font-medium text-cu-text-primary">No project selected</p>
+                <p className="text-xs text-cu-text-secondary max-w-xs">
                     Open a project first, then navigate to Documents. Folders and files always belong to a specific project.
                 </p>
             </div>
@@ -55,7 +55,7 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
     return (
         <>
             <div
-                className="w-full max-w-[1400px] mx-auto min-h-[calc(100vh-160px)] rounded-xl border border-[#E6E8EC] bg-[#FCFCFD] shadow-sm overflow-hidden relative"
+                className="w-full max-w-[1400px] mx-auto min-h-[calc(100vh-160px)] rounded-xl border border-cu-border bg-cu-bg-secondary shadow-sm overflow-hidden relative"
                 onDragEnter={(e) => {
                     e.preventDefault();
                     dragCounter.current++;
@@ -75,8 +75,8 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
             >
                 {/* pointer-events-none on the overlay so underlying drag events still fire on the container */}
                 {isDragOver && (
-                    <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#EEF4FF]/80 border-2 border-dashed border-[#155DFC] rounded-xl pointer-events-none">
-                        <p className="text-lg font-semibold text-[#155DFC]">Drop file to upload</p>
+                    <div className="absolute inset-0 z-30 flex items-center justify-center bg-cu-primary-light/80 border-2 border-dashed border-cu-primary rounded-xl pointer-events-none">
+                        <p className="text-lg font-semibold text-cu-primary">Drop file to upload</p>
                     </div>
                 )}
 
@@ -95,29 +95,29 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
                         withProjectId={withProjectId}
                     />
 
-                    <section className="col-span-12 lg:col-span-9 xl:col-span-10 bg-white">
-                        <div className="px-5 py-3 border-b border-[#E6E8EC] flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <section className="col-span-12 lg:col-span-9 xl:col-span-10 bg-cu-bg">
+                        <div className="px-5 py-3 border-b border-cu-border flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                             <div className="relative w-full lg:max-w-[420px]">
-                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#98A2B3]" />
+                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-cu-text-tertiary" />
                                 <input
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder="Search by name, owner, or type"
-                                    className={`w-full pl-9 ${searchQuery ? 'pr-8' : 'pr-3'} py-2 text-sm border border-[#D0D5DD] rounded-md focus:outline-none focus:ring-2 focus:ring-[#B2CCFF]`}
+                                    className={`w-full pl-9 ${searchQuery ? 'pr-8' : 'pr-3'} py-2 text-sm bg-cu-bg text-cu-text-primary border border-cu-border rounded-md focus:outline-none focus:ring-2 focus:ring-cu-primary/25`}
                                 />
                                 {searchQuery && (
                                     <button
                                         onClick={() => setSearchQuery('')}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[#98A2B3] hover:text-[#344054]"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-cu-text-tertiary hover:text-cu-text-primary"
                                         title="Clear search"
                                     >
                                         <X size={14} />
                                     </button>
                                 )}
                             </div>
-                            <div className="inline-flex rounded-md border border-[#D0D5DD] overflow-hidden text-xs">
-                                <span className="px-3 py-2 bg-[#F9FAFB] text-[#667085]">Mode</span>
-                                <span className="px-3 py-2 text-[#101828] font-semibold">{title}</span>
+                            <div className="inline-flex rounded-md border border-cu-border overflow-hidden text-xs">
+                                <span className="px-3 py-2 bg-cu-bg-secondary text-cu-text-secondary">Mode</span>
+                                <span className="px-3 py-2 bg-cu-bg text-cu-text-primary font-semibold">{title}</span>
                             </div>
                         </div>
 

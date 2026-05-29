@@ -10,8 +10,6 @@ import type { TaskRowProps } from '../TaskRow';
 import { useTaskRowState } from './useTaskRowState';
 import { ArchiveBadge } from '@/components/ui';
 
-// ── Desktop Task Row ─────────────────────────────────────────────────────────
-
 export default function DesktopTaskRow(props: TaskRowProps) {
   const {
     task, projectKey, teamMembers = [], loadingMembers = false,
@@ -22,11 +20,9 @@ export default function DesktopTaskRow(props: TaskRowProps) {
   } = props;
 
   const {
-    // Refs – only used for DOM attachment (ref={…}), never read during render
     statusRef, assignRef, labelRef, dateRef,
     statusPortalRef, assignPortalRef, labelPortalRef,
     lastTapRef,
-    // State values – safe to read during render
     statusOpen, setStatusOpen,
     assignOpen, setAssignOpen,
     labelOpen, setLabelOpen,
@@ -35,12 +31,10 @@ export default function DesktopTaskRow(props: TaskRowProps) {
     labelInput, setLabelInput,
     creatingLabel,
     statusPosition, assignPosition, labelPosition,
-    // Handlers / callbacks
     onTouchStartInternal, onTouchEndInternal, onTouchMoveInternal,
     startRename, updateLastTap, commitRename,
     taskLabelIds, openLabel, handleLabelToggle, handleCreateLabelFromInput,
     openStatus, openAssign, openDatePicker,
-    // Derived display values
     displayLabel, displayStyle, dueClass, statusBorderColor, priorityKey, priorityStyle,
   } = useTaskRowState(task, {
     canDelete, onDeleteTask, onRenameTask: props.onRenameTask,
@@ -51,20 +45,16 @@ export default function DesktopTaskRow(props: TaskRowProps) {
   const getMemberName = (m: NonNullable<typeof teamMembers>[number]) => m.user.fullName || m.user.username;
 
   const rowBg =
-    dueClass === 'five_days' ? 'bg-[#FFFBEB]'
-    : dueClass === 'old' ? 'bg-[#FEE2E2]'
-    : dueClass === 'overdue' || dueClass === 'today' ? 'bg-[#FEE2E2]'
-    : dueClass === 'soon' ? 'bg-[#FFFDF5]'
-    : 'bg-white';
-
-  const amberStyle = dueClass === 'five_days' ? { backgroundColor: 'rgba(245, 158, 11, 0.4)' } : {};
+    dueClass === 'five_days' ? 'bg-amber-50 dark:bg-amber-900/15'
+    : dueClass === 'old' ? 'bg-cu-danger-light'
+    : dueClass === 'overdue' || dueClass === 'today' ? 'bg-cu-danger-light'
+    : dueClass === 'soon' ? 'bg-cu-bg-secondary'
+    : 'bg-cu-bg';
 
   return (
     <div
-      className={`group relative flex items-center min-h-[40px] rounded-lg border-2 ${
-        dueClass === 'five_days' ? 'border-transparent' : 'border-transparent'
-      } ${rowBg} hover:opacity-90 transition-colors duration-150 ${task.archived ? 'opacity-60' : ''}`}
-      style={{ borderLeft: `3px solid ${statusBorderColor}`, ...amberStyle }}
+      className={`group relative flex items-center min-h-[40px] rounded-lg border-2 border-transparent ${rowBg} hover:opacity-90 transition-colors duration-150 ${task.archived ? 'opacity-60' : ''}`}
+      style={{ borderLeft: `3px solid ${statusBorderColor}` }}
       onClick={() => { if (!renaming) onOpenTask?.(task.id); }}
       onTouchStart={onTouchStartInternal}
       onTouchEnd={onTouchEndInternal}
@@ -76,7 +66,7 @@ export default function DesktopTaskRow(props: TaskRowProps) {
           <input
             type="checkbox" checked={task.selected ?? false}
             onChange={() => onToggle?.(task.id)}
-            className="h-4 w-4 rounded border-[#D0D5DD] text-[#155DFC] focus:ring-[#155DFC]/20 cursor-pointer"
+            className="h-4 w-4 rounded border-cu-border accent-cu-primary cursor-pointer"
             aria-label={`Select ${task.title}`}
           />
         </div>
@@ -84,7 +74,7 @@ export default function DesktopTaskRow(props: TaskRowProps) {
 
       {/* Task number */}
       <div className="flex-shrink-0 w-[130px] pl-2 pr-1 flex items-center justify-start">
-        <span className="inline-flex max-w-full items-center rounded-md bg-[#F8F9FC] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#667085] truncate" title={displayTaskKey}>
+        <span className="inline-flex max-w-full items-center rounded-md bg-cu-bg-secondary px-2 py-0.5 text-[11px] font-semibold tabular-nums text-cu-text-secondary truncate" title={displayTaskKey}>
           {displayTaskKey}
         </span>
       </div>
@@ -107,20 +97,18 @@ export default function DesktopTaskRow(props: TaskRowProps) {
               onKeyDown={(e) => { if (e.key === 'Enter') void commitRename(); if (e.key === 'Escape') setRenaming(false); }}
               onBlur={() => void commitRename()}
               autoFocus
-              className="w-full border-b-2 border-[#175CD3] bg-transparent text-[12px] font-semibold text-[#101828] outline-none"
+              className="w-full border-b-2 border-cu-primary bg-transparent text-[12px] font-semibold text-cu-text-primary outline-none"
             />
             {renameValue.length > 200 && (
-              <p className="text-xs text-amber-500 mt-1">
-                {255 - renameValue.length} characters remaining
-              </p>
+              <p className="text-xs text-amber-500 mt-1">{255 - renameValue.length} characters remaining</p>
             )}
           </div>
         ) : (
           <>
             <span
               className={`text-[12px] font-medium truncate min-w-0 select-none ${
-                dueClass === 'five_days' ? 'text-[#92400E]' :
-                task.status?.toUpperCase() === 'DONE' ? 'line-through text-[#98A2B3]' : 'text-[#101828]'
+                dueClass === 'five_days' ? 'text-amber-800 dark:text-amber-300' :
+                task.status?.toUpperCase() === 'DONE' ? 'line-through text-cu-text-muted' : 'text-cu-text-primary'
               }`}
               onClick={(e) => {
                 e.stopPropagation();
@@ -153,21 +141,21 @@ export default function DesktopTaskRow(props: TaskRowProps) {
           {task.assigneeName && task.assigneeName !== 'Unassigned' ? (
             <AssigneeAvatar name={task.assigneeName} profilePicUrl={task.assigneePhotoUrl} size={22} />
           ) : (
-            <div className="flex h-[22px] w-[22px] items-center justify-center rounded-full border border-dashed border-[#EAECF0] hover:border-[#155DFC] transition-colors">
-              <UserPlus size={11} className="text-[#667085]" />
+            <div className="flex h-[22px] w-[22px] items-center justify-center rounded-full border border-dashed border-cu-border hover:border-cu-primary transition-colors">
+              <UserPlus size={11} className="text-cu-text-secondary" />
             </div>
           )}
         </button>
         {assignOpen && typeof document !== 'undefined' && createPortal(
-          <div ref={assignPortalRef} className="fixed z-[9999] w-52 overflow-hidden rounded-xl border border-[#E4E7EC] bg-white shadow-xl" style={{ top: assignPosition.top, left: assignPosition.left }}>
-            <div className="px-3 py-2 text-[10px] font-bold text-[#667085] uppercase tracking-wider border-b border-[#F2F4F7] bg-[#F9FAFB]">Assign To</div>
+          <div ref={assignPortalRef} className="fixed z-[9999] w-52 overflow-hidden rounded-xl border border-cu-border bg-cu-bg shadow-cu-xl" style={{ top: assignPosition.top, left: assignPosition.left }}>
+            <div className="px-3 py-2 text-[10px] font-bold text-cu-text-secondary uppercase tracking-wider border-b border-cu-border bg-cu-bg-secondary">Assign To</div>
             {loadingMembers ? (
-              <div className="px-3 py-3 text-[12px] text-[#667085]">Loading…</div>
+              <div className="px-3 py-3 text-[12px] text-cu-text-secondary">Loading…</div>
             ) : teamMembers.length > 0 ? (
               <div className="max-h-52 overflow-y-auto">
                 {teamMembers.map((m) => (
                   <button key={m.user.userId} onClick={() => { void onAssignTask(task.id, m.user.userId); setAssignOpen(false); }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-[12px] font-medium text-[#344054] hover:bg-[#F9FAFB]"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-[12px] font-medium text-cu-text-primary hover:bg-cu-hover"
                   >
                     <AssigneeAvatar name={getMemberName(m)} profilePicUrl={m.user.profilePicUrl} size={20} />
                     <span className="truncate">{getMemberName(m)}</span>
@@ -175,7 +163,7 @@ export default function DesktopTaskRow(props: TaskRowProps) {
                 ))}
               </div>
             ) : (
-              <div className="px-3 py-3 text-[12px] text-[#667085]">No members found</div>
+              <div className="px-3 py-3 text-[12px] text-cu-text-secondary">No members found</div>
             )}
           </div>,
           document.body
@@ -192,18 +180,18 @@ export default function DesktopTaskRow(props: TaskRowProps) {
             <ChevronDown size={9} className="flex-shrink-0 opacity-60" />
           </button>
           {statusOpen && typeof document !== 'undefined' && createPortal(
-            <div ref={statusPortalRef} className="fixed z-[9999] w-32 overflow-hidden rounded-xl border border-[#E4E7EC] bg-white shadow-xl" style={{ top: statusPosition.top, left: statusPosition.left }}>
+            <div ref={statusPortalRef} className="fixed z-[9999] w-32 overflow-hidden rounded-xl border border-cu-border bg-cu-bg shadow-cu-xl" style={{ top: statusPosition.top, left: statusPosition.left }}>
               {(Object.keys(STATUS_LABELS) as TaskStatus[]).map((s) => (
                 <button key={s} onClick={() => { onStatusChange(task.id, s); setStatusOpen(false); }}
-                  className={`w-full px-3 py-2 text-left text-[11px] font-bold hover:bg-[#F9FAFB] ${task.status?.toUpperCase() === s ? 'text-[#155DFC]' : ''}`}
+                  className={`w-full px-3 py-2 text-left text-[11px] font-bold hover:bg-cu-hover ${task.status?.toUpperCase() === s ? 'text-cu-primary' : 'text-cu-text-primary'}`}
                 >
                   {STATUS_LABELS[s]}
                 </button>
               ))}
-              {extraStatuses.length > 0 && <div className="border-t border-[#EAECF0] my-1" />}
+              {extraStatuses.length > 0 && <div className="border-t border-cu-border my-1" />}
               {extraStatuses.map((s) => (
                 <button key={s.value} onClick={() => { onStatusChange(task.id, s.value); setStatusOpen(false); }}
-                  className={`w-full px-3 py-2 text-left text-[11px] font-bold hover:bg-[#F9FAFB] ${task.status?.toUpperCase() === s.value ? 'text-[#155DFC]' : ''}`}
+                  className={`w-full px-3 py-2 text-left text-[11px] font-bold hover:bg-cu-hover ${task.status?.toUpperCase() === s.value ? 'text-cu-primary' : 'text-cu-text-primary'}`}
                 >
                   {s.label}
                 </button>
@@ -219,7 +207,7 @@ export default function DesktopTaskRow(props: TaskRowProps) {
         <div className="flex-shrink-0 w-[88px] px-1 flex items-center relative" onClick={(e) => e.stopPropagation()}>
           <button type="button" onClick={openDatePicker} title={dueClass === 'overdue' ? formatDate(task.dueDate) : undefined}
             className={`flex h-6 w-full items-center justify-center gap-1 rounded-md px-2 text-[10px] font-bold transition-all border ${
-              dueClass === 'none' ? 'bg-white border-[#EAECF0] text-[#667085] hover:bg-gray-50' : DUE_CHIP_STYLES[dueClass]
+              dueClass === 'none' ? 'bg-cu-bg border-cu-border text-cu-text-secondary hover:bg-cu-hover' : DUE_CHIP_STYLES[dueClass]
             }`}
           >
             <CalendarDays size={10} className="flex-shrink-0 opacity-60" />
@@ -231,10 +219,10 @@ export default function DesktopTaskRow(props: TaskRowProps) {
 
       {/* Story points */}
       <div className="flex-shrink-0 w-[40px] px-1 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-        <div className="flex h-6 w-full items-center justify-center rounded-md border border-[#EAECF0] bg-[#F9FAFB]">
+        <div className="flex h-6 w-full items-center justify-center rounded-md border border-cu-border bg-cu-bg-secondary">
           <input type="number" min="0" value={task.storyPoints}
             onChange={(e) => onStoryPointsChange(task.id, Number(e.target.value))}
-            className="w-full text-center text-[12px] font-bold text-[#101828] outline-none bg-transparent"
+            className="w-full text-center text-[12px] font-bold text-cu-text-primary outline-none bg-transparent"
           />
         </div>
       </div>
@@ -243,33 +231,33 @@ export default function DesktopTaskRow(props: TaskRowProps) {
       {(onAddLabel || onCreateLabel) && (
         <div className="flex-shrink-0 w-[26px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" ref={labelRef} onClick={(e) => e.stopPropagation()}>
           <button type="button" onClick={() => { if (labelOpen) setLabelOpen(false); else openLabel(); }} title="Labels"
-            className={`flex h-6 w-6 items-center justify-center rounded-md transition-all ${labelOpen ? 'bg-[#EFF8FF] text-[#175CD3]' : 'text-[#667085] hover:text-[#175CD3] hover:bg-[#EFF8FF]'}`}
+            className={`flex h-6 w-6 items-center justify-center rounded-md transition-all ${labelOpen ? 'bg-cu-primary-light text-cu-primary' : 'text-cu-text-secondary hover:text-cu-primary hover:bg-cu-primary-light'}`}
           >
             <Tag size={12} />
           </button>
           {labelOpen && typeof document !== 'undefined' && createPortal(
-            <div ref={labelPortalRef} className="fixed z-[9999] w-56 overflow-hidden rounded-xl border border-[#E4E7EC] bg-white shadow-xl" style={{ top: labelPosition.top, left: labelPosition.left }}>
-              <div className="px-3 py-2 border-b border-[#F2F4F7]">
+            <div ref={labelPortalRef} className="fixed z-[9999] w-56 overflow-hidden rounded-xl border border-cu-border bg-cu-bg shadow-cu-xl" style={{ top: labelPosition.top, left: labelPosition.left }}>
+              <div className="px-3 py-2 border-b border-cu-border">
                 <input autoFocus type="text" value={labelInput}
                   onChange={(e) => setLabelInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleCreateLabelFromInput(); } if (e.key === 'Escape') { setLabelOpen(false); setLabelInput(''); } }}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="New label name + Enter" disabled={creatingLabel}
-                  className="w-full text-[12px] text-[#101828] placeholder-[#98A2B3] bg-transparent outline-none"
+                  className="w-full text-[12px] text-cu-text-primary placeholder:text-cu-text-tertiary bg-transparent outline-none"
                 />
               </div>
               <div className="max-h-48 overflow-y-auto">
-                {projectLabels.length === 0 && <div className="px-3 py-3 text-[12px] text-[#98A2B3]">No labels yet</div>}
+                {projectLabels.length === 0 && <div className="px-3 py-3 text-[12px] text-cu-text-tertiary">No labels yet</div>}
                 {projectLabels.map((label) => {
                   const active = taskLabelIds.has(label.id);
                   return (
                     <button key={label.id} type="button" onClick={(e) => { e.stopPropagation(); void handleLabelToggle(label); }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-[12px] hover:bg-[#F9FAFB] transition-colors"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[12px] hover:bg-cu-hover transition-colors"
                     >
                       <span className="inline-block h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: label.color ?? '#6B7280' }} />
-                      <span className="flex-1 text-left truncate text-[#344054] font-medium">{label.name}</span>
+                      <span className="flex-1 text-left truncate text-cu-text-primary font-medium">{label.name}</span>
                       {active && (
-                        <span className="h-4 w-4 rounded-full bg-[#175CD3] flex items-center justify-center flex-shrink-0">
+                        <span className="h-4 w-4 rounded-full bg-cu-primary flex items-center justify-center flex-shrink-0">
                           <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         </span>
                       )}
@@ -285,11 +273,11 @@ export default function DesktopTaskRow(props: TaskRowProps) {
 
       {/* Rename / Delete actions */}
       <div className="flex-shrink-0 w-[52px] pl-1 pr-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-        <button type="button" onClick={startRename} title="Rename" className="flex h-6 w-6 items-center justify-center rounded-md text-[#667085] hover:text-[#175CD3] hover:bg-[#EFF8FF] transition-all">
+        <button type="button" onClick={startRename} title="Rename" className="flex h-6 w-6 items-center justify-center rounded-md text-cu-text-secondary hover:text-cu-primary hover:bg-cu-primary-light transition-all">
           <Pencil size={12} />
         </button>
         <button type="button" onClick={() => canDelete && onDeleteTask(task.id)} disabled={!canDelete} title={canDelete ? 'Delete task' : 'Viewers cannot delete tasks'}
-          className={`flex h-6 w-6 items-center justify-center rounded-md transition-all ${canDelete ? 'text-[#667085] hover:text-[#D92D20] hover:bg-[#FEF3F2]' : 'text-[#D0D5DD] cursor-not-allowed'}`}
+          className={`flex h-6 w-6 items-center justify-center rounded-md transition-all ${canDelete ? 'text-cu-text-secondary hover:text-cu-danger hover:bg-cu-danger-light' : 'text-cu-text-muted cursor-not-allowed'}`}
         >
           <Trash2 size={12} />
         </button>
