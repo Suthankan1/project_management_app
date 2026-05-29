@@ -198,7 +198,7 @@ class SprintboardServiceTest {
 
         org.junit.jupiter.api.Assertions.assertThrows(
                 ConflictException.class,
-                () -> sprintSvc.completeSprint(5L, 100L)
+                () -> sprintSvc.completeSprint(5L, null, 100L)
         );
     }
 }
