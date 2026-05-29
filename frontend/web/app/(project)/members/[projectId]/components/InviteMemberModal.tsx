@@ -31,9 +31,9 @@ export function InviteMemberModal({
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50 p-4 sm:p-0">
-      <div className="bg-white rounded-lg shadow-lg p-4 sm:p-8 w-full max-w-sm sm:max-w-md max-h-[90vh] overflow-y-auto relative">
+      <div className="bg-cu-bg rounded-lg shadow-lg p-4 sm:p-8 w-full max-w-sm sm:max-w-md max-h-[90vh] overflow-y-auto relative">
         <button
-          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+          className="absolute top-2 right-2 text-cu-text-muted hover:text-cu-text-primary"
           onClick={onClose}
         >
           &times;
@@ -44,7 +44,7 @@ export function InviteMemberModal({
             <label className="block text-xs sm:text-sm font-medium mb-1">Email Address <span className="text-red-500">*</span></label>
             <input
               type="email"
-              className="w-full border rounded px-3 py-2.5 min-h-[44px] text-sm"
+              className="w-full border border-cu-border bg-cu-bg text-cu-text-primary rounded px-3 py-2.5 min-h-[44px] text-sm focus:outline-none focus:border-cu-primary"
               value={inviteEmail}
               onChange={(e) => onInviteEmailChange(e.target.value)}
               required
@@ -53,7 +53,7 @@ export function InviteMemberModal({
           <div>
             <label className="block text-xs sm:text-sm font-medium mb-1">Role <span className="text-red-500">*</span></label>
             <select
-              className="w-full border rounded px-3 py-2.5 min-h-[44px] text-sm"
+              className="w-full border border-cu-border bg-cu-bg text-cu-text-primary rounded px-3 py-2.5 min-h-[44px] text-sm focus:outline-none focus:border-cu-primary"
               value={inviteRole}
               onChange={(e) => onInviteRoleChange(e.target.value)}
               required
@@ -67,12 +67,12 @@ export function InviteMemberModal({
               <div className="text-red-500 text-xs mt-1">Please select a role.</div>
             )}
           </div>
-          {inviteError && <div className="text-red-600 text-sm">{inviteError}</div>}
-          {inviteSuccess && <div className="text-green-600 text-sm">{inviteSuccess}</div>}
+          {inviteError && <div className="text-cu-danger text-sm">{inviteError}</div>}
+          {inviteSuccess && <div className="text-emerald-500 text-sm">{inviteSuccess}</div>}
           <div className="flex flex-col sm:flex-row gap-2 mt-4">
             <button
               type="button"
-              className="flex-1 py-2.5 min-h-[44px] rounded border border-gray-300 bg-gray-100 hover:bg-gray-200"
+              className="flex-1 py-2.5 min-h-[44px] rounded border border-cu-border bg-cu-bg-secondary hover:bg-cu-hover"
               onClick={onClose}
               disabled={inviteLoading}
             >

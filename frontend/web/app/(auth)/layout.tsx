@@ -8,10 +8,7 @@ export default function AuthLayout({
 }) {
   return (
     // overflow-hidden prevents the oversized blobs from creating a horizontal scrollbar
-    <div className="min-h-screen w-full relative overflow-hidden font-sans text-gray-900 antialiased"
-      style={{
-        background: 'hsl(210, 40%, 98%)',
-      }}
+    <div className="min-h-screen w-full relative overflow-hidden font-sans text-cu-text-primary antialiased bg-cu-bg"
     >
       {/* pointer-events-none ensures these decorative blobs never accidentally intercept clicks on forms below them */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">

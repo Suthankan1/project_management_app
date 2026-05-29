@@ -128,6 +128,20 @@ class GithubIssueImportServiceTest {
         verify(githubIssuesSyncService, never()).syncIssues(any(), any());
     }
 
+    @Test
+    void importIssues_usesRequestTokenForBrowserOauthConnections() {
+        user.setGithubAccessToken(null);
+        request.setIssueNumbers(List.of());
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(teamMembershipLookupService.getTeamMember(20L, 7L)).thenReturn(member);
+        when(githubIssuesSyncService.syncIssues("planora/app", "browser-token"))
+                .thenReturn(List.of());
+
+        service.importIssues(request, user, "browser-token");
+
+        verify(githubIssuesSyncService).syncIssues("planora/app", "browser-token");
+    }
+
     private GithubIssueDTO issue(
             Integer number,
             String state,

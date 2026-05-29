@@ -16,12 +16,12 @@
   --cu-purple-muted: var(--cu-primary-muted);
 
   /* ── Sidebar ── */
-  --cu-sidebar: #1A1A2E;
-  --cu-sidebar-hover: #252543;
-  --cu-sidebar-active: #2D2D50;
-  --cu-sidebar-border: #32325D;
-  --cu-sidebar-text: #A0A0B8;
-  --cu-sidebar-text-bright: #E0E0F0;
+  --cu-sidebar: #F9FAFB;
+  --cu-sidebar-hover: #F1F5F9;
+  --cu-sidebar-active: #EAF1FF;
+  --cu-sidebar-border: #E5E7EB;
+  --cu-sidebar-text: #64748B;
+  --cu-sidebar-text-bright: #111827;
 
   /* ── Semantic colors ── */
   --cu-success: #6BC950;
@@ -49,6 +49,7 @@
   --cu-bg: #FFFFFF;
   --cu-bg-secondary: #F7F8FA;
   --cu-bg-tertiary: #F0F1F3;
+  --cu-hover: #F5F7FA;
   --cu-border: #E8E8ED;
   --cu-border-light: #F0F0F5;
 
@@ -56,6 +57,7 @@
   --cu-text-primary: #1A1A2E;
   --cu-text-secondary: #6B6F7B;
   --cu-text-tertiary: #9CA3AF;
+  --cu-text-muted: #B0B8C4;
   --cu-text-inverse: #FFFFFF;
 
   /* ── Typography scale (px) ── */
@@ -130,27 +132,44 @@
    Applied when <html class="dark"> is present
    ══════════════════════════════════════════════════ */
 html.dark {
-  /* Surface */
-  --cu-bg: #111827;
-  --cu-bg-secondary: #0F172A;
+  color-scheme: dark;
+
+  /* Surface — slate-based dark hierarchy */
+  --cu-bg: #0B1120;
+  --cu-bg-secondary: #111827;
   --cu-bg-tertiary: #1E293B;
+  --cu-hover: #182235;
 
   /* Border */
-  --cu-border: #334155;
-  --cu-border-light: #1E293B;
+  --cu-border: #273449;
+  --cu-border-light: #1C2638;
 
   /* Text */
-  --cu-text-primary: #F1F5F9;
-  --cu-text-secondary: #94A3B8;
-  --cu-text-tertiary: #64748B;
+  --cu-text-primary: #F8FAFC;
+  --cu-text-secondary: #CBD5E1;
+  --cu-text-tertiary: #94A3B8;
+  --cu-text-muted: #64748B;
 
-  /* Sidebar — keep dark but slightly lighter than main bg */
-  --cu-sidebar: #0F172A;
-  --cu-sidebar-hover: #1E293B;
-  --cu-sidebar-active: #293548;
-  --cu-sidebar-border: #1E293B;
-  --cu-sidebar-text: #94A3B8;
-  --cu-sidebar-text-bright: #F1F5F9;
+  /* Semantic light surfaces — tinted dark backgrounds */
+  --cu-primary-light: #1a2f5c;
+  --cu-success-light: #0d2518;
+  --cu-warning-light: #271a08;
+  --cu-danger-light: #270d0d;
+  --cu-info-light: #0a1f36;
+
+  /* Sidebar — sits on top of --cu-bg */
+  --cu-sidebar: #08111F;
+  --cu-sidebar-hover: #111D31;
+  --cu-sidebar-active: #132A4A;
+  --cu-sidebar-border: #1E2B40;
+  --cu-sidebar-text: #A7B3C6;
+  --cu-sidebar-text-bright: #F8FAFC;
+
+  /* Shadows — heavier opacity in dark mode */
+  --cu-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --cu-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --cu-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --cu-shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.7);
 }
 
 /* ── Mobile: enforce minimum touch targets ── */

@@ -50,7 +50,7 @@ const RecurrenceSection: React.FC<RecurrenceSectionProps> = ({
           <select
             value={localRule}
             onChange={(e) => handleRuleChange(e.target.value)}
-            className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 min-h-[44px] sm:min-h-0 bg-white"
+            className="flex-1 text-sm border border-cu-border rounded px-2 py-1 min-h-[44px] sm:min-h-0 bg-cu-bg text-cu-text-primary"
           >
             <option value="">No recurrence</option>
             {RULES.map((r) => (
@@ -60,7 +60,7 @@ const RecurrenceSection: React.FC<RecurrenceSectionProps> = ({
           {localRule && (
             <button
               onClick={handleClear}
-              className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-colors"
+              className="p-1 rounded hover:bg-cu-hover text-cu-text-muted hover:text-cu-danger transition-colors"
               title="Clear recurrence"
             >
               <X size={14} />
@@ -70,18 +70,18 @@ const RecurrenceSection: React.FC<RecurrenceSectionProps> = ({
 
         {localRule && (
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-gray-400">End date (optional)</span>
+            <span className="text-xs text-cu-text-muted">End date (optional)</span>
             <input
               type="date"
               value={localEnd}
               onChange={(e) => handleEndChange(e.target.value)}
-              className="text-sm border border-gray-200 rounded px-2 py-1 min-h-[44px] sm:min-h-0"
+              className="text-sm border border-cu-border bg-cu-bg text-cu-text-primary rounded px-2 py-1 min-h-[44px] sm:min-h-0"
             />
           </div>
         )}
 
         {localRule && (
-          <div className="flex items-center gap-1.5 text-xs text-blue-600">
+          <div className="flex items-center gap-1.5 text-xs text-cu-primary">
             <RefreshCw size={11} />
             <span>Repeats {RULES.find((r) => r.value === localRule)?.label.toLowerCase()}</span>
           </div>

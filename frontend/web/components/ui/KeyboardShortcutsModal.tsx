@@ -65,17 +65,17 @@ const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({ open, o
           exit={{ scale: 0.95, opacity: 0 }}
           transition={{ type: 'spring', damping: 22, stiffness: 280 }}
           onClick={(e) => e.stopPropagation()}
-          className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col"
+          className="relative bg-cu-bg border border-cu-border rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-cu-border">
             <div className="flex items-center gap-2">
-              <Keyboard size={18} className="text-blue-600" />
-              <h2 className="font-semibold text-gray-900">Keyboard Shortcuts</h2>
+              <Keyboard size={18} className="text-cu-primary" />
+              <h2 className="font-semibold text-cu-text-primary">Keyboard Shortcuts</h2>
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 hover:bg-gray-100 rounded text-gray-500 transition-colors"
+              className="p-1.5 hover:bg-cu-hover rounded text-cu-text-secondary transition-colors"
             >
               <X size={16} />
             </button>
@@ -85,20 +85,20 @@ const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({ open, o
           <div className="overflow-y-auto flex-1 px-5 py-4 space-y-6">
             {SHORTCUTS.map((section) => (
               <div key={section.group}>
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                <h3 className="text-xs font-semibold text-cu-text-muted uppercase tracking-wider mb-3">
                   {section.group}
                 </h3>
                 <div className="space-y-2">
                   {section.shortcuts.map((s) => (
                     <div
                       key={s.description}
-                      className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-gray-50 transition-colors"
+                      className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-cu-hover transition-colors"
                     >
-                      <span className="text-sm text-gray-700">{s.description}</span>
+                      <span className="text-sm text-cu-text-primary">{s.description}</span>
                       <div className="flex items-center gap-1">
                         {s.keys.map((k, i) => (
                           <React.Fragment key={k}>
-                            {i > 0 && <span className="text-xs text-gray-400">then</span>}
+                            {i > 0 && <span className="text-xs text-cu-text-muted">then</span>}
                             <KbdKey>{k}</KbdKey>
                           </React.Fragment>
                         ))}
@@ -110,7 +110,7 @@ const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({ open, o
             ))}
           </div>
 
-          <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-400 text-center">
+          <div className="px-5 py-3 border-t border-cu-border bg-cu-bg-secondary text-xs text-cu-text-muted text-center">
             Press <KbdKey>?</KbdKey> anytime to toggle this panel
           </div>
         </motion.div>

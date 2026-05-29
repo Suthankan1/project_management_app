@@ -5,6 +5,7 @@ import { RefreshCw, WifiOff } from 'lucide-react';
 
 interface ChatConnectionBannersProps {
   isConnected: boolean;
+  isReconnecting: boolean;
   shouldShowErrorBanner: boolean;
   error: string;
   onRetry: () => void;
@@ -12,6 +13,7 @@ interface ChatConnectionBannersProps {
 
 export function ChatConnectionBanners({
   isConnected,
+  isReconnecting,
   shouldShowErrorBanner,
   error,
   onRetry,
@@ -29,16 +31,24 @@ export function ChatConnectionBanners({
           >
             <div className="bg-amber-50 border-b border-amber-100 px-4 py-2.5 flex items-center justify-between gap-3" role="alert">
               <div className="flex items-center gap-2 text-amber-700">
-                <WifiOff size={14} strokeWidth={2.5} />
-                  <span className="text-[12.5px] font-medium">Disconnected — messages may not be delivered</span>
+                {isReconnecting ? (
+                  <RefreshCw size={14} strokeWidth={2.5} className="animate-spin" />
+                ) : (
+                  <WifiOff size={14} strokeWidth={2.5} />
+                )}
+                <span className="text-[12.5px] font-medium">
+                  {isReconnecting ? 'Reconnecting...' : 'Disconnected — messages may not be delivered'}
+                </span>
               </div>
-              <button
-                onClick={onRetry}
-                className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-700 hover:text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg px-3 py-1 transition-colors"
-              >
-                <RefreshCw size={12} strokeWidth={2.5} />
-                Reconnect
-              </button>
+              {!isReconnecting && (
+                <button
+                  onClick={onRetry}
+                  className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-700 hover:text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg px-3 py-1 transition-colors"
+                >
+                  <RefreshCw size={12} strokeWidth={2.5} />
+                  Reconnect
+                </button>
+              )}
             </div>
           </motion.div>
         )}

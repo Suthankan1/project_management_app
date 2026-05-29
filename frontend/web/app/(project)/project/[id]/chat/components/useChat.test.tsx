@@ -45,10 +45,11 @@ jest.mock('@/services/chat-service', () => ({
   },
   searchChatMessages: async (projectId: string, query: string) => {
     const res = await fetch(
-      `/api/projects/${projectId}/chat/search?q=${encodeURIComponent(query)}`,
+      `/api/search?q=${encodeURIComponent(query)}&projectId=${encodeURIComponent(projectId)}`,
     );
     if (!res.ok) return [];
-    return (res.json() as Promise<unknown[]>);
+    const data = (await res.json()) as { messages?: unknown[] };
+    return data.messages || [];
   },
   postThreadReply: async (projectId: string, parentId: number, content: string) => {
     const res = await fetch(
@@ -137,15 +138,20 @@ describe('useChat hook', () => {
       return jsonResponse({ id: 51, sender: 'alice', content: 'thread reply', parentMessageId: 1 });
     }
 
-    if (url.includes('/chat/search?')) {
-      return jsonResponse([
-        {
-          messageId: 10,
-          sender: 'bob',
-          content: 'backend deploy complete',
-          context: 'TEAM',
-        },
-      ]);
+    if (url.includes('/api/search?')) {
+      return jsonResponse({
+        messages: [
+          {
+            messageId: 10,
+            senderName: 'bob',
+            highlightedContent: 'backend deploy complete',
+            type: 'MESSAGE',
+            roomOrProjectId: 42,
+            projectId: 42,
+            deepLinkUrl: '/project/42/chat?messageId=10&view=team',
+          },
+        ],
+      });
     }
 
     if (url.includes('/chat/messages/') && url.includes('/reactions')) {
@@ -371,7 +377,7 @@ describe('useChat hook', () => {
 
     await waitFor(() => {
       expect(result.current.searchResults).toHaveLength(1);
-      expect(result.current.searchResults[0].content).toContain('backend');
+      expect(result.current.searchResults[0].highlightedContent).toContain('backend');
     });
   });
 
@@ -383,7 +389,7 @@ describe('useChat hook', () => {
     await result.current.searchMessages('backend');
 
     expect(result.current.searchResults).toEqual([]);
-    const searchCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/chat/search?'));
+    const searchCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/search?'));
     expect(searchCalls).toHaveLength(0);
   });
 

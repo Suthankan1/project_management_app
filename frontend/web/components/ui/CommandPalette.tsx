@@ -59,10 +59,10 @@ export default function CommandPalette() {
                 >
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
 
-                    <div className="relative w-full max-w-xl bg-white dark:bg-[#1E293B] rounded-2xl shadow-2xl border border-[#E5E7EB] dark:border-[#334155] overflow-hidden">
+                    <div className="relative w-full max-w-xl bg-cu-bg rounded-2xl shadow-2xl border border-cu-border overflow-hidden">
                         {/* Search input */}
-                        <div className="flex items-center gap-3 px-4 py-3 border-b border-[#F3F4F6] dark:border-[#334155]">
-                            <Search size={18} className="text-[#9CA3AF] flex-shrink-0" />
+                        <div className="flex items-center gap-3 px-4 py-3 border-b border-cu-border">
+                            <Search size={18} className="text-cu-text-muted flex-shrink-0" />
                             <input
                                 ref={inputRef}
                                 type="text"
@@ -70,10 +70,10 @@ export default function CommandPalette() {
                                 value={query}
                                 onChange={(e) => { setQuery(e.target.value); setHighlighted(0); }}
                                 onKeyDown={handleKeyDown}
-                                className="flex-1 bg-transparent text-sm text-[#101828] dark:text-[#F1F5F9] placeholder-[#9CA3AF] outline-none"
+                                className="flex-1 bg-transparent text-sm text-cu-text-primary placeholder-cu-text-muted outline-none"
                             />
                             {query && (
-                                <button type="button" onClick={() => setQuery('')} className="text-[#9CA3AF] hover:text-[#374151] dark:hover:text-[#F1F5F9]">
+                                <button type="button" onClick={() => setQuery('')} className="text-cu-text-muted hover:text-cu-text-primary">
                                     <X size={16} />
                                 </button>
                             )}
@@ -84,17 +84,17 @@ export default function CommandPalette() {
                             {/* Navigation section (shown when no query) */}
                             {showNav && (
                                 <div>
-                                    <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-[#9CA3AF] uppercase tracking-wider">Navigate</p>
+                                    <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-cu-text-muted uppercase tracking-wider">Navigate</p>
                                     {NAV_ITEMS.map(({ label, path, icon: Icon }) => (
                                         <button
                                             key={path}
                                             type="button"
                                             onClick={() => navigateTo(path)}
-                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-[#F9FAFB] dark:hover:bg-[#293548] transition-colors"
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-cu-hover transition-colors"
                                         >
-                                            <Icon size={15} className="text-[#6B7280] flex-shrink-0" />
-                                            <span className="flex-1 text-sm text-[#344054] dark:text-[#F1F5F9]">{label}</span>
-                                            <ChevronRight size={13} className="text-[#D1D5DB]" />
+                                            <Icon size={15} className="text-cu-text-secondary flex-shrink-0" />
+                                            <span className="flex-1 text-sm text-cu-text-primary">{label}</span>
+                                            <ChevronRight size={13} className="text-cu-border" />
                                         </button>
                                     ))}
                                 </div>
@@ -103,12 +103,12 @@ export default function CommandPalette() {
                             {/* Task search results */}
                             {!showNav && (
                                 <>
-                                    {isSearching && <p className="px-4 py-3 text-sm text-[#9CA3AF]">Searching…</p>}
+                                    {isSearching && <p className="px-4 py-3 text-sm text-cu-text-muted">Searching…</p>}
                                     {!isSearching && results.length === 0 && (
-                                        <p className="px-4 py-3 text-sm text-[#9CA3AF]">No tasks found for &quot;{query}&quot;</p>
+                                        <p className="px-4 py-3 text-sm text-cu-text-muted">No tasks found for &quot;{query}&quot;</p>
                                     )}
                                     {!isSearching && results.length > 0 && (
-                                        <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-[#9CA3AF] uppercase tracking-wider">Tasks</p>
+                                        <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-cu-text-muted uppercase tracking-wider">Tasks</p>
                                     )}
                                     {results.map((task, i) => (
                                         <button
@@ -117,12 +117,12 @@ export default function CommandPalette() {
                                             onClick={() => openTask(task.id)}
                                             onMouseEnter={() => setHighlighted(i)}
                                             className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                                                i === highlighted ? 'bg-blue-50 dark:bg-[#293548]' : 'hover:bg-[#F9FAFB] dark:hover:bg-[#293548]'
+                                                i === highlighted ? 'bg-cu-primary/10' : 'hover:bg-cu-hover'
                                             }`}
                                         >
-                                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[task.status] ?? 'bg-gray-400'}`} />
-                                            <span className="flex-1 text-sm text-[#344054] dark:text-[#F1F5F9] truncate">{task.title}</span>
-                                            <span className="text-xs text-[#9CA3AF] flex-shrink-0">{STATUS_LABEL[task.status] ?? task.status}</span>
+                                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[task.status] ?? 'bg-cu-border'}`} />
+                                            <span className="flex-1 text-sm text-cu-text-primary truncate">{task.title}</span>
+                                            <span className="text-xs text-cu-text-muted flex-shrink-0">{STATUS_LABEL[task.status] ?? task.status}</span>
                                         </button>
                                     ))}
                                 </>
@@ -130,10 +130,10 @@ export default function CommandPalette() {
                         </div>
 
                         {/* Footer hint */}
-                        <div className="border-t border-[#F3F4F6] dark:border-[#334155] px-4 py-2 flex items-center gap-3 text-[11px] text-[#9CA3AF]">
-                            <span><kbd className="font-mono bg-[#F3F4F6] dark:bg-[#293548] px-1 rounded">↑↓</kbd> navigate</span>
-                            <span><kbd className="font-mono bg-[#F3F4F6] dark:bg-[#293548] px-1 rounded">↵</kbd> open</span>
-                            <span><kbd className="font-mono bg-[#F3F4F6] dark:bg-[#293548] px-1 rounded">Esc</kbd> close</span>
+                        <div className="border-t border-cu-border px-4 py-2 flex items-center gap-3 text-[11px] text-cu-text-muted">
+                            <span><kbd className="font-mono bg-cu-bg-secondary px-1 rounded">↑↓</kbd> navigate</span>
+                            <span><kbd className="font-mono bg-cu-bg-secondary px-1 rounded">↵</kbd> open</span>
+                            <span><kbd className="font-mono bg-cu-bg-secondary px-1 rounded">Esc</kbd> close</span>
                         </div>
                     </div>
                 </div>

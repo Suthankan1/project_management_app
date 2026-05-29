@@ -275,13 +275,13 @@ export function NotificationBell() {
     <div className="relative" ref={rootRef}>
       <button
         onClick={() => setShowDropdown(!showDropdown)}
-        className="relative inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-600 hover:text-slate-800 hover:bg-black/5 transition-colors max-sm:h-9 max-sm:w-9"
+        className="relative inline-flex h-8 w-8 items-center justify-center rounded-full text-cu-text-secondary hover:text-cu-text-primary hover:bg-cu-hover transition-colors max-sm:h-9 max-sm:w-9"
       >
         <span className="relative inline-flex items-center justify-center leading-none">
           <Bell size={20} strokeWidth={2.2} className="block text-current" />
           {hasMounted && unreadCount > 0 && (
             <span
-              className="pointer-events-none absolute -right-1.5 -top-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-cu-danger px-1 text-[10px] font-bold leading-none text-white shadow-sm"
+              className="pointer-events-none absolute -right-1.5 -top-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-cu-bg bg-cu-danger px-1 text-[10px] font-bold leading-none text-white shadow-sm"
               aria-label={`${unreadCount} unread notifications`}
             >
               <span className="tabular-nums">{unreadCount > 9 ? '9+' : unreadCount}</span>
@@ -297,24 +297,24 @@ export function NotificationBell() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="absolute right-0 mt-3 w-80 bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden z-50 origin-top-right transition-all"
+            className="absolute right-0 mt-3 w-80 bg-cu-bg border border-cu-border shadow-cu-xl rounded-2xl overflow-hidden z-50 origin-top-right transition-all"
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-white/50">
-              <span className="font-bold text-slate-900 text-[14px] font-outfit">Notifications</span>
-              <button 
+            <div className="flex items-center justify-between px-4 py-3 border-b border-cu-border bg-cu-bg/80">
+              <span className="font-bold text-cu-text-primary text-[14px] font-outfit">Notifications</span>
+              <button
                 onClick={() => void handleMarkAllAsRead()}
                 disabled={unreadCount === 0 || isMarkingAllRead}
-                className="text-[11px] font-bold text-blue-600 hover:text-blue-700 transition font-outfit uppercase tracking-wider disabled:opacity-50"
+                className="text-[11px] font-bold text-cu-primary hover:text-cu-primary-hover transition font-outfit uppercase tracking-wider disabled:opacity-50"
               >
                 {isMarkingAllRead ? 'Marking...' : 'Mark all as read'}
               </button>
             </div>
             {notifications.length > 0 && (
-              <div className="flex justify-end px-4 py-2 border-b border-slate-100 bg-slate-50/40">
+              <div className="flex justify-end px-4 py-2 border-b border-cu-border bg-cu-bg-secondary/60">
                 <button
                   onClick={handleDeleteAll}
                   disabled={isDeletingAll}
-                  className="text-[11px] font-semibold text-slate-500 hover:text-red-600 transition font-outfit uppercase tracking-wider disabled:opacity-50"
+                  className="text-[11px] font-semibold text-cu-text-tertiary hover:text-cu-danger transition font-outfit uppercase tracking-wider disabled:opacity-50"
                 >
                   {isDeletingAll ? 'Deleting...' : 'Delete all'}
                 </button>
@@ -322,12 +322,12 @@ export function NotificationBell() {
             )}
             <div className="max-h-[320px] overflow-y-auto no-scrollbar">
               {listItems.length === 0 ? (
-                <div className="p-10 text-center text-slate-400 text-sm italic">You have no notifications</div>
+                <div className="p-10 text-center text-cu-text-muted text-sm italic">You have no notifications</div>
               ) : (
                 listItems.map((item) => (
                   <div
                     key={item.rowKey}
-                    className={`group relative border-b last:border-0 border-slate-50 ${item.isUnread ? 'bg-blue-50/30' : ''}`}
+                    className={`group relative border-b last:border-0 border-cu-border ${item.isUnread ? 'bg-cu-primary/5' : ''}`}
                   >
                     {(() => {
                       const isRowReadPending = item.unreadIds.some((id) => pendingReadIds.includes(id));
@@ -341,17 +341,17 @@ export function NotificationBell() {
                           void markRowAsRead(item.unreadIds);
                           setShowDropdown(false);
                       }}
-                      className={`block p-4 pr-11 hover:bg-slate-50 transition-colors ${
+                      className={`block p-4 pr-11 hover:bg-cu-hover transition-colors ${
                         isRowReadPending ? 'pointer-events-none opacity-70' : ''
                       }`}
                     >
                       <div className="flex gap-3">
-                        <div className={`w-2 h-2 mt-1.5 rounded-full shrink-0 ${item.isUnread ? 'bg-blue-600' : 'bg-transparent'}`} />
+                        <div className={`w-2 h-2 mt-1.5 rounded-full shrink-0 ${item.isUnread ? 'bg-cu-primary' : 'bg-transparent'}`} />
                         <div>
-                          <p className={`text-[13px] leading-relaxed ${item.isUnread ? 'text-slate-900 font-bold' : 'text-slate-600 font-medium'} font-outfit`}>
+                          <p className={`text-[13px] leading-relaxed font-outfit ${item.isUnread ? 'text-cu-text-primary font-bold' : 'text-cu-text-secondary font-medium'}`}>
                             {item.displayMessage}
                           </p>
-                          <span className="text-[10px] text-slate-400 mt-1.5 block font-bold uppercase tracking-wider font-outfit">
+                          <span className="text-[10px] text-cu-text-muted mt-1.5 block font-bold uppercase tracking-wider font-outfit">
                             {new Date(item.createdAt).toLocaleDateString()}
                           </span>
                         </div>
@@ -364,7 +364,7 @@ export function NotificationBell() {
                       aria-label="Delete notification"
                       onClick={(event) => void handleDeleteSingle(event, item.notificationIds)}
                       disabled={item.notificationIds.some((id) => pendingDeleteIds.includes(id))}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50 transition opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-cu-text-muted hover:text-cu-danger hover:bg-cu-danger/10 transition opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -372,11 +372,11 @@ export function NotificationBell() {
                 ))
               )}
             </div>
-            <div className="border-t border-slate-100 bg-white px-4 py-2.5">
+            <div className="border-t border-cu-border bg-cu-bg px-4 py-2.5">
               <Link
                 href="/dashboard/notifications"
                 onClick={() => setShowDropdown(false)}
-                className="block text-center text-[12px] font-semibold text-blue-600 hover:text-blue-700 transition font-outfit"
+                className="block text-center text-[12px] font-semibold text-cu-primary hover:text-cu-primary-hover transition font-outfit"
               >
                 View all notifications
               </Link>

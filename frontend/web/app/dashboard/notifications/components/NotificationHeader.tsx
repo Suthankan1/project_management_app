@@ -22,7 +22,7 @@ export function NotificationHeader({
       <div className="flex items-center gap-3 py-4 md:hidden">
           <button
               onClick={() => window.dispatchEvent(new CustomEvent('planora:sidebar:toggle'))}
-              className="p-2 -ml-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors border border-slate-100"
+              className="p-2 -ml-2 text-cu-text-secondary hover:bg-cu-hover rounded-lg transition-colors border border-cu-border"
               aria-label="Toggle Sidebar"
           >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -31,23 +31,23 @@ export function NotificationHeader({
                   <line x1="3" y1="18" x2="21" y2="18" />
               </svg>
           </button>
-          <div className="font-outfit text-xl font-extrabold tracking-tight text-[#101828] flex items-center gap-2">
-              <span className="w-2 h-5 bg-blue-600 rounded-full"></span>
+          <div className="font-outfit text-xl font-extrabold tracking-tight text-cu-text-primary flex items-center gap-2">
+              <span className="w-2 h-5 bg-cu-primary rounded-full"></span>
               PLANORA
           </div>
       </div>
 
       <div className="flex flex-col sm:mb-2 mt-0">
-          <div className="flex items-center gap-2 text-[13px] text-[#4A5565] mb-1">
-              <Link href="/dashboard" className="hover:text-[#0052CC]">Dashboard</Link>
+          <div className="flex items-center gap-2 text-[13px] text-cu-text-secondary mb-1">
+              <Link href="/dashboard" className="hover:text-cu-primary">Dashboard</Link>
               <span>/</span>
-              <span className="font-medium text-[#101828]">Notifications</span>
+              <span className="font-medium text-cu-text-primary">Notifications</span>
           </div>
           
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1 className="font-outfit text-2xl sm:text-[32px] font-bold text-[#101828]">Notifications</h1>
-              <p className="text-xs sm:text-sm text-[#4A5565] mt-1 font-outfit leading-relaxed">
+              <h1 className="font-outfit text-2xl sm:text-[32px] font-bold text-cu-text-primary">Notifications</h1>
+              <p className="text-xs sm:text-sm text-cu-text-secondary mt-1 font-outfit leading-relaxed">
                 Stay updated with task changes, chat activity, and project events.
               </p>
             </div>
@@ -57,7 +57,7 @@ export function NotificationHeader({
           type="button"
           onClick={onMarkAllAsRead}
           disabled={unreadCount === 0}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D0D5DD] bg-white px-3 py-2.5 min-h-[44px] sm:min-h-0 text-xs font-bold text-[#344054] hover:bg-[#F9FAFB] disabled:opacity-50 transition-all active:scale-95 font-outfit"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-cu-border bg-cu-bg px-3 py-2.5 min-h-[44px] sm:min-h-0 text-xs font-bold text-cu-text-primary hover:bg-cu-hover disabled:opacity-50 transition-all active:scale-95 font-outfit shadow-cu-sm"
         >
           <CheckCheck size={14} />
           Mark all as read
@@ -66,7 +66,7 @@ export function NotificationHeader({
           type="button"
           onClick={onDeleteAll}
           disabled={totalCount === 0 || isDeletingAll}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-100 bg-white px-3 py-2.5 min-h-[44px] sm:min-h-0 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50 transition-all active:scale-95 font-outfit"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-cu-danger/20 bg-cu-bg px-3 py-2.5 min-h-[44px] sm:min-h-0 text-xs font-bold text-cu-danger hover:bg-cu-danger/10 disabled:opacity-50 transition-all active:scale-95 font-outfit shadow-cu-sm"
         >
           <Trash2 size={14} />
           {isDeletingAll ? 'Deleting...' : 'Delete all'}

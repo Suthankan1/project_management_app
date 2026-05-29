@@ -11,13 +11,13 @@ interface CalendarEventPopupProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-    TODO:        'bg-gray-100 text-gray-600',
-    IN_PROGRESS: 'bg-blue-100 text-blue-700',
-    IN_REVIEW:   'bg-yellow-100 text-yellow-800',
-    DONE:        'bg-green-100 text-green-700',
-    Planned:     'bg-gray-100 text-gray-600',
-    Active:      'bg-blue-100 text-blue-700',
-    Completed:   'bg-green-100 text-green-700',
+    TODO:        'bg-cu-bg-tertiary text-cu-text-secondary',
+    IN_PROGRESS: 'bg-cu-primary/10 text-cu-primary',
+    IN_REVIEW:   'bg-amber-400/15 text-amber-500',
+    DONE:        'bg-emerald-500/15 text-emerald-500',
+    Planned:     'bg-cu-bg-tertiary text-cu-text-secondary',
+    Active:      'bg-cu-primary/10 text-cu-primary',
+    Completed:   'bg-emerald-500/15 text-emerald-500',
 };
 
 function formatDate(d?: string) {
@@ -63,19 +63,19 @@ export default function CalendarEventPopup({ event, position, onClose }: Calenda
         <div
             ref={ref}
             style={{ position: 'fixed', left, top, zIndex: 200, width: POPUP_W }}
-            className="bg-white rounded-xl border border-[#E4E7EC] shadow-xl overflow-hidden"
+            className="bg-cu-bg rounded-xl border border-cu-border shadow-xl overflow-hidden"
         >
             {/* Header */}
-            <div className={`px-4 py-3 flex items-start justify-between gap-2 ${event.kind === 'sprint' ? 'bg-[#DFF3FF]' : 'bg-[#F9FAFB]'}`}>
+            <div className={`px-4 py-3 flex items-start justify-between gap-2 ${event.kind === 'sprint' ? 'bg-cu-primary/10' : 'bg-cu-bg-secondary'}`}>
                 <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-[#101828] truncate">{event.title}</p>
-                    <span className={`inline-block mt-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${event.kind === 'sprint' ? 'bg-[#B2DDFF] text-[#175CD3]' : 'bg-[#E4E7EC] text-[#344054]'}`}>
+                    <p className="text-[13px] font-semibold text-cu-text-primary truncate">{event.title}</p>
+                    <span className={`inline-block mt-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${event.kind === 'sprint' ? 'bg-cu-primary/20 text-cu-primary' : 'bg-cu-bg-tertiary text-cu-text-secondary'}`}>
                         {event.kind === 'sprint' ? 'Sprint' : (event.type ?? 'Task')}
                     </span>
                 </div>
                 <button
                     onClick={onClose}
-                    className="p-1 text-[#98A2B3] hover:text-[#344054] rounded transition-colors shrink-0 mt-0.5"
+                    className="p-1 text-cu-text-muted hover:text-cu-text-primary rounded transition-colors shrink-0 mt-0.5"
                 >
                     <X size={14} />
                 </button>
@@ -85,34 +85,34 @@ export default function CalendarEventPopup({ event, position, onClose }: Calenda
             <div className="px-4 py-3 space-y-2">
                 {event.status && (
                     <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[#667085] w-16 shrink-0">Status</span>
-                        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[event.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                        <span className="text-[11px] text-cu-text-muted w-16 shrink-0">Status</span>
+                        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[event.status] ?? 'bg-cu-bg-tertiary text-cu-text-secondary'}`}>
                             {event.status.replace(/_/g, ' ')}
                         </span>
                     </div>
                 )}
                 {event.assignee && (
                     <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[#667085] w-16 shrink-0">Assignee</span>
-                        <span className="text-[11px] text-[#101828]">{event.assignee}</span>
+                        <span className="text-[11px] text-cu-text-muted w-16 shrink-0">Assignee</span>
+                        <span className="text-[11px] text-cu-text-primary">{event.assignee}</span>
                     </div>
                 )}
                 {(event.startDate || event.dueDate) && (
                     <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[#667085] w-16 shrink-0">
+                        <span className="text-[11px] text-cu-text-muted w-16 shrink-0">
                             {event.kind === 'sprint' ? 'Start' : 'Due'}
                         </span>
-                        <span className="text-[11px] text-[#101828]">{formatDate(event.startDate || event.dueDate)}</span>
+                        <span className="text-[11px] text-cu-text-primary">{formatDate(event.startDate || event.dueDate)}</span>
                     </div>
                 )}
                 {event.endDate && event.kind === 'sprint' && (
                     <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[#667085] w-16 shrink-0">End</span>
-                        <span className="text-[11px] text-[#101828]">{formatDate(event.endDate)}</span>
+                        <span className="text-[11px] text-cu-text-muted w-16 shrink-0">End</span>
+                        <span className="text-[11px] text-cu-text-primary">{formatDate(event.endDate)}</span>
                     </div>
                 )}
                 {event.description && (
-                    <p className="text-[12px] text-[#475467] line-clamp-3 pt-2 border-t border-[#F2F4F7] mt-1">
+                    <p className="text-[12px] text-cu-text-secondary line-clamp-3 pt-2 border-t border-cu-border mt-1">
                         {event.description}
                     </p>
                 )}

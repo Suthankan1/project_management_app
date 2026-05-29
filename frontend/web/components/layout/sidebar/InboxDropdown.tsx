@@ -130,7 +130,7 @@ export function InboxDropdown({
   return (
     <div
       data-sidebar-dropdown
-      className="bg-white rounded-xl border border-cu-border shadow-2xl shadow-black/10 overflow-hidden flex flex-col"
+      className="bg-cu-bg rounded-xl border border-cu-border shadow-2xl shadow-black/20 overflow-hidden flex flex-col"
       style={{
         position: 'fixed',
         top: fixedTop,
@@ -160,10 +160,10 @@ export function InboxDropdown({
       <div className="overflow-y-auto flex-1 py-1 custom-scrollbar">
         {loading ? (
           <div className="px-3 py-3 flex flex-col gap-3 animate-pulse">
-            <div className="h-3 w-32 bg-gray-100 rounded" />
-            <div className="h-3 w-24 bg-gray-100 rounded" />
-            <div className="h-3 w-28 bg-gray-100 rounded" />
-            <div className="h-3 w-20 bg-gray-100 rounded" />
+            <div className="h-3 w-32 bg-cu-bg-tertiary rounded" />
+            <div className="h-3 w-24 bg-cu-bg-tertiary rounded" />
+            <div className="h-3 w-28 bg-cu-bg-tertiary rounded" />
+            <div className="h-3 w-20 bg-cu-bg-tertiary rounded" />
           </div>
         ) : error ? (
           <div className="px-3 py-5 text-center">

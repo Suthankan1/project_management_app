@@ -32,6 +32,9 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     @EntityGraph(attributePaths = {"owner", "team"})
     List<Project> findAll();
 
+    @EntityGraph(attributePaths = {"team"})
+    List<Project> findByGithubRepoFullNameIgnoreCase(String githubRepoFullName);
+
     @Query("SELECT p.team.id FROM Project p WHERE p.id = :projectId")
     Long findTeamIdByProjectId(@Param("projectId") Long projectId);
 

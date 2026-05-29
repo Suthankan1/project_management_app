@@ -39,7 +39,11 @@ export default function SummaryPage() {
     }
 
     if (error) {
-        return <div className="p-4 text-center text-red-500">Failed to load dashboard data. Please refresh.</div>;
+        return (
+            <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-cu-danger/20 bg-cu-bg p-6 text-center text-cu-danger shadow-cu-sm">
+                Failed to load dashboard data. Please refresh.
+            </div>
+        );
     }
 
     return (

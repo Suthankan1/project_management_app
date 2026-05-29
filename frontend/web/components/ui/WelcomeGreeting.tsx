@@ -26,7 +26,13 @@ export default function WelcomeGreeting({ username }: WelcomeGreetingProps) {
         return () => clearTimeout(timer);
     }, [username]);
 
-    if (!timeData) return <h1 className="font-arimo text-[16px] xl:text-[20px] leading-[24px] text-transparent font-semibold invisible">Loading</h1>;
+    if (!timeData) {
+        return (
+            <div className="flex h-7 w-full max-w-[360px] items-center">
+                <div className="h-5 w-48 rounded bg-cu-bg-tertiary" />
+            </div>
+        );
+    }
 
     const renderIcon = () => {
         switch (timeData.period) {
@@ -121,12 +127,12 @@ export default function WelcomeGreeting({ username }: WelcomeGreetingProps) {
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
-            className="flex items-center gap-2 sm:gap-2.5 min-w-0"
+            className="flex w-full min-w-0 items-center gap-2 sm:gap-2.5"
         >
             <div className="flex-shrink-0 flex items-center justify-center">
                 {renderIcon()}
             </div>
-            <h1 className="font-outfit text-[16px] sm:text-[19px] xl:text-[21px] leading-tight text-[#101828] font-bold tracking-tight truncate">
+            <h1 className="min-w-0 truncate font-outfit text-[16px] sm:text-[19px] xl:text-[21px] leading-tight text-cu-text-primary font-bold tracking-tight">
                 {timeData.text}
             </h1>
         </motion.div>

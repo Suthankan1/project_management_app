@@ -8,7 +8,7 @@ interface KbdKeyProps {
 
 const KbdKey: React.FC<KbdKeyProps> = ({ children, className = '' }) => (
   <kbd
-    className={`inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 border border-gray-300 rounded shadow-sm font-mono ${className}`}
+    className={`inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 py-0.5 text-xs font-medium bg-cu-bg-secondary text-cu-text-secondary border border-cu-border rounded shadow-cu-sm font-mono ${className}`}
   >
     {children}
   </kbd>

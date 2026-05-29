@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, FlatList, TextInput, Modal,
+  ActivityIndicator, FlatList, TextInput, Modal, Animated, SectionList,
   Platform, Linking, LayoutChangeEvent,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,6 +25,69 @@ import {
 const GITHUB_CLIENT_ID = process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID ?? '';
 const REDIRECT_URI = 'mobile://github-callback';
 type ActiveTab = 'prs' | 'commits' | 'issues';
+type IssueFilter = 'open' | 'closed' | 'all';
+type NotificationType = 'pull-request' | 'issue' | 'security' | 'release';
+
+type GitHubNotificationItem = {
+  id: string;
+  repoFullName: string;
+  type: NotificationType;
+  title: string;
+  reason: string;
+  timestamp: string;
+  unread: boolean;
+};
+
+type GitHubNotificationGroup = {
+  repoFullName: string;
+  unreadCount: number;
+  items: GitHubNotificationItem[];
+};
+
+const MOCK_ISSUES: GitHubIssue[] = [
+  {
+    id: 9101,
+    number: 1842,
+    title: 'Glass shell overlaps the bottom tab bar on shorter devices',
+    state: 'open',
+    labels: [
+      { id: 1, name: 'bug', color: 'ef4444' },
+      { id: 2, name: 'mobile', color: '38bdf8' },
+    ],
+    html_url: 'https://github.com/planora/mobile/issues/1842',
+    updated_at: '2026-05-27T17:15:00.000Z',
+    user: { login: 'samirh', avatar_url: 'https://avatars.githubusercontent.com/u/9919?v=4' },
+    comments: 8,
+  },
+  {
+    id: 9102,
+    number: 1848,
+    title: 'Notification badges should stay visible over blur layers',
+    state: 'open',
+    labels: [
+      { id: 3, name: 'enhancement', color: '3b82f6' },
+      { id: 4, name: 'ui', color: 'a855f7' },
+    ],
+    html_url: 'https://github.com/planora/mobile/issues/1848',
+    updated_at: '2026-05-28T06:25:00.000Z',
+    user: { login: 'ninao', avatar_url: 'https://avatars.githubusercontent.com/u/15590466?v=4' },
+    comments: 3,
+  },
+  {
+    id: 9103,
+    number: 1799,
+    title: 'Refine repository picker spacing for compact phones',
+    state: 'closed',
+    labels: [
+      { id: 5, name: 'resolved', color: '94a3b8' },
+      { id: 6, name: 'layout', color: '14b8a6' },
+    ],
+    html_url: 'https://github.com/planora/mobile/issues/1799',
+    updated_at: '2026-05-23T14:45:00.000Z',
+    user: { login: 'luke', avatar_url: 'https://avatars.githubusercontent.com/u/1000?v=4' },
+    comments: 1,
+  },
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function timeAgo(dateStr: string): string {
@@ -43,6 +106,85 @@ function prStatusInfo(pr: GitHubPullRequest) {
   if (pr.merged_at) return { label: 'Merged', color: '#C084FC', bg: 'rgba(192,132,252,0.12)', border: 'rgba(192,132,252,0.3)' };
   if (pr.state === 'closed') return { label: 'Closed', color: '#F87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.25)' };
   return { label: 'Open', color: '#34D399', bg: 'rgba(52,211,153,0.12)', border: 'rgba(52,211,153,0.3)' };
+}
+
+function issueStatusInfo(issue: GitHubIssue) {
+  if (issue.state === 'open') {
+    return { label: 'Open', color: '#3fb950', bg: 'rgba(63,185,80,0.18)', border: 'rgba(63,185,80,0.34)' };
+  }
+  return { label: 'Closed', color: '#94A3B8', bg: 'rgba(148,163,184,0.14)', border: 'rgba(148,163,184,0.22)' };
+}
+
+function initialsFromName(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part[0]?.toUpperCase() ?? '')
+    .join('')
+    .slice(0, 2) || 'GH';
+}
+
+function buildNotificationGroups(repoFullName: string): GitHubNotificationGroup[] {
+  return [
+    {
+      repoFullName,
+      unreadCount: 2,
+      items: [
+        {
+          id: `${repoFullName}-1`,
+          repoFullName,
+          type: 'issue',
+          title: 'Glass cards for issue rows need a stronger blur edge on dark mode',
+          reason: 'mentioned',
+          timestamp: '12m ago',
+          unread: true,
+        },
+        {
+          id: `${repoFullName}-2`,
+          repoFullName,
+          type: 'pull-request',
+          title: 'Review requested for mobile issue shell polish',
+          reason: 'review requested',
+          timestamp: '2h ago',
+          unread: false,
+        },
+        {
+          id: `${repoFullName}-3`,
+          repoFullName,
+          type: 'release',
+          title: 'v1.8.0 is ready to publish to the beta channel',
+          reason: 'subscribed',
+          timestamp: '5h ago',
+          unread: true,
+        },
+      ],
+    },
+    {
+      repoFullName: 'vercel/next.js',
+      unreadCount: 1,
+      items: [
+        {
+          id: 'vercel-next-1',
+          repoFullName: 'vercel/next.js',
+          type: 'security',
+          title: 'A dependency update is waiting for triage in the app router',
+          reason: 'security alert',
+          timestamp: '1d ago',
+          unread: true,
+        },
+        {
+          id: 'vercel-next-2',
+          repoFullName: 'vercel/next.js',
+          type: 'issue',
+          title: 'Layout shift on iPhone 15 Pro Max in nested scroll views',
+          reason: 'subscribed',
+          timestamp: '4d ago',
+          unread: false,
+        },
+      ],
+    },
+  ];
 }
 
 // ── Glass Card ────────────────────────────────────────────────────────────────
@@ -246,6 +388,435 @@ function RepoPickerModal({
         </View>
       </View>
     </Modal>
+  );
+}
+
+function FadeSlideIn({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: object }) {
+  const opacity = React.useRef(new Animated.Value(0)).current;
+  const translateY = React.useRef(new Animated.Value(12)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 300, delay, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 300, delay, useNativeDriver: true }),
+    ]).start();
+  }, [delay, opacity, translateY]);
+
+  return (
+    <Animated.View style={[style, { opacity, transform: [{ translateY }] }]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+function AvatarStack({ primaryUrl, primaryInitials, secondaryInitials, tertiaryInitials }: {
+  primaryUrl?: string | null;
+  primaryInitials: string;
+  secondaryInitials: string;
+  tertiaryInitials: string;
+}) {
+  return (
+    <View style={gh.avatarStack}>
+      {primaryUrl ? (
+        <Image source={{ uri: primaryUrl }} style={[gh.avatarStackItem, gh.avatarStackPrimary]} contentFit="cover" />
+      ) : (
+        <View style={[gh.avatarStackItem, gh.avatarStackPrimary, gh.avatarFallback]}>
+          <Text style={gh.avatarFallbackText}>{primaryInitials}</Text>
+        </View>
+      )}
+      <View style={[gh.avatarStackItem, gh.avatarStackSecondary]}>
+        <Text style={gh.avatarFallbackText}>{secondaryInitials}</Text>
+      </View>
+      <View style={[gh.avatarStackItem, gh.avatarStackTertiary]}>
+        <Text style={gh.avatarFallbackText}>{tertiaryInitials}</Text>
+      </View>
+    </View>
+  );
+}
+
+function IssueGlassCard({ issue, repoFullName, index }: { issue: GitHubIssue; repoFullName: string; index: number }) {
+  const status = issueStatusInfo(issue);
+  const secondaryInitials = initialsFromName(issue.user.login).slice(0, 2) || 'GH';
+  const tertiaryInitials = issue.number.toString().slice(-2);
+
+  return (
+    <FadeSlideIn delay={index * 60} style={gh.issueCardSpacing}>
+      <TouchableOpacity activeOpacity={0.85} style={gh.issueCardWrap}>
+        <BlurView intensity={22} tint="dark" experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
+        <View style={gh.issueCard}>
+          <View style={[gh.issueStateDot, { backgroundColor: status.color }]} />
+
+          <View style={gh.issueMain}>
+            <Text style={gh.issueTitle} numberOfLines={1}>{issue.title}</Text>
+            <Text style={gh.issueRepo}>{repoFullName}</Text>
+
+            <View style={gh.issueLabelRow}>
+              {issue.labels.slice(0, 2).map(label => (
+                <View
+                  key={`${issue.id}-${label.id ?? label.name}`}
+                  style={[
+                    gh.issueLabel,
+                    { backgroundColor: `#${label.color}1A`, borderColor: `#${label.color}40` },
+                  ]}
+                >
+                  <Text style={[gh.issueLabelText, { color: `#${label.color}` }]} numberOfLines={1}>
+                    {label.name}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={gh.issueFooterRow}>
+              <Text style={gh.issueMetaText}>
+                #{issue.number} {issue.state === 'open' ? 'opened' : 'closed'} {timeAgo(issue.updated_at)} by @{issue.user.login}
+              </Text>
+            </View>
+          </View>
+
+          <View style={gh.issueMetaSide}>
+            <AvatarStack
+              primaryUrl={issue.user.avatar_url}
+              primaryInitials={secondaryInitials}
+              secondaryInitials={tertiaryInitials}
+              tertiaryInitials={repoFullName.slice(0, 2).toUpperCase()}
+            />
+            <View style={gh.commentPill}>
+              <MaterialCommunityIcons name="message-reply-text-outline" size={11} color="rgba(255,255,255,0.75)" />
+              <Text style={gh.commentPillText}>{issue.comments}</Text>
+            </View>
+          </View>
+
+          <LinearGradient
+            colors={['rgba(255,255,255,0.00)', 'rgba(255,255,255,0.04)', 'rgba(88,166,255,0.10)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={gh.issueSwipeHint}
+          />
+        </View>
+      </TouchableOpacity>
+    </FadeSlideIn>
+  );
+}
+
+function NotificationGlassCard({ item, index }: { item: GitHubNotificationItem; index: number }) {
+  const iconInfo = {
+    'pull-request': { icon: 'source-pull', color: '#C084FC' },
+    issue: { icon: 'alert-circle-outline', color: '#3fb950' },
+    security: { icon: 'shield-outline', color: '#FBBF24' },
+    release: { icon: 'tag-outline', color: '#60A5FA' },
+  }[item.type];
+
+  return (
+    <FadeSlideIn delay={index * 60} style={gh.notificationSpacing}>
+      <TouchableOpacity activeOpacity={0.85} style={[gh.notificationCardWrap, item.unread && gh.notificationCardUnreadWrap]}>
+        <BlurView intensity={20} tint="dark" experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
+        <View style={[gh.notificationCard, item.unread && gh.notificationCardUnread]}>
+          <View style={[gh.notificationAccent, { backgroundColor: `${iconInfo.color}22` }]} />
+
+          <View style={[gh.notificationIcon, { borderColor: `${iconInfo.color}44`, backgroundColor: `${iconInfo.color}12` }]}>
+            <MaterialCommunityIcons name={iconInfo.icon as never} size={14} color={iconInfo.color} />
+          </View>
+
+          <View style={gh.notificationBody}>
+            <Text style={gh.notificationTitle} numberOfLines={2}>{item.title}</Text>
+            <View style={gh.notificationMetaRow}>
+              <View style={gh.reasonPill}>
+                <Text style={gh.reasonPillText}>{item.reason}</Text>
+              </View>
+              <Text style={gh.notificationTime}>{item.timestamp}</Text>
+            </View>
+          </View>
+
+          <View style={gh.notificationRight}>
+            <View style={[gh.unreadDotGlow, !item.unread && gh.unreadDotDim]}>
+              <LinearGradient
+                colors={item.unread ? ['#58a6ff', '#dbeafe'] : ['rgba(148,163,184,0.55)', 'rgba(148,163,184,0.18)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </View>
+          </View>
+
+          <LinearGradient
+            colors={['rgba(255,255,255,0.00)', 'rgba(255,255,255,0.03)', 'rgba(88,166,255,0.12)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={gh.notificationSwipeHint}
+          />
+        </View>
+      </TouchableOpacity>
+    </FadeSlideIn>
+  );
+}
+
+function MobileGitHubGlassShell({
+  projectId,
+  connection,
+  user,
+  issues,
+  loading,
+  onBack,
+  onHome,
+  onProfile,
+  onRepoPicker,
+}: {
+  projectId: string;
+  connection: ProjectGitHubConnection;
+  user: GitHubUser | null;
+  issues: GitHubIssue[];
+  loading: boolean;
+  onBack: () => void;
+  onHome: () => void;
+  onProfile: () => void;
+  onRepoPicker: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const listRef = React.useRef<SectionList<any>>(null);
+  const [issueFilter, setIssueFilter] = useState<IssueFilter>('open');
+  const [activeTab, setActiveTab] = useState<'issues' | 'notifications'>('issues');
+
+  const displayIssues = useMemo(() => (issues.length > 0 ? issues : MOCK_ISSUES), [issues]);
+  const filteredIssues = useMemo(() => {
+    if (issueFilter === 'all') return displayIssues;
+    return displayIssues.filter(issue => issue.state === issueFilter);
+  }, [displayIssues, issueFilter]);
+
+  const openIssueCount = useMemo(() => displayIssues.filter(issue => issue.state === 'open').length, [displayIssues]);
+  const notificationGroups = useMemo(() => buildNotificationGroups(connection.repoFullName), [connection.repoFullName]);
+  const unreadCount = useMemo(
+    () => notificationGroups.reduce((sum, group) => sum + group.unreadCount, 0),
+    [notificationGroups],
+  );
+
+  const sections = useMemo(() => {
+    const notificationSections = [
+      { key: 'notifications-intro', kind: 'notifications-intro' as const, data: [] as never[] },
+      ...notificationGroups.map(group => ({
+        key: group.repoFullName,
+        kind: 'notifications' as const,
+        repoFullName: group.repoFullName,
+        unreadCount: group.unreadCount,
+        data: group.items,
+      })),
+    ];
+
+    return [
+      { key: 'issues', kind: 'issues' as const, data: filteredIssues },
+      ...notificationSections,
+    ];
+  }, [filteredIssues, notificationGroups]);
+
+  const scrollToIssues = useCallback(() => {
+    listRef.current?.scrollToLocation({ sectionIndex: 0, itemIndex: 0, animated: true, viewOffset: 24 });
+    setActiveTab('issues');
+  }, []);
+
+  const scrollToNotifications = useCallback(() => {
+    listRef.current?.scrollToLocation({ sectionIndex: 1, itemIndex: 0, animated: true, viewOffset: 24 });
+    setActiveTab('notifications');
+  }, []);
+
+  return (
+    <View style={gh.shell}>
+      <LinearGradient
+        colors={['#0d1117', '#161b22', '#1a1f2e']}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <View style={[gh.blobIssues, { top: insets.top + 68 }]} />
+      <View style={gh.blobNotifications} />
+
+      <View style={[gh.topBar, { paddingTop: insets.top + 10 }]}>
+        <BlurView intensity={26} tint="dark" experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
+        <View style={gh.topBarRow}>
+          <TouchableOpacity onPress={onBack} style={gh.topBarAction} activeOpacity={0.8}>
+            <MaterialCommunityIcons name="arrow-left" size={20} color="rgba(255,255,255,0.92)" />
+          </TouchableOpacity>
+
+          <View style={gh.topBarTitleWrap}>
+            <Text style={gh.topBarTitle}>GitHub</Text>
+            <Text style={gh.topBarSubtitle} numberOfLines={1}>{connection.repoFullName}</Text>
+          </View>
+
+          <TouchableOpacity onPress={scrollToNotifications} style={gh.topBarAction} activeOpacity={0.8}>
+            <MaterialCommunityIcons name="bell-outline" size={18} color="rgba(255,255,255,0.92)" />
+            {unreadCount > 0 && (
+              <View style={gh.badgeBubble}>
+                <Text style={gh.badgeBubbleText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <SectionList
+        ref={listRef}
+        sections={sections as any}
+        keyExtractor={(item: any, index) => item?.id ? String(item.id) : `section-${index}`}
+        stickySectionHeadersEnabled
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingTop: insets.top + 110,
+          paddingHorizontal: 14,
+          paddingBottom: insets.bottom + 110,
+        }}
+        ListHeaderComponent={(
+          <View style={gh.heroCardWrap}>
+            <BlurView intensity={18} tint="dark" experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
+            <View style={gh.heroCard}>
+              <View style={gh.heroCopy}>
+                <Text style={gh.heroKicker}>Mobile GitHub</Text>
+                <Text style={gh.heroTitle}>Issues and notifications in a liquid glass shell.</Text>
+                <Text style={gh.heroSubCopy}>
+                  Open issues and repo notifications are surfaced with a dark glassmorphism treatment tuned for compact screens.
+                </Text>
+              </View>
+
+              <View style={gh.heroStatsRow}>
+                <View style={gh.heroStatPill}>
+                  <Text style={gh.heroStatValue}>{openIssueCount}</Text>
+                  <Text style={gh.heroStatLabel}>open issues</Text>
+                </View>
+                <View style={gh.heroStatPill}>
+                  <Text style={gh.heroStatValue}>{unreadCount}</Text>
+                  <Text style={gh.heroStatLabel}>unread alerts</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+        renderSectionHeader={({ section }) => {
+          if (section.kind === 'issues') {
+            return (
+              <View style={gh.sectionWrap}>
+                <View style={gh.sectionHeaderRow}>
+                  <View style={gh.sectionTitleRow}>
+                    <MaterialCommunityIcons name="circle-slice-8" size={15} color="#3fb950" />
+                    <Text style={gh.sectionTitle}>Issues</Text>
+                  </View>
+                  <View style={gh.sectionActionsRow}>
+                    <View style={gh.pillBadge}>
+                      <Text style={gh.pillBadgeText}>{openIssueCount} open</Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setIssueFilter((current) => (current === 'open' ? 'closed' : current === 'closed' ? 'all' : 'open'));
+                      }}
+                      style={gh.iconPill}
+                      activeOpacity={0.8}
+                    >
+                      <MaterialCommunityIcons name="filter-variant" size={14} color="rgba(255,255,255,0.88)" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={gh.filterRow}>
+                  {(['open', 'closed', 'all'] as IssueFilter[]).map(filterValue => {
+                    const isActive = issueFilter === filterValue;
+                    return (
+                      <TouchableOpacity
+                        key={filterValue}
+                        onPress={() => setIssueFilter(filterValue)}
+                        style={[gh.filterPill, isActive && gh.filterPillActive]}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[gh.filterPillText, isActive && gh.filterPillTextActive]}>
+                          {filterValue.charAt(0).toUpperCase() + filterValue.slice(1)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            );
+          }
+
+          if (section.kind === 'notifications-intro') {
+            return (
+              <View style={gh.sectionIntroWrap}>
+                <View style={gh.sectionHeaderRow}>
+                  <View style={gh.sectionTitleRow}>
+                    <MaterialCommunityIcons name="bell-outline" size={15} color="#58a6ff" />
+                    <Text style={gh.sectionTitle}>Notifications</Text>
+                  </View>
+                  <View style={gh.sectionActionsRow}>
+                    <View style={[gh.pillBadge, gh.pillBadgeBlue]}>
+                      <Text style={gh.pillBadgeText}>{unreadCount} unread</Text>
+                    </View>
+                  </View>
+                </View>
+                <Text style={gh.sectionIntroText}>Grouped by repository with sticky glass headers.</Text>
+              </View>
+            );
+          }
+
+          if (section.kind === 'notifications') {
+            return (
+              <View style={gh.repoHeaderWrap}>
+                <BlurView intensity={20} tint="dark" experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
+                <View style={gh.repoHeader}>
+                  <View style={gh.repoHeaderLeft}>
+                    <MaterialCommunityIcons name="github" size={14} color="rgba(255,255,255,0.92)" />
+                    <Text style={gh.repoHeaderText} numberOfLines={1}>{section.repoFullName}</Text>
+                  </View>
+                  <View style={gh.repoUnreadPill}>
+                    <Text style={gh.repoUnreadPillText}>{section.unreadCount} unread</Text>
+                  </View>
+                </View>
+              </View>
+            );
+          }
+
+          return null;
+        }}
+        renderItem={({ item, index, section }) => {
+          if (section.kind === 'issues') {
+            return <IssueGlassCard issue={item as GitHubIssue} repoFullName={connection.repoFullName} index={index} />;
+          }
+
+          if (section.kind === 'notifications') {
+            return <NotificationGlassCard item={item as GitHubNotificationItem} index={index} />;
+          }
+
+          return null;
+        }}
+      />
+
+      <View style={[gh.bottomBarWrap, { paddingBottom: insets.bottom + 10 }]}>
+        <BlurView intensity={28} tint="dark" experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
+        <View style={gh.bottomBar}>
+          {[
+            { key: 'home', icon: 'home-outline', label: 'Home', onPress: onHome },
+            { key: 'issues', icon: 'circle-slice-8', label: 'Issues', onPress: scrollToIssues },
+            { key: 'notifications', icon: 'bell-outline', label: 'Notifications', onPress: scrollToNotifications },
+            { key: 'profile', icon: 'account-circle-outline', label: 'Profile', onPress: onProfile },
+          ].map(tab => {
+            const active = tab.key === activeTab;
+            const issueTabActive = tab.key === 'issues' && activeTab === 'issues';
+            const notificationTabActive = tab.key === 'notifications' && activeTab === 'notifications';
+            const isActive = issueTabActive || notificationTabActive;
+
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                onPress={tab.onPress}
+                activeOpacity={0.8}
+                style={gh.bottomTab}
+              >
+                <MaterialCommunityIcons
+                  name={tab.icon as never}
+                  size={19}
+                  color={isActive ? '#58a6ff' : 'rgba(255,255,255,0.60)'}
+                />
+                <Text style={[gh.bottomTabLabel, isActive && gh.bottomTabLabelActive]}>{tab.label}</Text>
+                {isActive && <View style={gh.bottomTabGlow} />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -471,152 +1042,17 @@ export default function GitHubScreen() {
 
   // ── CONNECTED screen ─────────────────────────────────────────────────────
   return (
-    <LinearGradient
-      colors={['#050B1A', '#0C0921', '#120820', '#080E1C']}
-      style={StyleSheet.absoluteFill}
-    >
-      <StatusBar style="light" />
-      <View style={[s.orb, { top: -60, left: '20%', width: 280, height: 280, backgroundColor: 'rgba(99,102,241,0.16)' }]} />
-      <View style={[s.orb, { bottom: 40, right: '8%', width: 220, height: 220, backgroundColor: 'rgba(168,85,247,0.11)' }]} />
-
-      {/* Fixed top nav — measured via onLayout for list padding */}
-      <View
-        style={s.topNav}
-        onLayout={(e: LayoutChangeEvent) => setNavH(e.nativeEvent.layout.height)}
-        pointerEvents="box-none"
-      >
-        <BlurView intensity={24} tint="dark" experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
-        <View style={{ borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)' }}>
-          {/* Row 1: Back / Repo / Actions */}
-          <View style={[s.navRow, { paddingTop: insets.top + 10 }]}>
-            <TouchableOpacity onPress={() => router.back()} style={s.navBackBtn}>
-              <MaterialCommunityIcons name="arrow-left" size={20} color="rgba(255,255,255,0.8)" />
-            </TouchableOpacity>
-
-            <View style={s.repoBadge}>
-              <MaterialCommunityIcons name="github" size={13} color="#fff" />
-              <Text style={s.repoLabel} numberOfLines={1}>{connection.repoFullName}</Text>
-              <View style={[s.visibilityChip,
-                connection.private
-                  ? { backgroundColor: 'rgba(148,163,184,0.12)', borderColor: 'rgba(148,163,184,0.22)' }
-                  : { backgroundColor: 'rgba(96,165,250,0.1)', borderColor: 'rgba(96,165,250,0.22)' }
-              ]}>
-                <Text style={[s.visibilityText, { color: connection.private ? '#94A3B8' : '#60A5FA' }]}>
-                  {connection.private ? 'Private' : 'Public'}
-                </Text>
-              </View>
-            </View>
-
-            <View style={s.navActions}>
-              <TouchableOpacity
-                onPress={() => token && connection && void loadData(token, connection)}
-                disabled={loading}
-                style={s.navActionBtn}
-              >
-                <MaterialCommunityIcons name="refresh" size={17} color={loading ? '#1E293B' : '#64748B'} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => { void loadRepos(); setShowRepoPicker(true); }} style={s.navActionBtn}>
-                <MaterialCommunityIcons name="link-variant" size={17} color="#64748B" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleDisconnect} style={s.navActionBtn}>
-                <MaterialCommunityIcons name="logout" size={17} color="#EF4444" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Row 2: User + branch */}
-          <View style={s.navMeta}>
-            {ghUser?.avatar_url ? (
-              <Image source={{ uri: ghUser.avatar_url }} style={s.userAvatar} contentFit="cover" />
-            ) : null}
-            {ghUser ? <Text style={s.userLogin}>@{ghUser.login}</Text> : null}
-            <View style={s.branchPill}>
-              <MaterialCommunityIcons name="source-branch" size={10} color="#475569" />
-              <Text style={s.branchPillText}>{connection.defaultBranch}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Tab switcher */}
-        <View style={s.tabRow}>
-          {([
-            { id: 'prs' as ActiveTab, label: 'PRs', icon: 'source-pull' as const, count: prs.length },
-            { id: 'commits' as ActiveTab, label: 'Commits', icon: 'source-commit' as const, count: commits.length },
-            { id: 'issues' as ActiveTab, label: 'Issues', icon: 'alert-circle-outline' as const, count: issues.length },
-          ]).map(tab => {
-            const active = activeTab === tab.id;
-            return (
-              <TouchableOpacity
-                key={tab.id}
-                onPress={() => setActiveTab(tab.id)}
-                style={[s.tabBtn, active && s.tabBtnActive]}
-                activeOpacity={0.75}
-              >
-                <MaterialCommunityIcons name={tab.icon} size={13} color={active ? '#fff' : '#334155'} />
-                <Text style={[s.tabText, active && s.tabTextActive]}>
-                  {tab.label}{!loading && tab.count > 0 ? ` (${tab.count})` : ''}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* List content */}
-      {loading ? (
-        <ScrollView
-          contentContainerStyle={[s.listPad, { paddingTop: navH + 12 }]}
-          showsVerticalScrollIndicator={false}
-        >
-          {[0, 1, 2, 3].map(i => (
-            <View key={i} style={{ marginBottom: 12 }}>
-              <SkeletonCard />
-            </View>
-          ))}
-        </ScrollView>
-      ) : error ? (
-        <View style={[s.centerContent, { paddingTop: navH }]}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={34} color="#EF4444" />
-          <Text style={s.errorText}>{error}</Text>
-          <TouchableOpacity
-            onPress={() => token && connection && void loadData(token, connection)}
-            style={s.retryBtn}
-          >
-            <Text style={s.retryText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      ) : tabData.length === 0 ? (
-        <View style={[s.centerContent, { paddingTop: navH }]}>
-          <MaterialCommunityIcons
-            name={activeTab === 'commits' ? 'source-commit' : activeTab === 'issues' ? 'alert-circle-outline' : 'source-pull'}
-            size={34}
-            color="#1E293B"
-          />
-          <Text style={s.emptyText}>
-            No {activeTab === 'prs' ? 'pull requests' : activeTab} found
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={tabData as (GitHubPullRequest | GitHubCommit | GitHubIssue)[]}
-          keyExtractor={item => 'sha' in item ? item.sha : String((item as GitHubPullRequest | GitHubIssue).id)}
-          contentContainerStyle={[s.listPad, { paddingTop: navH + 12, paddingBottom: insets.bottom + 24 }]}
-          showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          renderItem={({ item }) => {
-            if (activeTab === 'prs') return <PRCard pr={item as GitHubPullRequest} />;
-            if (activeTab === 'commits') return <CommitCard commit={item as GitHubCommit} />;
-            return <IssueCard issue={item as GitHubIssue} />;
-          }}
-        />
-      )}
-
-      <RepoPickerModal
-        visible={showRepoPicker} repos={repos} loading={repoLoading}
-        search={repoSearch} onSearch={setRepoSearch}
-        onSelect={handleSelectRepo} onClose={() => setShowRepoPicker(false)}
-      />
-    </LinearGradient>
+    <MobileGitHubGlassShell
+      projectId={projectId}
+      connection={connection}
+      user={ghUser}
+      issues={issues}
+      loading={loading}
+      onBack={() => router.back()}
+      onHome={() => router.replace('/(tabs)' as never)}
+      onProfile={() => router.push('/(tabs)/profile' as never)}
+      onRepoPicker={() => { void loadRepos(); setShowRepoPicker(true); }}
+    />
   );
 }
 
@@ -685,6 +1121,589 @@ const s = StyleSheet.create({
   authorText: { fontSize: 11, color: '#475569', fontWeight: '600' },
   shaChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   shaText: { fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', color: '#64748B', fontWeight: '600' },
+});
+
+const gh = StyleSheet.create({
+  shell: {
+    flex: 1,
+    backgroundColor: '#0d1117',
+  },
+  blobIssues: {
+    position: 'absolute',
+    left: -24,
+    width: 200,
+    height: 200,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(63,185,80,0.18)',
+    opacity: 0.22,
+    filter: 'blur(60px)' as any,
+  },
+  blobNotifications: {
+    position: 'absolute',
+    right: -28,
+    top: 300,
+    width: 220,
+    height: 220,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(88,166,255,0.18)',
+    opacity: 0.18,
+    filter: 'blur(60px)' as any,
+  },
+  topBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 30,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(13,17,23,0.75)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  topBarRow: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+  },
+  topBarAction: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitleWrap: {
+    flex: 1,
+    alignItems: 'center',
+    minWidth: 0,
+  },
+  topBarTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: 'rgba(255,255,255,0.94)',
+    letterSpacing: 0.2,
+  },
+  topBarSubtitle: {
+    marginTop: 1,
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.45)',
+    maxWidth: 210,
+    textAlign: 'center',
+  },
+  badgeBubble: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9999,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(88,166,255,0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  badgeBubbleText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  heroCardWrap: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginBottom: 14,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.38, shadowRadius: 24 },
+      android: { elevation: 6 },
+    }),
+  },
+  heroCard: {
+    padding: 18,
+    gap: 16,
+  },
+  heroCopy: {
+    gap: 8,
+  },
+  heroKicker: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.35)',
+  },
+  heroTitle: {
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '900',
+    color: 'rgba(255,255,255,0.94)',
+    letterSpacing: -0.5,
+  },
+  heroSubCopy: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: 'rgba(255,255,255,0.55)',
+  },
+  heroStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  heroStatPill: {
+    flex: 1,
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  heroStatValue: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: 'rgba(255,255,255,0.95)',
+  },
+  heroStatLabel: {
+    marginTop: 2,
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.48)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  sectionWrap: {
+    marginBottom: 10,
+    gap: 12,
+  },
+  sectionIntroWrap: {
+    marginTop: 10,
+    marginBottom: 10,
+    gap: 10,
+  },
+  sectionIntroText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: 'rgba(255,255,255,0.48)',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 0,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: 'rgba(255,255,255,0.92)',
+  },
+  sectionActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pillBadge: {
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  pillBadgeBlue: {
+    backgroundColor: 'rgba(88,166,255,0.12)',
+    borderColor: 'rgba(88,166,255,0.22)',
+  },
+  pillBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  iconPill: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  filterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  filterPillActive: {
+    backgroundColor: 'rgba(63,185,80,0.2)',
+    borderColor: 'rgba(63,185,80,0.36)',
+  },
+  filterPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  filterPillTextActive: {
+    color: '#fff',
+  },
+  repoHeaderWrap: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginTop: 10,
+    marginBottom: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  repoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  repoHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    minWidth: 0,
+  },
+  repoHeaderText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    fontWeight: '900',
+    color: 'rgba(255,255,255,0.92)',
+  },
+  repoUnreadPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(88,166,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(88,166,255,0.22)',
+  },
+  repoUnreadPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  issueCardSpacing: {
+    marginBottom: 12,
+  },
+  issueCardWrap: {
+    borderRadius: 22,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 18 },
+      android: { elevation: 5 },
+    }),
+  },
+  issueCard: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 14,
+    minHeight: 108,
+  },
+  issueStateDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 4,
+    shadowColor: '#3fb950',
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+  },
+  issueMain: {
+    flex: 1,
+    minWidth: 0,
+    gap: 7,
+  },
+  issueTitle: {
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.92)',
+    letterSpacing: -0.15,
+  },
+  issueRepo: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.52)',
+    fontWeight: '600',
+  },
+  issueLabelRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  issueLabel: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 9999,
+    borderWidth: 1,
+  },
+  issueLabelText: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'capitalize',
+  },
+  issueFooterRow: {
+    marginTop: 2,
+  },
+  issueMetaText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: 'rgba(255,255,255,0.42)',
+    fontWeight: '600',
+  },
+  issueMetaSide: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  avatarStack: {
+    width: 52,
+    height: 52,
+    position: 'relative',
+    alignItems: 'flex-end',
+  },
+  avatarStackItem: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+  },
+  avatarStackPrimary: {
+    top: 0,
+    left: 0,
+    zIndex: 3,
+  },
+  avatarStackSecondary: {
+    top: 13,
+    left: 14,
+    zIndex: 2,
+    backgroundColor: 'rgba(255,255,255,0.09)',
+  },
+  avatarStackTertiary: {
+    top: 28,
+    left: 28,
+    zIndex: 1,
+    backgroundColor: 'rgba(88,166,255,0.18)',
+  },
+  avatarFallback: {
+    backgroundColor: 'rgba(255,255,255,0.09)',
+  },
+  avatarFallbackText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#fff',
+  },
+  commentPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  commentPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.78)',
+  },
+  issueSwipeHint: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 64,
+    bottom: 0,
+  },
+  notificationSpacing: {
+    marginBottom: 10,
+  },
+  notificationCardWrap: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  notificationCardUnreadWrap: {
+    borderColor: 'rgba(88,166,255,0.22)',
+  },
+  notificationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    minHeight: 88,
+  },
+  notificationCardUnread: {
+    backgroundColor: 'rgba(255,255,255,0.09)',
+    borderLeftWidth: 2,
+    borderLeftColor: 'rgba(88,166,255,0.6)',
+  },
+  notificationAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    borderTopLeftRadius: 18,
+    borderBottomLeftRadius: 18,
+  },
+  notificationIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  notificationBody: {
+    flex: 1,
+    minWidth: 0,
+    gap: 6,
+  },
+  notificationTitle: {
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.92)',
+  },
+  notificationMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  reasonPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  reasonPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.76)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  notificationTime: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.48)',
+    fontWeight: '600',
+  },
+  notificationRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 16,
+  },
+  unreadDotGlow: {
+    width: 8,
+    height: 8,
+    borderRadius: 99,
+    overflow: 'hidden',
+    shadowColor: '#58a6ff',
+    shadowOpacity: 0.7,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  unreadDotDim: {
+    shadowOpacity: 0.2,
+  },
+  notificationSwipeHint: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 72,
+  },
+  bottomBarWrap: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    bottom: 10,
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(13,17,23,0.72)',
+  },
+  bottomBar: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingTop: 8,
+  },
+  bottomTab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    position: 'relative',
+  },
+  bottomTabLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.58)',
+  },
+  bottomTabLabelActive: {
+    color: 'rgba(255,255,255,0.94)',
+  },
+  bottomTabGlow: {
+    position: 'absolute',
+    bottom: 0,
+    left: '24%',
+    right: '24%',
+    height: 2,
+    borderRadius: 9999,
+    backgroundColor: '#58a6ff',
+    shadowColor: '#58a6ff',
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+  },
 });
 
 // ── Repo modal styles ─────────────────────────────────────────────────────────

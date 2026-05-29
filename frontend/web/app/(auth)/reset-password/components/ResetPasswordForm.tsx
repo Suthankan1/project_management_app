@@ -30,16 +30,16 @@ export default function ResetPasswordForm({
   return (
     <form className='space-y-5' onSubmit={onSubmit}>
       {error && (
-        <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+        <div role="alert" className="bg-cu-danger/10 border border-cu-danger/30 text-cu-danger px-4 py-3 rounded-lg text-sm">
           {error}
         </div>
       )}
 
       <OtpInput value={otp} onChange={onOtpChange} disabled={isLoading} />
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <p className="text-xs font-semibold text-blue-900 mb-2">Password Requirements:</p>
-        <PasswordChecklist password={newPassword} unmetClassName="text-blue-800" />
+      <div className="bg-cu-primary/5 border border-cu-primary/20 rounded-lg p-3">
+        <p className="text-xs font-semibold text-cu-text-primary mb-2">Password Requirements:</p>
+        <PasswordChecklist password={newPassword} unmetClassName="text-cu-text-muted" />
       </div>
 
       <PasswordInput
@@ -61,7 +61,7 @@ export default function ResetPasswordForm({
       <button
         type="submit"
         disabled={isLoading}
-        className='w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors'
+        className='w-full bg-cu-primary hover:opacity-90 disabled:bg-cu-bg-tertiary disabled:text-cu-text-muted disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors'
       >
         {isLoading ? 'Resetting...' : 'Reset Password'}
       </button>

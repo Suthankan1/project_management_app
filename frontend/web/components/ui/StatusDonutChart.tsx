@@ -22,8 +22,9 @@ export default function StatusDonutChart({ items, onHover }: StatusDonutChartPro
     if (data.total === 0) return <DonutEmptyState />;
 
     return (
-        <div className="flex flex-col items-center justify-center h-full min-h-[250px] w-full p-6">
+        <div className="flex flex-col items-center justify-center h-full min-h-[250px] w-full rounded-2xl border border-cu-border bg-cu-bg-secondary/45 p-6 shadow-cu-sm">
             <div className="relative flex items-center justify-center w-48 h-48">
+                <div className="absolute inset-4 rounded-full bg-cu-bg/70 shadow-[inset_0_1px_10px_rgba(15,23,42,0.08)]" />
                 <motion.div
                     animate={{ rotate: 360, scale: [1, 1.03, 1] }}
                     transition={{
@@ -32,9 +33,9 @@ export default function StatusDonutChart({ items, onHover }: StatusDonutChartPro
                     }}
                     className="w-full h-full"
                 >
-                    <svg className="w-full h-full transform -rotate-90 pointer-events-none" viewBox="0 0 160 160">
+                    <svg className="w-full h-full transform -rotate-90 pointer-events-none drop-shadow-sm" viewBox="0 0 160 160">
                         <motion.circle
-                            cx="80" cy="80" r={RADIUS} fill="none" stroke="#F3F4F6" strokeWidth="14"
+                            cx="80" cy="80" r={RADIUS} fill="none" stroke="var(--cu-bg-tertiary)" strokeWidth="14"
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 0.3 }}
                         />
                         {data.slicesWithOrigin.map((slice, index) => {
@@ -53,7 +54,7 @@ export default function StatusDonutChart({ items, onHover }: StatusDonutChartPro
                                     style={{
                                         transformOrigin: '80px 80px',
                                         scale: hoveredSlice === slice.key ? 1.05 : hoveredSlice ? 0.95 : 1,
-                                        filter: hoveredSlice === slice.key ? 'brightness(1.15)' : 'brightness(1)',
+                                        filter: hoveredSlice === slice.key ? 'brightness(1.16) drop-shadow(0 0 8px rgba(59,130,246,0.28))' : 'brightness(1)',
                                     }}
                                     onMouseEnter={() => handleHover(slice.key)}
                                     onMouseLeave={() => handleHover(null)}
@@ -65,10 +66,10 @@ export default function StatusDonutChart({ items, onHover }: StatusDonutChartPro
 
                 {/* Center metric */}
                 <div className="absolute flex flex-col items-center justify-center pointer-events-none">
-                    <motion.span className="text-[38px] font-bold text-gray-800 font-sans leading-none tracking-tight">
+                    <motion.span className="text-[38px] font-bold text-cu-text-primary font-sans leading-none tracking-tight">
                         {displayCount}
                     </motion.span>
-                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-1">Active Tasks</span>
+                    <span className="text-[11px] font-bold text-cu-text-muted uppercase tracking-widest mt-1">Active Tasks</span>
                 </div>
 
                 {/* Hover tooltip */}
@@ -83,7 +84,7 @@ export default function StatusDonutChart({ items, onHover }: StatusDonutChartPro
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: 5, scale: 0.9 }}
                                 transition={{ duration: 0.15 }}
-                                className="absolute -top-10 bg-gray-900 text-white text-[11px] font-semibold px-3 py-1.5 rounded-full shadow-lg whitespace-nowrap pointer-events-none z-50 flex items-center gap-2"
+                                className="absolute -top-10 bg-cu-text-primary text-cu-bg text-[11px] font-semibold px-3 py-1.5 rounded-full shadow-cu-lg whitespace-nowrap pointer-events-none z-50 flex items-center gap-2"
                             >
                                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: active.color }} />
                                 {active.label}: {active.count} ({pct}%)
@@ -97,7 +98,7 @@ export default function StatusDonutChart({ items, onHover }: StatusDonutChartPro
             <motion.div
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.8 }}
-                className="flex items-center gap-4 mt-8"
+                className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-8"
             >
                 {data.counts.map((slice) => (
                     <div
@@ -108,8 +109,8 @@ export default function StatusDonutChart({ items, onHover }: StatusDonutChartPro
                         onMouseEnter={() => handleHover(slice.key)}
                         onMouseLeave={() => handleHover(null)}
                     >
-                        <span className="w-2.5 h-2.5 rounded-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]" style={{ backgroundColor: slice.color }} />
-                        <span className="text-[12px] font-medium text-gray-600 font-arimo">{slice.label}</span>
+                        <span className="w-2.5 h-2.5 rounded-full shadow-[0_0_0_3px_rgba(255,255,255,0.06)]" style={{ backgroundColor: slice.color }} />
+                        <span className="text-[12px] font-semibold text-cu-text-secondary font-arimo">{slice.label}</span>
                     </div>
                 ))}
             </motion.div>
