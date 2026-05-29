@@ -1,16 +1,86 @@
-import { Stack } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { Platform, View, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
-import { useRouter } from 'expo-router';
 import SplashAnimation from '@/src/components/SplashAnimation';
 import { getValidToken } from '@/src/auth/storage';
 
 // Prevent the native splash from auto-hiding — we control it
 SplashScreen.preventAutoHideAsync();
+
+const SUPPORTED_NOTIFICATION_PREFIXES = [
+  '/summary/',
+  '/board/',
+  '/project/',
+  '/github/',
+  '/create-project/',
+  '/portfolios/',
+  '/(tabs)',
+  '/modal',
+];
+
+function normalizeRouteLink(link: string): string {
+  const trimmed = link.trim();
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)) {
+    try {
+      const url = new URL(trimmed);
+      return `${url.pathname}${url.search}${url.hash}` || '/';
+    } catch {
+      return trimmed;
+    }
+  }
+
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
+function resolveNotificationRoute(data: Record<string, unknown> | undefined): string | null {
+  const rawLink = typeof data?.link === 'string' ? data.link : null;
+  if (rawLink) {
+    const route = normalizeRouteLink(rawLink);
+    if (SUPPORTED_NOTIFICATION_PREFIXES.some((prefix) => route.startsWith(prefix))) {
+      return route;
+    }
+  }
+
+  const projectIdValue = data?.projectId;
+  const projectId = typeof projectIdValue === 'string' || typeof projectIdValue === 'number'
+    ? String(projectIdValue)
+    : null;
+
+  if (!projectId) {
+    return null;
+  }
+
+  const eventType = typeof data?.eventType === 'string' ? data.eventType : '';
+  if (eventType === 'TASK_ACTIVITY' || eventType === 'CHAT_ACTIVITY') {
+    return `/board/${projectId}`;
+  }
+
+  return `/summary/${projectId}`;
+}
+
+function NativeNotificationBridge({
+  onNotificationResponse,
+}: {
+  onNotificationResponse: (response: Notifications.NotificationResponse | null) => void;
+}) {
+  const lastNotificationResponse = Notifications.useLastNotificationResponse();
+
+  useEffect(() => {
+    onNotificationResponse(lastNotificationResponse ?? null);
+  }, [lastNotificationResponse, onNotificationResponse]);
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(onNotificationResponse);
+    return () => subscription.remove();
+  }, [onNotificationResponse]);
+
+  return null;
+}
 
 /**
  * Root layout — declares all route groups.
@@ -36,6 +106,34 @@ export default function RootLayout() {
   const [showSplash,   setShowSplash]   = useState(true);
   const [authChecked,  setAuthChecked]  = useState(false);
   const [isAuthed,     setIsAuthed]     = useState(false);
+  const [pendingRoute, setPendingRoute] = useState<string | null>(null);
+  const seenNotificationIds = useRef(new Set<string>());
+
+  const destination = useMemo(() => {
+    if (!isAuthed) {
+      return '/' as Parameters<typeof router.replace>[0];
+    }
+
+    return (pendingRoute ?? '/(tabs)') as Parameters<typeof router.replace>[0];
+  }, [isAuthed, pendingRoute, router]);
+
+  const handleNotificationResponse = useCallback((response: Notifications.NotificationResponse | null) => {
+    if (!response) {
+      return;
+    }
+
+    const notificationId = response.notification.request.identifier;
+    if (seenNotificationIds.current.has(notificationId)) {
+      return;
+    }
+
+    seenNotificationIds.current.add(notificationId);
+    const data = response.notification.request.content.data as Record<string, unknown> | undefined;
+    const route = resolveNotificationRoute(data);
+    if (route) {
+      setPendingRoute(route);
+    }
+  }, []);
 
   // Check auth in background while animation plays
   useEffect(() => {
@@ -55,21 +153,25 @@ export default function RootLayout() {
     // Auth check is almost certainly done by now (it's < 300ms),
     // but await it just in case
     if (authChecked) {
-      router.replace(isAuthed ? '/(tabs)' : '/');
+      router.replace(destination);
     }
     // If not done, the effect below will fire when authChecked flips
-  }, [authChecked, isAuthed]);
+  }, [authChecked, destination, router]);
 
   // Safety net: if auth resolves AFTER animation finished
   useEffect(() => {
     if (!showSplash && authChecked) {
-      router.replace(isAuthed ? '/(tabs)' : '/');
+      router.replace(destination);
     }
-  }, [showSplash, authChecked, isAuthed]);
+  }, [showSplash, authChecked, destination, router]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.root}>
+        {Platform.OS !== 'web' && (
+          <NativeNotificationBridge onNotificationResponse={handleNotificationResponse} />
+        )}
+
         {/* Stack navigator — always mounted so screens can prepare */}
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index"                  options={{ headerShown: false }} />

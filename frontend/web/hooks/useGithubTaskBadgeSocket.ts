@@ -15,7 +15,7 @@ export function useGithubTaskBadgeSocket(
   onUpdate: (update: GithubTaskBadgeUpdate) => void,
   onError?: (message: string) => void,
 ): void {
-  const { connected, subscribe } = useStomp();
+  const { connected, subscribe, reconnectCount } = useStomp();
   const onUpdateRef = useRef(onUpdate);
   const onErrorRef = useRef(onError);
 
@@ -48,5 +48,5 @@ export function useGithubTaskBadgeSocket(
     return () => {
       subscription?.unsubscribe();
     };
-  }, [connected, projectId, subscribe]);
+  }, [connected, projectId, reconnectCount, subscribe]);
 }
