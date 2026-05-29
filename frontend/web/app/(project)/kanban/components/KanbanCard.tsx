@@ -162,7 +162,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
         <div className="flex justify-end gap-1.5 pt-1 border-t border-cu-border">
           <button onClick={handleCancelEdit} disabled={saving} className="px-2 py-1 text-xs text-cu-text-secondary hover:text-cu-text-primary rounded transition-colors flex items-center gap-1"><X size={12} /> Cancel</button>
           <button onClick={() => void handleSaveInline()} disabled={saving || !editTitle.trim()}
-            className="px-2.5 py-1 text-xs font-medium text-white bg-cu-primary rounded hover:bg-cu-primary-dark disabled:opacity-40 transition-colors flex items-center gap-1">
+            className="px-2.5 py-1 text-xs font-medium text-white bg-cu-primary rounded hover:bg-cu-primary-hover disabled:opacity-40 transition-colors flex items-center gap-1">
             {saving ? <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /> : <Check size={12} />} Save
           </button>
         </div>
@@ -170,7 +170,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
     );
   }
 
-  // ── NORMAL DISPLAY MODE ───────────────────────────────────
+  // Normal display mode
   return (
     <div
       ref={setNodeRef} style={style} {...attributes} {...listeners}
@@ -208,7 +208,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
         {/* Top row: labels + task ID */}
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <div className="flex flex-wrap gap-1 min-w-0">
-            {/* Show task labels — resolve from allLabels if task.labels not populated */}
+            {/* Show task labels: resolve from allLabels if task.labels not populated */}
             {(() => {
               const displayLabels = (task.labels && task.labels.length > 0)
                 ? task.labels
@@ -237,7 +237,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
           </div>
         )}
 
-        {/* Subtask checklist — ClickUp style */}
+        {/* Subtask checklist: ClickUp style */}
         {totalSubtasks > 0 && (
           <div className="mb-2">
             {/* Progress bar and Toggle */}
@@ -278,7 +278,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
         {/* Bottom meta row: due date (clickable), label (clickable), story points, assignee */}
         <div className="flex items-center justify-between gap-2 mt-1">
           <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            {/* Due date — inline pickable */}
+            {/* Due date: inline pickable */}
             <div className="relative" ref={datePickerRef}>
               <button
                 data-action="date"
@@ -296,7 +296,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
               </button>
 
               {showDatePicker && (
-                <div className="absolute bottom-full left-0 mb-1 bg-cu-bg border border-cu-border rounded-xl shadow-xl z-50 p-2 w-48" onClick={e => e.stopPropagation()}>
+                <div className="absolute bottom-full left-0 mb-1 bg-cu-bg border border-cu-border rounded-xl shadow-cu-xl z-50 p-2 w-48" onClick={e => e.stopPropagation()}>
                   <p className="text-[10px] font-medium text-cu-text-muted mb-1.5">Due date</p>
                   <input
                     type="date"
@@ -312,7 +312,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
               )}
             </div>
 
-            {/* Label — inline pickable */}
+            {/* Label: inline pickable */}
             <div className="relative" ref={labelPickerRef}>
               <button
                 data-action="label"
@@ -334,7 +334,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
               </button>
 
               {showLabelPicker && (
-                <div className="absolute bottom-full left-0 mb-1 bg-cu-bg border border-cu-border rounded-xl shadow-xl z-50 p-2 w-52" onClick={e => e.stopPropagation()}>
+                <div className="absolute bottom-full left-0 mb-1 bg-cu-bg border border-cu-border rounded-xl shadow-cu-xl z-50 p-2 w-52" onClick={e => e.stopPropagation()}>
                   <p className="text-[10px] font-medium text-cu-text-muted mb-1.5">Labels</p>
                   <div className="max-h-32 overflow-y-auto space-y-0.5 mb-1.5">
                     {/* No label option */}
