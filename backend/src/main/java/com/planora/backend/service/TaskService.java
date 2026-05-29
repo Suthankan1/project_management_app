@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -370,6 +371,30 @@ public class TaskService {
             task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule()));
         }
 
+        // Handle archiving/unarchiving
+        if (request.getArchived() != null) {
+            if (request.getArchived() != task.isArchived()) {
+                task.setArchived(request.getArchived());
+                User actor = userRepository.findById(currentUserId).orElseThrow();
+                task.setLastModifiedBy(actor);
+                if (request.getArchived()) {
+                    task.setArchivedAt(LocalDateTime.now());
+                    taskActivityService.logActivity(
+                            taskId,
+                            TaskActivityType.UPDATED,
+                            actor.getUsername(),
+                            "Task archived");
+                } else {
+                    task.setArchivedAt(null);
+                    taskActivityService.logActivity(
+                            taskId,
+                            TaskActivityType.UPDATED,
+                            actor.getUsername(),
+                            "Task unarchived");
+                }
+            }
+        }
+
         task.setLastModifiedBy(userRepository.findById(currentUserId).orElseThrow());
     Task saved = taskRepository.save(task);
 
@@ -425,7 +450,7 @@ public class TaskService {
 
     // ── 4. DELETE TASK ──────────────────────────────────────────────────────────
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long deleteTask(Long taskId, Long currentUserId) {
         Task task = taskRepository.findByIdWithDetails(taskId)
                 .orElseThrow(()-> new ResourceNotFoundException("Task not found"));
@@ -487,24 +512,45 @@ public class TaskService {
 
     // ── 5. GET TASKS BY PROJECT (Highly Optimized Fetch) ────────────────────────
     @Transactional(readOnly = true)
-    public List<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId,
-                                                   String status, Long assigneeId,
-                                                   String priority, Long sprintId, Long milestoneId) {
+    public Page<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId, Pageable pageable) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
         requireMinimumRole(project.getTeam().getId(), currentUserId, null);
 
-        /*
-         * PERFORMANCE OPTIMIZATION (The "Two-Phase Fetch"):
-         * Fetching a Task + Labels + Subtasks + Attachments + Assignees all in one SQL query
-         * creates a massive "Cartesian Product" (multiplying rows), which crashes the database memory.
-         * * Solution:
-         * 1. Query just the IDs of the tasks we need.
-         * 2. Use those IDs to execute a secondary, batched fetch that safely loads collections.
-         */
+        Page<Task> taskPage = taskRepository.findByProjectIdAndArchivedFalse(projectId, pageable);
+        if (taskPage.isEmpty()) {
+            return taskPage.map(t -> mapToDTO(t, java.util.Map.of()));
+        }
+
+        List<Long> ids = taskPage.getContent().stream().map(Task::getId).toList();
+        List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
+        java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(ids);
+        java.util.Map<Long, Task> enrichedMap = enriched.stream()
+                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t));
+
+        return taskPage.map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap));
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId,
+                                                   String status, Long assigneeId,
+                                                   String priority, Long sprintId, Long milestoneId) {
+        return getTasksByProject(projectId, currentUserId, status, assigneeId, priority, sprintId, milestoneId, false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId,
+                                                   String status, Long assigneeId,
+                                                   String priority, Long sprintId, Long milestoneId,
+                                                   Boolean archived) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+        requireMinimumRole(project.getTeam().getId(), currentUserId, null);
+
+        boolean isArchived = archived != null && archived;
         boolean hasFilters = status != null || assigneeId != null || priority != null || sprintId != null || milestoneId != null;
         if (hasFilters) {
-            List<Task> filteredTasks = taskRepository.findByProjectIdFiltered(projectId, status, assigneeId, priority, sprintId, milestoneId)
+            List<Task> filteredTasks = taskRepository.findByProjectIdFilteredAndArchived(projectId, status, assigneeId, priority, sprintId, milestoneId, isArchived)
                     .stream()
                     .distinct()
                     .toList();
@@ -521,8 +567,8 @@ public class TaskService {
                     .collect(Collectors.toList());
         }
 
-        // Standard unfiltered fetch
-        List<Task> tasks = taskRepository.findByProjectIdWithScalars(projectId);
+        // Standard fetch
+        List<Task> tasks = taskRepository.findByProjectIdWithScalarsAndArchived(projectId, isArchived);
         if (tasks.isEmpty()) return List.of();
         List<Long> ids = tasks.stream().map(Task::getId).collect(Collectors.toList());
         List<Task> enriched = taskRepository.findByIdInWithCollections(ids);

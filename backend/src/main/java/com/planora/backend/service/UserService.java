@@ -14,7 +14,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.tika.Tika;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -71,13 +73,13 @@ public class UserService {
     @Value("${aws.region}")
     private String region;
 
-    /** In-memory presigned URL cache: S3 key → (url, expiry). TTL = 55 min (URLs expire at 60 min). */
-    /* Generating S3 presigned URLs is a CPU-intensive cryptographic operation.
-     * Caching them prevents our server from buckling under load if a user frequently
-     * refreshes the page or fetches lists of users.
-     */
-    private final Map<String, Object[]> presignedUrlCache = new ConcurrentHashMap<>();
-    private static final Duration PRESIGN_TTL = Duration.ofMinutes(55);
+    @Autowired
+    @Lazy
+    private UserService self;
+
+    private UserService getSelf() {
+        return self != null ? self : this;
+    }
 
     private final Cache<String, LoginAttemptRecord> loginAttemptCache = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofMinutes(20))
@@ -462,15 +464,9 @@ public class UserService {
         // Step 1. Fetch the raw list from the database.
         java.util.List<User> allUsers = userRepository.findAll();
 
-        // Step 2. Filter out the specific email if requested.
-        if (excludeEmail != null && !excludeEmail.isEmpty()) {
-            allUsers = allUsers.stream()
-                    .filter(user -> !user.getEmail().equalsIgnoreCase(excludeEmail))
-                    .collect(java.util.stream.Collectors.toList());
-        }
-
-        // Step 3. Transform the remaining entities into clean DTOs.
-        return allUsers.stream()
+        // Step 2. Filter and transform entities in parallel stream.
+        return allUsers.parallelStream()
+                .filter(user -> excludeEmail == null || excludeEmail.isEmpty() || !user.getEmail().equalsIgnoreCase(excludeEmail))
                 .map(this::mapToUserResponseDTO)
                 .collect(java.util.stream.Collectors.toList());
     }
@@ -483,7 +479,7 @@ public class UserService {
     public UserResponseDTO mapToUserResponseDTO(User user) {
         // Step 1. Dynamically generate an S3 presigned URL if they have an avatar key saved.
         String presignedUrl = user.getProfilePicUrl() != null && !user.getProfilePicUrl().isEmpty()
-                ? generatePresignedUrl(user.getProfilePicUrl())
+                ? getSelf().generatePresignedUrl(user.getProfilePicUrl())
                 : null;
 
         // Step 2. Construct the DTO with safe public data.
@@ -568,7 +564,7 @@ public class UserService {
         }
 
         // Step 3. Pass to the generation method.
-        return generatePresignedUrl(user.getProfilePicUrl());
+        return getSelf().generatePresignedUrl(user.getProfilePicUrl());
     }
 
     /*
@@ -776,30 +772,17 @@ public class UserService {
     /**
      * Generates a presigned S3 URL valid for 60 minutes.
      * Accepts either a raw S3 object key or a legacy full S3 URL for backward compatibility.
-     * Returns null/empty for null/empty input. Results are cached for 55 minutes.
+     * Returns null/empty for null/empty input. Results are cached via Spring Cache (userPhotoUrls).
      */
-    public String generatePresignedUrl(String stored) {
+    @Cacheable(value = "userPhotoUrls", key = "#photoKey", unless = "#result == null")
+    public String generatePresignedUrl(String photoKey) {
         // Step 1. Handle empty states gracefully.
-        if (stored == null || stored.isEmpty()) {
-            return stored;
+        if (photoKey == null || photoKey.isEmpty()) {
+            return photoKey;
         }
 
         // Step 2. Strip any legacy HTTP formatting to isolate just the S3 Key.
-        String key = extractKeyFromStoredValue(stored);
-
-        // Step 3. Query the in-memory ConcurrentHashMap cache.
-        Object[] cached = presignedUrlCache.get(key);
-        if (cached != null) {
-            Instant expiry = (Instant) cached[1];
-
-            // Step 3a. If the cached URL is still valid, return it instantly.
-            if (Instant.now().isBefore(expiry)) {
-                return (String) cached[0];
-            }
-
-            // Step 3b. Cache is expired. Remove it and proceed to generate a new one.
-            presignedUrlCache.remove(key);
-        }
+        String key = extractKeyFromStoredValue(photoKey);
 
         try {
             // Step 4. Build S3 Request targeting the specific object key.
@@ -815,12 +798,7 @@ public class UserService {
                     .build();
 
             // Step 6. Execute generation and convert to string URL.
-            String url = s3Presigner.presignGetObject(presignRequest).url().toString();
-
-            // Step 7. Push to cache. We set the cache expiry to 55 minutes
-            // (5 minutes BEFORE the actual AWS 60-minute expiry) to prevent edge-case race conditions.
-            presignedUrlCache.put(key, new Object[]{url, Instant.now().plus(PRESIGN_TTL)});
-            return url;
+            return s3Presigner.presignGetObject(presignRequest).url().toString();
         } catch (Exception e) {
             logger.error("Failed to generate presigned URL for key={}: {}", key, e.getMessage());
             return null;

@@ -37,3 +37,6 @@ export {
 export { Skeleton, SkeletonTaskRow, SkeletonBoardCard, SkeletonSidebarItem, SkeletonList } from './Skeleton';
 
 export { ToastProvider, toast } from './Toast';
+
+export { ArchiveBadge } from './ArchiveBadge';
+

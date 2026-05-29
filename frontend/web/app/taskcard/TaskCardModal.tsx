@@ -47,6 +47,7 @@ interface TaskData {
   completedAt?: string | null;
   githubIssueNumber?: number | null;
   githubRepoFullName?: string | null;
+  archived?: boolean;
 }
 
 interface ProjectMemberOption {
@@ -91,14 +92,21 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
       setLoading(true);
       const response = await api.get(`/api/tasks/${taskId}`);
       setTaskData(response.data);
+      localStorage.setItem(`planora:task:${taskId}`, JSON.stringify({ ...response.data, timestamp: Date.now() }));
       setError(null);
       if (response.data?.projectId) {
         void loadTaskMeta(response.data.projectId);
       }
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      setError(axiosErr?.response?.data?.message || 'Failed to fetch task data');
-      setTaskData(null);
+      const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };
+      if (axiosErr?.response?.status === 404) {
+        localStorage.removeItem(`planora:task:${taskId}`);
+        toast('This task no longer exists.', 'error');
+        onClose(false);
+      } else {
+        setError(axiosErr?.response?.data?.message || 'Failed to fetch task data');
+        setTaskData(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -155,6 +163,17 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
       } catch { /* ignore */ }
     }
     fetchTaskData();
+    return () => {
+      const cached = localStorage.getItem(`planora:task:${taskId}`);
+      if (cached) {
+        try {
+          const { timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp > 5 * 60_000) {
+            localStorage.removeItem(`planora:task:${taskId}`);
+          }
+        } catch { /* ignore */ }
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
@@ -169,6 +188,10 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
           const event = JSON.parse(msg.body) as { type: string; taskId?: number };
           if (event.type === 'TASK_COMMENT_ADDED' && event.taskId === taskId) {
             commentRefetchRef.current?.();
+          } else if (event.type === 'TASK_DELETED' && event.taskId === taskId) {
+            localStorage.removeItem(`planora:task:${taskId}`);
+            toast.info("This task was deleted by another team member.");
+            onClose(false);
           }
         } catch { /* ignore malformed messages */ }
       },
@@ -245,7 +268,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
       githubRepoFullName: taskData.githubRepoFullName ?? projectGitHubRepo?.repoFullName ?? null,
     };
     setTaskData(nextTaskData);
-    localStorage.setItem(`planora:task:${taskId}`, JSON.stringify(nextTaskData));
+    localStorage.setItem(`planora:task:${taskId}`, JSON.stringify({ ...nextTaskData, timestamp: Date.now() }));
     wasModified.current = true;
   };
 
@@ -326,7 +349,8 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
               project={taskData.projectName}
               taskId={`TASK-${taskData.id}`}
               numericTaskId={taskData.id}
-              onClose={() => onClose(wasModified.current)}
+              archived={taskData.archived}
+              onClose={(wasModifiedFlag) => onClose(wasModifiedFlag || wasModified.current)}
             />
             <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-y-auto md:overflow-hidden">
               <div className="flex flex-1 flex-col min-h-0 md:overflow-y-auto">

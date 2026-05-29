@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,21 +8,22 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Animated,
+  Animated as RNAnimated,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useRegisterForm } from '@/src/hooks/useRegisterForm';
 import BrandHeader from '@/src/components/ui/BrandHeader';
 import TextInputField from '@/src/components/ui/TextInputField';
 import PasswordInput from '@/src/components/ui/PasswordInput';
 import PasswordStrengthBar from '@/src/components/ui/PasswordStrengthBar';
 import PrimaryButton from '@/src/components/ui/PrimaryButton';
-import ErrorBanner from '@/src/components/ui/ErrorBanner';
+import Toast from '@/src/components/ui/Toast';
 import { Colors } from '@/src/constants/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -34,6 +35,7 @@ export default function RegisterScreen() {
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const confirmPasswordRef = useRef<TextInput>(null);
+  const insets = useSafeAreaInsets();
   const {
     username, setUsername,
     fullName, setFullName,
@@ -45,36 +47,23 @@ export default function RegisterScreen() {
     handleRegister,
   } = useRegisterForm();
 
-  const cardAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.spring(cardAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      tension: 60,
-      friction: 10,
-      delay: 80,
-    }).start();
-  }, [cardAnim]);
+  const [toastVisible, setToastVisible] = useState(false);
 
-  const slideAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
-    Animated.spring(slideAnim, {
+    if (error) {
+      setToastVisible(true);
+    }
+  }, [error]);
+
+  const slideAnim = useRef(new RNAnimated.Value(1)).current;
+  useEffect(() => {
+    RNAnimated.spring(slideAnim, {
       toValue: 1,
       tension: 200,
       friction: 20,
       useNativeDriver: true,
     }).start();
-  }, []);
-
-  const cardStyle = {
-    opacity: cardAnim,
-    transform: [{
-      translateY: cardAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [24, 0],
-      }),
-    }],
-  };
+  }, [slideAnim]);
 
   return (
     <LinearGradient
@@ -83,14 +72,21 @@ export default function RegisterScreen() {
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
     >
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+        <Toast
+          message={error}
+          visible={toastVisible}
+          onDismiss={() => setToastVisible(false)}
+          type="error"
+        />
+
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <ScrollView
             style={styles.flex}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -120,116 +116,114 @@ export default function RegisterScreen() {
             </View>
 
             {/* Card */}
-            <Animated.View style={cardStyle}>
-            <BlurView intensity={20} tint="light" style={styles.card}>
-              {/* Tab Switcher */}
-              <View style={styles.tabContainer}>
-                <Animated.View
-                  style={[
-                    styles.tabPill,
-                    {
-                      transform: [{
-                        translateX: slideAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, TAB_WIDTH],
-                        }),
-                      }],
-                    },
-                  ]}
-                />
-                <TouchableOpacity style={styles.tab} onPress={() => router.replace('/(auth)/login')}>
-                  <Text style={styles.tabText}>Sign In</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.tab} onPress={() => router.replace('/(auth)/register')}>
-                  <Text style={[styles.tabText, styles.tabTextActive]}>Register</Text>
-                </TouchableOpacity>
-              </View>
+            <Animated.View entering={FadeInUp.duration(600).springify().damping(15)}>
+              <BlurView intensity={20} tint="light" style={styles.card}>
+                {/* Tab Switcher */}
+                <View style={styles.tabContainer}>
+                  <RNAnimated.View
+                    style={[
+                      styles.tabPill,
+                      {
+                        transform: [{
+                          translateX: slideAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, TAB_WIDTH],
+                          }),
+                        }],
+                      },
+                    ]}
+                  />
+                  <TouchableOpacity style={styles.tab} onPress={() => router.replace('/(auth)/login')}>
+                    <Text style={styles.tabText}>Sign In</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.tab} onPress={() => router.replace('/(auth)/register')}>
+                    <Text style={[styles.tabText, styles.tabTextActive]}>Register</Text>
+                  </TouchableOpacity>
+                </View>
 
-              <View style={styles.formGap}>
-                <ErrorBanner message={error} visible={!!error} />
-
-                <TextInputField
-                  label="Username"
-                  value={username}
-                  onChangeText={t => setUsername(t.trim().toLowerCase())}
-                  placeholder="Pick a username"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="next"
-                  blurOnSubmit={false}
-                  submitBehavior="submit"
-                  onSubmitEditing={() => fullNameRef.current?.focus()}
-                />
-
-                <TextInputField
-                  inputRef={fullNameRef}
-                  label="Full Name"
-                  value={fullName}
-                  onChangeText={setFullName}
-                  placeholder="John Doe"
-                  autoCapitalize="words"
-                  returnKeyType="next"
-                  blurOnSubmit={false}
-                  submitBehavior="submit"
-                  onSubmitEditing={() => emailRef.current?.focus()}
-                />
-
-                <TextInputField
-                  inputRef={emailRef}
-                  label="Email Address"
-                  value={email}
-                  onChangeText={t => setEmail(t.toLowerCase())}
-                  placeholder="Enter your email"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  textContentType="emailAddress"
-                  returnKeyType="next"
-                  blurOnSubmit={false}
-                  submitBehavior="submit"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
-                />
-
-                <View>
-                  <PasswordInput
-                    inputRef={passwordRef}
-                    label="Password"
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="Create a password (min 8 chars)"
-                    autoComplete="new-password"
-                    textContentType="newPassword"
+                <View style={styles.formGap}>
+                  <TextInputField
+                    label="Username"
+                    value={username}
+                    onChangeText={t => setUsername(t.trim().toLowerCase())}
+                    placeholder="Pick a username"
+                    autoCapitalize="none"
+                    autoCorrect={false}
                     returnKeyType="next"
                     blurOnSubmit={false}
                     submitBehavior="submit"
-                    onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+                    onSubmitEditing={() => fullNameRef.current?.focus()}
                   />
-                  {password.length > 0 && (
-                    <PasswordStrengthBar strength={strength} password={password} />
-                  )}
+
+                  <TextInputField
+                    inputRef={fullNameRef}
+                    label="Full Name"
+                    value={fullName}
+                    onChangeText={setFullName}
+                    placeholder="John Doe"
+                    autoCapitalize="words"
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    submitBehavior="submit"
+                    onSubmitEditing={() => emailRef.current?.focus()}
+                  />
+
+                  <TextInputField
+                    inputRef={emailRef}
+                    label="Email Address"
+                    value={email}
+                    onChangeText={t => setEmail(t.toLowerCase())}
+                    placeholder="Enter your email"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    textContentType="emailAddress"
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    submitBehavior="submit"
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                  />
+
+                  <View>
+                    <PasswordInput
+                      inputRef={passwordRef}
+                      label="Password"
+                      value={password}
+                      onChangeText={setPassword}
+                      placeholder="Create a password (min 8 chars)"
+                      autoComplete="new-password"
+                      textContentType="newPassword"
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                      submitBehavior="submit"
+                      onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+                    />
+                    {password.length > 0 && (
+                      <PasswordStrengthBar strength={strength} password={password} />
+                    )}
+                  </View>
+
+                  <PasswordInput
+                    inputRef={confirmPasswordRef}
+                    label="Confirm Password"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    placeholder="Confirm your password"
+                    autoComplete="new-password"
+                    textContentType="newPassword"
+                    returnKeyType="done"
+                    blurOnSubmit
+                    submitBehavior="blurAndSubmit"
+                    onSubmitEditing={handleRegister}
+                  />
+
+                  <PrimaryButton
+                    label="Create Account"
+                    loading={isLoading}
+                    onPress={handleRegister}
+                  />
                 </View>
-
-                <PasswordInput
-                  inputRef={confirmPasswordRef}
-                  label="Confirm Password"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  placeholder="Confirm your password"
-                  autoComplete="new-password"
-                  textContentType="newPassword"
-                  returnKeyType="done"
-                  blurOnSubmit
-                  submitBehavior="blurAndSubmit"
-                  onSubmitEditing={handleRegister}
-                />
-
-                <PrimaryButton
-                  label="Create Account"
-                  loading={isLoading}
-                  onPress={handleRegister}
-                />
-              </View>
-            </BlurView>
+              </BlurView>
             </Animated.View>
 
             <Text style={styles.footer}>© 2026 Planora. All rights reserved.</Text>

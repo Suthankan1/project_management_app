@@ -290,7 +290,7 @@ export function GlobalNotificationProvider({ children }: { children: React.React
       reconnectTimerRef.current = null;
       connectRealtime(token);
     }, delay);
-  }, [connectRealtime, clearReconnectTimer]);
+  }, [connectRealtime]);
 
   useEffect(() => {
     reconnectAttemptHandlerRef.current = scheduleReconnect;
