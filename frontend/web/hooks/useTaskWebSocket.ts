@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CompatClient, Stomp } from '@stomp/stompjs';
 import { getValidToken } from '@/lib/auth';
 import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
@@ -32,6 +32,8 @@ export function useTaskWebSocket(
 ) {
   const clientRef = useRef<CompatClient | null>(null);
   const onEventRef = useRef(onEvent);
+  const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
+  const [reconnectCount, setReconnectCount] = useState(0);
 
   useEffect(() => {
     onEventRef.current = onEvent;
@@ -53,17 +55,7 @@ export function useTaskWebSocket(
       { Authorization: `Bearer ${token}` },
       () => {
         clientRef.current = stompClient;
-        stompClient.subscribe(
-          `/topic/project/${projectId}/tasks`,
-          (message) => {
-            try {
-              const event = JSON.parse(message.body) as TaskEvent;
-              onEventRef.current(event);
-            } catch {
-              // ignore parse errors
-            }
-          }
-        );
+        setReconnectCount((prev) => prev + 1);
       },
       (error: unknown) => {
         const errorMessage = typeof error === 'string' ? error : ((error as { headers?: { message?: string } })?.headers?.message || '');
@@ -82,10 +74,37 @@ export function useTaskWebSocket(
     );
 
     return () => {
+      subscriptionRef.current?.unsubscribe();
+      subscriptionRef.current = null;
       if (stompClient.connected) {
         stompClient.disconnect();
       }
       clientRef.current = null;
     };
   }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId || !clientRef.current?.connected) return;
+
+    const subscription = clientRef.current.subscribe(
+      `/topic/project/${projectId}/tasks`,
+      (message) => {
+        try {
+          const event = JSON.parse(message.body) as TaskEvent;
+          onEventRef.current(event);
+        } catch {
+          // ignore parse errors
+        }
+      }
+    );
+
+    subscriptionRef.current = subscription;
+
+    return () => {
+      subscriptionRef.current?.unsubscribe();
+      if (subscriptionRef.current === subscription) {
+        subscriptionRef.current = null;
+      }
+    };
+  }, [projectId, reconnectCount]);
 }
