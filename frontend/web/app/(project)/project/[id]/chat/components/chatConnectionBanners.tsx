@@ -30,7 +30,7 @@ export function ChatConnectionBanners({
             <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2.5 flex items-center justify-between gap-3" role="alert">
               <div className="flex items-center gap-2 text-amber-500">
                 <WifiOff size={14} strokeWidth={2.5} />
-                  <span className="text-[12.5px] font-medium">Disconnected - messages may not be delivered</span>
+                  <span className="text-[12.5px] font-medium">Disconnected — messages may not be delivered</span>
               </div>
               <button
                 onClick={onRetry}
