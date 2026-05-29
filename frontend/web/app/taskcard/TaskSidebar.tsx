@@ -11,6 +11,8 @@ import DateSection from './sidebar/DateSection';
 import RecurrenceSection from './sidebar/RecurrenceSection';
 import TaskGitHubSection from './sidebar/TaskGitHubSection';
 import SidebarField from './sidebar/SidebarField';
+import CustomFieldsSection from './sidebar/CustomFieldsSection';
+import api from '@/lib/axios';
 import { Check, ChevronDown, Link2, Plus } from 'lucide-react';
 import GitHubIssueBadge from '@/components/github/GitHubIssueBadge';
 import GitHubMark from '@/components/github/GitHubMark';
@@ -85,6 +87,20 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
   const [labelMenuOpen, setLabelMenuOpen] = React.useState(false);
   const [selectedLabelIds, setSelectedLabelIds] = React.useState<number[]>(labelIds);
   const labelMenuRef = React.useRef<HTMLDivElement>(null);
+  const [projectCustomFields, setProjectCustomFields] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (projectId == null) return;
+    let active = true;
+    api.get(`/api/projects/${projectId}/custom-fields`)
+      .then((res) => {
+        if (active) {
+          setProjectCustomFields(res.data || []);
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [projectId]);
 
   React.useEffect(() => {
     setSelectedLabelIds((prev) => {
@@ -240,6 +256,13 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
               )}
             </div>
           </SidebarField>
+          {projectCustomFields.length > 0 && taskId != null && projectId != null && (
+            <CustomFieldsSection
+              taskId={taskId}
+              projectId={projectId}
+              canEdit={canEdit}
+            />
+          )}
           <SidebarField label="Sprint">
             <select
               value={sprintId ?? ''}

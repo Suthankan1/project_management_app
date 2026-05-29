@@ -236,7 +236,7 @@ class TaskServiceTest {
         Task taskTwo = buildTask(72L);
 
         when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
-        when(taskRepository.findByProjectIdWithScalars(10L)).thenReturn(List.of(taskOne, taskTwo));
+        when(taskRepository.findByProjectIdWithScalarsAndArchived(10L, false)).thenReturn(List.of(taskOne, taskTwo));
         when(taskRepository.findByIdInWithCollections(List.of(71L, 72L))).thenReturn(List.of(taskOne, taskTwo));
         when(taskRepository.findDependencyRowsByTaskIds(List.of(71L, 72L)))
                 .thenReturn(java.util.Collections.singletonList(new Object[] {71L, 99L, "Foundation task"}));

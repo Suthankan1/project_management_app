@@ -47,7 +47,7 @@ interface BacklogTaskRowProps {
 
 export default function BacklogTaskRow({
     task, onDelete, onClick, onStatusChange, onOpenModal,
-    onArchive, onUnarchive, selected, onToggleSelect, onDateChange,
+    onArchive, onUnarchive, selected, onToggleSelect, onDateChange, isArchived = false,
 }: BacklogTaskRowProps) {
     const PriorityIcon = task.priority ? (PRIORITY_CONFIG[task.priority]?.icon ?? Minus) : Minus;
     const priorityColor = task.priority ? (PRIORITY_CONFIG[task.priority]?.color ?? '#9CA3AF') : '#9CA3AF';

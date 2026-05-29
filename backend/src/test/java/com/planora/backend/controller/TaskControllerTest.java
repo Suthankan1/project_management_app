@@ -85,7 +85,7 @@ class TaskControllerTest {
     @Test
     @WithMockUserPrincipal
     void getTasksByProject_returnsListOfTasks() throws Exception {
-        when(service.getTasksByProject(eq(10L), any(), any(), any(), any(), any(), any()))
+        when(service.getTasksByProject(eq(10L), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of(sampleTask));
 
         mockMvc.perform(get("/api/tasks/project/10"))
