@@ -37,25 +37,23 @@ import com.planora.backend.service.GithubNotificationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 
+import lombok.RequiredArgsConstructor;
+
 @Validated
 @RestController
 @RequestMapping("/api/github")
+@RequiredArgsConstructor
 public class GithubIssuesController {
 
-    @Autowired
-    private GithubIssuesSyncService githubIssuesSyncService;
+    private final GithubIssuesSyncService githubIssuesSyncService;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private GithubIssueImportService githubIssueImportService;
+    private final GithubIssueImportService githubIssueImportService;
 
-    @Autowired
-    private GithubIssueCommentSyncService githubIssueCommentSyncService;
+    private final GithubIssueCommentSyncService githubIssueCommentSyncService;
 
-    @Autowired
-    private GithubNotificationService githubNotificationService;
+    private final GithubNotificationService githubNotificationService;
 
     @GetMapping("/issues")
     public ResponseEntity<List<GithubIssueDTO>> getIssues(

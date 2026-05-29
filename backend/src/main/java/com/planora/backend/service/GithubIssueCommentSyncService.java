@@ -23,23 +23,21 @@ import com.planora.backend.repository.CommentRepository;
 import com.planora.backend.repository.ProjectRepository;
 import com.planora.backend.repository.TaskRepository;
 
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class GithubIssueCommentSyncService {
 
-    @Autowired
-    private ProjectRepository projectRepository;
+    private final ProjectRepository projectRepository;
 
-    @Autowired
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
-    @Autowired
-    private CommentRepository commentRepository;
+    private final CommentRepository commentRepository;
 
-    @Autowired
-    private TeamMembershipLookupService teamMembershipLookupService;
+    private final TeamMembershipLookupService teamMembershipLookupService;
 
-    @Autowired
-    private GithubIssuesSyncService githubIssuesSyncService;
+    private final GithubIssuesSyncService githubIssuesSyncService;
 
     @Transactional
     public GithubCommentSyncResponseDTO syncComments(Long projectId, int issueNumber, User currentUser) {

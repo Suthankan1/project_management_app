@@ -14,12 +14,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("api/teams")
+@RequiredArgsConstructor
 public class TeamController {
 
-    @Autowired
-    TeamService service;
+    private final TeamService service;
 
     // 0. CHECK TEAM NAME
     @GetMapping("/check-name")

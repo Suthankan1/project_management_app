@@ -11,12 +11,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/github")
+@RequiredArgsConstructor
 public class GitHubController {
 
-    @Autowired
-    private GitHubIntegrationService gitHubIntegrationService;
+    private final GitHubIntegrationService gitHubIntegrationService;
 
     /**
      * Returns repositories visible to the provided GitHub token.

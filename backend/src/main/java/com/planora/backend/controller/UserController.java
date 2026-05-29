@@ -20,13 +20,15 @@ import java.util.stream.Collectors;
 
 import org.springframework.security.core.Authentication;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/auth")
+@RequiredArgsConstructor
 // CORS is configured globally in SecurityConfig — no @CrossOrigin annotation needed here.
 public class UserController {
 
-    @Autowired
-    private UserService service;
+    private final UserService service;
 
     //@Valid is used here to fail fast. It catches the bad data (like malformed emails or short passwords)
     //at the controller level before we waste resources hitting the database or service layer.

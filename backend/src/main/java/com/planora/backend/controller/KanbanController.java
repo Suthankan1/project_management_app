@@ -10,14 +10,16 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
+
 /*Controller managing the lifecycle of Kanban boards.
   Each board serves as a container for columns and tasks within a specific project context.*/
 @RestController
 @RequestMapping("/api/kanbans")
+@RequiredArgsConstructor
 public class KanbanController {
 
-    @Autowired
-    private KanbanService kanbanService;
+    private final KanbanService kanbanService;
 
     @PostMapping
     public ResponseEntity<Kanban> createKanban(@RequestBody KanbanRequestDTO dto) {

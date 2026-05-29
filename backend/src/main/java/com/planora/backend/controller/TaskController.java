@@ -35,25 +35,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/tasks")
+@RequiredArgsConstructor
 public class TaskController {
 
-    @Autowired
-    TaskService service;
+    private final TaskService service;
 
-    @Autowired
-    TaskActivityService activityService;
+    private final TaskActivityService activityService;
 
-    @Autowired
-    TaskTemplateService templateService;
+    private final TaskTemplateService templateService;
 
-    @Autowired
-    TaskGithubService taskGithubService;
+    private final TaskGithubService taskGithubService;
 
     // Spring's WebSocket messaging template used for real-time push notifications.
-    @Autowired
-    SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
 
     //Creates a new task and broadcasts the creation to all connected clients.
     @PostMapping

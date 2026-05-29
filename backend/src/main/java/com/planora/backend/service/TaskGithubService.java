@@ -28,6 +28,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
+
 /**
  * Aggregates all GitHub-related data for a Planora task.
  *
@@ -45,6 +47,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class TaskGithubService {
 
     /** Maximum number of commits returned by the list endpoint to prevent large payloads. */
@@ -59,23 +62,17 @@ public class TaskGithubService {
     private static final Pattern TASK_KEY_PATTERN =
             Pattern.compile("(?:#|TASK-)([0-9]+)", Pattern.CASE_INSENSITIVE);
 
-    @Autowired
-    private GithubPullRequestRepository prRepository;
+    private final GithubPullRequestRepository prRepository;
 
-    @Autowired
-    private GithubCommitRepository commitRepository;
+    private final GithubCommitRepository commitRepository;
 
-    @Autowired
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
-    @Autowired
-    private GitHubIntegrationService gitHubIntegrationService;
+    private final GitHubIntegrationService gitHubIntegrationService;
 
-    @Autowired
-    private TaskActivityService taskActivityService;
+    private final TaskActivityService taskActivityService;
 
-    @Autowired
-    private CiStatusResolver ciStatusResolver;
+    private final CiStatusResolver ciStatusResolver;
 
     // ── 1. READ — DB-backed aggregation ──────────────────────────────────────────
 

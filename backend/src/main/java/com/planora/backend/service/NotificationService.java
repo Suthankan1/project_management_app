@@ -26,23 +26,21 @@ import com.planora.backend.repository.TaskRepository;
 
 import jakarta.persistence.EntityNotFoundException;
 
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class NotificationService {
 
-    @Autowired
-    private NotificationRepository notificationRepository;
+    private final NotificationRepository notificationRepository;
 
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    @Autowired
-    private StringRedisTemplate stringRedisTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
 
-    @Autowired
-    private NotificationPreferenceService notificationPreferenceService;
+    private final NotificationPreferenceService notificationPreferenceService;
 
-    @Autowired
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
     private static final Duration UNREAD_COUNT_TTL = Duration.ofSeconds(30);
     private static final String UNREAD_COUNT_KEY_PREFIX = "notifications:unread-count:";

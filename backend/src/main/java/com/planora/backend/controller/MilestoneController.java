@@ -17,13 +17,15 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 // @Tag is used by Swagger/OpenAPI to group these endpoints cleanly in the generated API documentation UI.
 @Tag(name = "Milestones", description = "Milestone management for projects")
+@RequiredArgsConstructor
 public class MilestoneController {
 
-    @Autowired
-    private MilestoneService milestoneService;
+    private final MilestoneService milestoneService;
 
     /*
      * DRY Helper Method.

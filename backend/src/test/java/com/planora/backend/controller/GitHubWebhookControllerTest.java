@@ -137,13 +137,18 @@ class GitHubWebhookControllerTest {
 
     @BeforeEach
     void setUp() {
-        GitHubWebhookController controller = new GitHubWebhookController();
         githubNotificationService = mock(GithubNotificationService.class);
+        CiStatusResolver ciStatusResolver = mock(CiStatusResolver.class);
+        TaskGithubService taskGithubService = mock(TaskGithubService.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        GitHubWebhookController controller = new GitHubWebhookController(
+                ciStatusResolver,
+                taskGithubService,
+                githubNotificationService,
+                objectMapper
+        );
         ReflectionTestUtils.setField(controller, "webhookSecret", SECRET);
-        ReflectionTestUtils.setField(controller, "objectMapper", new ObjectMapper());
-        ReflectionTestUtils.setField(controller, "githubNotificationService", githubNotificationService);
-        ReflectionTestUtils.setField(controller, "ciStatusResolver", mock(CiStatusResolver.class));
-        ReflectionTestUtils.setField(controller, "taskGithubService", mock(TaskGithubService.class));
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -328,12 +333,15 @@ class GitHubWebhookControllerTest {
 
     @Test
     void webhook_rejectsDeliveriesWhenSecretIsNotConfigured() throws Exception {
-        GitHubWebhookController controller = new GitHubWebhookController();
+        CiStatusResolver ciStatusResolver = mock(CiStatusResolver.class);
+        TaskGithubService taskGithubService = mock(TaskGithubService.class);
+        GitHubWebhookController controller = new GitHubWebhookController(
+                ciStatusResolver,
+                taskGithubService,
+                githubNotificationService,
+                new ObjectMapper()
+        );
         ReflectionTestUtils.setField(controller, "webhookSecret", "");
-        ReflectionTestUtils.setField(controller, "objectMapper", new ObjectMapper());
-        ReflectionTestUtils.setField(controller, "githubNotificationService", githubNotificationService);
-        ReflectionTestUtils.setField(controller, "ciStatusResolver", mock(CiStatusResolver.class));
-        ReflectionTestUtils.setField(controller, "taskGithubService", mock(TaskGithubService.class));
         MockMvc unconfiguredMockMvc = MockMvcBuilders.standaloneSetup(controller).build();
 
         unconfiguredMockMvc.perform(post("/api/github/webhook")

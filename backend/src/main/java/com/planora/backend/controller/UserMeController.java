@@ -11,14 +11,16 @@ import org.springframework.web.bind.annotation.RestController;
 import com.planora.backend.dto.UserResponseDTO;
 import com.planora.backend.service.UserService;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/user")
+@RequiredArgsConstructor
 // Maintaining a dedicated controller or endpoint for the "current user"
 // keeps user-context operations distinct from broader administrative actions (like fetching all users).
 public class UserMeController {
 
-    @Autowired
-    private UserService service;
+    private final UserService service;
 
     /* Frontend calls this endpoint immediately after login or upon hard page refresh.
         It allows fronted to blindly send its auth token and "hydrate" the app state with the current

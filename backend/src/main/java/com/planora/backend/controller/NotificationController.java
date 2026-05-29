@@ -17,12 +17,14 @@ import com.planora.backend.dto.NotificationFeedResponseDTO;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.service.NotificationService;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/notifications")
+@RequiredArgsConstructor
 public class NotificationController {
 
-    @Autowired
-    private NotificationService notificationService;
+    private final NotificationService notificationService;
 
     // ---------------- GET NOTIFICATIONS ----------------
 
