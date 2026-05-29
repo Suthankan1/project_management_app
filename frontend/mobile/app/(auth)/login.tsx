@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,20 +8,21 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Animated,
+  Animated as RNAnimated,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useLoginForm } from '@/src/hooks/useLoginForm';
 import BrandHeader from '@/src/components/ui/BrandHeader';
 import TextInputField from '@/src/components/ui/TextInputField';
 import PasswordInput from '@/src/components/ui/PasswordInput';
 import PrimaryButton from '@/src/components/ui/PrimaryButton';
-import ErrorBanner from '@/src/components/ui/ErrorBanner';
+import Toast from '@/src/components/ui/Toast';
 import { Colors } from '@/src/constants/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -31,6 +32,7 @@ const TAB_WIDTH = (SCREEN_WIDTH - 40 - 48 - 10) / 2;
 export default function LoginScreen() {
   const router = useRouter();
   const passwordRef = useRef<TextInput>(null);
+  const insets = useSafeAreaInsets();
   const {
     email, setEmail,
     password, setPassword,
@@ -39,36 +41,23 @@ export default function LoginScreen() {
     handleLogin,
   } = useLoginForm();
 
-  const cardAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.spring(cardAnim, {
-      toValue: 1,
-      useNativeDriver: Platform.OS !== 'web',
-      tension: 60,
-      friction: 10,
-      delay: 80,
-    }).start();
-  }, [cardAnim]);
+  const [toastVisible, setToastVisible] = useState(false);
 
-  const slideAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.spring(slideAnim, {
+    if (error) {
+      setToastVisible(true);
+    }
+  }, [error]);
+
+  const slideAnim = useRef(new RNAnimated.Value(0)).current;
+  useEffect(() => {
+    RNAnimated.spring(slideAnim, {
       toValue: 0,
       tension: 200,
       friction: 20,
-      useNativeDriver: Platform.OS !== 'web',
+      useNativeDriver: true,
     }).start();
-  }, []);
-
-  const cardStyle = {
-    opacity: cardAnim,
-    transform: [{
-      translateY: cardAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [24, 0],
-      }),
-    }],
-  };
+  }, [slideAnim]);
 
   return (
     <LinearGradient
@@ -77,14 +66,21 @@ export default function LoginScreen() {
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
     >
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+        <Toast
+          message={error}
+          visible={toastVisible}
+          onDismiss={() => setToastVisible(false)}
+          type="error"
+        />
+
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <ScrollView
             style={styles.flex}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -114,89 +110,87 @@ export default function LoginScreen() {
             </View>
 
             {/* Card */}
-            <Animated.View style={cardStyle}>
-            <BlurView intensity={20} tint="light" style={styles.card}>
-              {/* Tab Switcher */}
-              <View style={styles.tabContainer}>
-                <Animated.View
-                  style={[
-                    styles.tabPill,
-                    {
-                      transform: [{
-                        translateX: slideAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, TAB_WIDTH],
-                        }),
-                      }],
-                    },
-                  ]}
-                />
-                <TouchableOpacity style={styles.tab} onPress={() => router.replace('/(auth)/login')}>
-                  <Text style={[styles.tabText, styles.tabTextActive]}>Sign In</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.tab} onPress={() => router.replace('/(auth)/register')}>
-                  <Text style={styles.tabText}>Register</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.formGap}>
-                <ErrorBanner message={error} visible={!!error} />
-
-                <TextInputField
-                  label="Email Address"
-                  value={email}
-                  onChangeText={t => setEmail(t.toLowerCase())}
-                  placeholder="Enter your email"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  textContentType="username"
-                  returnKeyType="next"
-                  blurOnSubmit={false}
-                  submitBehavior="submit"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
-                />
-
-                <PasswordInput
-                  inputRef={passwordRef}
-                  label="Password"
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="Enter your password"
-                  autoComplete="current-password"
-                  textContentType="password"
-                  returnKeyType="done"
-                  blurOnSubmit
-                  submitBehavior="blurAndSubmit"
-                  onSubmitEditing={handleLogin}
-                />
-
-                {/* Utilities Row */}
-                <View style={styles.utilitiesRow}>
-                  <TouchableOpacity
-                    style={styles.rememberRow}
-                    onPress={() => setRemember(v => !v)}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: remember }}
-                    accessibilityLabel="Remember me for 30 days"
-                  >
-                    <Animated.View style={[styles.checkbox, remember && styles.checkboxChecked]}>
-                      <Animated.Text style={styles.checkmark}>{remember ? '✓' : ''}</Animated.Text>
-                    </Animated.View>
-                    <Text style={styles.rememberText}>Remember me for 30 days</Text>
+            <Animated.View entering={FadeInUp.duration(600).springify().damping(15)}>
+              <BlurView intensity={20} tint="light" style={styles.card}>
+                {/* Tab Switcher */}
+                <View style={styles.tabContainer}>
+                  <RNAnimated.View
+                    style={[
+                      styles.tabPill,
+                      {
+                        transform: [{
+                          translateX: slideAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, TAB_WIDTH],
+                          }),
+                        }],
+                      },
+                    ]}
+                  />
+                  <TouchableOpacity style={styles.tab} onPress={() => router.replace('/(auth)/login')}>
+                    <Text style={[styles.tabText, styles.tabTextActive]}>Sign In</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
-                    <Text style={styles.forgotText}>Forgot password?</Text>
+                  <TouchableOpacity style={styles.tab} onPress={() => router.replace('/(auth)/register')}>
+                    <Text style={styles.tabText}>Register</Text>
                   </TouchableOpacity>
                 </View>
 
-                <PrimaryButton
-                  label="Sign In"
-                  loading={isLoading}
-                  onPress={handleLogin}
-                />
-              </View>
-            </BlurView>
+                <View style={styles.formGap}>
+                  <TextInputField
+                    label="Email Address"
+                    value={email}
+                    onChangeText={t => setEmail(t.toLowerCase())}
+                    placeholder="Enter your email"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    textContentType="username"
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    submitBehavior="submit"
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                  />
+
+                  <PasswordInput
+                    inputRef={passwordRef}
+                    label="Password"
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                    textContentType="password"
+                    returnKeyType="done"
+                    blurOnSubmit
+                    submitBehavior="blurAndSubmit"
+                    onSubmitEditing={handleLogin}
+                  />
+
+                  {/* Utilities Row */}
+                  <View style={styles.utilitiesRow}>
+                    <TouchableOpacity
+                      style={styles.rememberRow}
+                      onPress={() => setRemember(v => !v)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: remember }}
+                      accessibilityLabel="Remember me for 30 days"
+                    >
+                      <View style={[styles.checkbox, remember && styles.checkboxChecked]}>
+                        <Text style={styles.checkmark}>{remember ? '✓' : ''}</Text>
+                      </View>
+                      <Text style={styles.rememberText}>Remember me for 30 days</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
+                      <Text style={styles.forgotText}>Forgot password?</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <PrimaryButton
+                    label="Sign In"
+                    loading={isLoading}
+                    onPress={handleLogin}
+                  />
+                </View>
+              </BlurView>
             </Animated.View>
 
             <Text style={styles.footer}>© 2026 Planora. All rights reserved.</Text>

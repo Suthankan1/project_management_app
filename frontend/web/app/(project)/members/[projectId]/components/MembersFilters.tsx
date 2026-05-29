@@ -24,13 +24,13 @@ export function MembersFilters({
       <div className="flex flex-col sm:flex-row gap-2">
         <input
           type="text"
-          className="flex-1 border rounded px-4 py-2.5 min-h-[44px] text-sm focus:outline-none focus:ring-2 focus:ring-cu-primary/20"
+          className="flex-1 border border-cu-border bg-cu-bg text-cu-text-primary rounded px-4 py-2.5 min-h-[44px] text-sm focus:outline-none focus:ring-2 focus:ring-cu-primary/20 placeholder:text-cu-text-muted"
           placeholder="Search members by name or email..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
         />
         <button
-          className="border rounded px-4 py-2.5 min-h-[44px] flex items-center justify-center gap-2 text-sm bg-white hover:bg-gray-50"
+          className="border border-cu-border rounded px-4 py-2.5 min-h-[44px] flex items-center justify-center gap-2 text-sm bg-cu-bg text-cu-text-secondary hover:bg-cu-hover"
           onClick={onToggleFilters}
         >
           <span>Filters</span>
@@ -41,7 +41,7 @@ export function MembersFilters({
       {showFilters && (
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
           <select
-            className="border rounded px-3 py-2.5 min-h-[44px] text-sm"
+            className="border border-cu-border bg-cu-bg text-cu-text-primary rounded px-3 py-2.5 min-h-[44px] text-sm"
             value={roleFilter || ''}
             onChange={(e) => onRoleFilterChange(e.target.value || null)}
           >
@@ -53,7 +53,7 @@ export function MembersFilters({
           </select>
 
           <select
-            className="border rounded px-3 py-2.5 min-h-[44px] text-sm"
+            className="border border-cu-border bg-cu-bg text-cu-text-primary rounded px-3 py-2.5 min-h-[44px] text-sm"
             value={statusFilter || ''}
             onChange={(e) => onStatusFilterChange(e.target.value || null)}
           >

@@ -1,7 +1,5 @@
 'use client';
 
-// Main dashboard UI: Shows analytics, charts, download & schedule options for reports
-
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -19,11 +17,9 @@ import {
   getProjectScheduledReports, deleteScheduledReport,
   pauseScheduledReport, resumeScheduledReport, ScheduledReportResponse,
 } from '@/services/report-schedule-service';
+import KpiStrip from './analytics/KpiStrip';
+import { useTheme } from '@/components/providers/ThemeProvider';
 
-// ── Analytics components ──────────────────────────────────────────────────────
-import KpiStrip                         from './analytics/KpiStrip';
-
-// ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
   projectId:  number;
   tasks:      Task[];
@@ -36,7 +32,6 @@ interface Props {
   isAgile:    boolean;
 }
 
-// ── Compact action button ─────────────────────────────────────────────────────
 function ActionBtn({
   label, sub, Icon, gradient, onClick, 'data-id': dataId,
 }: {
@@ -51,10 +46,7 @@ function ActionBtn({
       whileTap={{ scale: 0.97 }}
       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
       className="w-full sm:w-auto min-w-0 sm:min-w-[160px] flex items-center gap-3 px-5 py-3 rounded-2xl text-left relative overflow-hidden"
-      style={{
-        background:     gradient,
-        boxShadow:      '0 4px 20px rgba(21,93,252,0.25)',
-      }}
+      style={{ background: gradient, boxShadow: '0 4px 20px rgba(21,93,252,0.25)' }}
     >
       <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
         <Icon size={16} className="text-white" />
@@ -67,15 +59,15 @@ function ActionBtn({
   );
 }
 
-// ── Active schedule row ────────────────────────────────────────────────────────
 import { Loader2, Pause, Trash2 } from 'lucide-react';
 
 function ScheduleRow({
-  sr, onDelete, onToggle,
+  sr, onDelete, onToggle, isDark,
 }: {
   sr: ScheduledReportResponse;
   onDelete: () => void;
   onToggle: () => void;
+  isDark: boolean;
 }) {
   const [delLoading, setDelLoading] = useState(false);
   const [togLoading, setTogLoading] = useState(false);
@@ -99,20 +91,24 @@ function ScheduleRow({
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -6 }}
-      className="flex items-center gap-3 p-3 rounded-xl border border-[#F3F4F6] bg-white/60 hover:bg-white transition-colors"
+      className="flex items-center gap-3 p-3 rounded-xl transition-colors"
+      style={{
+        border:     `1px solid ${isDark ? '#273449' : '#F3F4F6'}`,
+        background: isDark ? 'rgba(17,24,39,0.6)' : 'rgba(255,255,255,0.6)',
+      }}
     >
       <div className="w-2 h-2 rounded-full shrink-0" style={{ background: statusColor }} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[11px] font-bold text-[#1F2937]">{freqLabel}</span>
-          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase" style={{ background: '#EBF2FF', color: '#155DFC' }}>
+          <span className="text-[11px] font-bold" style={{ color: isDark ? '#F1F5F9' : '#1F2937' }}>{freqLabel}</span>
+          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase" style={{ background: isDark ? 'rgba(21,93,252,0.2)' : '#EBF2FF', color: '#155DFC' }}>
             {sr.format}
           </span>
           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase" style={{ background: `${statusColor}15`, color: statusColor }}>
             {sr.status}
           </span>
         </div>
-        <p className="text-[10px] text-[#9CA3AF] mt-0.5 truncate">
+        <p className="text-[10px] mt-0.5 truncate" style={{ color: isDark ? '#64748B' : '#9CA3AF' }}>
           To: {sr.recipientsTo.join(', ')}
           {sr.nextSendAt && ` · Next: ${new Date(sr.nextSendAt).toLocaleString()}`}
           {` · Sent: ${sr.sendCount}×`}
@@ -123,7 +119,8 @@ function ScheduleRow({
           <button
             onClick={async () => { setTogLoading(true); await onToggle(); setTogLoading(false); }}
             disabled={togLoading}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-[#9CA3AF] hover:bg-[#F3F4F6] transition-colors"
+            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+            style={{ color: isDark ? '#64748B' : '#9CA3AF' }}
           >
             {togLoading ? <Loader2 size={12} className="animate-spin" /> :
              sr.status === 'ACTIVE' ? <Pause size={12} /> : <RefreshCw size={12} />}
@@ -132,7 +129,8 @@ function ScheduleRow({
         <button
           onClick={async () => { setDelLoading(true); await onDelete(); setDelLoading(false); }}
           disabled={delLoading}
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-[#9CA3AF] hover:bg-red-50 hover:text-red-500 transition-colors"
+          className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:text-red-500"
+          style={{ color: isDark ? '#64748B' : '#9CA3AF' }}
         >
           {delLoading ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
         </button>
@@ -141,24 +139,17 @@ function ScheduleRow({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  MAIN COMPONENT
-// ─────────────────────────────────────────────────────────────────────────────
 export default function ReportPageContent({
   projectId, tasks, sprints, metrics, project, milestones, members, isAgile,
 }: Props) {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
-  // Modal state
   const [dlOpen,  setDlOpen]  = useState(false);
   const [schOpen, setSchOpen] = useState(false);
 
-  // Build report data (memoized)
   const reportData = useMemo(() => buildReportData(
-    project,
-    tasks,
-    sprints,
-    metrics,
-    milestones,
+    project, tasks, sprints, metrics, milestones,
     members.map(m => ({
       id:     m.id,
       userId: m.user.userId,
@@ -168,7 +159,6 @@ export default function ReportPageContent({
     isAgile,
   ), [project, tasks, sprints, metrics, milestones, members, isAgile]);
 
-  // Scheduled reports
   const { data: schedules = [], mutate: mutateSchedules } = useSWR<ScheduledReportResponse[]>(
     projectId ? `scheduled-reports-${projectId}` : null,
     () => getProjectScheduledReports(projectId),
@@ -181,9 +171,23 @@ export default function ReportPageContent({
     mutateSchedules();
   };
 
+  // Reusable dark-mode style helpers
+  const cardStyle = {
+    background:     isDark ? 'rgba(17,24,39,0.9)'   : 'rgba(255,255,255,0.85)',
+    backdropFilter: 'blur(20px) saturate(180%)',
+    border:         `1px solid ${isDark ? 'rgba(39,52,73,0.8)' : 'rgba(255,255,255,0.65)'}`,
+    boxShadow:      isDark ? '0 4px 24px rgba(0,0,0,0.4)' : '0 4px 24px rgba(0,0,0,0.06)',
+  };
+
+  const cardStyleSm = {
+    background:     isDark ? 'rgba(17,24,39,0.85)'  : 'rgba(255,255,255,0.75)',
+    backdropFilter: 'blur(20px)',
+    border:         `1px solid ${isDark ? 'rgba(39,52,73,0.7)' : 'rgba(255,255,255,0.60)'}`,
+    boxShadow:      isDark ? '0 2px 16px rgba(0,0,0,0.35)' : '0 2px 16px rgba(0,0,0,0.04)',
+  };
+
   return (
     <>
-      {/* Modals */}
       <DownloadNowModal
         open={dlOpen}
         onClose={() => setDlOpen(false)}
@@ -197,11 +201,12 @@ export default function ReportPageContent({
         projectName={project?.name || 'Project'}
       />
 
-      {/* Page */}
       <div
         className="w-full min-h-[calc(100vh-80px)] relative overflow-x-clip"
         style={{
-          background: 'linear-gradient(160deg, #F8FAFF 0%, #F0F4FF 35%, #F8F9FF 70%, #FAFBFF 100%)',
+          background: isDark
+            ? 'linear-gradient(160deg, #0B1120 0%, #0D1529 35%, #0B1120 70%, #0B1120 100%)'
+            : 'linear-gradient(160deg, #F8FAFF 0%, #F0F4FF 35%, #F8F9FF 70%, #FAFBFF 100%)',
         }}
       >
         {/* Decorative blobs */}
@@ -219,17 +224,10 @@ export default function ReportPageContent({
             initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
             className="rounded-2xl p-4 sm:p-6"
-            style={{
-              background:     'rgba(255,255,255,0.85)',
-              backdropFilter: 'blur(20px) saturate(180%)',
-              border:         '1px solid rgba(255,255,255,0.65)',
-              boxShadow:      '0 4px 24px rgba(0,0,0,0.06)',
-            }}
+            style={cardStyle}
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              {/* Title area */}
               <div>
-                {/* Planora branding */}
                 <div className="flex items-center gap-2 mb-2">
                   <div
                     className="w-6 h-6 rounded-lg flex items-center justify-center"
@@ -237,12 +235,12 @@ export default function ReportPageContent({
                   >
                     <BarChart3 size={12} className="text-white" />
                   </div>
-                  <span className="text-[10px] font-black text-[#9CA3AF] uppercase tracking-widest">
+                  <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: isDark ? '#64748B' : '#9CA3AF' }}>
                     Planora · Report Studio
                   </span>
                 </div>
 
-                <h1 className="text-[20px] sm:text-[22px] font-black text-[#1A1A2E] leading-tight break-words">
+                <h1 className="text-[20px] sm:text-[22px] font-black leading-tight break-words" style={{ color: isDark ? '#F1F5F9' : '#1A1A2E' }}>
                   {project?.name || 'Project'} Analytics
                 </h1>
 
@@ -250,24 +248,23 @@ export default function ReportPageContent({
                   <span
                     className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest"
                     style={{
-                      background: isAgile ? '#EBF2FF' : '#F3E8FF',
+                      background: isAgile ? (isDark ? 'rgba(21,93,252,0.2)' : '#EBF2FF') : (isDark ? 'rgba(124,58,237,0.2)' : '#F3E8FF'),
                       color:      isAgile ? '#155DFC' : '#7C3AED',
                     }}
                   >
                     {isAgile ? '⚡ Agile / Scrum' : '📋 Kanban'}
                   </span>
-                  <span className="text-[10px] text-[#9CA3AF]">
+                  <span className="text-[10px]" style={{ color: isDark ? '#64748B' : '#9CA3AF' }}>
                     Generated {reportData.generatedAt}
                   </span>
                   {reportData.unassignedCount > 0 && (
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#FEF2F2', color: '#DC2626' }}>
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: isDark ? 'rgba(220,38,38,0.15)' : '#FEF2F2', color: '#DC2626' }}>
                       ⚠ {reportData.unassignedCount} unassigned
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Action buttons */}
               <div className="grid grid-cols-1 sm:flex gap-3 w-full sm:w-auto">
                 <ActionBtn
                   data-id="report-download-btn"
@@ -287,7 +284,6 @@ export default function ReportPageContent({
                 />
               </div>
             </div>
-
           </motion.div>
 
           {/* ── ACTIVE SCHEDULES ───────────────────────────────────────────── */}
@@ -296,20 +292,15 @@ export default function ReportPageContent({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.08 }}
             className="rounded-2xl p-5"
-            style={{
-              background:     'rgba(255,255,255,0.75)',
-              backdropFilter: 'blur(20px)',
-              border:         '1px solid rgba(255,255,255,0.60)',
-              boxShadow:      '0 2px 16px rgba(0,0,0,0.04)',
-            }}
+            style={cardStyleSm}
           >
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">
+              <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: isDark ? '#64748B' : '#9CA3AF' }}>
                 Active Schedules
               </p>
               <span
                 className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                style={{ background: '#EBF2FF', color: '#155DFC' }}
+                style={{ background: isDark ? 'rgba(21,93,252,0.2)' : '#EBF2FF', color: '#155DFC' }}
               >
                 {schedules.filter(s => s.status === 'ACTIVE').length} active
               </span>
@@ -322,6 +313,7 @@ export default function ReportPageContent({
                     <ScheduleRow
                       key={sr.id}
                       sr={sr}
+                      isDark={isDark}
                       onDelete={() => handleDelete(sr.id)}
                       onToggle={() => handleToggle(sr)}
                     />
@@ -329,14 +321,25 @@ export default function ReportPageContent({
                 </AnimatePresence>
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-[#CBD5E1] bg-white/60 px-4 py-4 text-[11px] text-[#94A3B8]">
+              <div
+                className="rounded-xl border border-dashed px-4 py-4 text-[11px]"
+                style={{
+                  borderColor: isDark ? '#334155' : '#CBD5E1',
+                  background:  isDark ? 'rgba(15,23,36,0.6)' : 'rgba(255,255,255,0.6)',
+                  color:       isDark ? '#475569' : '#94A3B8',
+                }}
+              >
                 No active schedules yet. Create one to start automatic report emails.
               </div>
             )}
 
             <button
               onClick={() => setSchOpen(true)}
-              className="mt-3 w-full h-9 rounded-xl border border-dashed border-[#155DFC]/30 text-[11px] font-semibold text-[#155DFC] hover:bg-[#EBF2FF] flex items-center justify-center gap-1.5 transition-colors"
+              className="mt-3 w-full h-9 rounded-xl border border-dashed text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
+              style={{
+                borderColor: isDark ? 'rgba(21,93,252,0.4)' : 'rgba(21,93,252,0.3)',
+                color:       '#155DFC',
+              }}
             >
               <CalendarClock size={12} /> Add another schedule
             </button>
@@ -353,51 +356,50 @@ export default function ReportPageContent({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             className="rounded-2xl p-5"
-            style={{
-              background:     'rgba(255,255,255,0.75)',
-              backdropFilter: 'blur(20px)',
-              border:         '1px solid rgba(255,255,255,0.60)',
-              boxShadow:      '0 2px 16px rgba(0,0,0,0.04)',
-            }}
+            style={cardStyleSm}
           >
-            <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-4">
+            <p className="text-[11px] font-bold uppercase tracking-widest mb-4" style={{ color: isDark ? '#64748B' : '#9CA3AF' }}>
               Export Contents
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {[
-                { Icon: BarChart3, label: 'Project Overview & KPIs',       color: '#155DFC' },
-                { Icon: Zap,       label: isAgile ? 'Sprint Analytics' : 'Kanban Flow', color: '#F59E0B' },
-                { Icon: Users,     label: 'Team Workload Breakdown',        color: '#16A34A' },
-                { Icon: AlertTriangle, label: 'Overdue & Risk Analysis',   color: '#DC2626' },
-                { Icon: Flag,      label: 'Milestone Tracker',              color: '#7C3AED' },
-                { Icon: FileText,  label: 'Full Task Table',                color: '#6B7280' },
+                { Icon: BarChart3,      label: 'Project Overview & KPIs',                      color: '#155DFC' },
+                { Icon: Zap,           label: isAgile ? 'Sprint Analytics' : 'Kanban Flow',    color: '#F59E0B' },
+                { Icon: Users,         label: 'Team Workload Breakdown',                        color: '#16A34A' },
+                { Icon: AlertTriangle, label: 'Overdue & Risk Analysis',                        color: '#DC2626' },
+                { Icon: Flag,          label: 'Milestone Tracker',                              color: '#7C3AED' },
+                { Icon: FileText,      label: 'Full Task Table',                                color: '#6B7280' },
               ].map(({ Icon, label, color }) => (
-                <div key={label} className="flex items-center gap-2.5 p-3 rounded-xl" style={{ background: '#F8FAFF' }}>
+                <div
+                  key={label}
+                  className="flex items-center gap-2.5 p-3 rounded-xl"
+                  style={{ background: isDark ? 'rgba(15,23,36,0.7)' : '#F8FAFF' }}
+                >
                   <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${color}15` }}>
                     <Icon size={12} style={{ color }} />
                   </div>
-                  <span className="text-[10px] font-semibold text-[#374151] leading-tight">{label}</span>
+                  <span className="text-[10px] font-semibold leading-tight" style={{ color: isDark ? '#CBD5E1' : '#374151' }}>{label}</span>
                 </div>
               ))}
             </div>
-            <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-[#F3F4F6]">
+            <div className="flex flex-wrap gap-3 mt-4 pt-4" style={{ borderTop: `1px solid ${isDark ? '#1E293B' : '#F3F4F6'}` }}>
               {[
-                { Icon: FileText, color: '#DC2626', border: '#FECACA', bg: '#FFF5F5', label: 'PDF', sub: 'Print-ready branded document' },
-                { Icon: Table2,   color: '#16A34A', border: '#BBF7D0', bg: '#F0FDF4', label: 'Excel', sub: 'Multi-sheet workbook' },
-                { Icon: Sparkles, color: '#155DFC', border: '#BFDBFE', bg: '#EBF2FF', label: 'Both', sub: 'Complete package' },
-                { Icon: Shield,   color: '#7C3AED', border: '#E9D5FF', bg: '#FAF5FF', label: 'Secure', sub: 'Generated in-browser · no server upload' },
+                { Icon: FileText, color: '#DC2626', border: isDark ? 'rgba(220,38,38,0.3)' : '#FECACA', bg: isDark ? 'rgba(220,38,38,0.1)' : '#FFF5F5', label: 'PDF',    sub: 'Print-ready branded document' },
+                { Icon: Table2,   color: '#16A34A', border: isDark ? 'rgba(22,163,74,0.3)'  : '#BBF7D0', bg: isDark ? 'rgba(22,163,74,0.1)'  : '#F0FDF4', label: 'Excel', sub: 'Multi-sheet workbook' },
+                { Icon: Sparkles, color: '#155DFC', border: isDark ? 'rgba(21,93,252,0.3)'  : '#BFDBFE', bg: isDark ? 'rgba(21,93,252,0.1)'  : '#EBF2FF', label: 'Both',  sub: 'Complete package' },
+                { Icon: Shield,   color: '#7C3AED', border: isDark ? 'rgba(124,58,237,0.3)' : '#E9D5FF', bg: isDark ? 'rgba(124,58,237,0.1)' : '#FAF5FF', label: 'Secure', sub: 'Generated in-browser · no server upload' },
               ].map(({ Icon, color, border, bg, label, sub }) => (
                 <div key={label} className="flex items-center gap-2 px-3 py-2 rounded-xl border" style={{ borderColor: border, background: bg }}>
                   <Icon size={12} style={{ color }} />
                   <span className="text-[11px] font-bold" style={{ color }}>{label}</span>
-                  <span className="text-[10px] text-[#9CA3AF]">{sub}</span>
+                  <span className="text-[10px]" style={{ color: isDark ? '#64748B' : '#9CA3AF' }}>{sub}</span>
                 </div>
               ))}
             </div>
           </motion.div>
 
           {/* Footer */}
-          <p className="text-center text-[10px] text-[#C4C9D4] pb-4">
+          <p className="text-center text-[10px] pb-4" style={{ color: isDark ? '#334155' : '#C4C9D4' }}>
             Planora Project Management Suite · Report generated {reportData.generatedAt}
           </p>
 

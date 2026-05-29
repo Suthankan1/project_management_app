@@ -40,7 +40,7 @@ export default function PagesPage() {
 
   if (!projectId) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-[#F7F8FA]">
+      <div className="flex h-full w-full items-center justify-center bg-cu-bg-secondary">
         <div className="text-center">
           <p className="text-gray-500 font-outfit text-sm">Loading project information...</p>
         </div>
@@ -86,8 +86,8 @@ export default function PagesPage() {
 
       {/* Error Toast */}
       {error && (
-        <div className="fixed bottom-4 right-4 p-4 bg-red-50 border border-red-200 rounded-md shadow-md z-40">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="fixed bottom-4 right-4 p-4 bg-red-50 dark:bg-cu-danger-light border border-red-200 dark:border-cu-danger/30 rounded-md shadow-md z-40">
+          <p className="text-sm text-red-600 dark:text-cu-danger">{error}</p>
         </div>
       )}
     </>

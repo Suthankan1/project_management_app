@@ -109,15 +109,15 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
 
   return (
     <div className="mt-8">
-      <div className="flex items-center gap-6 border-b border-[#EAECF0] mb-4">
+      <div className="flex items-center gap-6 border-b border-cu-border mb-4">
         {['Comments', 'History'].map((tab) => (
-          <button 
+          <button
             key={tab}
             onClick={() => setActiveTab(tab as 'Comments' | 'History')}
             className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === tab 
-                ? 'border-[#155DFC] text-[#155DFC]' 
-                : 'border-transparent text-[#667085] hover:text-[#344054]'
+              activeTab === tab
+                ? 'border-cu-primary text-cu-primary'
+                : 'border-transparent text-cu-text-muted hover:text-cu-text-primary'
             }`}
           >
             {tab}
@@ -126,7 +126,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
       </div>
       
       <div className="flex gap-3">
-        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden bg-[#155DFC]">
+        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden bg-cu-primary">
           {currentUser?.profilePicUrl ? (
              <Image 
                src={resolveProfilePic(currentUser.profilePicUrl)} 
@@ -154,13 +154,13 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
               }
             }}
             disabled={isSubmitting}
-            className="w-full border border-[#D0D5DD] rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] focus:outline-none transition-all placeholder:text-[#98A2B3] disabled:bg-[#F2F4F7] resize-none"
+            className="w-full border border-cu-border bg-cu-bg text-cu-text-primary rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-cu-primary/20 focus:border-cu-primary focus:outline-none transition-all placeholder:text-cu-text-muted disabled:bg-cu-bg-secondary resize-none"
           />
           <div className="flex items-center justify-between mt-1">
-            <p className="text-xs text-[#98A2B3]">
-              <strong>Pro tip:</strong> press <span className="bg-[#F2F4F7] border border-[#D0D5DD] px-1 rounded text-[#667085] font-mono">Enter</span> to comment
+            <p className="text-xs text-cu-text-muted">
+              <strong>Pro tip:</strong> press <span className="bg-cu-bg-secondary border border-cu-border px-1 rounded text-cu-text-secondary font-mono">Enter</span> to comment
             </p>
-            <p className="text-xs text-gray-400">{newComment.length}/2000</p>
+            <p className="text-xs text-cu-text-muted">{newComment.length}/2000</p>
           </div>
         </div>
       </div>
@@ -179,8 +179,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
               ))}
             </div>
           ) : (
-            <div className="mt-6 text-center py-8 bg-[#F9FAFB] rounded-xl border border-dashed border-[#D0D5DD]">
-              <p className="text-[#98A2B3] text-sm">No comments yet.</p>
+            <div className="mt-6 text-center py-8 bg-cu-bg-secondary rounded-xl border border-dashed border-cu-border">
+              <p className="text-cu-text-muted text-sm">No comments yet.</p>
             </div>
           )}
         </div>

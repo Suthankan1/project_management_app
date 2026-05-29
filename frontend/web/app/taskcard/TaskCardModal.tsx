@@ -47,6 +47,7 @@ interface TaskData {
   completedAt?: string | null;
   githubIssueNumber?: number | null;
   githubRepoFullName?: string | null;
+  archived?: boolean;
 }
 
 interface ProjectMemberOption {
@@ -91,14 +92,21 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
       setLoading(true);
       const response = await api.get(`/api/tasks/${taskId}`);
       setTaskData(response.data);
+      localStorage.setItem(`planora:task:${taskId}`, JSON.stringify({ ...response.data, timestamp: Date.now() }));
       setError(null);
       if (response.data?.projectId) {
         void loadTaskMeta(response.data.projectId);
       }
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      setError(axiosErr?.response?.data?.message || 'Failed to fetch task data');
-      setTaskData(null);
+      const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };
+      if (axiosErr?.response?.status === 404) {
+        localStorage.removeItem(`planora:task:${taskId}`);
+        toast('This task no longer exists.', 'error');
+        onClose(false);
+      } else {
+        setError(axiosErr?.response?.data?.message || 'Failed to fetch task data');
+        setTaskData(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -155,6 +163,17 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
       } catch { /* ignore */ }
     }
     fetchTaskData();
+    return () => {
+      const cached = localStorage.getItem(`planora:task:${taskId}`);
+      if (cached) {
+        try {
+          const { timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp > 5 * 60_000) {
+            localStorage.removeItem(`planora:task:${taskId}`);
+          }
+        } catch { /* ignore */ }
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
@@ -169,6 +188,10 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
           const event = JSON.parse(msg.body) as { type: string; taskId?: number };
           if (event.type === 'TASK_COMMENT_ADDED' && event.taskId === taskId) {
             commentRefetchRef.current?.();
+          } else if (event.type === 'TASK_DELETED' && event.taskId === taskId) {
+            localStorage.removeItem(`planora:task:${taskId}`);
+            toast.info("This task was deleted by another team member.");
+            onClose(false);
           }
         } catch { /* ignore malformed messages */ }
       },
@@ -245,7 +268,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
       githubRepoFullName: taskData.githubRepoFullName ?? projectGitHubRepo?.repoFullName ?? null,
     };
     setTaskData(nextTaskData);
-    localStorage.setItem(`planora:task:${taskId}`, JSON.stringify(nextTaskData));
+    localStorage.setItem(`planora:task:${taskId}`, JSON.stringify({ ...nextTaskData, timestamp: Date.now() }));
     wasModified.current = true;
   };
 
@@ -264,55 +287,55 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
         animate={{ x: 0, boxShadow: '-10px 0 30px rgba(0,0,0,0.1)' }}
         exit={{ x: '100%', boxShadow: '-10px 0 30px rgba(0,0,0,0)' }}
         transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-        className="absolute inset-0 md:inset-y-3 md:left-auto md:right-3 md:w-[980px] md:max-w-[calc(100vw-24px)] max-h-[100dvh] bg-white flex flex-col font-sans overflow-hidden md:shadow-2xl md:rounded-2xl border border-transparent md:border-[#E5E7EB]"
+        className="absolute inset-0 md:inset-y-3 md:left-auto md:right-3 md:w-[980px] md:max-w-[calc(100vw-24px)] max-h-[100dvh] bg-cu-bg flex flex-col font-sans overflow-hidden md:shadow-2xl md:rounded-2xl border border-transparent md:border-cu-border"
         // stopPropagation prevents clicks inside the panel from bubbling to the backdrop and closing the modal
         onClick={(e) => e.stopPropagation()}
       >
         {/* Mobile drag handle */}
         <div className="md:hidden flex justify-center pt-3 pb-1 flex-shrink-0">
-          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+          <div className="w-10 h-1 bg-cu-bg-tertiary rounded-full" />
         </div>
 
         {loading && !taskData && (
           <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden animate-pulse">
-            <div className="flex-1 p-6 border-r border-[#EAECF0] space-y-6">
-              <div className="h-8 w-3/4 rounded-lg bg-[#F2F4F7]" />
+            <div className="flex-1 p-6 border-r border-cu-border space-y-6">
+              <div className="h-8 w-3/4 rounded-lg bg-cu-bg-secondary" />
               <div className="flex gap-2">
-                <div className="h-9 w-20 rounded-xl bg-[#F2F4F7]" />
-                <div className="h-9 w-28 rounded-xl bg-[#F2F4F7]" />
-                <div className="h-9 w-24 rounded-xl bg-[#F2F4F7]" />
+                <div className="h-9 w-20 rounded-xl bg-cu-bg-secondary" />
+                <div className="h-9 w-28 rounded-xl bg-cu-bg-secondary" />
+                <div className="h-9 w-24 rounded-xl bg-cu-bg-secondary" />
               </div>
               <div>
-                <div className="h-3 w-24 rounded bg-[#EAECF0] mb-3" />
-                <div className="h-28 rounded-xl bg-[#F2F4F7]" />
+                <div className="h-3 w-24 rounded bg-cu-bg-tertiary mb-3" />
+                <div className="h-28 rounded-xl bg-cu-bg-secondary" />
               </div>
               <div>
-                <div className="h-3 w-20 rounded bg-[#EAECF0] mb-3" />
+                <div className="h-3 w-20 rounded bg-cu-bg-tertiary mb-3" />
                 <div className="space-y-2">
-                  <div className="h-10 rounded-xl bg-[#F2F4F7]" />
-                  <div className="h-10 rounded-xl bg-[#F2F4F7]" />
+                  <div className="h-10 rounded-xl bg-cu-bg-secondary" />
+                  <div className="h-10 rounded-xl bg-cu-bg-secondary" />
                 </div>
               </div>
             </div>
-            <div className="w-full md:w-80 p-4 bg-[#F7F8FA] space-y-4 flex-shrink-0">
+            <div className="w-full md:w-80 p-4 bg-cu-bg-secondary space-y-4 flex-shrink-0">
               <div className="grid grid-cols-2 md:grid-cols-1 gap-2">
-                <div className="h-10 rounded-xl bg-[#EAECF0]" />
-                <div className="h-10 rounded-xl bg-[#EAECF0]" />
+                <div className="h-10 rounded-xl bg-cu-bg-tertiary" />
+                <div className="h-10 rounded-xl bg-cu-bg-tertiary" />
               </div>
-              <div className="h-52 rounded-xl bg-white border border-[#E5E7EB]" />
-              <div className="h-32 rounded-xl bg-white border border-[#E5E7EB]" />
+              <div className="h-52 rounded-xl bg-cu-bg border border-cu-border" />
+              <div className="h-32 rounded-xl bg-cu-bg border border-cu-border" />
             </div>
           </div>
         )}
 
         {!loading && (error || !taskData) && (
           <div className="flex-1 flex items-center justify-center p-4">
-            <div className="bg-white p-8 rounded-lg max-w-md w-full text-center">
-              <h2 className="text-red-600 font-semibold mb-2">Error Loading Task</h2>
-              <p className="text-gray-600 mb-4">{error || 'Task not found'}</p>
+            <div className="bg-cu-bg p-8 rounded-lg max-w-md w-full text-center border border-cu-border">
+              <h2 className="text-cu-danger font-semibold mb-2">Error Loading Task</h2>
+              <p className="text-cu-text-secondary mb-4">{error || 'Task not found'}</p>
               <button
                 onClick={() => onClose(wasModified.current)}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+                className="bg-cu-primary text-white px-4 py-2 rounded hover:bg-cu-primary-hover transition-colors"
               >
                 Close
               </button>
@@ -326,7 +349,8 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
               project={taskData.projectName}
               taskId={`TASK-${taskData.id}`}
               numericTaskId={taskData.id}
-              onClose={() => onClose(wasModified.current)}
+              archived={taskData.archived}
+              onClose={(wasModifiedFlag) => onClose(wasModifiedFlag || wasModified.current)}
             />
             <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-y-auto md:overflow-hidden">
               <div className="flex flex-1 flex-col min-h-0 md:overflow-y-auto">

@@ -31,6 +31,9 @@ public class Project {
     @Column(length = 1500) // JPA: limits column size to 1500 characters.
     private String description;
 
+    @Column(name = "github_repo_full_name", length = 255)
+    private String githubRepoFullName;
+
     @ManyToOne(fetch = FetchType.LAZY) // JPA: many projects can belong to one owner user.
     @JoinColumn(name = "userId", nullable = false) // JPA: foreign key column name for owner relation.
     private User owner;

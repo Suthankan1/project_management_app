@@ -22,6 +22,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { CompatClient, Stomp } from '@stomp/stompjs';
 import { getValidToken } from '@/lib/auth';
+import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
 
 // ── Types that mirror the backend MemberEvent record ───────────────────────────
 
@@ -123,7 +124,7 @@ export function useMembersSync(
     }
 
     const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-    const wsUrl = backendUrl.replace(/^http/, 'ws');
+    const wsUrl = resolveWebSocketBaseUrl(backendUrl);
     const client = Stomp.client(`${wsUrl}/ws-native`);
 
     // Silence the STOMP library's own console noise in production.

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { CompatClient, Stomp } from '@stomp/stompjs';
+import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
 
 interface UseNotificationSocketOptions {
   token: string | null;
@@ -16,7 +17,7 @@ export default function useNotificationSocket({
     if (!enabled || !token) return;
 
     const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-    const wsUrl = backendUrl.replace(/^http/, 'ws');
+    const wsUrl = resolveWebSocketBaseUrl(backendUrl);
     const client: CompatClient = Stomp.client(`${wsUrl}/ws-native`);
     client.debug = () => {};
 

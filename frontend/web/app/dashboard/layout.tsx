@@ -49,7 +49,7 @@ export default function DashboardLayout({
 
     return (
         <FullLayout>
-            <main className="flex-1 flex flex-col min-h-full bg-white px-4 md:px-8 pt-4 pb-0 md:pb-8">
+            <main className="flex-1 flex flex-col min-h-full bg-cu-bg px-4 md:px-8 pt-4 pb-0 md:pb-8">
                 {children}
             </main>
         </FullLayout>

@@ -1,15 +1,15 @@
 export const STATUS_COLOR: Record<string, string> = {
-  TODO:        'bg-[#F3F4F6] text-[#6A7282]',
-  IN_PROGRESS: 'bg-[#EFF6FF] text-[#1D4ED8]',
-  IN_REVIEW:   'bg-[#FEF3C7] text-[#92400E]',
-  DONE:        'bg-[#DCFCE7] text-[#166534]',
+  TODO:        'bg-cu-bg-tertiary text-cu-text-secondary',
+  IN_PROGRESS: 'bg-cu-primary/10 text-cu-primary',
+  IN_REVIEW:   'bg-amber-400/15 text-amber-500',
+  DONE:        'bg-emerald-500/15 text-emerald-500',
 };
 
 export const PRIORITY_CONFIG: Record<string, { color: string; dot: string; bg: string; label: string }> = {
-  URGENT: { color: '#DC2626', dot: 'bg-red-500',    bg: 'bg-red-50',    label: 'Urgent' },
-  HIGH:   { color: '#EA580C', dot: 'bg-orange-500', bg: 'bg-orange-50', label: 'High'   },
-  MEDIUM: { color: '#D97706', dot: 'bg-amber-400',  bg: 'bg-amber-50',  label: 'Medium' },
-  LOW:    { color: '#22C55E', dot: 'bg-gray-400',   bg: 'bg-gray-100',  label: 'Low'    },
+  URGENT: { color: '#DC2626', dot: 'bg-red-500',    bg: 'bg-red-500/10',    label: 'Urgent' },
+  HIGH:   { color: '#EA580C', dot: 'bg-orange-500', bg: 'bg-orange-500/10', label: 'High'   },
+  MEDIUM: { color: '#D97706', dot: 'bg-amber-400',  bg: 'bg-amber-400/10',  label: 'Medium' },
+  LOW:    { color: '#22C55E', dot: 'bg-emerald-400', bg: 'bg-emerald-500/10', label: 'Low' },
 };
 
 export const STATUS_OPTIONS = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'] as const;

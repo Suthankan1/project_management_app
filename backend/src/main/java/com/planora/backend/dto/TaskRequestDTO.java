@@ -74,4 +74,6 @@ public class TaskRequestDTO {
     // Recurring task fields (V7)
     private String recurrenceRule;    // DAILY | WEEKLY | MONTHLY | YEARLY
     private java.time.LocalDate recurrenceEnd;
+
+    private Boolean archived;
 }

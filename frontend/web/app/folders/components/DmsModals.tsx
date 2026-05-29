@@ -47,15 +47,15 @@ export default function DmsModals({
         <>
             {renameDoc !== null && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-md rounded-xl border border-[#E6E8EC] bg-white shadow-2xl">
-                        <div className="flex items-center justify-between border-b border-[#EAECF0] px-5 py-4">
-                            <div className="inline-flex items-center gap-2 text-[#101828]">
+                    <div className="w-full max-w-md rounded-xl border border-cu-border bg-cu-bg shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-cu-border px-5 py-4">
+                            <div className="inline-flex items-center gap-2 text-cu-text-primary">
                                 <Pencil size={16} />
                                 <h3 className="text-sm font-semibold">Rename document</h3>
                             </div>
                             <button
                                 onClick={onCancelRename}
-                                className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-[#D0D5DD] hover:bg-[#F9FAFB]"
+                                className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-cu-border text-cu-text-secondary hover:bg-cu-hover"
                                 title="Close"
                             >
                                 <X size={14} />
@@ -63,7 +63,7 @@ export default function DmsModals({
                         </div>
                         <div className="px-5 py-4 space-y-4">
                             <div>
-                                <label className="text-xs font-medium text-[#344054] mb-1.5 block">
+                                <label className="text-xs font-medium text-cu-text-primary mb-1.5 block">
                                     Document name
                                 </label>
                                 <input
@@ -73,21 +73,21 @@ export default function DmsModals({
                                         if (e.key === 'Enter') void onConfirmRename();
                                         if (e.key === 'Escape') onCancelRename();
                                     }}
-                                    className="w-full px-3 py-2 text-sm border border-[#D0D5DD] rounded-md focus:outline-none focus:ring-2 focus:ring-[#B2CCFF]"
+                                    className="w-full px-3 py-2 text-sm bg-cu-bg text-cu-text-primary border border-cu-border rounded-md focus:outline-none focus:ring-2 focus:ring-cu-primary/25"
                                     autoFocus
                                 />
                             </div>
                             <div className="flex items-center justify-end gap-2">
                                 <button
                                     onClick={onCancelRename}
-                                    className="px-4 py-2 text-sm border border-[#D0D5DD] rounded-md hover:bg-[#F9FAFB]"
+                                    className="px-4 py-2 text-sm border border-cu-border text-cu-text-secondary rounded-md hover:bg-cu-hover"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={() => void onConfirmRename()}
                                     disabled={busy || !renameName.trim() || renameName.trim() === renameDoc.name}
-                                    className="px-4 py-2 text-sm bg-[#155DFC] text-white rounded-md hover:bg-[#1347D4] disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-4 py-2 text-sm bg-cu-primary text-white rounded-md hover:bg-cu-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Rename
                                 </button>
@@ -98,77 +98,78 @@ export default function DmsModals({
             )}
 
             {isUploading && (
-                <div className="fixed bottom-8 right-8 z-50 w-72 rounded-xl border border-[#E6E8EC] bg-white p-4 shadow-2xl">
-                    <p className="text-sm font-medium text-[#101828] mb-2">Uploading...</p>
-                    <div className="w-full bg-[#F2F4F7] rounded-full h-2">
+                <div className="fixed bottom-8 right-8 z-50 w-72 rounded-xl border border-cu-border bg-cu-bg p-4 shadow-2xl">
+                    <p className="text-sm font-medium text-cu-text-primary mb-2">Uploading...</p>
+                    <div className="w-full bg-cu-bg-tertiary rounded-full h-2">
                         <div
                             style={{ width: `${uploadProgress}%` }}
-                            className="h-2 rounded-full bg-[#1D56D5] transition-all duration-200"
+                            className="h-2 rounded-full bg-cu-primary transition-all duration-200"
                         />
                     </div>
-                    <p className="text-xs text-[#667085] mt-1">{uploadProgress}%</p>
-                </div>
-            )}
-            {(selectedVersionsDocId !== null || selectedInfoDoc !== null) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm p-4">
-            {selectedVersionsDocId !== null && selectedVersionsDoc && (
-                <div className="w-full max-w-2xl rounded-xl border border-[#E6E8EC] bg-white shadow-2xl">
-                    <div className="flex items-center justify-between border-b border-[#EAECF0] px-5 py-4">
-                        <div className="inline-flex items-center gap-2 text-[#101828]">
-                            <Users size={16} />
-                            <h3 className="text-sm font-semibold">Version history</h3>
-                        </div>
-                        <button
-                            onClick={() => setSelectedVersionsDocId(null)}
-                            className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-[#D0D5DD] hover:bg-[#F9FAFB]"
-                            title="Close"
-                        >
-                            <X size={14} />
-                        </button>
-                    </div>
-                    <div className="px-5 py-4">
-                        <p className="text-sm font-medium text-[#101828] mb-3 truncate">{selectedVersionsDoc.name}</p>
-                        <div className="max-h-[360px] overflow-y-auto space-y-2">
-                            {(versions[selectedVersionsDocId] || []).map((version) => (
-                                <div key={version.id} className="text-xs text-[#475467] flex items-center justify-between rounded-md border border-[#EAECF0] bg-[#FCFCFD] px-3 py-2">
-                                    <span>
-                                        v{version.versionNumber} • {formatBytes(version.fileSize)} • {version.contentType}
-                                    </span>
-                                    <span>
-                                        {version.uploadedByName} • {toDateLabel(version.uploadedAt)}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <p className="text-xs text-cu-text-secondary mt-1">{uploadProgress}%</p>
                 </div>
             )}
 
-            {selectedInfoDoc !== null && (
-                <div className="w-full max-w-md rounded-xl border border-[#E6E8EC] bg-white shadow-2xl">
-                    <div className="flex items-center justify-between border-b border-[#EAECF0] px-5 py-4">
-                        <div className="inline-flex items-center gap-2 text-[#101828]">
-                            <Info size={16} />
-                            <h3 className="text-sm font-semibold">Document info</h3>
+            {(selectedVersionsDocId !== null || selectedInfoDoc !== null) && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm p-4">
+                    {selectedVersionsDocId !== null && selectedVersionsDoc && (
+                        <div className="w-full max-w-2xl rounded-xl border border-cu-border bg-cu-bg shadow-2xl">
+                            <div className="flex items-center justify-between border-b border-cu-border px-5 py-4">
+                                <div className="inline-flex items-center gap-2 text-cu-text-primary">
+                                    <Users size={16} />
+                                    <h3 className="text-sm font-semibold">Version history</h3>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedVersionsDocId(null)}
+                                    className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-cu-border text-cu-text-secondary hover:bg-cu-hover"
+                                    title="Close"
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+                            <div className="px-5 py-4">
+                                <p className="text-sm font-medium text-cu-text-primary mb-3 truncate">{selectedVersionsDoc.name}</p>
+                                <div className="max-h-[360px] overflow-y-auto space-y-2">
+                                    {(versions[selectedVersionsDocId] || []).map((version) => (
+                                        <div key={version.id} className="text-xs text-cu-text-secondary flex items-center justify-between rounded-md border border-cu-border bg-cu-bg-secondary px-3 py-2">
+                                            <span>
+                                                v{version.versionNumber} • {formatBytes(version.fileSize)} • {version.contentType}
+                                            </span>
+                                            <span>
+                                                {version.uploadedByName} • {toDateLabel(version.uploadedAt)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
-                        <button
-                            onClick={() => setSelectedInfoDoc(null)}
-                            className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-[#D0D5DD] hover:bg-[#F9FAFB]"
-                            title="Close"
-                        >
-                            <X size={14} />
-                        </button>
-                    </div>
-                    <div className="px-5 py-4 space-y-3 text-sm text-[#344054]">
-                        <p><span className="font-medium text-[#101828]">Name:</span> {selectedInfoDoc.name}</p>
-                        <p><span className="font-medium text-[#101828]">Owner:</span> {selectedInfoDoc.uploadedByName}</p>
-                        <p><span className="font-medium text-[#101828]">Folder:</span> {selectedInfoDoc.folderName ?? getFolderName(selectedInfoDoc.folderId)}</p>
-                        <p><span className="font-medium text-[#101828]">Updated:</span> {toDateLabel(selectedInfoDoc.updatedAt || selectedInfoDoc.createdAt)}</p>
-                        <p><span className="font-medium text-[#101828]">Size:</span> {selectedInfoDoc.humanReadableSize ?? formatBytes(selectedInfoDoc.fileSize)}</p>
-                    </div>
+                    )}
+
+                    {selectedInfoDoc !== null && (
+                        <div className="w-full max-w-md rounded-xl border border-cu-border bg-cu-bg shadow-2xl">
+                            <div className="flex items-center justify-between border-b border-cu-border px-5 py-4">
+                                <div className="inline-flex items-center gap-2 text-cu-text-primary">
+                                    <Info size={16} />
+                                    <h3 className="text-sm font-semibold">Document info</h3>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedInfoDoc(null)}
+                                    className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-cu-border text-cu-text-secondary hover:bg-cu-hover"
+                                    title="Close"
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+                            <div className="px-5 py-4 space-y-3 text-sm text-cu-text-primary">
+                                <p><span className="font-medium">Name:</span> {selectedInfoDoc.name}</p>
+                                <p><span className="font-medium">Owner:</span> {selectedInfoDoc.uploadedByName}</p>
+                                <p><span className="font-medium">Folder:</span> {selectedInfoDoc.folderName ?? getFolderName(selectedInfoDoc.folderId)}</p>
+                                <p><span className="font-medium">Updated:</span> {toDateLabel(selectedInfoDoc.updatedAt || selectedInfoDoc.createdAt)}</p>
+                                <p><span className="font-medium">Size:</span> {selectedInfoDoc.humanReadableSize ?? formatBytes(selectedInfoDoc.fileSize)}</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
-            )}
-        </div>
             )}
         </>
     );

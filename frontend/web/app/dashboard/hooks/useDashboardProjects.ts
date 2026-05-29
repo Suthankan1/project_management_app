@@ -20,6 +20,8 @@ export interface ProjectSummary {
   projectKey?: string;
   isFavorite?: boolean;
   type: 'AGILE' | 'KANBAN' | string;
+  completedTasks?: number;
+  totalTasks?: number;
 }
 
 // Return type for this hook
@@ -68,9 +70,36 @@ export function useDashboardProjects(): UseDashboardProjectsReturn {
           api.get('/api/projects/recent'),
           api.get('/api/projects/favorites'),
         ]);
+
+        const recent: ProjectSummary[] = recentRes.data || [];
+        const favorites: ProjectSummary[] = favRes.data || [];
+
+        // Collect unique project IDs across both lists
+        const uniqueIds = [...new Set([...recent, ...favorites].map((p) => p.id))];
+
+        // Fetch task completion metrics for all projects in parallel (best-effort)
+        const metricsResults = await Promise.allSettled(
+          uniqueIds.map((id) =>
+            api.get(`/api/projects/${id}/metrics`).then((r) => ({ id, data: r.data }))
+          )
+        );
+        const metricsMap = new Map<number, { completedTasks: number; totalTasks: number }>();
+        metricsResults.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            const { id, data } = result.value;
+            metricsMap.set(id, {
+              completedTasks: data.completedTasks ?? 0,
+              totalTasks: data.totalTasks ?? 0,
+            });
+          }
+        });
+
+        const mergeMetrics = (list: ProjectSummary[]): ProjectSummary[] =>
+          list.map((p) => ({ ...p, ...metricsMap.get(p.id) }));
+
         const fresh = {
-          recent: recentRes.data || [],
-          favorites: favRes.data || [],
+          recent: mergeMetrics(recent),
+          favorites: mergeMetrics(favorites),
         };
         setProjects(fresh);
 

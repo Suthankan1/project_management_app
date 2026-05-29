@@ -103,19 +103,19 @@ export default function BentoDashboard({
 
         <div key="metric-total">
           <BentoCard title="Total Tasks" icon={Icons.tasks}>
-            <StatMetric iconBg="bg-[#EAF2FF]" icon={Icons.tasks} value={metrics?.totalTasks || 0} label="Total Tasks" />
+            <StatMetric iconBg="bg-cu-primary/10 text-cu-primary" icon={Icons.tasks} value={metrics?.totalTasks || 0} label="Total Tasks" />
           </BentoCard>
         </div>
 
         <div key="metric-completed">
           <BentoCard title="Completed Tasks" icon={Icons.completed}>
-            <StatMetric iconBg="bg-[#E3FCEF]" icon={Icons.completed} value={metrics?.completedTasks || 0} label="Completed Tasks" />
+            <StatMetric iconBg="bg-cu-success/10 text-cu-success" icon={Icons.completed} value={metrics?.completedTasks || 0} label="Completed Tasks" />
           </BentoCard>
         </div>
 
         <div key="metric-due">
           <BentoCard title="Due Issues" icon={Icons.due}>
-            <StatMetric iconBg="bg-[#FFF4ED]" icon={Icons.due} value={metrics?.overdueTasks || 0} label="Due Issues" />
+            <StatMetric iconBg="bg-cu-warning/10 text-cu-warning" icon={Icons.due} value={metrics?.overdueTasks || 0} label="Due Issues" />
           </BentoCard>
         </div>
 
@@ -165,7 +165,7 @@ export default function BentoDashboard({
           </BentoCard>
         </div>
 
-        <div key="report" className="bento-drag-handle rounded-xl overflow-hidden shadow-sm ring-1 ring-black/[0.03] border border-[#E3E8EF]">
+        <div key="report" className="bento-drag-handle rounded-xl overflow-hidden shadow-cu-sm ring-1 ring-cu-border-light/60 border border-cu-border">
           <GenerateReport projectId={projectId} isAgile={isAgile} />
         </div>
 
@@ -215,7 +215,7 @@ export default function BentoDashboard({
       <button
         onClick={resetLayouts}
         title="Reset layout to default"
-        className="hidden md:flex fixed bottom-6 right-6 z-50 h-[44px] px-5 flex-row items-center justify-center gap-2 bg-[#101828] shadow-lg rounded-full font-semibold text-[13px] text-white hover:bg-[#1D2939] transition-all"
+        className="hidden md:flex fixed bottom-6 right-6 z-50 h-[44px] px-5 flex-row items-center justify-center gap-2 bg-cu-text-primary shadow-cu-lg rounded-full font-semibold text-[13px] text-cu-bg hover:opacity-90 transition-all border border-cu-border"
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" />

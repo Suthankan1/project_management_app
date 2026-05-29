@@ -13,6 +13,6 @@ export function formatRelativeTime(iso: string | null): string {
     return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
 }
 
-export const inputCls = 'h-10 w-full rounded-xl border border-[#D0D5DD] bg-white text-[#101828] px-3.5 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC]';
-export const disabledCls = 'h-10 w-full rounded-xl border border-[#D0D5DD] bg-[#F9FAFB] text-[#667085] px-3.5 text-sm';
-export const labelCls = 'mb-1.5 block text-[13px] font-semibold text-[#344054]';
+export const inputCls = 'h-10 w-full rounded-xl border border-cu-border bg-cu-bg text-cu-text-primary px-3.5 text-sm shadow-cu-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cu-primary/20 focus:border-cu-primary placeholder:text-cu-text-muted';
+export const disabledCls = 'h-10 w-full rounded-xl border border-cu-border bg-cu-bg-secondary text-cu-text-muted px-3.5 text-sm';
+export const labelCls = 'mb-1.5 block text-[13px] font-semibold text-cu-text-secondary';

@@ -73,7 +73,7 @@ export default function CreatePortfolioModal({ onClose, onCreated }: Props) {
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
 
         <motion.div
-          className="relative w-full max-w-md bg-white rounded-2xl shadow-[0_16px_48px_rgba(0,0,0,0.12)] border border-[#E8E8ED] overflow-hidden z-10 max-h-[90vh] flex flex-col"
+          className="relative w-full max-w-md bg-cu-bg rounded-2xl shadow-cu-xl border border-cu-border overflow-hidden z-10 max-h-[90vh] flex flex-col"
           initial={{ opacity: 0, scale: 0.96, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 12 }}
@@ -82,7 +82,7 @@ export default function CreatePortfolioModal({ onClose, onCreated }: Props) {
           <div className="h-1 flex-shrink-0" style={{ background: color }} />
 
           <div className="overflow-y-auto flex-1 p-6">
-            <h2 className="text-[#1A1A2E] text-base font-semibold mb-5">New Portfolio</h2>
+            <h2 className="text-cu-text-primary text-base font-semibold mb-5">New Portfolio</h2>
 
             {/* Emoji picker */}
             <div className="flex flex-wrap gap-1.5 mb-4">
@@ -90,8 +90,8 @@ export default function CreatePortfolioModal({ onClose, onCreated }: Props) {
                 <button key={e} onClick={() => setEmoji(emoji === e ? '' : e)}
                   className={`w-9 h-9 rounded-lg text-lg transition-all border ${
                     emoji === e
-                      ? 'border-[#155DFC] bg-[#EBF2FF] scale-110'
-                      : 'border-[#E8E8ED] bg-[#F7F8FA] opacity-70 hover:opacity-100'
+                      ? 'border-cu-primary bg-cu-primary/10 scale-110'
+                      : 'border-cu-border bg-cu-bg-secondary opacity-70 hover:opacity-100'
                   }`}>
                   {e}
                 </button>
@@ -104,8 +104,7 @@ export default function CreatePortfolioModal({ onClose, onCreated }: Props) {
               onChange={e => setName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && submit()}
               placeholder="Portfolio name *"
-              className="w-full rounded-xl px-4 py-2.5 text-sm text-[#1A1A2E] placeholder-[#9CA3AF] mb-3 outline-none transition-colors"
-              style={{ background: '#F7F8FA', border: '1px solid #E8E8ED' }}
+              className="w-full rounded-xl px-4 py-2.5 text-sm text-cu-text-primary placeholder-cu-text-muted mb-3 outline-none transition-colors bg-cu-bg-secondary border border-cu-border focus:border-cu-primary focus:ring-2 focus:ring-cu-primary/15"
             />
 
             {/* Description */}
@@ -114,13 +113,12 @@ export default function CreatePortfolioModal({ onClose, onCreated }: Props) {
               onChange={e => setDescription(e.target.value)}
               placeholder="Description (optional)"
               rows={2}
-              className="w-full rounded-xl px-4 py-2.5 text-sm text-[#1A1A2E] placeholder-[#9CA3AF] mb-4 outline-none resize-none"
-              style={{ background: '#F7F8FA', border: '1px solid #E8E8ED' }}
+              className="w-full rounded-xl px-4 py-2.5 text-sm text-cu-text-primary placeholder-cu-text-muted mb-4 outline-none resize-none bg-cu-bg-secondary border border-cu-border focus:border-cu-primary focus:ring-2 focus:ring-cu-primary/15"
             />
 
             {/* Color picker */}
             <div className="mb-5">
-              <p className="text-[#9CA3AF] text-xs mb-2">Accent color</p>
+              <p className="text-cu-text-muted text-xs mb-2">Accent color</p>
               <div className="flex gap-2 flex-wrap">
                 {COLORS.map(c => (
                   <button key={c} onClick={() => setColor(c)}
@@ -133,10 +131,10 @@ export default function CreatePortfolioModal({ onClose, onCreated }: Props) {
             </div>
 
             {/* Projects section */}
-            <div className="border border-[#E8E8ED] rounded-xl overflow-hidden mb-4">
+            <div className="border border-cu-border rounded-xl overflow-hidden mb-4">
               <button
                 onClick={() => setShowProjects(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 text-sm text-[#1A1A2E] font-medium hover:bg-[#F7F8FA] transition-colors">
+                className="w-full flex items-center justify-between px-4 py-3 text-sm text-cu-text-primary font-medium hover:bg-cu-hover transition-colors">
                 <span className="flex items-center gap-2">
                   <span>Add projects</span>
                   {selectedIds.length > 0 && (
@@ -146,7 +144,7 @@ export default function CreatePortfolioModal({ onClose, onCreated }: Props) {
                     </span>
                   )}
                 </span>
-                <span className={`text-[#9CA3AF] text-xs transition-transform ${showProjects ? 'rotate-180' : ''}`}>▼</span>
+                <span className={`text-cu-text-muted text-xs transition-transform ${showProjects ? 'rotate-180' : ''}`}>▼</span>
               </button>
 
               <AnimatePresence>
@@ -154,41 +152,40 @@ export default function CreatePortfolioModal({ onClose, onCreated }: Props) {
                   <motion.div
                     initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
                     transition={{ duration: 0.2 }} style={{ overflow: 'hidden' }}>
-                    <div className="border-t border-[#E8E8ED]">
+                    <div className="border-t border-cu-border">
                       <div className="px-3 py-2">
                         <input
                           value={projectSearch}
                           onChange={e => setProjectSearch(e.target.value)}
                           placeholder="Search projects..."
-                          className="w-full rounded-lg px-3 py-1.5 text-xs text-[#1A1A2E] placeholder-[#9CA3AF] outline-none"
-                          style={{ background: '#F7F8FA', border: '1px solid #E8E8ED' }}
+                          className="w-full rounded-lg px-3 py-1.5 text-xs text-cu-text-primary placeholder-cu-text-muted outline-none bg-cu-bg-secondary border border-cu-border focus:border-cu-primary"
                         />
                       </div>
                       <div className="max-h-40 overflow-y-auto">
                         {projectsLoading ? (
-                          <p className="text-center text-[#9CA3AF] text-xs py-4">Loading…</p>
+                          <p className="text-center text-cu-text-muted text-xs py-4">Loading…</p>
                         ) : filteredProjects.length === 0 ? (
-                          <p className="text-center text-[#9CA3AF] text-xs py-4">No projects found</p>
+                          <p className="text-center text-cu-text-muted text-xs py-4">No projects found</p>
                         ) : filteredProjects.map(p => {
                           const selected = selectedIds.includes(p.id);
                           return (
                             <button key={p.id} onClick={() => toggleProject(p.id)}
-                              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#F7F8FA] transition-colors">
+                              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-cu-hover transition-colors">
                               <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-colors ${
-                                selected ? 'border-transparent' : 'border-[#D1D5DB]'
+                                selected ? 'border-transparent' : 'border-cu-border'
                               }`} style={selected ? { background: color } : {}}>
                                 {selected && <span className="text-white text-[10px] font-bold">✓</span>}
                               </div>
                               <div className="min-w-0 flex-1 text-left">
-                                <p className="text-[#1A1A2E] text-xs font-medium truncate">{p.name}</p>
+                                <p className="text-cu-text-primary text-xs font-medium truncate">{p.name}</p>
                                 {p.projectKey && (
-                                  <p className="text-[#9CA3AF] text-[10px]">{p.projectKey}</p>
+                                  <p className="text-cu-text-muted text-[10px]">{p.projectKey}</p>
                                 )}
                               </div>
                               <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-semibold"
                                 style={{
-                                  background: p.type === 'AGILE' ? '#EBF2FF' : '#E6F9E0',
-                                  color:      p.type === 'AGILE' ? '#155DFC' : '#6BC950',
+                                  background: p.type === 'AGILE' ? 'var(--cu-primary-light)' : 'var(--cu-success-light)',
+                                  color:      p.type === 'AGILE' ? 'var(--cu-primary)' : 'var(--cu-success)',
                                 }}>
                                 {p.type === 'AGILE' ? 'Sprint' : 'Kanban'}
                               </span>
@@ -202,13 +199,13 @@ export default function CreatePortfolioModal({ onClose, onCreated }: Props) {
               </AnimatePresence>
             </div>
 
-            {error && <p className="text-[#FF5C5C] text-xs mb-3">{error}</p>}
+            {error && <p className="text-cu-danger text-xs mb-3">{error}</p>}
           </div>
 
           {/* Actions — always visible at bottom */}
-          <div className="px-6 pb-6 pt-2 flex-shrink-0 flex gap-2.5 border-t border-[#F0F0F5]">
+          <div className="px-6 pb-6 pt-2 flex-shrink-0 flex gap-2.5 border-t border-cu-border">
             <button onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl text-sm text-[#6B6F7B] font-medium transition-all hover:bg-[#F7F8FA] border border-[#E8E8ED]">
+              className="flex-1 py-2.5 rounded-xl text-sm text-cu-text-secondary font-medium transition-all hover:bg-cu-hover border border-cu-border">
               Cancel
             </button>
             <button onClick={submit} disabled={loading}

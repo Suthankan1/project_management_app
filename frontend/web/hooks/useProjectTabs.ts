@@ -24,7 +24,6 @@ export function useProjectTabs(projectId: string | null, isAgile: boolean) {
       { id: 'dms',        label: 'DMS' },
       { id: 'list',       label: 'List' },
       { id: 'report',     label: 'Report' },
-      { id: 'github',     label: 'GitHub' },
     );
 
     return base;
@@ -57,7 +56,7 @@ export function useProjectTabs(projectId: string | null, isAgile: boolean) {
   const getTabHref = (tabId: string) => {
     switch (tabId) {
       case 'summary':    return projectId ? `/summary/${projectId}` : '/dashboard';
-      case 'timeline':   return withProjectId('/timeline');
+      case 'timeline':   return projectId ? `/timeline/${projectId}` : '/timeline';
       case 'backlog':    return isAgile ? withProjectId('/sprint-backlog') : withProjectId('/backlog');
       case 'board':      return isAgile ? withProjectId('/sprint-board')   : withProjectId('/kanban');
       case 'list':       return withProjectId('/list');

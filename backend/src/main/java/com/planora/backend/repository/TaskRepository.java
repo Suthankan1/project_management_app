@@ -2,7 +2,9 @@ package com.planora.backend.repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,10 +17,17 @@ import com.planora.backend.model.Task;
 
 @Repository
 public interface TaskRepository extends JpaRepository<Task, Long> {
+    Page<Task> findByProjectIdAndArchivedFalse(Long projectId, Pageable pageable);
+
     boolean existsByProjectIdAndGithubIssueNumberAndGithubRepoFullNameIgnoreCase(
             Long projectId, Long githubIssueNumber, String githubRepoFullName);
 
     List<Task> findByProjectIdAndGithubIssueNumber(Long projectId, Long githubIssueNumber);
+
+    List<Task> findByProjectIdAndGithubIssueNumberAndGithubRepoFullNameIgnoreCase(
+            Long projectId, Long githubIssueNumber, String githubRepoFullName);
+
+    Optional<Task> findByProjectIdAndProjectTaskNumber(Long projectId, Long projectTaskNumber);
 
     @Query("""
            SELECT t FROM Task t
@@ -376,4 +385,56 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
      */
     @Query("SELECT t FROM Task t WHERE t.githubBranch = :branch AND t.archived = false")
     List<Task> findByGithubBranch(@Param("branch") String branch);
+
+    @Query("""
+           SELECT t FROM Task t
+           LEFT JOIN FETCH t.project p
+           LEFT JOIN FETCH p.team
+           LEFT JOIN FETCH t.sprint
+           LEFT JOIN FETCH t.assignee a
+           LEFT JOIN FETCH a.user
+           LEFT JOIN FETCH t.reporter r
+           LEFT JOIN FETCH r.user
+           LEFT JOIN FETCH t.milestone
+           LEFT JOIN FETCH t.lastModifiedBy
+           WHERE t.project.id = :projectId
+             AND t.archived = :archived
+           ORDER BY
+             CASE WHEN t.sprint IS NULL THEN 0 ELSE 1 END,
+             CASE WHEN t.sprint IS NULL THEN t.backlogPosition ELSE t.sprintPosition END,
+             t.id
+           """)
+    List<Task> findByProjectIdWithScalarsAndArchived(
+            @Param("projectId") Long projectId,
+            @Param("archived") boolean archived);
+
+    @Query("SELECT t FROM Task t " +
+           "LEFT JOIN FETCH t.project p " +
+           "LEFT JOIN FETCH p.team pt " +
+           "LEFT JOIN FETCH t.sprint s " +
+           "LEFT JOIN FETCH t.assignee a " +
+           "LEFT JOIN FETCH a.user au " +
+           "LEFT JOIN FETCH t.reporter r " +
+           "LEFT JOIN FETCH r.user ru " +
+           "LEFT JOIN FETCH t.milestone m " +
+           "LEFT JOIN FETCH t.kanbanColumn kc " +
+           "WHERE p.id = :projectId " +
+           "AND t.archived = :archived " +
+           "AND (:status IS NULL OR t.status = :status) " +
+           "AND (:assigneeId IS NULL OR au.userId = :assigneeId) " +
+           "AND (:priority IS NULL OR CAST(t.priority AS string) = :priority) " +
+           "AND (:sprintId IS NULL OR s.id = :sprintId) " +
+           "AND (:milestoneId IS NULL OR m.id = :milestoneId) " +
+           "ORDER BY " +
+           "CASE WHEN t.sprint IS NULL THEN 0 ELSE 1 END, " +
+           "CASE WHEN t.sprint IS NULL THEN t.backlogPosition ELSE t.sprintPosition END, " +
+           "t.id")
+    List<Task> findByProjectIdFilteredAndArchived(
+            @Param("projectId") Long projectId,
+            @Param("status") String status,
+            @Param("assigneeId") Long assigneeId,
+            @Param("priority") String priority,
+            @Param("sprintId") Long sprintId,
+            @Param("milestoneId") Long milestoneId,
+            @Param("archived") boolean archived);
 }

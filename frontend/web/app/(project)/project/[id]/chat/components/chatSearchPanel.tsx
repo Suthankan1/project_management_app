@@ -5,11 +5,14 @@ import { Search } from 'lucide-react';
 
 interface ChatSearchResult {
   messageId: number;
-  context: string;
-  sender: string;
-  content: string;
+  highlightedContent?: string;
+  content?: string;
+  senderName?: string;
+  sender?: string;
+  context?: string;
+  deepLinkUrl: string;
   roomId?: number | null;
-  recipient?: string | null;
+  timestamp?: string | null;
 }
 
 interface ChatSearchPanelProps {
@@ -40,11 +43,11 @@ export function ChatSearchPanel({
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
-          className="overflow-hidden border-b border-gray-100"
+          className="overflow-hidden border-b border-cu-border bg-cu-bg"
         >
           <div className="px-5 py-3 flex items-center gap-2">
-            <div className="flex-1 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 focus-within:border-blue-200 focus-within:ring-2 focus-within:ring-blue-50 transition-all">
-              <Search size={14} className="text-gray-400 flex-shrink-0" strokeWidth={2.5} />
+            <div className="flex-1 flex items-center gap-2 bg-cu-bg-secondary border border-cu-border rounded-xl px-3 py-2 focus-within:border-cu-primary/40 focus-within:ring-2 focus-within:ring-cu-primary/10 transition-all">
+              <Search size={14} className="text-cu-text-muted flex-shrink-0" strokeWidth={2.5} />
               <input
                 type="text"
                 id="chat-search-input"
@@ -52,7 +55,7 @@ export function ChatSearchPanel({
                 onChange={(e) => onSearchQueryChange(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && void onExecuteSearch()}
                 placeholder="Search all messages..."
-                className="flex-1 bg-transparent text-[13px] text-gray-700 placeholder:text-gray-400 outline-none"
+                className="flex-1 bg-transparent text-[13px] text-cu-text-primary placeholder:text-cu-text-muted outline-none"
                 aria-label="Search all chat messages"
                 autoFocus
               />
@@ -73,18 +76,18 @@ export function ChatSearchPanel({
                 <button
                   key={result.messageId}
                   onClick={() => void onOpenResult(result)}
-                  className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100"
+                  className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-cu-bg-secondary transition-colors border border-transparent hover:border-cu-border"
                   role="option"
                   aria-selected="false"
-                  aria-label={`${result.context} message from ${result.sender}`}
+                  aria-label={`Message from ${result.senderName ?? result.sender ?? 'unknown'}`}
                 >
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500 bg-blue-50 border border-blue-100 rounded-full px-2 py-0.5">
-                      {result.context}
+                      {result.context ?? (result.roomId ? 'ROOM' : 'CHAT')}
                     </span>
-                    <span className="text-[11px] font-semibold text-gray-600">{result.sender}</span>
+                    <span className="text-[11px] font-semibold text-gray-600">{result.senderName ?? result.sender ?? 'unknown'}</span>
                   </div>
-                  <p className="text-[12.5px] text-gray-700 truncate">{result.content}</p>
+                  <p className="text-[12.5px] text-gray-700 truncate">{result.highlightedContent ?? result.content ?? ''}</p>
                 </button>
               ))}
             </div>

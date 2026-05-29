@@ -21,6 +21,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import com.planora.backend.annotation.WithMockUserPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Map;
@@ -84,11 +86,22 @@ class TaskControllerTest {
 
     @Test
     @WithMockUserPrincipal
-    void getTasksByProject_returnsListOfTasks() throws Exception {
-        when(service.getTasksByProject(eq(10L), any(), any(), any(), any(), any(), any()))
-                .thenReturn(List.of(sampleTask));
+    void getTasksByProject_returnsPageOfTasks() throws Exception {
+        when(service.getTasksByProject(eq(10L), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(sampleTask)));
 
         mockMvc.perform(get("/api/tasks/project/10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].title").value("Implement login"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void getAllTasksByProject_returnsListOfTasks() throws Exception {
+        when(service.getTasksByProject(eq(10L), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(sampleTask));
+
+        mockMvc.perform(get("/api/tasks/project/10/all"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("Implement login"));
     }

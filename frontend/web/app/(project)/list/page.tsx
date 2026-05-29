@@ -164,42 +164,42 @@ export default function ListPage() {
   // ── No project selected ──
   if (!projectId) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="flex items-center justify-center min-h-screen bg-cu-bg-secondary">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-gray-800">Missing Project ID</h1>
-          <p className="text-gray-500 text-sm mt-2">Add <code className="bg-gray-100 px-1 rounded">?projectId=...</code> to the URL.</p>
+          <AlertCircle className="w-12 h-12 text-cu-danger mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-cu-text-primary">Missing Project ID</h1>
+          <p className="text-cu-text-secondary text-sm mt-2">Add <code className="bg-cu-bg-tertiary px-1 rounded text-cu-text-primary">?projectId=...</code> to the URL.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 h-full bg-gray-50 overflow-y-auto">
+    <div className="flex-1 flex flex-col min-w-0 h-full bg-cu-bg-secondary overflow-y-auto">
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-[1400px] mx-auto w-full">
 
         {/* Header */}
-        <div className="sticky-section-header glass-panel border border-[#E4E7EC] rounded-2xl px-4 sm:px-6 py-4 mb-4 flex items-center gap-3 flex-wrap">
+        <div className="sticky-section-header glass-panel border border-cu-border rounded-2xl px-4 sm:px-6 py-4 mb-4 flex items-center gap-3 flex-wrap">
           <div>
-            <h1 className="text-[20px] sm:text-2xl font-bold text-[#101828]">Task List</h1>
-            <p className="text-[12px] sm:text-[13px] text-[#6A7282] mt-0.5">
+            <h1 className="text-[20px] sm:text-2xl font-bold text-cu-text-primary">Task List</h1>
+            <p className="text-[12px] sm:text-[13px] text-cu-text-secondary mt-0.5">
               {filteredTasks.length} visible of {sortedTasks.length} task{sortedTasks.length !== 1 ? 's' : ''}
             </p>
           </div>
           <div className="flex items-center gap-2 ml-auto">
-            <div className="flex items-center gap-2 bg-white border border-[#E5E7EB] rounded-lg px-3 py-2 shadow-sm">
-              <Search size={14} className="text-[#9CA3AF] shrink-0" />
+            <div className="flex items-center gap-2 bg-cu-bg border border-cu-border rounded-lg px-3 py-2 shadow-cu-sm">
+              <Search size={14} className="text-cu-text-tertiary shrink-0" />
               <input
                 type="text"
                 placeholder="Search tasks…"
                 value={filters.search}
                 onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
-                className="text-[13px] text-[#101828] bg-transparent focus:outline-none placeholder:text-[#9CA3AF] w-44"
+                className="text-[13px] text-cu-text-primary bg-transparent focus:outline-none placeholder:text-cu-text-muted w-44"
               />
             </div>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-[#155DFC] text-white text-[13px] font-medium rounded-lg hover:bg-[#0042A8] transition-colors shrink-0"
+              className="flex items-center gap-1.5 px-3 py-2 bg-cu-primary text-white text-[13px] font-medium rounded-lg hover:bg-cu-primary-hover transition-colors shrink-0"
             >
               <Plus size={15} />
               <span className="hidden sm:inline">Create Task</span>
@@ -217,7 +217,7 @@ export default function ListPage() {
 
         {/* Error */}
         {error && (
-          <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 mb-4">
+          <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-cu-danger-light border border-red-200 dark:border-cu-danger/30 rounded-xl text-red-700 dark:text-cu-danger mb-4">
             <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold text-sm">Error loading tasks</p>
@@ -234,14 +234,14 @@ export default function ListPage() {
             ))}
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden">
-            <div className="hidden md:flex items-center px-4 py-2 border-b border-[#EAECF0] bg-[#FCFCFD]">
-              <label className="inline-flex items-center gap-2 text-[12px] text-[#667085] font-medium">
+          <div className="bg-cu-bg rounded-2xl border border-cu-border overflow-hidden">
+            <div className="hidden md:flex items-center px-4 py-2 border-b border-cu-border bg-cu-bg-secondary">
+              <label className="inline-flex items-center gap-2 text-[12px] text-cu-text-secondary font-medium cursor-pointer">
                 <input
                   type="checkbox"
                   checked={allVisibleSelected}
                   onChange={toggleSelectAllVisible}
-                  className="h-4 w-4 rounded border-[#D0D5DD] text-[#155DFC] focus:ring-[#155DFC]/20 cursor-pointer"
+                  className="h-4 w-4 rounded border-cu-border accent-cu-primary cursor-pointer"
                 />
                 Select visible
               </label>
@@ -249,11 +249,11 @@ export default function ListPage() {
             <TaskTableHeader />
             {flatGroupedTasks.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <Search size={32} className="text-[#D1D5DB] mb-3" />
-                <p className="text-[14px] font-medium text-[#374151]">
+                <Search size={32} className="text-cu-text-muted mb-3" />
+                <p className="text-[14px] font-medium text-cu-text-primary">
                   {filters.search ? 'No tasks match your search' : 'No tasks yet'}
                 </p>
-                <p className="text-[12px] text-[#9CA3AF] mt-1">
+                <p className="text-[12px] text-cu-text-tertiary mt-1">
                   {filters.search ? 'Try a different search term' : 'Create a task to get started'}
                 </p>
               </div>
@@ -286,7 +286,7 @@ export default function ListPage() {
             <button
               onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
-              className="px-3 py-1.5 rounded-lg border border-[#E5E7EB] bg-white text-[13px] text-[#344054] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#F9FAFB]"
+              className="px-3 py-1.5 rounded-lg border border-cu-border bg-cu-bg text-[13px] text-cu-text-primary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-cu-hover transition-colors"
             >
               Prev
             </button>
@@ -301,8 +301,8 @@ export default function ListPage() {
                   onClick={() => setCurrentPage(pageNumber)}
                   className={`min-w-9 h-9 px-3 rounded-lg text-[13px] font-medium border transition-colors ${
                     isActive
-                      ? 'bg-[#155DFC] text-white border-[#155DFC]'
-                      : 'bg-white text-[#344054] border-[#E5E7EB] hover:bg-[#F9FAFB]'
+                      ? 'bg-cu-primary text-white border-cu-primary'
+                      : 'bg-cu-bg text-cu-text-primary border-cu-border hover:bg-cu-hover'
                   }`}
                 >
                   {pageNumber}
@@ -313,7 +313,7 @@ export default function ListPage() {
             <button
               onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages}
-              className="px-3 py-1.5 rounded-lg border border-[#E5E7EB] bg-white text-[13px] text-[#344054] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#F9FAFB]"
+              className="px-3 py-1.5 rounded-lg border border-cu-border bg-cu-bg text-[13px] text-cu-text-primary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-cu-hover transition-colors"
             >
               Next
             </button>

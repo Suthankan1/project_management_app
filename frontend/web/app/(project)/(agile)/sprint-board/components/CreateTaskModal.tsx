@@ -116,9 +116,9 @@ export default function CreateTaskModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-[#00000040] z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 fade-in duration-200">
-        <div className="bg-[#155DFC] px-6 py-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md animate-in overflow-hidden rounded-2xl border border-cu-border bg-cu-bg shadow-cu-xl duration-200 fade-in zoom-in-95">
+        <div className="bg-cu-primary px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Plus size={20} className="text-white" />
@@ -132,7 +132,7 @@ export default function CreateTaskModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054]">TASK TITLE</label>
+            <label className="text-[13px] font-bold text-cu-text-primary">TASK TITLE</label>
             <input
               type="text"
               maxLength={255}
@@ -142,7 +142,7 @@ export default function CreateTaskModal({
                 setTitleLength(e.target.value.length);
               }}
               placeholder="e.g. Design new landing page"
-              className="w-full px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm focus:ring-2 focus:ring-[#155DFC]/20 focus:outline-none transition-all"
+              className="w-full rounded-xl border border-cu-border bg-cu-bg-secondary px-4 py-3 text-sm text-cu-text-primary transition-all placeholder:text-cu-text-muted focus:outline-none focus:ring-2 focus:ring-cu-primary/20"
               autoFocus
             />
             {titleLength > 200 && (
@@ -154,19 +154,19 @@ export default function CreateTaskModal({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054] flex items-center gap-2">
-              <Calendar size={14} className="text-[#98A2B3]" /> DUE DATE
+            <label className="flex items-center gap-2 text-[13px] font-bold text-cu-text-primary">
+              <Calendar size={14} className="text-cu-text-muted" /> DUE DATE
             </label>
             <button
                 type="button"
                 onClick={() => setShowDatePicker(!showDatePicker)}
-                className="w-full text-left px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm text-[#475467] hover:bg-gray-50 flex items-center justify-between"
+                className="flex w-full items-center justify-between rounded-xl border border-cu-border bg-cu-bg-secondary px-4 py-3 text-left text-sm text-cu-text-secondary transition-colors hover:bg-cu-hover hover:text-cu-text-primary"
             >
                 {dueDate ? dueDate.toLocaleDateString() : 'Set due date (optional)'}
-                <Calendar size={16} className="text-[#98A2B3]" />
+                <Calendar size={16} className="text-cu-text-muted" />
             </button>
             {showDatePicker && (
-                <div className="absolute z-[110] bg-white border border-[#EAECF0] rounded-xl shadow-xl p-2 mt-1">
+                <div className="absolute z-[110] mt-1 rounded-xl border border-cu-border bg-cu-bg p-2 shadow-cu-xl">
                      <DatePicker
                         selected={dueDate}
                         onChange={(date: Date | null) => {
@@ -180,13 +180,13 @@ export default function CreateTaskModal({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054] flex items-center gap-2">
-              <User size={14} className="text-[#98A2B3]" /> ASSIGNEE
+            <label className="flex items-center gap-2 text-[13px] font-bold text-cu-text-primary">
+              <User size={14} className="text-cu-text-muted" /> ASSIGNEE
             </label>
             <select
                 value={assignee}
                 onChange={(e) => setAssignee(e.target.value ? parseInt(e.target.value, 10) : '')}
-                className="w-full px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm text-[#475467] focus:ring-2 focus:ring-[#155DFC]/20 focus:outline-none transition-all appearance-none"
+                className="w-full appearance-none rounded-xl border border-cu-border bg-cu-bg-secondary px-4 py-3 text-sm text-cu-text-secondary transition-all focus:outline-none focus:ring-2 focus:ring-cu-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={loadingMembers}
             >
                 <option value="">Select Assignee (optional)</option>
@@ -194,20 +194,20 @@ export default function CreateTaskModal({
             </select>
           </div>
 
-          {submitError && <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl">{submitError}</div>}
+          {submitError && <div className="rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-500">{submitError}</div>}
 
           <div className="flex gap-3 pt-3">
              <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-3 border border-[#EAECF0] text-[#344054] rounded-xl font-bold text-sm hover:bg-gray-50 transition-all"
+              className="flex-1 rounded-xl border border-cu-border px-4 py-3 text-sm font-bold text-cu-text-secondary transition-all hover:bg-cu-hover hover:text-cu-text-primary"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-4 py-3 bg-[#155DFC] text-white rounded-xl font-bold text-sm hover:bg-[#1149C9] shadow-md transition-all disabled:opacity-50"
+              className="flex-1 rounded-xl bg-cu-primary px-4 py-3 text-sm font-bold text-white shadow-cu-md transition-all hover:bg-cu-primary-hover disabled:opacity-50"
             >
               {loading ? 'Creating...' : 'Create Task'}
             </button>

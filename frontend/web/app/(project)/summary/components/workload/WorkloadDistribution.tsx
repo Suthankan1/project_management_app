@@ -11,14 +11,25 @@ import api from '@/lib/axios';
 import { WorkloadEntry } from './types';
 import { WorkloadPieChart } from './WorkloadPieChart';
 import { WorkloadMembersList } from './WorkloadMembersList';
+import { getInitials, profileLookupKey, resolveSummaryAvatarUrl } from '../avatar-utils';
 
-const COLORS = ['#0052CC', '#00875A', '#FF8B00', '#DE350B', '#FFC400', '#6554C0', '#36B37E', '#FF5630', '#2684FF', '#FF991F'];
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-
+const COLORS = [
+  'var(--cu-primary)',
+  'var(--cu-success)',
+  'var(--cu-warning)',
+  'var(--cu-danger)',
+  'var(--cu-warning)',
+  'var(--cu-primary-hover)',
+  'var(--cu-success)',
+  'var(--cu-danger)',
+  'var(--cu-primary-light)',
+  'var(--cu-warning)',
+];
 interface UserProfileItem {
   userId: number;
   email?: string;
   username?: string;
+  fullName?: string;
   profilePicUrl?: string;
 }
 
@@ -38,38 +49,52 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
     fetcher
   );
 
-  const userProfiles = useMemo(() => {
+  const userProfiles = useMemo<Record<string, string>>(() => {
     if (!usersData || usersData.length === 0) return {};
     const profilesMap: Record<string, string> = {};
     usersData.forEach((u) => {
-      if (u.profilePicUrl) {
-        const fullUrl = u.profilePicUrl.startsWith('http') ? u.profilePicUrl : `${API_BASE_URL}${u.profilePicUrl.startsWith('/') ? '' : '/'}${u.profilePicUrl}`;
-        profilesMap[`id:${u.userId}`] = fullUrl;
-        if (u.email) profilesMap[`email:${u.email}`] = fullUrl;
-        if (u.username) profilesMap[`username:${u.username}`] = fullUrl;
-      }
+      const fullUrl = resolveSummaryAvatarUrl(u.profilePicUrl);
+      if (!fullUrl) return;
+
+      profilesMap[`id:${profileLookupKey(u.userId)}`] = fullUrl;
+      if (u.email) profilesMap[`email:${profileLookupKey(u.email)}`] = fullUrl;
+      if (u.username) profilesMap[`username:${profileLookupKey(u.username)}`] = fullUrl;
+      if (u.fullName) profilesMap[`fullname:${profileLookupKey(u.fullName)}`] = fullUrl;
     });
     return profilesMap;
   }, [usersData]);
 
   const workloadData = useMemo(() => {
     const workloads: Record<string, Omit<WorkloadEntry, 'value' | 'color'>> = {};
+    const workloadByMemberId: Record<string, string> = {};
+    const workloadByUserId: Record<string, string> = {};
+    const workloadByName: Record<string, string> = {};
 
     members.forEach(m => {
-      let pathName = m.user.profilePicUrl;
-      if (!pathName) {
-        pathName = userProfiles[`id:${m.user.userId}`] || userProfiles[`email:${m.user.email}`] || userProfiles[`username:${m.user.username}`] || null;
-      } else if (!pathName.startsWith('http')) {
-        pathName = `${API_BASE_URL}${pathName.startsWith('/') ? '' : '/'}${pathName}`;
-      }
+      const memberName = m.user.fullName || m.user.username || 'Unknown member';
+      const workloadKey = `M_${m.id}`;
+      const profileUrl =
+        resolveSummaryAvatarUrl(m.user.profilePicUrl) ||
+        userProfiles[`id:${profileLookupKey(m.user.userId)}`] ||
+        userProfiles[`email:${profileLookupKey(m.user.email)}`] ||
+        userProfiles[`username:${profileLookupKey(m.user.username)}`] ||
+        userProfiles[`fullname:${profileLookupKey(memberName)}`] ||
+        null;
 
-      workloads[`M_${m.id}`] = {
+      workloadByMemberId[profileLookupKey(m.id)] = workloadKey;
+      workloadByUserId[profileLookupKey(m.user.userId)] = workloadKey;
+      [memberName, m.user.fullName, m.user.username, m.user.email].forEach((value) => {
+        const key = profileLookupKey(value);
+        if (key) workloadByName[key] = workloadKey;
+      });
+
+      workloads[workloadKey] = {
         isMember: true,
         id: m.id,
-        name: m.user.fullName || m.user.username,
+        name: memberName,
         role: m.role,
-        avatar: pathName,
-        initials: (m.user.fullName || m.user.username || 'U').substring(0, 2).toUpperCase(),
+        avatar: profileUrl,
+        initials: getInitials(memberName),
         tasks: 0,
         completed: 0,
         overdue: 0
@@ -81,16 +106,22 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
 
     tasks.forEach(t => {
       let key = "UNASSIGNED";
-      if (t.assigneeId && workloads[`M_${t.assigneeId}`]) {
-        key = `M_${t.assigneeId}`;
-      } else if (t.assigneeName) {
-        key = `O_${t.assigneeName}`;
+      const assigneeIdKey = profileLookupKey(t.assigneeId ?? t.assignee?.id);
+      const displayAssigneeName = t.assigneeName || t.assignee?.name;
+      const assigneeNameKey = profileLookupKey(displayAssigneeName);
+
+      if (assigneeIdKey && (workloadByMemberId[assigneeIdKey] || workloadByUserId[assigneeIdKey])) {
+        key = workloadByMemberId[assigneeIdKey] || workloadByUserId[assigneeIdKey];
+      } else if (assigneeNameKey && workloadByName[assigneeNameKey]) {
+        key = workloadByName[assigneeNameKey];
+      } else if (displayAssigneeName) {
+        key = `O_${displayAssigneeName}`;
         if (!workloads[key]) {
           workloads[key] = {
             isMember: false,
-            name: t.assigneeName,
-            avatar: t.assigneePhotoUrl,
-            initials: t.assigneeName.substring(0, 2).toUpperCase(),
+            name: displayAssigneeName,
+            avatar: resolveSummaryAvatarUrl(t.assigneePhotoUrl || t.assignee?.avatar || t.assignee?.profilePicUrl),
+            initials: getInitials(displayAssigneeName),
             tasks: 0, completed: 0, overdue: 0
           };
         }
@@ -128,19 +159,19 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
   }
 
   return (
-    <MotionWrapper className="relative bg-white/60 backdrop-blur-2xl rounded-2xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 overflow-hidden">
+    <MotionWrapper className="relative bg-cu-bg/90 backdrop-blur-2xl rounded-2xl border border-cu-border shadow-cu-sm hover:shadow-cu-md transition-all duration-300 overflow-hidden">
       {/* Decorative gradient blob background for glass effect */}
-      <div className="absolute top-[-50%] left-[-10%] w-[60%] h-[150%] bg-gradient-to-r from-blue-100/40 to-emerald-50/40 rounded-full blur-3xl -z-10 animate-pulse pointer-events-none" style={{ animationDuration: '8s' }} />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[100%] bg-gradient-to-l from-amber-50/40 to-purple-50/40 rounded-full blur-3xl -z-10 animate-pulse pointer-events-none" style={{ animationDuration: '10s' }} />
+      <div className="absolute top-[-50%] left-[-10%] w-[60%] h-[150%] bg-gradient-to-r from-cu-primary/10 to-cu-success/10 rounded-full blur-3xl -z-10 animate-pulse pointer-events-none" style={{ animationDuration: '8s' }} />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[100%] bg-gradient-to-l from-cu-warning/10 to-cu-primary/10 rounded-full blur-3xl -z-10 animate-pulse pointer-events-none" style={{ animationDuration: '10s' }} />
 
-      <div className="p-5 border-b border-white/50 flex items-center justify-between bg-white/40">
-        <h2 className="font-arimo text-[16px] font-semibold text-[#101828] flex items-center gap-2">
-          <Briefcase size={18} className="text-[#0052CC]" />
+      <div className="p-5 border-b border-cu-border flex items-center justify-between bg-cu-bg-secondary/60">
+        <h2 className="font-arimo text-[16px] font-semibold text-cu-text-primary flex items-center gap-2">
+          <Briefcase size={18} className="text-cu-primary" />
           Team Workload Distribution
         </h2>
       </div>
 
-      <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-white/50">
+      <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-cu-border">
         <WorkloadPieChart 
           projectId={projectId}
           membersLength={members.length}

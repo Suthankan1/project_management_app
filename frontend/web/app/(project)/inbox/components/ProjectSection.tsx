@@ -23,15 +23,15 @@ export const ProjectSection = memo(function ProjectSection({
 
   return (
     <section
-      className="bg-white border border-slate-200 rounded-2xl p-3.5 sm:p-4 md:p-5"
+      className="bg-cu-bg border border-cu-border rounded-2xl p-3.5 sm:p-4 md:p-5 shadow-cu-sm"
       style={{ contentVisibility: 'auto', containIntrinsicSize: '420px' }}
     >
       <div className="flex items-center justify-between gap-3 mb-3">
         <div>
-          <h2 className="text-[16px] font-bold text-slate-900">{group.projectName}</h2>
-          <p className="text-[12px] text-slate-500 mt-0.5">{group.totalItems} chats · {group.unreadCount} unread</p>
+          <h2 className="text-[16px] font-bold text-cu-text-primary">{group.projectName}</h2>
+          <p className="text-[12px] text-cu-text-muted mt-0.5">{group.totalItems} chats · {group.unreadCount} unread</p>
         </div>
-        <span className="text-[10px] uppercase tracking-wide font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">
+        <span className="text-[10px] uppercase tracking-wide font-bold text-cu-text-muted bg-cu-bg-secondary border border-cu-border-light px-2 py-1 rounded">
           Project {group.projectId}
         </span>
       </div>
@@ -51,7 +51,7 @@ export const ProjectSection = memo(function ProjectSection({
           <button
             type="button"
             onClick={() => setShowAllActivities((prev) => !prev)}
-            className="px-3 py-2 min-h-[44px] rounded-lg text-[13px] sm:text-[12px] font-semibold border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+            className="px-3 py-2 min-h-[44px] rounded-lg text-[13px] sm:text-[12px] font-semibold border border-cu-border bg-cu-bg text-cu-text-secondary hover:bg-cu-hover hover:text-cu-text-primary"
           >
             {showAllActivities
               ? 'Show less'

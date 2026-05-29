@@ -1,0 +1,167 @@
+package com.planora.backend.service;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Centralizes ALL GitHub REST API communication.
+ * No business logic here — only HTTP calls, auth headers, and error handling.
+ */
+@Slf4j
+@Service
+public class GithubApiClient {
+
+    private static final String GITHUB_API_BASE = "https://api.github.com";
+    private static final int MAX_PER_PAGE = 100;
+
+    private final HttpClient httpClient;
+    private final ObjectMapper objectMapper;
+
+    public GithubApiClient() {
+        this.httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
+        this.objectMapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    }
+
+    public List<JsonNode> fetchPullRequests(String repoFullName, String token, String state, int page, int perPage) {
+        String url = GITHUB_API_BASE + "/repos/" + repoFullName + "/pulls"
+            + "?state=" + state
+            + "&per_page=" + Math.min(perPage, MAX_PER_PAGE)
+            + "&page=" + page;
+        return getList(url, token);
+    }
+
+    public List<JsonNode> fetchCommits(String repoFullName, String token, int page, int perPage) {
+        String url = GITHUB_API_BASE + "/repos/" + repoFullName + "/commits"
+            + "?per_page=" + Math.min(perPage, MAX_PER_PAGE)
+            + "&page=" + page;
+        return getList(url, token);
+    }
+
+    public List<JsonNode> fetchIssues(String repoFullName, String token, String state, int page, int perPage) {
+        // GitHub issues endpoint returns both issues and PRs — callers must filter out PRs
+        String url = GITHUB_API_BASE + "/repos/" + repoFullName + "/issues"
+            + "?state=" + state
+            + "&per_page=" + Math.min(perPage, MAX_PER_PAGE)
+            + "&page=" + page;
+        return getList(url, token);
+    }
+
+    public JsonNode fetchRepository(String repoFullName, String token) {
+        return get(GITHUB_API_BASE + "/repos/" + repoFullName, token);
+    }
+
+    public List<JsonNode> fetchUserRepositories(String token, int page) {
+        String url = GITHUB_API_BASE + "/user/repos?per_page=30&page=" + page + "&sort=updated";
+        return getList(url, token);
+    }
+
+    public JsonNode createIssue(String repoFullName, String token, String title, String body, List<String> labels) {
+        try {
+            Map<String, Object> payload = Map.of(
+                "title", title,
+                "body", body != null ? body : "",
+                "labels", labels != null ? labels : List.of()
+            );
+            String json = objectMapper.writeValueAsString(payload);
+            return post(GITHUB_API_BASE + "/repos/" + repoFullName + "/issues", token, json);
+        } catch (IOException e) {
+            throw new GithubApiException("Failed to serialize create-issue payload", e);
+        }
+    }
+
+    // ── Internal HTTP helpers ────────────────────────────────────────────────
+
+    private JsonNode get(String url, String token) {
+        try {
+            HttpRequest request = buildRequest(url, token).GET().build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            validateResponse(url, response);
+            return objectMapper.readTree(response.body());
+        } catch (IOException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new GithubApiException("GitHub GET failed: " + url, e);
+        }
+    }
+
+    private List<JsonNode> getList(String url, String token) {
+        try {
+            HttpRequest request = buildRequest(url, token).GET().build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            validateResponse(url, response);
+            return objectMapper.readValue(response.body(), new TypeReference<>() {});
+        } catch (IOException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new GithubApiException("GitHub GET-list failed: " + url, e);
+        }
+    }
+
+    private JsonNode post(String url, String token, String body) {
+        try {
+            HttpRequest request = buildRequest(url, token)
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .header("Content-Type", "application/json")
+                .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            validateResponse(url, response);
+            return objectMapper.readTree(response.body());
+        } catch (IOException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new GithubApiException("GitHub POST failed: " + url, e);
+        }
+    }
+
+    private HttpRequest.Builder buildRequest(String url, String token) {
+        return HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Authorization", "Bearer " + token)
+            .header("Accept", "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .timeout(Duration.ofSeconds(30));
+    }
+
+    private void validateResponse(String url, HttpResponse<String> response) {
+        int status = response.statusCode();
+        if (status == 401) {
+            throw new GithubApiException("GitHub API unauthorized — check token for: " + url);
+        }
+        if (status == 403) {
+            String remaining = response.headers().firstValue("X-RateLimit-Remaining").orElse("?");
+            if ("0".equals(remaining)) {
+                throw new GithubApiException("GitHub API rate limit exceeded for: " + url);
+            }
+            throw new GithubApiException("GitHub API forbidden for: " + url);
+        }
+        if (status == 404) {
+            throw new GithubApiException("GitHub resource not found: " + url);
+        }
+        if (status >= 400) {
+            throw new GithubApiException("GitHub API error " + status + " for: " + url
+                + " — " + response.body());
+        }
+    }
+
+    public static class GithubApiException extends RuntimeException {
+        public GithubApiException(String message) {
+            super(message);
+        }
+        public GithubApiException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+}

@@ -19,14 +19,14 @@ function formatTimeAgo(dateString?: string | Date) {
 // Individual timeline item component to render a single task's activity efficiently.
 const ActivityItem = memo(({ task }: { task: Task }) => {
   const isDone = task.status === 'DONE' || task.status === 'COMPLETED';
-  const colorClass = isDone ? 'bg-[#00875A]' : 'bg-[#0052CC]';
+  const colorClass = isDone ? 'bg-cu-success' : 'bg-cu-primary';
   const actionText = isDone ? 'completed' : 'updated';
   const initials = task.assigneeName ? task.assigneeName.substring(0, 2).toUpperCase() : null;
 
   return (
     <div className="relative group">
       {/* Circle indicator on the timeline showing user initials or a status icon. */}
-      <div className={`absolute -left-[27px] w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-sm transition-transform group-hover:scale-110 ${colorClass}`}>
+      <div className={`absolute -left-[27px] w-6 h-6 rounded-full flex items-center justify-center border-2 border-cu-bg shadow-cu-sm transition-transform group-hover:scale-110 ${colorClass}`}>
         {initials ? (
           <span className="text-[10px] text-white font-bold">{initials}</span>
         ) : (
@@ -37,13 +37,13 @@ const ActivityItem = memo(({ task }: { task: Task }) => {
       </div>
 
       {/* The main content of the activity item. */}
-      <p className="font-arimo text-[13px] text-gray-800 leading-tight">
-        <span className="font-semibold">{task.assigneeName || 'Someone'}</span> {actionText} <span className="font-medium text-[#0052CC]">TSK-{task.id}</span>
+      <p className="font-arimo text-[13px] text-cu-text-primary leading-tight">
+        <span className="font-semibold">{task.assigneeName || 'Someone'}</span> {actionText} <span className="font-medium text-cu-primary">TSK-{task.id}</span>
       </p>
-      <p className="font-arimo text-[12px] text-gray-500 mt-1 truncate" title={task.title}>{task.title}</p>
+      <p className="font-arimo text-[12px] text-cu-text-secondary mt-1 truncate" title={task.title}>{task.title}</p>
       
       {/* The timestamp positioned at the top right of the item. */}
-      <span className="font-arimo text-[11px] text-gray-400 absolute top-0 right-0 bg-white/80 px-1 rounded">
+      <span className="font-arimo text-[11px] text-cu-text-muted absolute top-0 right-0 bg-cu-bg/80 px-1 rounded">
         {formatTimeAgo(task.updatedAt)}
       </span>
     </div>
@@ -65,11 +65,11 @@ export function ActivityFeed({ tasks = [] }: { tasks?: Task[] }) {
     <div className="h-full">
       {/* Show empty state if there are no recent task updates. */}
       {recentUpdates.length === 0 ? (
-        <p className="font-arimo text-[14px] text-[#98A2B3] italic bg-gray-50 p-4 rounded-lg text-center border border-dashed border-gray-200">
+        <p className="font-arimo text-[14px] text-cu-text-muted italic bg-cu-bg-secondary p-4 rounded-lg text-center border border-dashed border-cu-border">
           No recent updates
         </p>
       ) : (
-        <div className="relative border-l-2 border-gray-100 ml-3 pl-5 space-y-6 pt-1 pb-1">
+        <div className="relative border-l-2 border-cu-border ml-3 pl-5 space-y-6 pt-1 pb-1">
           {/* Render the extracted timeline item for each recent update. */}
           {recentUpdates.map(task => <ActivityItem key={task.id} task={task} />)}
         </div>

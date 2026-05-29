@@ -16,23 +16,54 @@ export interface TeamMemberOption {
 }
 
 /**
- * Fetch all tasks for a specific project
+ * Fetch all tasks for a specific project (paginated, returning page 0 with size 500 for compatibility)
  * @param projectId - The project ID to fetch tasks for
  * @returns Promise with array of tasks
  */
 export async function fetchTasksByProject(
   projectId: number,
-  filters?: { milestoneId?: number | null }
+  filters?: { milestoneId?: number | null; archived?: boolean }
 ): Promise<Task[]> {
   try {
-    const params: Record<string, number> = {};
+    const params: Record<string, unknown> = {
+      page: 0,
+      size: 500,
+    };
     if (filters?.milestoneId != null) {
       params.milestoneId = filters.milestoneId;
     }
+    if (filters?.archived !== undefined) {
+      params.archived = filters.archived;
+    }
     const response = await axios.get(`/api/tasks/project/${projectId}`, { params });
-    return response.data || [];
+    return response.data?.content || [];
   } catch (error) {
     console.error('Error fetching tasks:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch all tasks for a specific project (unpaginated, for timeline/Gantt)
+ * @param projectId - The project ID to fetch tasks for
+ * @returns Promise with array of tasks
+ */
+export async function fetchAllTasksByProject(
+  projectId: number,
+  filters?: { milestoneId?: number | null; archived?: boolean }
+): Promise<Task[]> {
+  try {
+    const params: Record<string, unknown> = {};
+    if (filters?.milestoneId != null) {
+      params.milestoneId = filters.milestoneId;
+    }
+    if (filters?.archived !== undefined) {
+      params.archived = filters.archived;
+    }
+    const response = await axios.get(`/api/tasks/project/${projectId}/all`, { params });
+    return response.data || [];
+  } catch (error) {
+    console.error('Error fetching all tasks:', error);
     throw error;
   }
 }
@@ -258,8 +289,7 @@ export async function fetchKanbanBoard(projectId: number): Promise<KanbanBoardRe
         wipLimit: (col.wipLimit as number) || 0,
       })),
     };
-  } catch (error) {
-    console.error('Error fetching kanban board:', error);
+  } catch {
     return null;
   }
 }
