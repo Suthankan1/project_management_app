@@ -1,7 +1,6 @@
 // REST controller exposing endpoints for user notifications under /api/notifications; delegates logic to NotificationService.
 package com.planora.backend.controller;
 
-import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.planora.backend.dto.NotificationResponseDTO;
+import com.planora.backend.dto.NotificationFeedResponseDTO;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.service.NotificationService;
 
@@ -29,8 +28,8 @@ public class NotificationController {
 
     // Retrieves all notifications for the currently authenticated user.
     @GetMapping
-    public ResponseEntity<List<NotificationResponseDTO>> getUserNotifications(@AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(notificationService.getUserNotifications(principal.getUserId()));
+    public ResponseEntity<NotificationFeedResponseDTO> getUserNotifications(@AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(notificationService.getUserNotificationFeed(principal.getUserId()));
     }
 
     // Retrieves the count of unread notifications for the user.

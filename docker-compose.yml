@@ -18,10 +18,22 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?SPRING_DATASOURCE_PASSWORD is required}
       # Allow requests from local frontend dev server and Netlify
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       # Always use Flyway for schema management in Docker/production.
       # Never use ddl-auto=update in a containerised environment — it silently breaks on NOT NULL columns.
       FLYWAY_ENABLED: "true"
       JPA_DDL_AUTO: validate
+    depends_on:
+      - redis
+    networks:
+      - planora-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: planora-redis
+    ports:
+      - "6379:6379"
     networks:
       - planora-network
 

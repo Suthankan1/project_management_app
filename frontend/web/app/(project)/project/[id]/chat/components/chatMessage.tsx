@@ -12,6 +12,7 @@ import { avatarColor } from '@/hooks/chat/chat-utils';
 interface ChatMessagesProps {
   projectId: string;
   messages: ChatMessage[];
+  targetMessageId?: number | null;
   currentUser: string;
   currentUserAliases: string[];
   userProfilePics?: Record<string, string>;
@@ -145,6 +146,7 @@ const ClockIcon = () => (
 export const ChatMessages = ({
   projectId,
   messages,
+  targetMessageId,
   currentUser,
   currentUserAliases,
   isPrivateChat,
@@ -221,6 +223,22 @@ export const ChatMessages = ({
     const t = setTimeout(() => virtualizer.scrollToIndex(visibleMessages.length - 1, { align: 'end' }), 50);
     return () => clearTimeout(t);
   }, [visibleMessages.length]);
+
+  useEffect(() => {
+    if (!targetMessageId) {
+      return;
+    }
+    const targetIndex = visibleMessages.findIndex((message) => message.id === targetMessageId);
+    if (targetIndex < 0) {
+      return;
+    }
+
+    const virtualizer = virtualizerRef.current;
+    if (!virtualizer) {
+      return;
+    }
+    virtualizer.scrollToIndex(targetIndex, { align: 'center' });
+  }, [targetMessageId, visibleMessages]);
 
   const handleDocumentClick = async (
     e: React.MouseEvent<HTMLAnchorElement>,

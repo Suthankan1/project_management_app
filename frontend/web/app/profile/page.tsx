@@ -1,9 +1,10 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useState } from 'react';
 import { PhoneInput } from 'react-international-phone';
-import { Activity, BadgeCheck, BriefcaseBusiness, Camera, Mail, UserRound, Menu } from 'lucide-react';
+import { Activity, BadgeCheck, Bell, BriefcaseBusiness, Camera, Mail, UserRound, Menu } from 'lucide-react';
 import { useProfile } from './hooks/useProfile';
 import { useChangePassword } from './hooks/useChangePassword';
 import ChangePasswordCard from './components/ChangePasswordCard';
@@ -56,6 +57,13 @@ export default function ProfilePage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap justify-start sm:justify-end">
+                        <Link
+                            href="/profile/notification-settings"
+                            className="inline-flex items-center gap-1.5 rounded-full border border-cu-border bg-cu-bg px-3 py-1 text-xs font-semibold text-cu-text-secondary hover:border-cu-primary/30 hover:text-cu-primary transition-colors"
+                        >
+                            <Bell size={13} className="text-cu-primary" />
+                            Notification Settings
+                        </Link>
                         <span className="inline-flex items-center gap-1 rounded-full border border-cu-border bg-cu-bg px-3 py-1 text-xs font-semibold text-cu-text-secondary">
                             <BadgeCheck size={13} className="text-cu-primary" />
                             Verified Account

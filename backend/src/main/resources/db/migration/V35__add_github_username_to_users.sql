@@ -1,0 +1,1 @@
+ALTER TABLE users ALTER COLUMN github_username TYPE VARCHAR(39);

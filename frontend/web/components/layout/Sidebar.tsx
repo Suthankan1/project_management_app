@@ -193,6 +193,12 @@ export default function Sidebar() {
 
   useEffect(() => {
     let isCurrentlyMobile = window.innerWidth < 768;
+    const frameId = window.requestAnimationFrame(() => {
+      setIsMobile(isCurrentlyMobile);
+      setCollapsed(
+        isCurrentlyMobile || localStorage.getItem('planora:sidebar:collapsed') === 'true',
+      );
+    });
 
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
@@ -204,7 +210,10 @@ export default function Sidebar() {
     };
 
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   useEffect(() => {

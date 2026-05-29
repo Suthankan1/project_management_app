@@ -20,14 +20,19 @@ jest.mock('sockjs-client', () => jest.fn(() => ({})));
 
 type SubscriptionPayload = { body: string };
 let notificationHandler: ((payload: SubscriptionPayload) => void) | null = null;
+let badgeHandler: ((payload: SubscriptionPayload) => void) | null = null;
 
 let stompClientOnConnect: (() => void) | null = null;
 const stompClient = {
   connected: true,
   debug: jest.fn(),
   reconnect_delay: 0,
-  subscribe: jest.fn((_: string, callback: (payload: SubscriptionPayload) => void) => {
-    notificationHandler = callback;
+  subscribe: jest.fn((destination: string, callback: (payload: SubscriptionPayload) => void) => {
+    if (destination === '/user/queue/notifications-badge') {
+      badgeHandler = callback;
+    } else {
+      notificationHandler = callback;
+    }
     return { unsubscribe: jest.fn() };
   }),
   disconnect: jest.fn(),
@@ -48,7 +53,6 @@ jest.mock('@stomp/stompjs', () => ({
 
 jest.mock('@/services/notifications-service', () => ({
   fetchNotifications: jest.fn(),
-  fetchUnreadCount: jest.fn(),
   markNotificationRead: jest.fn(),
   markAllNotificationsRead: jest.fn(),
   deleteNotification: jest.fn(),
@@ -127,12 +131,12 @@ describe('GlobalNotificationProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     notificationHandler = null;
+    badgeHandler = null;
     setRoute('/dashboard', '');
     window.localStorage.clear();
     window.localStorage.setItem('token', buildMockJwt());
 
-    mockedApi.fetchNotifications.mockResolvedValue([]);
-    mockedApi.fetchUnreadCount.mockResolvedValue(0);
+    mockedApi.fetchNotifications.mockResolvedValue({ notifications: [], unreadCount: 0 });
     mockedApi.markNotificationRead.mockResolvedValue(undefined);
     mockedApi.markAllNotificationsRead.mockResolvedValue(undefined);
     mockedApi.deleteNotification.mockResolvedValue(undefined);
@@ -140,11 +144,13 @@ describe('GlobalNotificationProvider', () => {
   });
 
   it('hydrates initial notifications and unread count then subscribes for realtime updates', async () => {
-    mockedApi.fetchNotifications.mockResolvedValue([
-      buildNotification(1, false),
-      buildNotification(2, true, '/members/8'),
-    ]);
-    mockedApi.fetchUnreadCount.mockResolvedValue(1);
+    mockedApi.fetchNotifications.mockResolvedValue({
+      notifications: [
+        buildNotification(1, false),
+        buildNotification(2, true, '/members/8'),
+      ],
+      unreadCount: 1,
+    });
 
     render(
       <GlobalNotificationProvider>
@@ -159,6 +165,7 @@ describe('GlobalNotificationProvider', () => {
 
     expect(stompClient.activate).toHaveBeenCalled();
     expect(stompClient.subscribe).toHaveBeenCalledWith('/user/queue/notifications', expect.any(Function));
+    expect(stompClient.subscribe).toHaveBeenCalledWith('/user/queue/notifications-badge', expect.any(Function));
   });
 
   it('connects when token becomes available after mount', async () => {
@@ -197,6 +204,10 @@ describe('GlobalNotificationProvider', () => {
       notificationHandler?.({ body: JSON.stringify(buildNotification(10, false, '/project/8/chat', 'New chat message')) });
     });
 
+    act(() => {
+      badgeHandler?.({ body: '1' });
+    });
+
     await waitFor(() => {
       expect(screen.getByTestId('notification-count')).toHaveTextContent('1');
       expect(screen.getByTestId('unread-count')).toHaveTextContent('1');
@@ -222,6 +233,10 @@ describe('GlobalNotificationProvider', () => {
 
     act(() => {
       notificationHandler?.({ body: JSON.stringify(buildNotification(11, false, '/project/8/chat', 'In-page event')) });
+    });
+
+    act(() => {
+      badgeHandler?.({ body: '0' });
     });
 
     await waitFor(() => {
@@ -250,6 +265,10 @@ describe('GlobalNotificationProvider', () => {
       notificationHandler?.({ body: JSON.stringify(buildNotification(12, false, '/project/8/chat', 'Generic chat event')) });
     });
 
+    act(() => {
+      badgeHandler?.({ body: '1' });
+    });
+
     await waitFor(() => {
       expect(screen.getByText('12:unread')).toBeInTheDocument();
       expect(screen.getByTestId('unread-count')).toHaveTextContent('1');
@@ -274,6 +293,10 @@ describe('GlobalNotificationProvider', () => {
 
     act(() => {
       notificationHandler?.({ body: JSON.stringify(buildNotification(13, false, '/project/8/chat?with=bob', 'Matched private chat event')) });
+    });
+
+    act(() => {
+      badgeHandler?.({ body: '0' });
     });
 
     await waitFor(() => {
@@ -306,11 +329,13 @@ describe('GlobalNotificationProvider', () => {
   });
 
   it('supports markAsRead and markAllAsRead actions via context', async () => {
-    mockedApi.fetchNotifications.mockResolvedValue([
-      buildNotification(1, false, '/project/8/chat', 'First'),
-      buildNotification(2, false, '/members/8', 'Second'),
-    ]);
-    mockedApi.fetchUnreadCount.mockResolvedValue(2);
+    mockedApi.fetchNotifications.mockResolvedValue({
+      notifications: [
+        buildNotification(1, false, '/project/8/chat', 'First'),
+        buildNotification(2, false, '/members/8', 'Second'),
+      ],
+      unreadCount: 2,
+    });
 
     render(
       <GlobalNotificationProvider>
@@ -341,11 +366,13 @@ describe('GlobalNotificationProvider', () => {
   });
 
   it('supports deleting one notification via context', async () => {
-    mockedApi.fetchNotifications.mockResolvedValue([
-      buildNotification(1, false, '/project/8/chat', 'First'),
-      buildNotification(2, true, '/members/8', 'Second'),
-    ]);
-    mockedApi.fetchUnreadCount.mockResolvedValue(1);
+    mockedApi.fetchNotifications.mockResolvedValue({
+      notifications: [
+        buildNotification(1, false, '/project/8/chat', 'First'),
+        buildNotification(2, true, '/members/8', 'Second'),
+      ],
+      unreadCount: 1,
+    });
 
     render(
       <GlobalNotificationProvider>
@@ -368,12 +395,14 @@ describe('GlobalNotificationProvider', () => {
   });
 
   it('supports deleting all notifications via context', async () => {
-    mockedApi.fetchNotifications.mockResolvedValue([
-      buildNotification(1, false, '/project/8/chat', 'First'),
-      buildNotification(2, true, '/members/8', 'Second'),
-      buildNotification(3, false, '/project/8/tasks', 'Third'),
-    ]);
-    mockedApi.fetchUnreadCount.mockResolvedValue(2);
+    mockedApi.fetchNotifications.mockResolvedValue({
+      notifications: [
+        buildNotification(1, false, '/project/8/chat', 'First'),
+        buildNotification(2, true, '/members/8', 'Second'),
+        buildNotification(3, false, '/project/8/tasks', 'Third'),
+      ],
+      unreadCount: 2,
+    });
     mockedApi.deleteAllNotifications.mockResolvedValue([
       { status: 'fulfilled', value: undefined },
       { status: 'fulfilled', value: undefined },

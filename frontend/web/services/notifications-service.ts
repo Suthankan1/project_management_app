@@ -12,16 +12,16 @@ export interface Notification {
   [key: string]: unknown;
 }
 
-// ── API ──
-
-export async function fetchNotifications(): Promise<Notification[]> {
-  const { data } = await api.get<Notification[]>('/api/notifications');
-  return data;
+export interface NotificationFeedResponse {
+  notifications: Notification[];
+  unreadCount: number;
 }
 
-export async function fetchUnreadCount(): Promise<number> {
-  const { data } = await api.get<{ count: number }>('/api/notifications/unread-count');
-  return data.count;
+// ── API ──
+
+export async function fetchNotifications(): Promise<NotificationFeedResponse> {
+  const { data } = await api.get<NotificationFeedResponse>('/api/notifications');
+  return data;
 }
 
 export async function markNotificationRead(id: number): Promise<void> {
