@@ -1,28 +1,39 @@
 // Service layer for notification operations: creation, deduplication, retrieval, and status updates.
 package com.planora.backend.service;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.planora.backend.dto.NotificationFeedResponseDTO;
 import com.planora.backend.dto.NotificationResponseDTO;
 import com.planora.backend.model.Notification;
 import com.planora.backend.model.NotificationChannel;
 import com.planora.backend.model.NotificationEventType;
 import com.planora.backend.model.User;
+import com.planora.backend.model.UserPushToken;
 import com.planora.backend.repository.NotificationRepository;
 import com.planora.backend.repository.TaskRepository;
+import com.planora.backend.repository.UserPushTokenRepository;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -31,9 +42,11 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
+    private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
+    private static final String EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
     private final NotificationRepository notificationRepository;
-
+    private final UserPushTokenRepository userPushTokenRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     private final StringRedisTemplate stringRedisTemplate;
@@ -41,6 +54,11 @@ public class NotificationService {
     private final NotificationPreferenceService notificationPreferenceService;
 
     private final TaskRepository taskRepository;
+
+        private final ObjectMapper objectMapper = new ObjectMapper();
+        private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .build();
 
     private static final Duration UNREAD_COUNT_TTL = Duration.ofSeconds(30);
     private static final String UNREAD_COUNT_KEY_PREFIX = "notifications:unread-count:";
@@ -76,6 +94,8 @@ public class NotificationService {
         notification.setRead(false);
         notification.setCreatedAt(LocalDateTime.now());
         notification = notificationRepository.save(notification);
+
+        sendExpoPushNotifications(recipient, notification, projectId, eventType);
 
         // Disptach via websocket for global realtime overlay
         NotificationResponseDTO dto = NotificationResponseDTO.builder()
@@ -310,6 +330,76 @@ public class NotificationService {
                 "/queue/notifications-badge",
                 Long.toString(unreadCount)
         );
+    }
+
+    private void sendExpoPushNotifications(User recipient, Notification notification, Long projectId, String eventType) {
+        if (userPushTokenRepository == null) {
+            // In some unit-tests the repository is not provided; treat as no push tokens.
+            return;
+        }
+
+        List<UserPushToken> pushTokens = userPushTokenRepository.findByUserUserId(recipient.getUserId());
+        if (pushTokens == null || pushTokens.isEmpty()) {
+            return;
+        }
+
+        for (UserPushToken pushToken : pushTokens) {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("to", pushToken.getToken());
+            payload.put("title", buildExpoPushTitle(eventType));
+            payload.put("body", notification.getMessage());
+
+            Map<String, Object> data = new LinkedHashMap<>();
+            if (notification.getLink() != null) {
+                data.put("link", notification.getLink());
+            }
+            if (projectId != null) {
+                data.put("projectId", projectId);
+            }
+            if (eventType != null) {
+                data.put("eventType", eventType);
+            }
+            data.put("notificationId", notification.getId());
+            payload.put("data", data);
+
+            try {
+                String body = objectMapper.writeValueAsString(payload);
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(EXPO_PUSH_URL))
+                        .timeout(Duration.ofSeconds(5))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(body))
+                        .build();
+
+                httpClient.sendAsync(request, HttpResponse.BodyHandlers.discarding())
+                        .thenAccept(response -> {
+                            if (response.statusCode() >= 400) {
+                                log.warn("Expo push API returned {} for user {} token {}", response.statusCode(), recipient.getUserId(), pushToken.getId());
+                            }
+                        })
+                        .exceptionally(ex -> {
+                            log.warn("Expo push API request failed for user {} token {}: {}", recipient.getUserId(), pushToken.getId(), ex.getMessage());
+                            return null;
+                        });
+            } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
+                log.warn("Unable to serialize Expo push notification for user {} token {}: {}", recipient.getUserId(), pushToken.getId(), ex.getMessage());
+            }
+        }
+    }
+
+    private String buildExpoPushTitle(String eventType) {
+        if (eventType == null) {
+            return "Planora";
+        }
+
+        return switch (eventType) {
+            case "TASK_ACTIVITY" -> "Task update";
+            case "CHAT_ACTIVITY" -> "Chat update";
+            case "GITHUB_ACTIVITY" -> "GitHub update";
+            case "TEAM_ACTIVITY" -> "Team update";
+            case "REMINDER_ACTIVITY" -> "Reminder";
+            default -> "Project update";
+        };
     }
 
     private String unreadCountCacheKey(Long userId) {

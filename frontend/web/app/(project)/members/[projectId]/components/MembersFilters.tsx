@@ -1,3 +1,5 @@
+import { Search, SlidersHorizontal } from 'lucide-react';
+
 interface MembersFiltersProps {
   search: string;
   roleFilter: string | null;
@@ -22,26 +24,29 @@ export function MembersFilters({
   return (
     <div className="space-y-3">
       <div className="flex flex-col sm:flex-row gap-2">
-        <input
-          type="text"
-          className="flex-1 border border-cu-border bg-cu-bg text-cu-text-primary rounded px-4 py-2.5 min-h-[44px] text-sm focus:outline-none focus:ring-2 focus:ring-cu-primary/20 placeholder:text-cu-text-muted"
-          placeholder="Search members by name or email..."
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
+        <div className="relative flex-1">
+          <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cu-text-muted" aria-hidden="true" />
+          <input
+            type="text"
+            className="w-full border border-cu-border rounded-lg bg-cu-bg text-cu-text-primary pl-10 pr-4 py-2.5 min-h-[44px] text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-cu-primary/20 placeholder:text-cu-text-muted"
+            placeholder="Search members by name or email..."
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+        </div>
         <button
-          className="border border-cu-border rounded px-4 py-2.5 min-h-[44px] flex items-center justify-center gap-2 text-sm bg-cu-bg text-cu-text-secondary hover:bg-cu-hover"
+          className="border border-cu-border rounded-lg px-4 py-2.5 min-h-[44px] flex items-center justify-center gap-2 text-sm font-semibold bg-cu-bg text-cu-text-secondary shadow-sm hover:bg-cu-hover"
           onClick={onToggleFilters}
         >
           <span>Filters</span>
-          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 6h16M6 12h12M10 18h4" /></svg>
+          <SlidersHorizontal size={16} aria-hidden="true" />
         </button>
       </div>
 
       {showFilters && (
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
           <select
-            className="border border-cu-border bg-cu-bg text-cu-text-primary rounded px-3 py-2.5 min-h-[44px] text-sm"
+            className="border border-cu-border rounded-lg bg-cu-bg text-cu-text-primary px-3 py-2.5 min-h-[44px] text-sm shadow-sm"
             value={roleFilter || ''}
             onChange={(e) => onRoleFilterChange(e.target.value || null)}
           >
@@ -53,7 +58,7 @@ export function MembersFilters({
           </select>
 
           <select
-            className="border border-cu-border bg-cu-bg text-cu-text-primary rounded px-3 py-2.5 min-h-[44px] text-sm"
+            className="border border-cu-border rounded-lg bg-cu-bg text-cu-text-primary px-3 py-2.5 min-h-[44px] text-sm shadow-sm"
             value={statusFilter || ''}
             onChange={(e) => onStatusFilterChange(e.target.value || null)}
           >
