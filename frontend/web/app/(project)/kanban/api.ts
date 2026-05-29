@@ -25,7 +25,7 @@ export async function fetchTasksByProject(
   filters?: { milestoneId?: number | null; archived?: boolean }
 ): Promise<Task[]> {
   try {
-    const params: Record<string, any> = {
+    const params: Record<string, unknown> = {
       page: 0,
       size: 500,
     };
@@ -53,7 +53,7 @@ export async function fetchAllTasksByProject(
   filters?: { milestoneId?: number | null; archived?: boolean }
 ): Promise<Task[]> {
   try {
-    const params: Record<string, any> = {};
+    const params: Record<string, unknown> = {};
     if (filters?.milestoneId != null) {
       params.milestoneId = filters.milestoneId;
     }

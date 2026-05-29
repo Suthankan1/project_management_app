@@ -25,6 +25,13 @@ interface MultiAssignee {
   photoUrl: string | null;
 }
 
+interface ProjectCustomField {
+  id: number;
+  name: string;
+  fieldType: string;
+  options?: string[];
+}
+
 interface TaskSidebarProps {
   taskId?: number;
   projectId?: number;
@@ -87,7 +94,7 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
   const [labelMenuOpen, setLabelMenuOpen] = React.useState(false);
   const [selectedLabelIds, setSelectedLabelIds] = React.useState<number[]>(labelIds);
   const labelMenuRef = React.useRef<HTMLDivElement>(null);
-  const [projectCustomFields, setProjectCustomFields] = React.useState<any[]>([]);
+  const [projectCustomFields, setProjectCustomFields] = React.useState<ProjectCustomField[]>([]);
 
   React.useEffect(() => {
     if (projectId == null) return;
