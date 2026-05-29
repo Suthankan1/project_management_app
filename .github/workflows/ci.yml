@@ -18,8 +18,33 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+    - name: Check path changes
+      uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          backend:
+            - 'backend/**'
+            - '.github/workflows/ci.yml'
+          frontend:
+            - 'frontend/**'
+            - '.github/workflows/ci.yml'
+
   backend-build:
     name: Build Backend
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,6 +69,8 @@ jobs:
       
   frontend-build:
     name: Build Frontend
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     env:
       CI: true
@@ -55,15 +82,27 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
       
-    - name: Use Node.js 20
+    - name: Use Node.js 22
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
         cache: 'npm'
         cache-dependency-path: './frontend/web/package-lock.json'
+
+    - name: Cache Next.js Build
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/frontend/web/.next/cache
+        key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+        restore-keys: |
+          ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
         
     - name: Install Dependencies
       run: npm ci
+
+    - name: Audit Dependencies
+      run: npm audit --audit-level=high
+      continue-on-error: true
 
     - name: Lint Next.js App
       run: npm run lint
