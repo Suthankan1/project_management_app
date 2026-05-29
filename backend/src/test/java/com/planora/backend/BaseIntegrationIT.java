@@ -1,30 +1,23 @@
-package com.planora.backend.configuration;
+package com.planora.backend;
 
-import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@SpringBootTest(properties = {
-    "spring.jpa.hibernate.ddl-auto=validate",
-    "spring.flyway.enabled=true",
-    "app.flyway.repair-on-startup=false"
-})
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@Testcontainers
-class DatabaseMigrationSmokeTest {
+public abstract class BaseIntegrationIT {
 
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
+    protected static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("planora_test")
-            .withUsername("test")
-            .withPassword("test");
+            .withUsername("testuser")
+            .withPassword("testpass");
+
+    static {
+        postgres.start();
+    }
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -32,10 +25,7 @@ class DatabaseMigrationSmokeTest {
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-    }
-
-    @Test
-    void migrateAndValidateSchema() {
-        assertThat(postgres.isRunning()).isTrue();
+        registry.add("spring.flyway.enabled", () -> "true");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
     }
 }

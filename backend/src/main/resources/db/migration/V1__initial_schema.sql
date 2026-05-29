@@ -94,6 +94,19 @@ CREATE TABLE IF NOT EXISTS springcolumns (
     position        INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS kanban (
+    id         BIGSERIAL PRIMARY KEY,
+    project_id BIGINT REFERENCES projects(id) ON DELETE CASCADE,
+    name       VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS kanban_column (
+    id        BIGSERIAL PRIMARY KEY,
+    kanban_id BIGINT REFERENCES kanban(id) ON DELETE CASCADE,
+    name      VARCHAR(255),
+    position  INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS tasks (
     id                  BIGSERIAL PRIMARY KEY,
     project_id          BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -111,7 +124,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMP NOT NULL DEFAULT NOW(),
     parent_id           BIGINT REFERENCES tasks(id) ON DELETE CASCADE,
-    sprint_id           BIGINT REFERENCES sprints(id) ON DELETE SET NULL
+    sprint_id           BIGINT REFERENCES sprints(id) ON DELETE SET NULL,
+    kanban_column_id    BIGINT REFERENCES kanban_column(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS labels (

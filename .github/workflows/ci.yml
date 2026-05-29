@@ -64,8 +64,11 @@ jobs:
     - name: Ensure mvnw is executable
       run: chmod +x mvnw
         
-    - name: Verify Backend (Build + Tests)
-      run: ./mvnw -B verify --file pom.xml
+    - name: Run Unit Tests
+      run: ./mvnw -B test --file pom.xml
+        
+    - name: Run Integration Tests
+      run: ./mvnw -B failsafe:integration-test failsafe:verify --file pom.xml
       
   frontend-build:
     name: Build Frontend
