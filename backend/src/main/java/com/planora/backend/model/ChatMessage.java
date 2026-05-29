@@ -37,6 +37,7 @@ public class ChatMessage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Enumerated(EnumType.STRING)
     private MessageType type;
 
     @Column(columnDefinition = "text")
@@ -48,6 +49,7 @@ public class ChatMessage {
 
     private Long roomId;
 
+    @Enumerated(EnumType.STRING)
     private ChatType chatType;
 
     // parentMessageId links replies to a thread root while keeping a single message table.
