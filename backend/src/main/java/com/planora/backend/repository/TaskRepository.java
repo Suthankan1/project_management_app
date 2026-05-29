@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,6 +17,8 @@ import com.planora.backend.model.Task;
 
 @Repository
 public interface TaskRepository extends JpaRepository<Task, Long> {
+    Page<Task> findByProjectIdAndArchivedFalse(Long projectId, Pageable pageable);
+
     boolean existsByProjectIdAndGithubIssueNumberAndGithubRepoFullNameIgnoreCase(
             Long projectId, Long githubIssueNumber, String githubRepoFullName);
 

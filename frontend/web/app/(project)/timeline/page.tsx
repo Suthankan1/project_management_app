@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TimelineView from '../kanban/components/TimelineView';
 import { Task } from '../kanban/types';
-import { fetchTasksByProject } from '../kanban/api';
+import { fetchAllTasksByProject } from '../kanban/api';
 import { AlertCircle, CalendarRange, Diamond, ListChecks } from 'lucide-react';
 import TaskCardModal from '@/app/taskcard/TaskCardModal';
 import { useTaskWebSocket } from '@/hooks/useTaskWebSocket';
@@ -66,7 +66,7 @@ export default function TimelinePage() {
       if (isNaN(projectIdNum)) {
         throw new Error('Invalid project ID');
       }
-      const fetchedTasks = await fetchTasksByProject(projectIdNum);
+      const fetchedTasks = await fetchAllTasksByProject(projectIdNum);
       setTasks(fetchedTasks);
     } catch (err) {
       const errorMsg =

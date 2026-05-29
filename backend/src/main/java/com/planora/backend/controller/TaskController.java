@@ -24,6 +24,10 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 
 import java.time.LocalDate;
@@ -237,7 +241,22 @@ public class TaskController {
      * Supports multiple optional filters via query parameters.
      */
     @GetMapping("/project/{projectId}")
-    public ResponseEntity<List<TaskResponseDTO>> getTasksByProject(
+    public ResponseEntity<Page<TaskResponseDTO>> getTasksByProject(
+            @PathVariable Long projectId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        Pageable pageable = PageRequest.of(page, size,
+                sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() :
+                        Sort.by(sortBy).descending());
+        return ResponseEntity.ok(service.getTasksByProject(projectId,
+                currentUser.getUserId(), pageable));
+    }
+
+    @GetMapping("/project/{projectId}/all")
+    public ResponseEntity<List<TaskResponseDTO>> getAllTasksByProject(
             @PathVariable Long projectId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long assigneeId,

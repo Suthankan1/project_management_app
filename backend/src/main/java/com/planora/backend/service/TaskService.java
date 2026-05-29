@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -510,6 +511,26 @@ public class TaskService {
     }
 
     // ── 5. GET TASKS BY PROJECT (Highly Optimized Fetch) ────────────────────────
+    @Transactional(readOnly = true)
+    public Page<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId, Pageable pageable) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+        requireMinimumRole(project.getTeam().getId(), currentUserId, null);
+
+        Page<Task> taskPage = taskRepository.findByProjectIdAndArchivedFalse(projectId, pageable);
+        if (taskPage.isEmpty()) {
+            return taskPage.map(t -> mapToDTO(t, java.util.Map.of()));
+        }
+
+        List<Long> ids = taskPage.getContent().stream().map(Task::getId).toList();
+        List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
+        java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(ids);
+        java.util.Map<Long, Task> enrichedMap = enriched.stream()
+                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t));
+
+        return taskPage.map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap));
+    }
+
     @Transactional(readOnly = true)
     public List<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId,
                                                    String status, Long assigneeId,
