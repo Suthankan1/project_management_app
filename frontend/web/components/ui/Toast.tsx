@@ -34,6 +34,21 @@ export function toast(message: string, type: ToastType = 'info', duration?: numb
   addToastFn?.({ message, type, duration });
 }
 
+export namespace toast {
+  export const info = (message: string, duration?: number) => {
+    toast(message, 'info', duration);
+  };
+  export const success = (message: string, duration?: number) => {
+    toast(message, 'success', duration);
+  };
+  export const error = (message: string, duration?: number) => {
+    toast(message, 'error', duration);
+  };
+  export const warning = (message: string, duration?: number) => {
+    toast(message, 'warning', duration);
+  };
+}
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 

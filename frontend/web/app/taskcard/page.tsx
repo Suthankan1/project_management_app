@@ -61,7 +61,7 @@ function TaskPageContent() {
     try {
       const response = await api.get(`/api/tasks/${taskId}`);
       setTaskData(response.data);
-      localStorage.setItem(cacheKey, JSON.stringify(response.data));
+      localStorage.setItem(cacheKey, JSON.stringify({ ...response.data, timestamp: Date.now() }));
       setError(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
@@ -119,7 +119,7 @@ function TaskPageContent() {
       githubRepoFullName: taskData.githubRepoFullName ?? projectGitHubRepo?.repoFullName ?? null,
     };
     setTaskData(nextTaskData);
-    localStorage.setItem(`planora:task:${taskId}`, JSON.stringify(nextTaskData));
+    localStorage.setItem(`planora:task:${taskId}`, JSON.stringify({ ...nextTaskData, timestamp: Date.now() }));
   };
 
   const handleClose = () => {
