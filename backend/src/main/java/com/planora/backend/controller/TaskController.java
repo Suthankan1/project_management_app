@@ -416,14 +416,14 @@ public class TaskController {
 
     // ── ASSIGNMENT ──────────────────────────────────────────────────────────────
 
-    @PatchMapping("{taskID}/assign/{userId}")
+    @PatchMapping("/{taskId}/assign/{userId}")
     public ResponseEntity<Void> assignUser(
-            @PathVariable Long taskID,
+            @PathVariable Long taskId,
             @PathVariable Long userId,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
-        service.assignUser(taskID,userId,currentUserId);
+        service.assignUser(taskId, userId, currentUserId);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 

@@ -825,8 +825,8 @@ public class TaskService {
     // ── 12. ASSIGNEE MANAGEMENT ─────────────────────────────────────────────────
 
     @Transactional
-    public void assignUser(Long taskID, Long userId, Long currentUserId) {
-        Task task = findTaskWithProjectTeam(taskID);
+    public void assignUser(Long taskId, Long userId, Long currentUserId) {
+        Task task = findTaskWithProjectTeam(taskId);
 
         //permission check
         requireMinimumRole(task.getProject().getTeam().getId(), currentUserId, TeamRole.MEMBER);

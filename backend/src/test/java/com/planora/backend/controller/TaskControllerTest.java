@@ -301,4 +301,22 @@ class TaskControllerTest {
                 eq(Map.of("type", "TASK_UPDATED", "task", sampleTask))
         );
     }
+
+    @Test
+    @WithMockUserPrincipal
+    void assignUser_returns200() throws Exception {
+        doNothing().when(service).assignUser(anyLong(), anyLong(), anyLong());
+
+        mockMvc.perform(patch("/api/tasks/1/assign/5").with(csrf()))
+                .andExpect(status().isOk());
+
+        verify(service).assignUser(eq(1L), eq(5L), anyLong());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void assignUser_negativeTest_withoutSlash_returns404() throws Exception {
+        mockMvc.perform(patch("/api/tasks1/assign/5").with(csrf()))
+                .andExpect(status().isNotFound());
+    }
 }
