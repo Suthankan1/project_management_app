@@ -339,8 +339,13 @@ public class NotificationService {
     }
 
     private void sendExpoPushNotifications(User recipient, Notification notification, Long projectId, String eventType) {
+        if (userPushTokenRepository == null) {
+            // In some unit-tests the repository is not provided; treat as no push tokens.
+            return;
+        }
+
         List<UserPushToken> pushTokens = userPushTokenRepository.findByUserUserId(recipient.getUserId());
-        if (pushTokens.isEmpty()) {
+        if (pushTokens == null || pushTokens.isEmpty()) {
             return;
         }
 
