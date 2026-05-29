@@ -450,7 +450,7 @@ public class TaskService {
 
     // ── 4. DELETE TASK ──────────────────────────────────────────────────────────
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long deleteTask(Long taskId, Long currentUserId) {
         Task task = taskRepository.findByIdWithDetails(taskId)
                 .orElseThrow(()-> new ResourceNotFoundException("Task not found"));
