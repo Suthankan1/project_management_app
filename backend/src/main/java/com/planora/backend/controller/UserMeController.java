@@ -5,11 +5,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.planora.backend.dto.PushTokenRequestDTO;
 import com.planora.backend.dto.UserResponseDTO;
 import com.planora.backend.service.UserService;
+import com.planora.backend.service.UserPushTokenService;
 
 @RestController
 @RequestMapping("/api/user")
@@ -19,6 +23,9 @@ public class UserMeController {
 
     @Autowired
     private UserService service;
+
+    @Autowired
+    private UserPushTokenService pushTokenService;
 
     /* Frontend calls this endpoint immediately after login or upon hard page refresh.
         It allows fronted to blindly send its auth token and "hydrate" the app state with the current
@@ -38,6 +45,22 @@ public class UserMeController {
             return new ResponseEntity<>(dto, HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>("Failed to fetch current user: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PostMapping("/me/push-token")
+    public ResponseEntity<?> registerPushToken(Authentication authentication, @RequestBody PushTokenRequestDTO request) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return new ResponseEntity<>("User is not authenticated", HttpStatus.UNAUTHORIZED);
+        }
+
+        try {
+            pushTokenService.registerPushToken(authentication.getName(), request.getPushToken(), request.getPlatform());
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Failed to save push token: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }
