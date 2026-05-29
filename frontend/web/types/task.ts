@@ -61,6 +61,8 @@ export interface Task {
   createdAt?: string;
   completedAt?: string;
   updatedAt?: string;
+  archived?: boolean;
+  archivedAt?: string;
   assignee?: Assignee;
   assigneeId?: number;
   assigneeName?: string;
@@ -104,6 +106,8 @@ export interface TaskData {
   priority: string;
   storyPoint: number;
   reporterName: string;
+  archived?: boolean;
+  archivedAt?: string;
   reporterId?: number;
   assigneeName: string;
   assigneeId?: number;
@@ -137,6 +141,7 @@ export interface TaskItem {
   dueDate?: string;
   priority?: string;
   labels?: Label[];
+  archived?: boolean;
 }
 
 export interface CustomField {

@@ -29,6 +29,7 @@ interface TaskData {
   dependencies: Array<{ id: number; title: string; relation: string }>;
   githubIssueNumber?: number | null;
   githubRepoFullName?: string | null;
+  archived?: boolean;
 }
 
 // Wrapper component that uses searchParams
@@ -61,7 +62,7 @@ function TaskPageContent() {
     try {
       const response = await api.get(`/api/tasks/${taskId}`);
       setTaskData(response.data);
-      localStorage.setItem(cacheKey, JSON.stringify(response.data));
+      localStorage.setItem(cacheKey, JSON.stringify({ ...response.data, timestamp: Date.now() }));
       setError(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
@@ -119,7 +120,7 @@ function TaskPageContent() {
       githubRepoFullName: taskData.githubRepoFullName ?? projectGitHubRepo?.repoFullName ?? null,
     };
     setTaskData(nextTaskData);
-    localStorage.setItem(`planora:task:${taskId}`, JSON.stringify(nextTaskData));
+    localStorage.setItem(`planora:task:${taskId}`, JSON.stringify({ ...nextTaskData, timestamp: Date.now() }));
   };
 
   const handleClose = () => {
@@ -169,6 +170,8 @@ function TaskPageContent() {
         <TaskHeader 
           project={taskData.projectName} 
           taskId={`TASK-${taskData.id}`} 
+          numericTaskId={taskData.id}
+          archived={taskData.archived}
           onClose={handleClose} 
         />
 

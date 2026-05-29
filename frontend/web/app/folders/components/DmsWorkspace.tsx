@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import { Loader2, Search, X } from 'lucide-react';
 import DmsHeader from '@/app/folders/components/DmsHeader';
 import DmsSidebar from '@/app/folders/components/DmsSidebar';
@@ -18,7 +19,7 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
         folders, selectedFolderId, setSelectedFolderId,
         newFolderName, setNewFolderName, folderCount,
         filteredDocuments, favoriteIds,
-        searchQuery, setSearchQuery, isDragOver, setIsDragOver,
+        searchQuery, setSearchQuery,
         selectedVersionsDocId, setSelectedVersionsDocId,
         selectedVersionsDoc, selectedInfoDoc, setSelectedInfoDoc,
         renameDoc, renameName, setRenameName,
@@ -28,6 +29,9 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
         onToggleFavorite, onView, onDownload, onRename, onConfirmRename, onCancelRename,
         onSoftDelete, onToggleVersions, onOpenInfo, onRestore, onPermanentDelete,
     } = useDmsWorkspace(mode);
+
+    const dragCounter = useRef(0);
+    const [isDragOver, setIsDragOver] = useState(false);
 
     if (loading) {
         return (
@@ -52,9 +56,22 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
         <>
             <div
                 className="w-full max-w-[1400px] mx-auto min-h-[calc(100vh-160px)] rounded-xl border border-cu-border bg-cu-bg-secondary shadow-sm overflow-hidden relative"
-                onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
-                onDragLeave={() => setIsDragOver(false)}
-                onDrop={onDrop}
+                onDragEnter={(e) => {
+                    e.preventDefault();
+                    dragCounter.current++;
+                    if (dragCounter.current === 1) setIsDragOver(true);
+                }}
+                onDragLeave={() => {
+                    dragCounter.current--;
+                    if (dragCounter.current === 0) setIsDragOver(false);
+                }}
+                onDragOver={(e) => { e.preventDefault(); }} // keep for drop permission
+                onDrop={(e) => {
+                    e.preventDefault();
+                    dragCounter.current = 0;
+                    setIsDragOver(false);
+                    onDrop(e);
+                }}
             >
                 {/* pointer-events-none on the overlay so underlying drag events still fire on the container */}
                 {isDragOver && (

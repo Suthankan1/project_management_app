@@ -9,6 +9,7 @@ import { STATUS_LABELS, type TaskStatus } from './TaskRowConstants';
 import type { TaskRowProps } from '../TaskRow';
 import { useTaskRowState } from './useTaskRowState';
 import { formatDate } from './TaskRowConstants';
+import { ArchiveBadge } from '@/components/ui';
 
 export default function MobileTaskRow(props: TaskRowProps) {
   const {
@@ -45,7 +46,7 @@ export default function MobileTaskRow(props: TaskRowProps) {
 
   return (
     <div
-      className={`group relative flex flex-col rounded-2xl border-l-[6px] border border-cu-border shadow-cu-sm hover:shadow-cu-md transition-all duration-200 mb-3 select-none overflow-hidden ${rowBg}`}
+      className={`group relative flex flex-col rounded-2xl border-l-[6px] border border-cu-border shadow-cu-sm hover:shadow-cu-md transition-all duration-200 mb-3 select-none overflow-hidden ${rowBg} ${task.archived ? 'opacity-60' : ''}`}
       style={{ borderLeftColor: statusBorderColor }}
       onContextMenu={(e) => e.preventDefault()}
     >
@@ -90,12 +91,13 @@ export default function MobileTaskRow(props: TaskRowProps) {
               onTouchStart={onTouchStartInternal}
               onTouchEnd={onTouchEndInternal}
               onTouchMove={onTouchMoveInternal}
-              className={`text-[15px] font-bold leading-tight truncate cursor-text select-none ${
+              className={`text-[15px] font-bold leading-tight truncate cursor-text select-none flex items-center gap-2 ${
                 dueClass === 'five_days' ? 'text-amber-800 dark:text-amber-300' :
                 task.status?.toUpperCase() === 'DONE' ? 'line-through text-cu-text-muted' : 'text-cu-text-primary'
               }`}
             >
-              {task.title}
+              <span className="truncate">{task.title}</span>
+              {task.archived && <ArchiveBadge />}
             </h3>
           )}
           <div className="flex flex-wrap gap-1 mt-1.5">

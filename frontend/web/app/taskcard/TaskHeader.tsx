@@ -1,6 +1,6 @@
 "use client";
 import React, { useRef, useState } from 'react';
-import { Layout, Link2, MoreHorizontal, X, Check, FileText } from 'lucide-react';
+import { Layout, Link2, MoreHorizontal, X, Check, FileText, Archive } from 'lucide-react';
 import api from '@/lib/axios';
 import { toast } from '@/components/ui';
 
@@ -8,16 +8,33 @@ interface TaskHeaderProps {
   project: string;
   taskId: string;
   numericTaskId?: number;
-  onClose?: () => void;
+  archived?: boolean;
+  onClose?: (wasModified: boolean) => void;
 }
 
-const TaskHeader: React.FC<TaskHeaderProps> = ({ project, taskId, numericTaskId, onClose }) => {
+const TaskHeader: React.FC<TaskHeaderProps> = ({ project, taskId, numericTaskId, archived = false, onClose }) => {
   const [copied, setCopied] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateName, setTemplateName] = useState('');
   const [showTemplateInput, setShowTemplateInput] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleToggleArchive = async () => {
+    if (!numericTaskId) return;
+    setArchiving(true);
+    try {
+      const nextState = !archived;
+      await api.patch(`/api/tasks/${numericTaskId}`, { archived: nextState });
+      toast(nextState ? 'Task archived' : 'Task unarchived', 'success');
+      onClose?.(true);
+    } catch {
+      toast('Failed to update archive status', 'error');
+    } finally {
+      setArchiving(false);
+    }
+  };
 
   const handleCopyLink = () => {
     const url = window.location.href;
@@ -95,6 +112,15 @@ const TaskHeader: React.FC<TaskHeaderProps> = ({ project, taskId, numericTaskId,
           {copied ? <Check size={15} className="text-green-500" /> : <Link2 size={15} />}
           <span className="hidden sm:inline">{copied ? 'Copied!' : 'Copy link'}</span>
         </button>
+        <button
+          onClick={handleToggleArchive}
+          disabled={archiving}
+          title={archived ? "Unarchive Task" : "Archive Task"}
+          className="p-2 hover:bg-cu-hover rounded-lg flex items-center gap-1.5 text-cu-text-secondary hover:text-cu-primary text-xs transition-colors"
+        >
+          <Archive size={15} />
+          <span className="hidden sm:inline">{archived ? 'Unarchive Task' : 'Archive Task'}</span>
+        </button>
         <div className="relative">
           <button
             onClick={() => setDropdownOpen((v) => !v)}
@@ -120,7 +146,7 @@ const TaskHeader: React.FC<TaskHeaderProps> = ({ project, taskId, numericTaskId,
           )}
         </div>
         <button
-          onClick={onClose}
+          onClick={() => onClose?.(false)}
           className="p-2 hover:bg-cu-danger/10 rounded-lg text-cu-text-secondary hover:text-cu-danger transition-colors"
           title="Close"
         >

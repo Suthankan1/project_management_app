@@ -34,6 +34,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -236,7 +240,7 @@ class TaskServiceTest {
         Task taskTwo = buildTask(72L);
 
         when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
-        when(taskRepository.findByProjectIdWithScalars(10L)).thenReturn(List.of(taskOne, taskTwo));
+        when(taskRepository.findByProjectIdWithScalarsAndArchived(10L, false)).thenReturn(List.of(taskOne, taskTwo));
         when(taskRepository.findByIdInWithCollections(List.of(71L, 72L))).thenReturn(List.of(taskOne, taskTwo));
         when(taskRepository.findDependencyRowsByTaskIds(List.of(71L, 72L)))
                 .thenReturn(java.util.Collections.singletonList(new Object[] {71L, 99L, "Foundation task"}));
@@ -247,6 +251,30 @@ class TaskServiceTest {
         assertNotNull(result.getFirst().getDependencies());
         assertEquals(34L, result.getFirst().getGithubIssueNumber());
         assertEquals("planora/app", result.getFirst().getGithubRepoFullName());
+        verify(taskRepository, times(1)).findDependencyRowsByTaskIds(List.of(71L, 72L));
+    }
+
+    @Test
+    void getTasksByProject_paginated_batchesDependencyLookup() {
+        Task taskOne = buildTask(71L);
+        taskOne.setGithubIssueNumber(34L);
+        taskOne.setGithubRepoFullName("planora/app");
+        Task taskTwo = buildTask(72L);
+
+        PageRequest pageable = PageRequest.of(0, 10);
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(taskRepository.findByProjectIdAndArchivedFalse(10L, pageable))
+                .thenReturn(new PageImpl<>(List.of(taskOne, taskTwo), pageable, 2));
+        when(taskRepository.findByIdInWithCollections(List.of(71L, 72L))).thenReturn(List.of(taskOne, taskTwo));
+        when(taskRepository.findDependencyRowsByTaskIds(List.of(71L, 72L)))
+                .thenReturn(java.util.Collections.singletonList(new Object[] {71L, 99L, "Foundation task"}));
+
+        Page<TaskResponseDTO> result = taskService.getTasksByProject(10L, 500L, pageable);
+
+        assertEquals(2, result.getContent().size());
+        assertNotNull(result.getContent().getFirst().getDependencies());
+        assertEquals(34L, result.getContent().getFirst().getGithubIssueNumber());
+        assertEquals("planora/app", result.getContent().getFirst().getGithubRepoFullName());
         verify(taskRepository, times(1)).findDependencyRowsByTaskIds(List.of(71L, 72L));
     }
 

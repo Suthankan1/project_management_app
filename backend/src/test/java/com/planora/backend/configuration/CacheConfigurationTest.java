@@ -24,5 +24,6 @@ class CacheConfigurationTest {
         assertNotNull(cacheManager.getCache("team-member"));
         assertNotNull(cacheManager.getCache("github-issues"));
         assertNotNull(cacheManager.getCache("github-issue-comments"));
+        assertNotNull(cacheManager.getCache("userPhotoUrls"));
     }
 }
