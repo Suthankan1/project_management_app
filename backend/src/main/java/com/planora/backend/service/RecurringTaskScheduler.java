@@ -13,17 +13,19 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
+
 /**
- * Spawns new task instances for recurring tasks whose nextOccurrence is today or past.
+ * Spawns new task instances for recurring tasks whose next occurrence is today or past.
  * Runs once every day at midnight UTC.
  */
 @Service
+@RequiredArgsConstructor
 public class RecurringTaskScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(RecurringTaskScheduler.class);
 
-    @Autowired
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
     @Scheduled(cron = "0 0 0 * * *")   // every day at midnight UTC
     @Transactional

@@ -1,16 +1,13 @@
 package com.planora.backend.dto;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.*;
 import lombok.Data;
 
 @Data
 public class DocumentUploadInitRequestDTO {
 
     @NotBlank(message = "fileName is required")
+    @Size(max = 255, message = "File name must be 255 characters or fewer")
     private String fileName;
 
     @NotBlank(message = "contentType is required")
@@ -25,5 +22,6 @@ public class DocumentUploadInitRequestDTO {
     @Max(value = 104857600, message = "Maximum file size is 100MB")
     private Long fileSize;
 
+    @Positive(message = "Folder ID must be positive")
     private Long folderId;
 }

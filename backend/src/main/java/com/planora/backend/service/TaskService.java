@@ -53,60 +53,47 @@ import com.planora.backend.repository.TaskAccessRepository;
 import com.planora.backend.repository.TaskRepository;
 import com.planora.backend.repository.UserRepository;
 
+import lombok.RequiredArgsConstructor;
+
 /*
  * Handles the complete lifecycle of tasks, including Agile metrics (sprints, story points),
  * complex relationships (dependencies, subtasks), and strict Role-Based Access Control.
  */
 @Service
+@RequiredArgsConstructor
 public class TaskService {
 
-    @Autowired
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
-    @Autowired
-    private KanbanColumnRepository kanbanColumnRepository;
+    private final KanbanColumnRepository kanbanColumnRepository;
 
-    @Autowired
-    private KanbanRepository kanbanRepository;
+    private final KanbanRepository kanbanRepository;
 
-    @Autowired
-    private ProjectRepository projectRepository;
+    private final ProjectRepository projectRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private LabelRepository labelRepository;
+    private final LabelRepository labelRepository;
 
-    @Autowired
-    private CommentRepository commentRepository;
+    private final CommentRepository commentRepository;
 
-    @Autowired
-    private SprintRepository sprintRepository;
+    private final SprintRepository sprintRepository;
 
-    @Autowired
-    private NotificationService notificationService;
+    private final NotificationService notificationService;
 
-    @Autowired
-    private TaskAccessRepository taskAccessRepository;
+    private final TaskAccessRepository taskAccessRepository;
 
-    @Autowired
-    private TaskActivityService taskActivityService;
+    private final TaskActivityService taskActivityService;
 
-    @Autowired
-    private MilestoneRepository milestoneRepository;
+    private final MilestoneRepository milestoneRepository;
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
 
-    @Autowired
-    private TeamMembershipLookupService teamMembershipLookupService;
+    private final TeamMembershipLookupService teamMembershipLookupService;
 
-    @Autowired
-    private TaskGithubService taskGithubService;
+    private final TaskGithubService taskGithubService;
 
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
 
     // ── 1. CREATE TASK ──────────────────────────────────────────────────────────
 
@@ -825,8 +812,8 @@ public class TaskService {
     // ── 12. ASSIGNEE MANAGEMENT ─────────────────────────────────────────────────
 
     @Transactional
-    public void assignUser(Long taskID, Long userId, Long currentUserId) {
-        Task task = findTaskWithProjectTeam(taskID);
+    public void assignUser(Long taskId, Long userId, Long currentUserId) {
+        Task task = findTaskWithProjectTeam(taskId);
 
         //permission check
         requireMinimumRole(task.getProject().getTeam().getId(), currentUserId, TeamRole.MEMBER);

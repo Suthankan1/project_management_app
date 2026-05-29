@@ -371,7 +371,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("UPDATE Task t SET t.reporter = null WHERE t.reporter.id = :memberId")
     void nullifyReporterForMember(@Param("memberId") Long memberId);
 
-    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM task_assignees WHERE member_id = :memberId", nativeQuery = true)
     void removeFromTaskAssignees(@Param("memberId") Long memberId);
 

@@ -11,14 +11,16 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+import lombok.RequiredArgsConstructor;
+
 /*REST Controller for managing Kanban board columns.
  Handles column lifecycle, positioning, and configuration settings.*/
 @RestController
 @RequestMapping("/api/kanban-columns")
+@RequiredArgsConstructor
 public class KanbanColumnController {
 
-    @Autowired
-    private KanbanColumnService kanbanColumnService;
+    private final KanbanColumnService kanbanColumnService;
 
     //create column
     @PostMapping

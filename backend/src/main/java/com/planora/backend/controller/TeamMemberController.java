@@ -25,9 +25,7 @@ import java.util.stream.Collectors;
 public class TeamMemberController {
 
         private final TeamMemberService teamMemberService;
-
-        @Autowired
-        private TaskRepository taskRepository;
+        private final TaskRepository taskRepository;
 
         // ---------------- ADD MEMBER TO TEAM (OWNER ONLY) ----------------
         @PostMapping("/{teamId}/members/{userId}")

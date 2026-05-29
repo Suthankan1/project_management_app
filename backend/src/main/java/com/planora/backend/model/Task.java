@@ -74,8 +74,9 @@ public class Task {
 
     private String status;
 
-    @Column(nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @org.hibernate.annotations.CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
     private LocalDate startDate;
     private LocalDate dueDate;
@@ -83,6 +84,9 @@ public class Task {
     private Integer backlogPosition;
     @Column(name = "sprint_position")
     private Integer sprintPosition;
+
+    @org.hibernate.annotations.UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
     private LocalDateTime completedAt;
 
@@ -189,9 +193,7 @@ public class Task {
         return Objects.hash(id);
     }
 
-    @PreUpdate
-    public void setLastUpdate() {
-        this.updatedAt = LocalDateTime.now(); }
+
 
 
 

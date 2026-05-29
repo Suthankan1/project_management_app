@@ -35,25 +35,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/tasks")
+@RequiredArgsConstructor
 public class TaskController {
 
-    @Autowired
-    TaskService service;
+    private final TaskService service;
 
-    @Autowired
-    TaskActivityService activityService;
+    private final TaskActivityService activityService;
 
-    @Autowired
-    TaskTemplateService templateService;
+    private final TaskTemplateService templateService;
 
-    @Autowired
-    TaskGithubService taskGithubService;
+    private final TaskGithubService taskGithubService;
 
     // Spring's WebSocket messaging template used for real-time push notifications.
-    @Autowired
-    SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
 
     //Creates a new task and broadcasts the creation to all connected clients.
     @PostMapping
@@ -195,7 +193,7 @@ public class TaskController {
     @PutMapping("/{taskId}")
     public ResponseEntity<TaskResponseDTO> updateTask(
             @PathVariable Long taskId,
-            @Validated @RequestBody TaskRequestDTO request,
+            @Valid @RequestBody TaskRequestDTO request,
             @AuthenticationPrincipal UserPrincipal currentUser){
         Long currentUserId = currentUser.getUserId();
         TaskResponseDTO task = service.updateTask(taskId, request, currentUserId);
@@ -210,7 +208,7 @@ public class TaskController {
     @PatchMapping("/{taskId}")
     public ResponseEntity<TaskResponseDTO> patchTask(
             @PathVariable Long taskId,
-            @RequestBody TaskRequestDTO request,
+            @Valid @RequestBody TaskRequestDTO request,
             @AuthenticationPrincipal UserPrincipal currentUser){
         Long currentUserId = currentUser.getUserId();
         TaskResponseDTO task = service.updateTask(taskId, request, currentUserId);
@@ -416,14 +414,14 @@ public class TaskController {
 
     // ── ASSIGNMENT ──────────────────────────────────────────────────────────────
 
-    @PatchMapping("{taskID}/assign/{userId}")
+    @PatchMapping("/{taskId}/assign/{userId}")
     public ResponseEntity<Void> assignUser(
-            @PathVariable Long taskID,
+            @PathVariable Long taskId,
             @PathVariable Long userId,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
-        service.assignUser(taskID,userId,currentUserId);
+        service.assignUser(taskId, userId, currentUserId);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
