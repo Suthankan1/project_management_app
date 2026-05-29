@@ -30,7 +30,7 @@ export function BaseModal({ isOpen, onClose, title, icon, children, onSubmit, su
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
           />
           <div className="fixed inset-0 flex items-center justify-center p-4 z-50 pointer-events-none">
             <motion.div
@@ -38,15 +38,15 @@ export function BaseModal({ isOpen, onClose, title, icon, children, onSubmit, su
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 10 }}
               transition={{ type: 'spring', duration: 0.3 }}
-              className="bg-white rounded-2xl shadow-xl w-full max-w-md pointer-events-auto overflow-hidden flex flex-col"
+              className="bg-cu-bg border border-cu-border rounded-2xl shadow-cu-lg w-full max-w-md pointer-events-auto overflow-hidden flex flex-col"
             >
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <h3 className="text-[16px] font-bold text-gray-900 flex items-center gap-2">
+              <div className="px-5 py-4 border-b border-cu-border flex items-center justify-between">
+                <h3 className="text-[16px] font-bold text-cu-text-primary flex items-center gap-2">
                   {icon} {title}
                 </h3>
                 <button
                   onClick={onClose}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-cu-text-muted hover:text-cu-text-primary hover:bg-cu-bg-tertiary transition-colors"
                 >
                   <X size={18} strokeWidth={2.5} />
                 </button>
@@ -54,18 +54,18 @@ export function BaseModal({ isOpen, onClose, title, icon, children, onSubmit, su
               <div className="p-5 flex-1 overflow-y-auto">
                 {children}
               </div>
-              <div className="px-5 py-4 border-t border-gray-50 bg-gray-50 flex items-center justify-end gap-2">
+              <div className="px-5 py-4 border-t border-cu-border bg-cu-bg-secondary flex items-center justify-end gap-2">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 rounded-xl text-[13.5px] font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
+                  className="px-4 py-2 rounded-xl text-[13.5px] font-semibold text-cu-text-secondary hover:bg-cu-bg-tertiary transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={onSubmit}
                   disabled={submitDisabled}
-                  className={`px-4 py-2 rounded-xl text-[13.5px] font-semibold text-white transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed
-                    ${submitColor === 'red' ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'}`}
+                  className={`px-4 py-2 rounded-xl text-[13.5px] font-semibold text-white transition-colors shadow-cu-sm disabled:opacity-50 disabled:cursor-not-allowed
+                    ${submitColor === 'red' ? 'bg-red-500 hover:bg-red-600' : 'bg-cu-primary hover:bg-cu-primary-dark'}`}
                 >
                   {submitLabel}
                 </button>
@@ -78,7 +78,7 @@ export function BaseModal({ isOpen, onClose, title, icon, children, onSubmit, su
   );
 }
 
-// ── CREATE CHANNEL MODAL ──
+// Create channel modal
 export function CreateChannelModal({ isOpen, onClose, users, onCreate }: {
   isOpen: boolean;
   onClose: () => void;
@@ -126,7 +126,7 @@ export function CreateChannelModal({ isOpen, onClose, users, onCreate }: {
       isOpen={isOpen}
       onClose={onClose}
       title="Create Channel"
-      icon={<Hash size={18} className="text-blue-500" strokeWidth={2.5} />}
+      icon={<Hash size={18} className="text-cu-primary" strokeWidth={2.5} />}
       onSubmit={handleSubmit}
       submitLabel="Create"
       submitDisabled={!name.trim() || selectedUsers.size === 0}
@@ -134,30 +134,30 @@ export function CreateChannelModal({ isOpen, onClose, users, onCreate }: {
       <div className="space-y-4">
         {/* Channel name */}
         <div>
-          <label className="block text-[12px] font-bold text-gray-700 uppercase tracking-wide mb-1.5">Channel Name</label>
+          <label className="block text-[12px] font-bold text-cu-text-secondary uppercase tracking-wide mb-1.5">Channel Name</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. project-updates"
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-[14px] text-gray-900 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+            className="w-full bg-cu-bg-secondary border border-cu-border rounded-xl px-3 py-2.5 text-[14px] text-cu-text-primary placeholder:text-cu-text-muted focus:bg-cu-bg-tertiary focus:border-cu-primary/50 focus:ring-2 focus:ring-cu-primary/10 outline-none transition-all"
             autoFocus
           />
         </div>
 
         {/* Members section */}
         <div>
-          <label className="block text-[12px] font-bold text-gray-700 uppercase tracking-wide mb-1.5">
-            Add Members {selectedUsers.size > 0 && <span className="text-blue-500">({selectedUsers.size} selected)</span>}
+          <label className="block text-[12px] font-bold text-cu-text-secondary uppercase tracking-wide mb-1.5">
+            Add Members {selectedUsers.size > 0 && <span className="text-cu-primary">({selectedUsers.size} selected)</span>}
           </label>
 
           {/* Selected chips row */}
           {selectedList.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-2.5 p-2 bg-blue-50 rounded-xl border border-blue-100">
+            <div className="flex flex-wrap gap-1.5 mb-2.5 p-2 bg-cu-primary/10 rounded-xl border border-cu-primary/20">
               {selectedList.map(u => (
                 <span
                   key={u}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-white border border-blue-200 text-blue-700 rounded-full text-[12px] font-semibold shadow-sm"
+                  className="flex items-center gap-1 px-2.5 py-1 bg-cu-bg border border-cu-primary/25 text-cu-primary rounded-full text-[12px] font-semibold shadow-cu-sm"
                 >
                   <span className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-[9px] font-bold flex-shrink-0">
                     {u.charAt(0).toUpperCase()}
@@ -166,7 +166,7 @@ export function CreateChannelModal({ isOpen, onClose, users, onCreate }: {
                   <button
                     type="button"
                     onClick={() => toggleUser(u)}
-                    className="text-blue-400 hover:text-red-400 transition-colors ml-0.5"
+                    className="text-cu-primary hover:text-red-400 transition-colors ml-0.5"
                     aria-label={`Remove ${u}`}
                   >
                     <X size={10} strokeWidth={2.5} />
@@ -177,19 +177,19 @@ export function CreateChannelModal({ isOpen, onClose, users, onCreate }: {
           )}
 
           {/* Search input */}
-          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 mb-2 focus-within:bg-white focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-50 transition-all">
-            <Search size={13} className="text-gray-400 flex-shrink-0" strokeWidth={2.5} />
+          <div className="flex items-center gap-2 bg-cu-bg-secondary border border-cu-border rounded-xl px-3 py-2 mb-2 focus-within:bg-cu-bg-tertiary focus-within:border-cu-primary/50 focus-within:ring-2 focus-within:ring-cu-primary/10 transition-all">
+            <Search size={13} className="text-cu-text-muted flex-shrink-0" strokeWidth={2.5} />
             <input
               ref={searchRef}
               type="text"
               value={memberSearch}
               onChange={(e) => setMemberSearch(e.target.value)}
-              placeholder="Search members…"
-              className="flex-1 bg-transparent text-[13px] text-gray-700 placeholder:text-gray-400 outline-none"
+              placeholder="Search members..."
+              className="flex-1 bg-transparent text-[13px] text-cu-text-primary placeholder:text-cu-text-muted outline-none"
               aria-label="Search members"
             />
             {memberSearch && (
-              <button onClick={() => setMemberSearch('')} className="text-gray-300 hover:text-gray-500">
+              <button onClick={() => setMemberSearch('')} className="text-cu-text-muted hover:text-cu-text-primary">
                 <X size={12} strokeWidth={2.5} />
               </button>
             )}
@@ -198,9 +198,9 @@ export function CreateChannelModal({ isOpen, onClose, users, onCreate }: {
           {/* Filtered member list */}
           <div className="space-y-0.5 max-h-44 overflow-y-auto pr-0.5">
             {users.length === 0 ? (
-              <p className="text-[13px] text-gray-500 italic px-1 py-2">No other team members found.</p>
+              <p className="text-[13px] text-cu-text-secondary italic px-1 py-2">No other team members found.</p>
             ) : filteredUsers.length === 0 ? (
-              <p className="text-[13px] text-gray-400 italic px-2 py-2">No members match &quot;{memberSearch}&quot;</p>
+              <p className="text-[13px] text-cu-text-muted italic px-2 py-2">No members match &quot;{memberSearch}&quot;</p>
             ) : (
               filteredUsers.map(u => {
                 const isSelected = selectedUsers.has(u);
@@ -210,17 +210,17 @@ export function CreateChannelModal({ isOpen, onClose, users, onCreate }: {
                     onClick={() => toggleUser(u)}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border transition-all text-left
                       ${isSelected
-                        ? 'bg-blue-50 border-blue-200'
-                        : 'border-transparent hover:bg-gray-50 hover:border-gray-100'}`}
+                        ? 'bg-cu-primary/10 border-cu-primary/25'
+                        : 'border-transparent hover:bg-cu-bg-secondary hover:border-cu-border'}`}
                   >
                     <div className="flex items-center gap-2.5">
                       <div className={`w-7 h-7 rounded-full bg-gradient-to-br flex items-center justify-center text-white text-xs font-bold flex-shrink-0
-                        ${isSelected ? 'from-blue-500 to-indigo-600' : 'from-gray-400 to-gray-500'}`}>
+                        ${isSelected ? 'from-blue-500 to-indigo-600' : 'from-slate-500 to-slate-600'}`}>
                         {u.charAt(0).toUpperCase()}
                       </div>
-                      <span className={`text-[13.5px] font-medium ${isSelected ? 'text-blue-700' : 'text-gray-800'}`}>{u}</span>
+                      <span className={`text-[13.5px] font-medium ${isSelected ? 'text-cu-primary' : 'text-cu-text-primary'}`}>{u}</span>
                     </div>
-                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300 bg-white'}`}>
+                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-cu-primary border-cu-primary' : 'border-cu-border bg-cu-bg'}`}>
                       {isSelected && (
                         <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -238,7 +238,7 @@ export function CreateChannelModal({ isOpen, onClose, users, onCreate }: {
   );
 }
 
-// ── EDIT CHANNEL MODAL ──
+// Edit channel modal
 export function EditChannelModal({ isOpen, onClose, initialName, initialTopic, initialDescription, onSave }: {
   isOpen: boolean;
   onClose: () => void;
@@ -270,38 +270,38 @@ export function EditChannelModal({ isOpen, onClose, initialName, initialTopic, i
       isOpen={isOpen}
       onClose={onClose}
       title="Edit Channel"
-      icon={<Hash size={18} className="text-blue-500" strokeWidth={2.5} />}
+      icon={<Hash size={18} className="text-cu-primary" strokeWidth={2.5} />}
       onSubmit={handleSubmit}
       submitLabel="Save Changes"
       submitDisabled={!name.trim()}
     >
       <div className="space-y-4">
         <div>
-          <label className="block text-[12px] font-bold text-gray-700 uppercase tracking-wide mb-1.5">Channel Name</label>
+          <label className="block text-[12px] font-bold text-cu-text-secondary uppercase tracking-wide mb-1.5">Channel Name</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-[14px] text-gray-900 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+            className="w-full bg-cu-bg-secondary border border-cu-border rounded-xl px-3 py-2.5 text-[14px] text-cu-text-primary placeholder:text-cu-text-muted focus:bg-cu-bg-tertiary focus:border-cu-primary/50 focus:ring-2 focus:ring-cu-primary/10 outline-none transition-all"
           />
         </div>
         <div>
-          <label className="block text-[12px] font-bold text-gray-700 uppercase tracking-wide mb-1.5">Topic (Optional)</label>
+          <label className="block text-[12px] font-bold text-cu-text-secondary uppercase tracking-wide mb-1.5">Topic (Optional)</label>
           <input
             type="text"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             placeholder="What is this channel about?"
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-[14px] text-gray-900 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+            className="w-full bg-cu-bg-secondary border border-cu-border rounded-xl px-3 py-2.5 text-[14px] text-cu-text-primary placeholder:text-cu-text-muted focus:bg-cu-bg-tertiary focus:border-cu-primary/50 focus:ring-2 focus:ring-cu-primary/10 outline-none transition-all"
           />
         </div>
         <div>
-          <label className="block text-[12px] font-bold text-gray-700 uppercase tracking-wide mb-1.5">Description (Optional)</label>
+          <label className="block text-[12px] font-bold text-cu-text-secondary uppercase tracking-wide mb-1.5">Description (Optional)</label>
           <textarea
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             rows={2}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-[14px] text-gray-900 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none"
+            className="w-full bg-cu-bg-secondary border border-cu-border rounded-xl px-3 py-2.5 text-[14px] text-cu-text-primary placeholder:text-cu-text-muted focus:bg-cu-bg-tertiary focus:border-cu-primary/50 focus:ring-2 focus:ring-cu-primary/10 outline-none transition-all resize-none"
           />
         </div>
       </div>
@@ -309,7 +309,7 @@ export function EditChannelModal({ isOpen, onClose, initialName, initialTopic, i
   );
 }
 
-// ── EDIT MESSAGE MODAL ──
+// Edit message modal
 export function EditMessageModal({ isOpen, onClose, initialContent, onSave }: {
   isOpen: boolean;
   onClose: () => void;
@@ -333,7 +333,7 @@ export function EditMessageModal({ isOpen, onClose, initialContent, onSave }: {
       isOpen={isOpen}
       onClose={onClose}
       title="Edit Message"
-      icon={<MessageSquare size={18} className="text-blue-500" strokeWidth={2.5} />}
+      icon={<MessageSquare size={18} className="text-cu-primary" strokeWidth={2.5} />}
       onSubmit={handleSubmit}
       submitLabel="Save"
       submitDisabled={!content.trim() || content === initialContent}
@@ -343,7 +343,7 @@ export function EditMessageModal({ isOpen, onClose, initialContent, onSave }: {
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={4}
-          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-[14px] text-gray-900 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none"
+          className="w-full bg-cu-bg-secondary border border-cu-border rounded-xl px-3 py-2.5 text-[14px] text-cu-text-primary placeholder:text-cu-text-muted focus:bg-cu-bg-tertiary focus:border-cu-primary/50 focus:ring-2 focus:ring-cu-primary/10 outline-none transition-all resize-none"
           autoFocus
         />
       </div>
@@ -351,7 +351,7 @@ export function EditMessageModal({ isOpen, onClose, initialContent, onSave }: {
   );
 }
 
-// ── CONFIRM DELETE MODAL ──
+// Confirm delete modal
 export function ConfirmDeleteModal({ isOpen, onClose, onConfirm, title, message, isDeleting = false }: {
   isOpen: boolean;
   onClose: () => void;
@@ -370,7 +370,7 @@ export function ConfirmDeleteModal({ isOpen, onClose, onConfirm, title, message,
       submitDisabled={isDeleting}
       submitColor="red"
     >
-      <p className="text-[14px] text-gray-700 leading-relaxed font-medium">
+      <p className="text-[14px] text-cu-text-secondary leading-relaxed font-medium">
         {message}
       </p>
     </BaseModal>
