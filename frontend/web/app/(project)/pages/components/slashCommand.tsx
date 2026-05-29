@@ -159,12 +159,14 @@ const CommandList = forwardRef((props: any, ref) => {
         {props.items.map((item: CommandItem, index: number) => (
           <button
             className={`flex items-center gap-3 w-full text-left px-2 py-2 rounded-md transition-colors ${
-              index === selectedIndex ? 'bg-blue-50 text-blue-900' : 'text-gray-700 hover:bg-gray-100'
+              index === selectedIndex
+                ? 'bg-blue-50 dark:bg-cu-primary-light text-blue-900 dark:text-cu-primary'
+                : 'text-gray-700 hover:bg-gray-100'
             }`}
             key={index}
             onClick={() => selectItem(index)}
           >
-            <div className={`flex items-center justify-center w-10 h-10 rounded border ${index === selectedIndex ? 'bg-white border-blue-200 text-blue-600' : 'bg-white border-gray-200 text-gray-700'}`}>
+            <div className={`flex items-center justify-center w-10 h-10 rounded border ${index === selectedIndex ? 'bg-white dark:bg-cu-bg border-blue-200 dark:border-cu-primary/30 text-blue-600 dark:text-cu-primary' : 'bg-white border-gray-200 text-gray-700'}`}>
               {item.icon}
             </div>
             <div>
