@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -24,6 +25,9 @@ public class MilestoneController {
 
     @Autowired
     private MilestoneService milestoneService;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
 
     /*
      * DRY Helper Method.
@@ -49,7 +53,9 @@ public class MilestoneController {
             @PathVariable Long projectId,
             @Valid @RequestBody MilestoneRequestDTO dto,
             Authentication auth) {
-        return ResponseEntity.ok(milestoneService.createMilestone(projectId, dto, currentUserId(auth)));
+        MilestoneResponseDTO milestone = milestoneService.createMilestone(projectId, dto, currentUserId(auth));
+        broadcastMilestoneUpdate(milestone);
+        return ResponseEntity.ok(milestone);
     }
 
 
@@ -82,7 +88,9 @@ public class MilestoneController {
             @PathVariable Long milestoneId,
             @Valid @RequestBody MilestoneRequestDTO dto,
             Authentication auth) {
-        return ResponseEntity.ok(milestoneService.updateMilestone(milestoneId, dto, currentUserId(auth)));
+        MilestoneResponseDTO milestone = milestoneService.updateMilestone(milestoneId, dto, currentUserId(auth));
+        broadcastMilestoneUpdate(milestone);
+        return ResponseEntity.ok(milestone);
     }
 
     /*
@@ -119,5 +127,16 @@ public class MilestoneController {
                 : null;
         milestoneService.assignTaskToMilestone(taskId, milestoneId, currentUserId(auth));
         return ResponseEntity.ok().build();
+    }
+
+    private void broadcastMilestoneUpdate(MilestoneResponseDTO milestone) {
+        messagingTemplate.convertAndSend(
+                "/topic/project/" + milestone.getProjectId() + "/milestones",
+                Map.of(
+                        "type", "MILESTONE_UPDATED",
+                        "milestone", milestone,
+                        "projectId", milestone.getProjectId()
+                )
+        );
     }
 }

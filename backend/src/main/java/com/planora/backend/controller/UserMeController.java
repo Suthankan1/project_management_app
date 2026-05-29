@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.planora.backend.dto.PushTokenRequestDTO;
 import com.planora.backend.dto.UserResponseDTO;
-import com.planora.backend.service.UserService;
 import com.planora.backend.service.UserPushTokenService;
+import com.planora.backend.service.UserService;
 
 @RestController
 @RequestMapping("/api/user")
