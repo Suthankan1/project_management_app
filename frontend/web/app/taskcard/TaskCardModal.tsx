@@ -47,6 +47,7 @@ interface TaskData {
   completedAt?: string | null;
   githubIssueNumber?: number | null;
   githubRepoFullName?: string | null;
+  archived?: boolean;
 }
 
 interface ProjectMemberOption {
@@ -348,7 +349,8 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
               project={taskData.projectName}
               taskId={`TASK-${taskData.id}`}
               numericTaskId={taskData.id}
-              onClose={() => onClose(wasModified.current)}
+              archived={taskData.archived}
+              onClose={(wasModifiedFlag) => onClose(wasModifiedFlag || wasModified.current)}
             />
             <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-y-auto md:overflow-hidden">
               <div className="flex flex-1 flex-col min-h-0 md:overflow-y-auto">

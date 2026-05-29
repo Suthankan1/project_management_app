@@ -203,6 +203,21 @@ public class TaskController {
         return new ResponseEntity<>(task, HttpStatus.OK);
     }
 
+    @PatchMapping("/{taskId}")
+    public ResponseEntity<TaskResponseDTO> patchTask(
+            @PathVariable Long taskId,
+            @RequestBody TaskRequestDTO request,
+            @AuthenticationPrincipal UserPrincipal currentUser){
+        Long currentUserId = currentUser.getUserId();
+        TaskResponseDTO task = service.updateTask(taskId, request, currentUserId);
+
+        // REAL-TIME PUSH: Update the task card on everyone's screen.
+        messagingTemplate.convertAndSend(
+                "/topic/project/" + task.getProjectId() + "/tasks",
+                Map.of("type", "TASK_UPDATED", "task", task));
+        return new ResponseEntity<>(task, HttpStatus.OK);
+    }
+
     @DeleteMapping("/{taskId}")
     public ResponseEntity<Void> deleteTask(
             @PathVariable Long taskId,
@@ -229,10 +244,11 @@ public class TaskController {
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) Long sprintId,
             @RequestParam(required = false) Long milestoneId,
+            @RequestParam(required = false, defaultValue = "false") Boolean archived,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
-        return new ResponseEntity<>(service.getTasksByProject(projectId, currentUserId, status, assigneeId, priority, sprintId, milestoneId), HttpStatus.OK);
+        return new ResponseEntity<>(service.getTasksByProject(projectId, currentUserId, status, assigneeId, priority, sprintId, milestoneId, archived), HttpStatus.OK);
     }
 
     @GetMapping("/project/{projectId}/archived")

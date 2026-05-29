@@ -8,6 +8,7 @@ import { hexToLabelStyle } from '@/components/shared/LabelPicker';
 import { STATUS_LABELS, DUE_CHIP_STYLES, type TaskStatus, formatDate } from './TaskRowConstants';
 import type { TaskRowProps } from '../TaskRow';
 import { useTaskRowState } from './useTaskRowState';
+import { ArchiveBadge } from '@/components/ui';
 
 // ── Desktop Task Row ─────────────────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ export default function DesktopTaskRow(props: TaskRowProps) {
     <div
       className={`group relative flex items-center min-h-[40px] rounded-lg border-2 ${
         dueClass === 'five_days' ? 'border-transparent' : 'border-transparent'
-      } ${rowBg} hover:opacity-90 transition-colors duration-150`}
+      } ${rowBg} hover:opacity-90 transition-colors duration-150 ${task.archived ? 'opacity-60' : ''}`}
       style={{ borderLeft: `3px solid ${statusBorderColor}`, ...amberStyle }}
       onClick={() => { if (!renaming) onOpenTask?.(task.id); }}
       onTouchStart={onTouchStartInternal}
@@ -91,7 +92,7 @@ export default function DesktopTaskRow(props: TaskRowProps) {
       {/* Priority */}
       <div className="flex-shrink-0 w-[78px] px-1 flex items-center" onClick={(e) => e.stopPropagation()}>
         <span className={`inline-flex h-5 items-center rounded px-1.5 text-[10px] font-bold uppercase tracking-wide truncate ${priorityStyle}`}>
-          {priorityKey}
+          {priorityStyle ? priorityKey : '—'}
         </span>
       </div>
 
@@ -119,7 +120,7 @@ export default function DesktopTaskRow(props: TaskRowProps) {
             <span
               className={`text-[12px] font-medium truncate min-w-0 select-none ${
                 dueClass === 'five_days' ? 'text-[#92400E]' :
-                task.status.toUpperCase() === 'DONE' ? 'line-through text-[#98A2B3]' : 'text-[#101828]'
+                task.status?.toUpperCase() === 'DONE' ? 'line-through text-[#98A2B3]' : 'text-[#101828]'
               }`}
               onClick={(e) => {
                 e.stopPropagation();
@@ -136,6 +137,7 @@ export default function DesktopTaskRow(props: TaskRowProps) {
             >
               {task.title}
             </span>
+            {task.archived && <ArchiveBadge />}
             {task.labels?.[0] && (
               <span style={hexToLabelStyle(task.labels[0].color ?? '#6366F1')} className="flex-shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap border border-white/40">
                 {task.labels[0].name}

@@ -18,6 +18,7 @@ export interface TaskRowTask {
   dueDate?: string;
   priority?: string;
   labels?: Array<{ id: number; name: string; color?: string }>;
+  archived?: boolean;
 }
 
 export interface TaskRowTeamMember {

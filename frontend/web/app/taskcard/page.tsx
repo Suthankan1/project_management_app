@@ -29,6 +29,7 @@ interface TaskData {
   dependencies: Array<{ id: number; title: string; relation: string }>;
   githubIssueNumber?: number | null;
   githubRepoFullName?: string | null;
+  archived?: boolean;
 }
 
 // Wrapper component that uses searchParams
@@ -169,6 +170,8 @@ function TaskPageContent() {
         <TaskHeader 
           project={taskData.projectName} 
           taskId={`TASK-${taskData.id}`} 
+          numericTaskId={taskData.id}
+          archived={taskData.archived}
           onClose={handleClose} 
         />
 

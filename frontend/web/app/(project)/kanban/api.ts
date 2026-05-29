@@ -22,12 +22,15 @@ export interface TeamMemberOption {
  */
 export async function fetchTasksByProject(
   projectId: number,
-  filters?: { milestoneId?: number | null }
+  filters?: { milestoneId?: number | null; archived?: boolean }
 ): Promise<Task[]> {
   try {
-    const params: Record<string, number> = {};
+    const params: Record<string, any> = {};
     if (filters?.milestoneId != null) {
       params.milestoneId = filters.milestoneId;
+    }
+    if (filters?.archived !== undefined) {
+      params.archived = filters.archived;
     }
     const response = await axios.get(`/api/tasks/project/${projectId}`, { params });
     return response.data || [];

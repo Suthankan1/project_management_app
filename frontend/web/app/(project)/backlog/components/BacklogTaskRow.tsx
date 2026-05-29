@@ -12,6 +12,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { DayPicker } from 'react-day-picker';
 import { format, parseISO } from 'date-fns';
 import api from '@/lib/axios';
+import { ArchiveBadge } from '@/components/ui';
 import 'react-day-picker/dist/style.css';
 
 const PRIORITY_CONFIG: Record<string, { color: string; icon: React.ElementType; label: string }> = {
@@ -86,7 +87,7 @@ export default function BacklogTaskRow({
         <div
             className={`grid grid-cols-[auto_1fr_120px_100px_120px_100px_100px_32px] sm:grid-cols-[auto_1.5fr_140px_110px_130px_110px_120px_32px] items-center gap-x-2 px-3 sm:px-4 min-h-[52px] rounded-lg border cursor-pointer select-none transition-colors ${
                 selected ? 'bg-cu-primary/5 border-cu-primary/30' : isOverdue ? 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10' : 'bg-cu-bg border-cu-border hover:bg-cu-hover'
-            }`}
+            } ${task.archived || isArchived ? 'opacity-60' : ''}`}
             onClick={() => {
                 if (statusOpen || menuOpen) return;
                 if (window.innerWidth >= 768) onOpenModal(task.id);
@@ -108,6 +109,7 @@ export default function BacklogTaskRow({
                 <p className={`text-[14px] font-medium truncate ${normalizedStatus === 'DONE' ? 'line-through text-cu-text-muted' : 'text-cu-text-primary'}`}>
                     {task.title}
                 </p>
+                {(task.archived || isArchived) && <ArchiveBadge />}
             </div>
 
             {/* Label */}
