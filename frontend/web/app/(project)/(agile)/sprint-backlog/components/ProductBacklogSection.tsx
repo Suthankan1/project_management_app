@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ChevronDown,
   ChevronRight,
   CornerDownLeft,
+  GripVertical,
   Rocket,
 } from 'lucide-react';
+import { useTouchDragSort } from './useTouchDragSort';
 import CreateTaskModal, { type CreateTaskData } from '@/components/shared/CreateTaskModal';
 import type { TaskItem } from '@/types';
 import api from '@/lib/axios';
@@ -68,6 +71,7 @@ export default function ProductBacklogSection({
 }: ProductBacklogSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [showCreateModalInternal, setShowCreateModalInternal] = useState(false);
+  const taskListRef = useRef<HTMLDivElement>(null);
 
   // Sync external modal state with internal state and expand section
   const showCreateModal = externalShowCreateModal ?? showCreateModalInternal;
@@ -94,6 +98,14 @@ export default function ProductBacklogSection({
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskTitleLength, setNewTaskTitleLength] = useState(0);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+
+  const { activeDragId, touchDropIndex, ghost, draggingTask, getTouchProps } = useTouchDragSort({
+    tasks,
+    containerRef: taskListRef,
+    onDrop: (draggedId, targetIndex) => onDropTask(draggedId, targetIndex),
+  });
+
+  const effectiveDropIndex = activeDragId !== null ? touchDropIndex : dropIndex;
 
   const canDeleteTask = currentUserRole !== 'VIEWER';
 
@@ -254,11 +266,11 @@ export default function ProductBacklogSection({
 
       {isOpen && (
         <div>
-          <motion.div layout className="flex flex-col gap-[5px]" onDragOver={(e) => { e.preventDefault(); setDropIndex(tasks.length); }} onDrop={handleDrop}>
+          <motion.div ref={taskListRef} layout className="flex flex-col gap-[5px]" onDragOver={(e) => { e.preventDefault(); setDropIndex(tasks.length); }} onDrop={handleDrop}>
             <AnimatePresence initial={false}>
               {tasks.map((task, index) => (
                 <div key={task.id}>
-                  {dropIndex === index && (
+                  {effectiveDropIndex === index && (
                     <motion.div
                       layout
                       initial={{ height: 0, opacity: 0 }}
@@ -274,9 +286,12 @@ export default function ProductBacklogSection({
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ type: "spring", stiffness: 500, damping: 30, mass: 1 }}
                     className="rounded-lg overflow-hidden border border-[#EAECF0]"
+                    style={{ opacity: activeDragId === task.id ? 0.25 : 1 }}
                   >
                     <div
+                      data-task-row
                       draggable
+                      {...getTouchProps(task.id)}
                       onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
                         e.dataTransfer.setData('text/plain', String(task.id));
                         (e.target as HTMLElement).style.opacity = '0.5';
@@ -315,7 +330,7 @@ export default function ProductBacklogSection({
                 </div>
               ))}
             </AnimatePresence>
-            {dropIndex === tasks.length && tasks.length > 0 && (
+            {effectiveDropIndex === tasks.length && tasks.length > 0 && (
               <motion.div
                 layout
                 initial={{ height: 0, opacity: 0 }}
@@ -325,6 +340,18 @@ export default function ProductBacklogSection({
               />
             )}
           </motion.div>
+
+          {/* Touch drag ghost */}
+          {ghost && draggingTask && typeof document !== 'undefined' && createPortal(
+            <div
+              style={{ position: 'fixed', top: ghost.y, left: ghost.x, width: ghost.width, pointerEvents: 'none', zIndex: 9999 }}
+              className="flex items-center gap-2 rounded-2xl border border-[#D0D5DD] bg-white px-3 py-2.5 shadow-2xl opacity-95"
+            >
+              <GripVertical size={14} className="flex-shrink-0 text-[#98A2B3]" />
+              <span className="flex-1 min-w-0 truncate text-[14px] font-bold text-[#101828]">{draggingTask.title}</span>
+            </div>,
+            document.body
+          )}
 
 
            {/* ── Inline Create Task ── */}

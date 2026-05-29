@@ -91,24 +91,18 @@ export function useTaskRowState(task: TaskRowTask, props: Pick<TaskRowProps, 'ca
     };
   }, []);
 
-  // Touch handlers
+  // Touch handlers — double-tap on title to rename
   const onTouchStartInternal = useCallback((e: React.TouchEvent) => {
     const now = Date.now();
-    const isDoubleTap = now - lastTapRef.current < 300;
-    if (isDoubleTap) {
+    if (now - lastTapRef.current < 300) {
       e.preventDefault();
       setRenameValue(task.title);
       setRenaming(true);
       lastTapRef.current = 0;
-      if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
       return;
     }
     lastTapRef.current = now;
-    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = setTimeout(() => {
-      if (canDelete) onDeleteTask(task.id);
-    }, 600);
-  }, [task.id, task.title, canDelete, onDeleteTask]);
+  }, [task.title]);
 
   const onTouchEndInternal = useCallback(() => {
     if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }

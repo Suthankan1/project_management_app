@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useMemo, useRef, useState } from 'react';
-import { ChevronDown, CornerDownLeft } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, CornerDownLeft, GripVertical } from 'lucide-react';
+import { useTouchDragSort } from './useTouchDragSort';
 import TaskRow from './TaskRow';
 import type { SprintItem, TaskItem } from '@/types';
 import TaskCardModal from '@/app/taskcard/TaskCardModal';
@@ -54,6 +56,7 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, available
   const [newTaskNameLength, setNewTaskNameLength] = useState(0);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const createTaskRef = useRef<HTMLFormElement | null>(null);
+  const taskListRef = useRef<HTMLDivElement>(null);
 
   const canDeleteSprint = currentUserRole === 'OWNER' || currentUserRole === 'ADMIN';
   const canDeleteTask = currentUserRole !== 'VIEWER';
@@ -85,7 +88,17 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, available
     );
   }, [handlers.localTasks]);
 
-  // ── Drag & Drop ────────────────────────────────────────────────────────────
+  // ── Touch drag-and-drop ────────────────────────────────────────────────────
+
+  const { activeDragId, touchDropIndex, ghost, draggingTask, getTouchProps } = useTouchDragSort({
+    tasks: handlers.localTasks,
+    containerRef: taskListRef,
+    onDrop: (draggedId, targetIndex) => onDropTask(draggedId, sprint.id, targetIndex),
+  });
+
+  const effectiveDropIndex = activeDragId !== null ? touchDropIndex : dropIndex;
+
+  // ── HTML5 Drag & Drop (desktop) ────────────────────────────────────────────
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -145,13 +158,13 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, available
 
       {/* Task List */}
       {isOpen && (
-        <div onDragOver={(e) => { e.preventDefault(); setDropIndex(handlers.localTasks.length); }} onDrop={handleDrop}>
+        <div ref={taskListRef} onDragOver={(e) => { e.preventDefault(); setDropIndex(handlers.localTasks.length); }} onDrop={handleDrop}>
           <motion.div layout className="flex flex-col gap-[5px]">
             <AnimatePresence initial={false}>
               {handlers.localTasks.length > 0 ? (
                 handlers.localTasks.map((task, index) => (
                   <React.Fragment key={task.id}>
-                    {dropIndex === index && (
+                    {effectiveDropIndex === index && (
                       <motion.div
                         layout
                         initial={{ height: 0, opacity: 0 }}
@@ -167,9 +180,12 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, available
                       exit={{ opacity: 0, scale: 0.95 }}
                       transition={{ type: "spring", stiffness: 500, damping: 30, mass: 1 }}
                       className="rounded-lg overflow-hidden border border-[#EAECF0]"
+                      style={{ opacity: activeDragId === task.id ? 0.25 : 1 }}
                     >
                       <div
+                        data-task-row
                         draggable
+                        {...getTouchProps(task.id)}
                         onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
                           e.dataTransfer.setData('text/plain', String(task.id));
                           (e.target as HTMLElement).style.opacity = '0.5';
@@ -178,9 +194,9 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, available
                           (e.target as HTMLElement).style.opacity = '1';
                           setDropIndex(null);
                         }}
-                        onDragOver={(e: React.DragEvent<HTMLDivElement>) => { 
-                          e.preventDefault(); 
-                          setDropIndex(index); 
+                        onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
+                          e.preventDefault();
+                          setDropIndex(index);
                         }}
                         onDrop={(e: React.DragEvent<HTMLDivElement>) => handleRowDrop(e, index)}
                       >
@@ -222,7 +238,7 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, available
                 </motion.div>
               )}
             </AnimatePresence>
-            {dropIndex === handlers.localTasks.length && handlers.localTasks.length > 0 && (
+            {effectiveDropIndex === handlers.localTasks.length && handlers.localTasks.length > 0 && (
               <motion.div
                 layout
                 initial={{ height: 0, opacity: 0 }}
@@ -232,6 +248,18 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, available
               />
             )}
           </motion.div>
+
+          {/* Touch drag ghost — floats under the finger */}
+          {ghost && draggingTask && typeof document !== 'undefined' && createPortal(
+            <div
+              style={{ position: 'fixed', top: ghost.y, left: ghost.x, width: ghost.width, pointerEvents: 'none', zIndex: 9999 }}
+              className="flex items-center gap-2 rounded-2xl border border-[#D0D5DD] bg-white px-3 py-2.5 shadow-2xl opacity-95"
+            >
+              <GripVertical size={14} className="flex-shrink-0 text-[#98A2B3]" />
+              <span className="flex-1 min-w-0 truncate text-[14px] font-bold text-[#101828]">{draggingTask.title}</span>
+            </div>,
+            document.body
+          )}
 
           {/* Create Task Inline */}
           {!showCreateTaskBox ? (
