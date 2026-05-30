@@ -21,7 +21,7 @@ export default function ReportPage() {
   const projectId = Number(params.projectId);
   const { mutate } = useSWRConfig();
 
-  const { data: tasks = [], error: tasksError } = useSWR<Task[]>(projectId ? `/api/tasks/project/${projectId}` : null, fetcher);
+  const { data: tasks = [], error: tasksError } = useSWR<Task[]>(projectId ? `/api/tasks/project/${projectId}/all` : null, fetcher);
   const { data: sprints = [], error: sprintsError } = useSWR<Sprint[]>(projectId ? `/api/sprints/project/${projectId}` : null, fetcher);
   const { data: metrics, isLoading: mL, error: metricsError } = useSWR<ProjectMetrics>(projectId ? `/api/projects/${projectId}/metrics` : null, fetcher);
   const { data: project, isLoading: pL, error: projectError } = useSWR(projectId ? `/api/projects/${projectId}` : null, fetcher);
@@ -31,7 +31,7 @@ export default function ReportPage() {
   const hasError = Boolean(tasksError || sprintsError || metricsError || projectError || milestonesError || membersError);
   const refreshReport = () => {
     void Promise.all([
-      mutate(projectId ? `/api/tasks/project/${projectId}` : null),
+      mutate(projectId ? `/api/tasks/project/${projectId}/all` : null),
       mutate(projectId ? `/api/sprints/project/${projectId}` : null),
       mutate(projectId ? `/api/projects/${projectId}/metrics` : null),
       mutate(projectId ? `/api/projects/${projectId}` : null),

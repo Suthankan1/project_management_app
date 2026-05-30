@@ -175,10 +175,10 @@ export default function SprintBacklogPage() {
     if (showSpinner && !hasCachedData) setLoading(true);
     try {
       const tasksPromises = [
-        api.get(`/api/tasks/project/${projectId}`),
+        api.get(`/api/tasks/project/${projectId}/all`),
       ];
       if (showArchived) {
-        tasksPromises.push(api.get(`/api/tasks/project/${projectId}?archived=true`));
+        tasksPromises.push(api.get(`/api/tasks/project/${projectId}/all?archived=true`));
       }
 
       const [sprintsRes, ...tasksResList] = await Promise.all([
