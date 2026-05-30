@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowDown, ArrowUp, ChevronDown, Pencil, Trash2, UserPlus } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, Pencil, Trash2, UserPlus, RefreshCw } from 'lucide-react';
 import AssigneeAvatar from '../AssigneeAvatar';
 import { hexToLabelStyle } from '@/components/shared/LabelPicker';
 import { STATUS_LABELS, type TaskStatus } from './TaskRowConstants';
@@ -97,6 +97,18 @@ export default function MobileTaskRow(props: TaskRowProps) {
               }`}
             >
               <span className="truncate">{task.title}</span>
+              {task.recurrenceRule && (
+                <span
+                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold shrink-0 ${
+                    task.recurrenceActive === false
+                      ? 'bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/30'
+                      : 'bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/30'
+                  }`}
+                >
+                  <RefreshCw size={8} className="flex-shrink-0" />
+                  <span>Recur{task.recurrenceActive === false ? ' (P)' : ''}</span>
+                </span>
+              )}
               {task.archived && <ArchiveBadge />}
             </h3>
           )}

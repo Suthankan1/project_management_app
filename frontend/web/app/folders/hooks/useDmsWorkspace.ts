@@ -18,6 +18,11 @@ import {
     softDeleteDocument,
     updateDocumentMetadata,
     uploadDocument,
+    getFolderPermissions,
+    updateFolderPermissions,
+    getProjectStorageQuota,
+    ProjectStorageQuotaResponse,
+    FolderPermissionRequest,
 } from '@/lib/dms';
 import { ViewMode } from '@/app/folders/components/types';
 
@@ -50,6 +55,13 @@ export function useDmsWorkspace(mode: ViewMode) {
     const [renameDoc, setRenameDoc] = useState<DocumentItem | null>(null);
     const [renameName, setRenameName] = useState('');
 
+    const [quota, setQuota] = useState<ProjectStorageQuotaResponse | null>(null);
+    const [selectedPermsFolder, setSelectedPermsFolder] = useState<DocumentFolder | null>(null);
+    const [folderPermissions, setFolderPermissions] = useState<FolderPermissionRequest[]>([]);
+    const [loadingPerms, setLoadingPerms] = useState(false);
+    const [savingPerms, setSavingPerms] = useState(false);
+    const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
+
     const isTrashMode = mode === 'trash';
 
     useEffect(() => {
@@ -67,13 +79,15 @@ export function useDmsWorkspace(mode: ViewMode) {
         const load = async () => {
             try {
                 setLoading(true); setError(null);
-                const [folderData, documentData, allProjects] = await Promise.all([
+                const [folderData, documentData, allProjects, quotaData] = await Promise.all([
                     listFolders(projectId),
                     listDocuments(projectId, undefined, isTrashMode),
                     listUserProjects(),
+                    getProjectStorageQuota(projectId),
                 ]);
                 setFolders(folderData);
                 setDocuments(documentData);
+                setQuota(quotaData);
                 const match = allProjects.find((p) => p.id === projectId);
                 setCurrentProjectName(match?.name ?? null);
             } catch { setError('Failed to load folder and document data.'); }
@@ -114,13 +128,15 @@ export function useDmsWorkspace(mode: ViewMode) {
         try {
             setLoading(true);
             setError(null);
-            const [folderData, documentData, allProjects] = await Promise.all([
+            const [folderData, documentData, allProjects, quotaData] = await Promise.all([
                 listFolders(projectId),
                 listDocuments(projectId, undefined, isTrashMode),
                 listUserProjects(),
+                getProjectStorageQuota(projectId),
             ]);
             setFolders(folderData);
             setDocuments(documentData);
+            setQuota(quotaData);
             const match = allProjects.find((p) => p.id === projectId);
             setCurrentProjectName(match?.name ?? null);
         } catch {
@@ -196,8 +212,17 @@ export function useDmsWorkspace(mode: ViewMode) {
 
     const onView = async (documentId: number) => {
         if (!projectId) return;
-        try { window.open(await getDocumentDownloadUrl(projectId, documentId), '_blank', 'noopener,noreferrer'); }
-        catch { setError('Failed to open document in browser.'); }
+        try {
+            setBusy(true);
+            const doc = documents.find(d => d.id === documentId) || filteredDocuments.find(d => d.id === documentId);
+            if (!doc) return;
+            const downloadUrl = await getDocumentDownloadUrl(projectId, documentId);
+            setPreviewDoc({ ...doc, downloadUrl });
+        } catch {
+            setError('Failed to open document preview.');
+        } finally {
+            setBusy(false);
+        }
     };
 
     const onRename = (document: DocumentItem) => {
@@ -230,6 +255,8 @@ export function useDmsWorkspace(mode: ViewMode) {
 
     const onRestore = async (documentId: number) => {
         if (!projectId) return;
+        const msg = "Restore Document?\n\nThis will recover the document from the Trash and place it back into its original folder as an active asset.";
+        if (!window.confirm(msg)) return;
         try { setBusy(true); await restoreDocument(projectId, documentId); await refresh(); }
         catch { setError('Failed to restore document.'); }
         finally { setBusy(false); }
@@ -237,7 +264,8 @@ export function useDmsWorkspace(mode: ViewMode) {
 
     const onPermanentDelete = async (documentId: number) => {
         if (!projectId) return;
-        if (!window.confirm('Permanently delete this document and all versions?')) return;
+        const msg = "WARNING: Permanent Deletion!\n\nThis action cannot be undone. Restoring the document will be impossible, all version histories will be wiped, and the file bytes will be permanently deleted from S3 storage.\n\nAre you sure you want to proceed?";
+        if (!window.confirm(msg)) return;
         try { setBusy(true); await permanentDeleteDocument(projectId, documentId); await refresh(); }
         catch { setError('Failed to permanently delete document.'); }
         finally { setBusy(false); }
@@ -265,6 +293,39 @@ export function useDmsWorkspace(mode: ViewMode) {
 
     const onOpenInfo = (document: DocumentItem) => setSelectedInfoDoc(document);
 
+    const onOpenFolderPermissions = async (folder: DocumentFolder) => {
+        if (!projectId) return;
+        try {
+            setLoadingPerms(true);
+            setSelectedPermsFolder(folder);
+            const data = await getFolderPermissions(projectId, folder.id);
+            setFolderPermissions(data);
+        } catch {
+            setError('Failed to load folder permissions.');
+        } finally {
+            setLoadingPerms(false);
+        }
+    };
+
+    const onSaveFolderPermissions = async (permissions: FolderPermissionRequest[]) => {
+        if (!projectId || !selectedPermsFolder) return;
+        try {
+            setSavingPerms(true);
+            await updateFolderPermissions(projectId, selectedPermsFolder.id, permissions);
+            setSelectedPermsFolder(null);
+            setFolderPermissions([]);
+        } catch {
+            setError('Failed to update folder permissions. You may need Owner/Admin permission.');
+        } finally {
+            setSavingPerms(false);
+        }
+    };
+
+    const onCloseFolderPermissions = () => {
+        setSelectedPermsFolder(null);
+        setFolderPermissions([]);
+    };
+
     const selectedVersionsDoc = selectedVersionsDocId
         ? filteredDocuments.find((d) => d.id === selectedVersionsDocId)
             ?? documents.find((d) => d.id === selectedVersionsDocId)
@@ -286,5 +347,8 @@ export function useDmsWorkspace(mode: ViewMode) {
         onDownload, onView, onRename, onConfirmRename, onCancelRename, onSoftDelete, onRestore,
         onPermanentDelete, onToggleFavorite, onToggleVersions, onOpenInfo,
         isDragOver, setIsDragOver, isUploading, uploadProgress, refresh,
+        quota, selectedPermsFolder, folderPermissions, loadingPerms, savingPerms,
+        onOpenFolderPermissions, onSaveFolderPermissions, onCloseFolderPermissions,
+        previewDoc, setPreviewDoc,
     };
 }

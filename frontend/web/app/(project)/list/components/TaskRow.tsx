@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { CalendarDays, ChevronDown, Minus, MoreHorizontal, Plus, Lock } from 'lucide-react';
+import { CalendarDays, ChevronDown, Minus, MoreHorizontal, Plus, Lock, RefreshCw } from 'lucide-react';
 import { hexToLabelStyle } from '@/components/shared/LabelPicker';
 import { AvatarStack } from '@/components/ui/Avatar';
 import api from '@/lib/axios';
@@ -226,6 +226,19 @@ const TaskRow = React.memo(function TaskRow({
         <p className="text-[13px] font-medium truncate text-cu-text-primary">
           {task.title}
         </p>
+        {task.recurrenceRule && (
+          <span
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+              task.recurrenceActive === false
+                ? 'bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/30'
+                : 'bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/30'
+            }`}
+            title={task.recurrenceActive === false ? 'Recurring (Paused)' : `Recurring (${task.recurrenceRule})`}
+          >
+            <RefreshCw size={9} className="flex-shrink-0" />
+            <span>Recurring{task.recurrenceActive === false ? ' (Paused)' : ''}</span>
+          </span>
+        )}
         {isBlocked && (
           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-500 shrink-0">
             <Lock size={9} className="flex-shrink-0" /> Blocked

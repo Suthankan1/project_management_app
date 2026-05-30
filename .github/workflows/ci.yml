@@ -85,10 +85,10 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
       
-    - name: Use Node.js 22
+    - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '22'
+        node-version-file: 'frontend/web/.nvmrc'
         cache: 'npm'
         cache-dependency-path: './frontend/web/package-lock.json'
 
@@ -96,9 +96,9 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/frontend/web/.next/cache
-        key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+        key: ${{ runner.os }}-nextjs-${{ hashFiles('frontend/web/package-lock.json') }}-${{ hashFiles('frontend/web/**/*.js', 'frontend/web/**/*.jsx', 'frontend/web/**/*.ts', 'frontend/web/**/*.tsx') }}
         restore-keys: |
-          ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+          ${{ runner.os }}-nextjs-${{ hashFiles('frontend/web/package-lock.json') }}-
         
     - name: Install Dependencies
       run: npm ci

@@ -108,6 +108,34 @@ function extractErrorMessage(error: unknown, fallback: string): string {
     return fallback;
 }
 
+export interface FolderPermissionRequest {
+    teamRole: string;
+    permissions: string[];
+}
+
+export interface ProjectStorageQuotaResponse {
+    usedBytes: number;
+    quotaBytes: number;
+    maxFileSizeBytes: number;
+    documentCount: number;
+    humanReadableUsed: string;
+    humanReadableQuota: string;
+}
+
+export async function getFolderPermissions(projectId: number, folderId: number): Promise<FolderPermissionRequest[]> {
+    const response = await api.get<FolderPermissionRequest[]>(`/api/projects/${projectId}/folders/${folderId}/permissions`);
+    return response.data;
+}
+
+export async function updateFolderPermissions(projectId: number, folderId: number, permissions: FolderPermissionRequest[]): Promise<void> {
+    await api.put(`/api/projects/${projectId}/folders/${folderId}/permissions`, permissions);
+}
+
+export async function getProjectStorageQuota(projectId: number): Promise<ProjectStorageQuotaResponse> {
+    const response = await api.get<ProjectStorageQuotaResponse>(`/api/projects/${projectId}/storage-quota`);
+    return response.data;
+}
+
 export async function listFolders(projectId: number): Promise<DocumentFolder[]> {
     const response = await api.get<DocumentFolder[]>(`/api/projects/${projectId}/folders`);
     return response.data;

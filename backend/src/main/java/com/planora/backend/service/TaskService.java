@@ -181,7 +181,10 @@ public class TaskService {
         if (request.getRecurrenceRule() != null) {
             task.setRecurrenceRule(request.getRecurrenceRule());
             task.setRecurrenceEnd(request.getRecurrenceEnd());
-            task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule()));
+            task.setRecurrenceActive(request.getRecurrenceActive() != null ? request.getRecurrenceActive() : true);
+            task.setCustomInterval(request.getCustomInterval());
+            task.setRecurrenceLimit(request.getRecurrenceLimit());
+            task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule(), request.getCustomInterval()));
         }
 
         Task savedTask = taskRepository.save(task);
@@ -353,9 +356,25 @@ public class TaskService {
 
         // update recurrence (V7)
         if (request.getRecurrenceRule() != null) {
-            task.setRecurrenceRule(request.getRecurrenceRule());
-            task.setRecurrenceEnd(request.getRecurrenceEnd());
-            task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule()));
+            if (request.getRecurrenceRule().trim().isEmpty() || "NONE".equalsIgnoreCase(request.getRecurrenceRule())) {
+                task.setRecurrenceRule(null);
+                task.setRecurrenceEnd(null);
+                task.setNextOccurrence(null);
+                task.setCustomInterval(null);
+                task.setRecurrenceLimit(null);
+                task.setRecurrenceActive(false);
+            } else {
+                task.setRecurrenceRule(request.getRecurrenceRule());
+                task.setRecurrenceEnd(request.getRecurrenceEnd());
+                if (request.getRecurrenceActive() != null) {
+                    task.setRecurrenceActive(request.getRecurrenceActive());
+                }
+                task.setCustomInterval(request.getCustomInterval());
+                task.setRecurrenceLimit(request.getRecurrenceLimit());
+                task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule(), request.getCustomInterval()));
+            }
+        } else if (request.getRecurrenceActive() != null) {
+            task.setRecurrenceActive(request.getRecurrenceActive());
         }
 
         // Handle archiving/unarchiving
@@ -1337,6 +1356,10 @@ public class TaskService {
         dto.setRecurrenceRule(task.getRecurrenceRule());
         dto.setRecurrenceEnd(task.getRecurrenceEnd());
         dto.setNextOccurrence(task.getNextOccurrence());
+        dto.setRecurrenceActive(task.isRecurrenceActive());
+        dto.setCustomInterval(task.getCustomInterval());
+        dto.setRecurrenceLimit(task.getRecurrenceLimit());
+        dto.setRecurrenceCount(task.getRecurrenceCount());
         if (task.getRecurrenceParent() != null) {
             dto.setRecurrenceParentId(task.getRecurrenceParent().getId());
         }
@@ -1495,15 +1518,16 @@ public class TaskService {
     }
 
     // Computes the next occurrence date after today based on recurrence rule.
-    private LocalDate computeNextOccurrence(LocalDate base, String rule) {
+    private LocalDate computeNextOccurrence(LocalDate base, String rule, Integer customInterval) {
         LocalDate from = (base != null && base.isAfter(LocalDate.now())) ? base : LocalDate.now();
         if (rule == null) return null;
+        int delta = (customInterval != null && customInterval > 0) ? customInterval : 1;
         return switch (rule.toUpperCase()) {
-            case "DAILY"   -> from.plusDays(1);
-            case "WEEKLY"  -> from.plusWeeks(1);
-            case "MONTHLY" -> from.plusMonths(1);
-            case "YEARLY"  -> from.plusYears(1);
-            default        -> null;
+            case "DAILY", "CUSTOM_DAYS"     -> from.plusDays(delta);
+            case "WEEKLY", "CUSTOM_WEEKS"   -> from.plusWeeks(delta);
+            case "MONTHLY", "CUSTOM_MONTHS" -> from.plusMonths(delta);
+            case "YEARLY", "CUSTOM_YEARS"   -> from.plusYears(delta);
+            default                         -> null;
         };
     }
 }

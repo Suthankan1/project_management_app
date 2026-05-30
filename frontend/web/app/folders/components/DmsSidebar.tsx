@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { DocumentFolder } from '@/lib/dms';
-import { Clock, Folder, Plus, Star, Trash2 } from 'lucide-react';
+import { DocumentFolder, ProjectStorageQuotaResponse } from '@/lib/dms';
+import { Clock, Folder, Plus, Star, Trash2, Lock } from 'lucide-react';
 import { ViewMode } from '@/app/folders/components/types';
 
 interface DmsSidebarProps {
@@ -21,6 +21,8 @@ interface DmsSidebarProps {
     folderCount: number;
     filteredDocumentCount: number;
     withProjectId: (basePath: string) => string;
+    quota: ProjectStorageQuotaResponse | null;
+    onOpenFolderPermissions: (folder: DocumentFolder) => void;
 }
 
 export default function DmsSidebar({
@@ -39,6 +41,8 @@ export default function DmsSidebar({
     folderCount,
     filteredDocumentCount,
     withProjectId,
+    quota,
+    onOpenFolderPermissions,
 }: DmsSidebarProps) {
     const navLinkClass = (active: boolean, danger = false) =>
         `w-full block text-left px-3 py-2 rounded-md text-sm transition-colors ${
@@ -118,13 +122,22 @@ export default function DmsSidebar({
                                 <span className="truncate">{folder.name}</span>
                             </button>
                             {!isTrashMode && (
-                                <button
-                                    onClick={() => onDeleteFolder(folder)}
-                                    className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-transparent text-cu-text-tertiary hover:text-cu-danger hover:border-cu-danger/30 hover:bg-cu-danger-light opacity-0 group-hover:opacity-100 transition-opacity"
-                                    title="Delete folder"
-                                >
-                                    <Trash2 size={14} />
-                                </button>
+                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                        onClick={() => onOpenFolderPermissions(folder)}
+                                        className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-transparent text-cu-text-tertiary hover:text-cu-primary hover:border-cu-primary/30 hover:bg-cu-primary-light"
+                                        title="Folder permissions"
+                                    >
+                                        <Lock size={14} />
+                                    </button>
+                                    <button
+                                        onClick={() => onDeleteFolder(folder)}
+                                        className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-transparent text-cu-text-tertiary hover:text-cu-danger hover:border-cu-danger/30 hover:bg-cu-danger-light"
+                                        title="Delete folder"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
                             )}
                         </div>
                     ))}
@@ -158,14 +171,40 @@ export default function DmsSidebar({
                 </div>
             )}
 
-            {/* ---- Stats ---- */}
-            <div className="mt-auto rounded-md border border-cu-border bg-cu-bg p-3 text-xs text-cu-text-secondary">
-                <p className="font-semibold text-cu-text-primary truncate mb-0.5">
-                    {projectName ?? `Project #${projectId}`}
-                </p>
-                <p className="text-cu-text-tertiary mb-2">Project documents</p>
-                <p>Folders: <span className="font-semibold text-cu-text-primary">{folderCount}</span></p>
-                <p className="mt-0.5">Documents: <span className="font-semibold text-cu-text-primary">{filteredDocumentCount}</span></p>
+            {/* ---- Stats & Storage Quota ---- */}
+            <div className="mt-auto flex flex-col gap-3 rounded-md border border-cu-border bg-cu-bg p-3 text-xs text-cu-text-secondary">
+                <div>
+                    <p className="font-semibold text-cu-text-primary truncate mb-0.5">
+                        {projectName ?? `Project #${projectId}`}
+                    </p>
+                    <p className="text-cu-text-tertiary mb-2">Project documents</p>
+                    <p>Folders: <span className="font-semibold text-cu-text-primary">{folderCount}</span></p>
+                    <p className="mt-0.5">Documents: <span className="font-semibold text-cu-text-primary">{filteredDocumentCount}</span></p>
+                </div>
+
+                {quota && (
+                    <div className="border-t border-cu-border pt-3">
+                        <div className="flex justify-between items-center text-xs font-semibold mb-1">
+                            <span className="text-cu-text-secondary">Storage Used</span>
+                            <span className="text-cu-text-primary">{quota.humanReadableUsed} / {quota.humanReadableQuota}</span>
+                        </div>
+                        <div className="w-full bg-cu-bg-tertiary rounded-full h-2 overflow-hidden">
+                            <div
+                                style={{ width: `${Math.min(100, Math.max(0, (quota.usedBytes / quota.quotaBytes) * 100))}%` }}
+                                className={`h-2 rounded-full transition-all duration-300 ${
+                                    (quota.usedBytes / quota.quotaBytes) > 0.9
+                                        ? 'bg-red-500'
+                                        : (quota.usedBytes / quota.quotaBytes) > 0.7
+                                        ? 'bg-amber-500'
+                                        : 'bg-cu-primary'
+                                }`}
+                            />
+                        </div>
+                        <p className="text-[10px] text-cu-text-tertiary mt-1">
+                            {((quota.usedBytes / quota.quotaBytes) * 100).toFixed(1)}% of 5GB quota used
+                        </p>
+                    </div>
+                )}
             </div>
         </aside>
     );

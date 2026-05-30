@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Task, Label } from '../types';
-import { Calendar, GitBranch, GitPullRequest, MessageSquare, Paperclip, Check, X, Tag, Plus, ChevronDown, ChevronRight, Lock } from 'lucide-react';
+import { Calendar, GitBranch, GitPullRequest, MessageSquare, Paperclip, Check, X, Tag, Plus, ChevronDown, ChevronRight, Lock, RefreshCw } from 'lucide-react';
 import { CIStatusBadge } from '@/components/ui';
 
 interface KanbanCardProps {
@@ -241,6 +241,19 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
           {pStyle && task.priority && (
             <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${pStyle.text} ${pStyle.bg}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${pStyle.dot}`} /> {task.priority}
+            </div>
+          )}
+          {task.recurrenceRule && (
+            <div
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                task.recurrenceActive === false
+                  ? 'bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/30'
+                  : 'bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/30'
+              }`}
+              title={task.recurrenceActive === false ? 'Recurring (Paused)' : `Recurring (${task.recurrenceRule})`}
+            >
+              <RefreshCw size={10} className="flex-shrink-0" />
+              <span>Recurring{task.recurrenceActive === false ? ' (Paused)' : ''}</span>
             </div>
           )}
         </div>

@@ -19,6 +19,8 @@ export interface TaskRowTask {
   priority?: string;
   labels?: Array<{ id: number; name: string; color?: string }>;
   archived?: boolean;
+  recurrenceRule?: string | null;
+  recurrenceActive?: boolean;
 }
 
 export interface TaskRowTeamMember {

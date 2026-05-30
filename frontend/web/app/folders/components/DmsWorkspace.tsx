@@ -30,6 +30,9 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
         onToggleFavorite, onView, onDownload, onRename, onConfirmRename, onCancelRename,
         onSoftDelete, onToggleVersions, onOpenInfo, onRestore, onPermanentDelete,
         refresh,
+        quota, selectedPermsFolder, folderPermissions, loadingPerms, savingPerms,
+        onOpenFolderPermissions, onSaveFolderPermissions, onCloseFolderPermissions,
+        previewDoc, setPreviewDoc,
     } = useDmsWorkspace(mode);
 
     const dragCounter = useRef(0);
@@ -103,6 +106,8 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
                         busy={busy} folderCount={folderCount}
                         filteredDocumentCount={filteredDocuments.length}
                         withProjectId={withProjectId}
+                        quota={quota}
+                        onOpenFolderPermissions={onOpenFolderPermissions}
                     />
 
                     <section className="col-span-12 lg:col-span-9 xl:col-span-10 bg-cu-bg">
@@ -182,6 +187,11 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
                 getFolderName={getFolderName} isUploading={isUploading} uploadProgress={uploadProgress}
                 renameDoc={renameDoc} renameName={renameName} setRenameName={setRenameName}
                 onConfirmRename={onConfirmRename} onCancelRename={onCancelRename} busy={busy}
+                selectedPermsFolder={selectedPermsFolder} folderPermissions={folderPermissions}
+                loadingPerms={loadingPerms} savingPerms={savingPerms}
+                onSaveFolderPermissions={onSaveFolderPermissions} onCloseFolderPermissions={onCloseFolderPermissions}
+                projectId={projectId}
+                previewDoc={previewDoc} setPreviewDoc={setPreviewDoc}
             />
         </>
     );

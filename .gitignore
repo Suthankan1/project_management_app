@@ -14,3 +14,7 @@ frontend\mobile\.expo
 # Local IDE and Expo metadata
 .expo/
 .idea/
+
+# Logs
+*.log
+**/*.log
