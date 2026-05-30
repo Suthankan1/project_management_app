@@ -25,11 +25,9 @@ export default function CreateSprintModal({
 
   const nameInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Sync default name when modal opens
   React.useEffect(() => {
     if (isOpen) {
       setName(defaultName);
-      // Use a small timeout to ensure the input is rendered and focused
       setTimeout(() => {
         if (nameInputRef.current) {
           nameInputRef.current.focus();
@@ -74,78 +72,78 @@ export default function CreateSprintModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-[#00000040] z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 fade-in duration-200">
+    <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-cu-bg rounded-2xl shadow-xl border border-cu-border max-w-md w-full overflow-hidden animate-in zoom-in-95 fade-in duration-200">
         {/* Header */}
-        <div className="relative bg-[#155DFC] px-6 py-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white">
-                <Rocket size={24} />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-white">Create New Sprint</h2>
-                <p className="text-white/70 text-[11px] font-medium uppercase tracking-wider">Scrum Planning</p>
-              </div>
+        <div className="relative bg-cu-primary px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white">
+              <Rocket size={24} />
             </div>
-            <button
-              onClick={() => { resetForm(); onClose(); }}
-              className="absolute right-4 top-4 p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white"
-            >
-              <X size={20} />
-            </button>
+            <div>
+              <h2 className="text-lg font-bold text-white">Create New Sprint</h2>
+              <p className="text-white/70 text-[11px] font-medium uppercase tracking-wider">Scrum Planning</p>
+            </div>
+          </div>
+          <button
+            onClick={() => { resetForm(); onClose(); }}
+            className="absolute right-4 top-4 p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054]">SPRINT NAME</label>
+            <label className="text-[13px] font-bold text-cu-text-primary">SPRINT NAME</label>
             <input
               ref={nameInputRef}
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Sprint 1"
-              className="w-full px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm focus:ring-2 focus:ring-[#155DFC]/20 focus:outline-none transition-all font-medium"
+              className="w-full px-4 py-3 bg-cu-bg-secondary border border-cu-border rounded-xl text-sm text-cu-text-primary placeholder:text-cu-text-muted focus:ring-2 focus:ring-cu-primary/20 focus:outline-none focus:border-cu-primary transition-all font-medium"
             />
-            {error && <p className="text-red-500 text-xs font-medium">{error}</p>}
+            {error && <p className="text-cu-danger text-xs font-medium">{error}</p>}
           </div>
 
           {/* Dates Row */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-[13px] font-bold text-[#344054] flex items-center gap-2">
-                <Calendar size={14} className="text-[#98A2B3]" /> START DATE
+              <label className="text-[13px] font-bold text-cu-text-primary flex items-center gap-2">
+                <Calendar size={14} className="text-cu-text-tertiary" /> START DATE
               </label>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 transition-all cursor-pointer"
+                className="w-full px-4 py-3 bg-cu-bg-secondary border border-cu-border rounded-xl text-sm text-cu-text-primary focus:outline-none focus:ring-2 focus:ring-cu-primary/20 focus:border-cu-primary transition-all cursor-pointer"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[13px] font-bold text-[#344054] flex items-center gap-2">
-                <Calendar size={14} className="text-[#98A2B3]" /> END DATE
+              <label className="text-[13px] font-bold text-cu-text-primary flex items-center gap-2">
+                <Calendar size={14} className="text-cu-text-tertiary" /> END DATE
               </label>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 transition-all cursor-pointer"
+                className="w-full px-4 py-3 bg-cu-bg-secondary border border-cu-border rounded-xl text-sm text-cu-text-primary focus:outline-none focus:ring-2 focus:ring-cu-primary/20 focus:border-cu-primary transition-all cursor-pointer"
               />
             </div>
           </div>
 
-          {/* Sprint Goal - Hidden on Mobile */}
+          {/* Sprint Goal */}
           <div className="hidden sm:block space-y-2">
-            <label className="text-[13px] font-bold text-[#344054] flex items-center gap-2">
-              <Target size={14} className="text-[#98A2B3]" /> SPRINT GOAL
+            <label className="text-[13px] font-bold text-cu-text-primary flex items-center gap-2">
+              <Target size={14} className="text-cu-text-tertiary" /> SPRINT GOAL
             </label>
             <textarea
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
               placeholder="What do we want to achieve in this sprint?"
               rows={3}
-              className="w-full px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm focus:ring-2 focus:ring-[#155DFC]/20 focus:outline-none transition-all resize-none font-medium"
+              className="w-full px-4 py-3 bg-cu-bg-secondary border border-cu-border rounded-xl text-sm text-cu-text-primary placeholder:text-cu-text-muted focus:ring-2 focus:ring-cu-primary/20 focus:outline-none focus:border-cu-primary transition-all resize-none font-medium"
             />
           </div>
 
@@ -154,14 +152,14 @@ export default function CreateSprintModal({
             <button
               type="button"
               onClick={() => { resetForm(); onClose(); }}
-              className="flex-1 px-4 py-3 border border-[#EAECF0] text-[#344054] rounded-xl font-bold text-sm hover:bg-gray-50 transition-all active:scale-[0.98]"
+              className="flex-1 px-4 py-3 border border-cu-border bg-cu-bg text-cu-text-primary rounded-xl font-bold text-sm hover:bg-cu-hover transition-all active:scale-[0.98]"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 px-4 py-3 bg-[#155DFC] text-white rounded-xl font-bold text-sm hover:bg-[#1149C9] shadow-md transition-all disabled:opacity-50 active:scale-[0.98]"
+              className="flex-1 px-4 py-3 bg-cu-primary text-white rounded-xl font-bold text-sm hover:bg-cu-primary-hover shadow-md transition-all disabled:opacity-50 active:scale-[0.98]"
             >
               {submitting ? 'Creating...' : 'Create Sprint'}
             </button>

@@ -16,12 +16,14 @@ import com.planora.backend.service.UserService;
 
 import jakarta.validation.Valid;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/users/me")
+@RequiredArgsConstructor
 public class UserGithubUsernameController {
 
-    @Autowired
-    private UserService service;
+    private final UserService service;
 
     @PutMapping("/github-username")
     public ResponseEntity<?> updateGithubUsername(

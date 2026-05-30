@@ -37,29 +37,23 @@ import com.planora.backend.repository.UserPushTokenRepository;
 
 import jakarta.persistence.EntityNotFoundException;
 
-@Service
-public class NotificationService {
+import lombok.RequiredArgsConstructor;
 
+@Service
+@RequiredArgsConstructor
+public class NotificationService {
     private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
     private static final String EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
-    @Autowired
-    private NotificationRepository notificationRepository;
+    private final NotificationRepository notificationRepository;
+    private final UserPushTokenRepository userPushTokenRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    @Autowired
-    private UserPushTokenRepository userPushTokenRepository;
+    private final StringRedisTemplate stringRedisTemplate;
 
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    private final NotificationPreferenceService notificationPreferenceService;
 
-    @Autowired
-    private StringRedisTemplate stringRedisTemplate;
-
-    @Autowired
-    private NotificationPreferenceService notificationPreferenceService;
-
-    @Autowired
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
         private final ObjectMapper objectMapper = new ObjectMapper();
         private final HttpClient httpClient = HttpClient.newBuilder()

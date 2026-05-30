@@ -67,6 +67,7 @@ public class DocumentService {
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
     private final S3StorageService s3StorageService;
+    private final VirusScanService virusScanService;
 
     @Value("${aws.s3.dms-bucket}")
     private String dmsBucket;
@@ -114,6 +115,9 @@ public class DocumentService {
         // Step 2: Validate the request and ensure the user isn't trying to hijack someone else's object key.
         validateFileRequest(request.getFileName(), request.getContentType(), request.getFileSize());
         validateObjectKeyOwnership(projectId, request.getObjectKey());
+
+        // Virus scan verification
+        virusScanService.scanFile(request.getObjectKey(), request.getFileName());
 
         // Step 3: Crucial check — did the file actually make it to S3?
         // We don't want a database record pointing to a ghost file.
@@ -188,6 +192,9 @@ public class DocumentService {
 
         String objectKey = buildObjectKey(projectId, folderId, fileName);
 
+        // Virus scan verification
+        virusScanService.scanFile(objectKey, fileName);
+
         try {
             // Stream the file bytes to S3
             s3StorageService.putObject(dmsBucket, objectKey, resolvedContentType, file.getInputStream(), file.getSize());
@@ -246,6 +253,10 @@ public class DocumentService {
 
         validateFileRequest(request.getFileName(), request.getContentType(), request.getFileSize());
         validateObjectKeyOwnership(projectId, request.getObjectKey());
+
+        // Virus scan verification
+        virusScanService.scanFile(request.getObjectKey(), request.getFileName());
+
         verifyObjectExists(request.getObjectKey());
 
         // Step 1: Idempotency check. If we already saved this version, don't crash.
@@ -572,6 +583,7 @@ public class DocumentService {
         requireOwnerOrAdmin(member);
 
         DocumentFolder folder = resolveFolder(projectId, folderId);
+        requireFolderPermission(folder.getId(), member, "MANAGE");
         softDeleteFolderRecursive(folder);
     }
 
@@ -581,6 +593,7 @@ public class DocumentService {
         requireOwnerOrAdmin(member);
 
         DocumentFolder folder = resolveFolder(projectId, folderId);
+        requireFolderPermission(folder.getId(), member, "MANAGE");
         User grantedBy = getUser(userId);
 
         if (permissions == null) {
@@ -903,6 +916,47 @@ public class DocumentService {
                 .uploadedAt(version.getCreatedAt())
                 .downloadUrl(generateDownloadUrl(version.getObjectKey()))
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public ProjectStorageQuotaResponseDTO getStorageQuota(Long projectId, Long userId) {
+        TeamMember member = getProjectMember(projectId, userId);
+        
+        long usedBytes = documentRepository.sumFileSizeByProjectId(projectId);
+        long quotaBytes = 5L * 1024 * 1024 * 1024; // 5 GB
+        long maxFileSizeBytes = MAX_FILE_SIZE_BYTES; // 100 MB
+        long documentCount = documentRepository.countByProjectIdAndStatus(projectId, DocumentStatus.ACTIVE);
+        
+        return ProjectStorageQuotaResponseDTO.builder()
+                .usedBytes(usedBytes)
+                .quotaBytes(quotaBytes)
+                .maxFileSizeBytes(maxFileSizeBytes)
+                .documentCount(documentCount)
+                .humanReadableUsed(formatFileSize(usedBytes))
+                .humanReadableQuota(formatFileSize(quotaBytes))
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<FolderPermissionRequest> getFolderPermissions(Long projectId, Long folderId, Long userId) {
+        TeamMember member = getProjectMember(projectId, userId);
+        DocumentFolder folder = resolveFolder(projectId, folderId);
+        requireFolderPermission(folder.getId(), member, "READ");
+
+        List<DocumentFolderPermission> folderPermissions = folderPermissionRepository.findByFolderId(folderId);
+
+        Map<TeamRole, List<String>> permissionsByRole = folderPermissions.stream()
+                .collect(Collectors.groupingBy(
+                        DocumentFolderPermission::getTeamRole,
+                        Collectors.mapping(DocumentFolderPermission::getPermission, Collectors.toList())
+                ));
+
+        List<FolderPermissionRequest> result = new ArrayList<>();
+        for (TeamRole role : List.of(TeamRole.ADMIN, TeamRole.MEMBER, TeamRole.VIEWER)) {
+            List<String> perms = permissionsByRole.getOrDefault(role, List.of());
+            result.add(new FolderPermissionRequest(role.name(), perms));
+        }
+        return result;
     }
 
     private DocumentFolderResponseDTO mapFolder(DocumentFolder folder) {

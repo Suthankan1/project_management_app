@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import useSWR from 'swr';
-import api from '@/lib/axios';
+import { projectsApi } from '@/services/api-contract';
 
 interface Project {
   id: number;
   name: string;
   projectKey?: string;
   isFavorite?: boolean;
-}
-
-async function fetcher(url: string) {
-  const { data } = await api.get(url);
-  return data;
 }
 
 type ProjectEventName =
@@ -30,14 +25,14 @@ export function useSidebarProjects() {
 
   // Cache recent projects and avoid revalidating on every route change.
   const { data: recentData, isLoading: loadingRecent, mutate: mutateRecent } = useSWR<Project[]>(
-    '/api/projects/recent',
-    fetcher,
+    'projects-recent',
+    () => projectsApi.getRecent(),
     { revalidateOnFocus: false, dedupingInterval: 30000 }
   );
 
   const { data: favoritesData, isLoading: loadingFav, mutate: mutateFav } = useSWR<Project[]>(
-    '/api/projects/favorites',
-    fetcher,
+    'projects-favorites',
+    () => projectsApi.getFavorites(),
     { revalidateOnFocus: false, revalidateOnReconnect: true, revalidateIfStale: false }
   );
 
@@ -69,7 +64,7 @@ export function useSidebarProjects() {
     localStorage.setItem('currentProjectName', project.name);
     localStorage.setItem('currentProjectId', project.id.toString());
     try {
-      await api.post(`/api/projects/${project.id}/access`);
+      await projectsApi.recordAccess(project.id);
     } catch {
       // ignore
     }
@@ -84,7 +79,7 @@ export function useSidebarProjects() {
       setTogglingFavoriteId(project.id);
 
       try {
-        await api.post(`/api/projects/${project.id}/favorite`);
+        await projectsApi.toggleFavorite(project.id);
 
         // Keep dropdowns responsive without network revalidation.
         mutateFav((prev) => {

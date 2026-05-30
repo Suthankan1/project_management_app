@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, BarChart3, Rocket } from 'lucide-react';
+import { AlertTriangle, BarChart3, Rocket, Archive } from 'lucide-react';
 import BacklogCard from './components/BacklogCard';
 import ProductBacklogSection from './components/ProductBacklogSection';
 import FilterBar, { type BacklogFilters } from './components/FilterBar';
@@ -43,6 +43,7 @@ type RawTask = {
   startDate?: string;
   dueDate?: string;
   labels?: Label[];
+  archived?: boolean;
 };
 
 interface ProjectMember {
@@ -72,6 +73,7 @@ export default function SprintBacklogPage() {
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [projectLabels, setProjectLabels] = useState<Array<{ id: number; name: string; color?: string }>>([]);
   const [activeBoardStatuses, setActiveBoardStatuses] = useState<Array<{ value: string; label: string }>>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [filters, setFilters] = useState<BacklogFilters>({
     search: '',
     statuses: [],
@@ -117,6 +119,7 @@ export default function SprintBacklogPage() {
     startDate: raw.startDate ?? '',
     dueDate: raw.dueDate ?? '',
     labels: raw.labels ?? [],
+    archived: raw.archived ?? false,
   });
 
   const persistOrder = useCallback(async (targetSprintId: number | null, orderedTaskIds: number[]) => {
@@ -156,7 +159,7 @@ export default function SprintBacklogPage() {
   const fetchData = useCallback(async (options: { showSpinner?: boolean; forceNetwork?: boolean } = {}) => {
     const { showSpinner = true, forceNetwork = false } = options;
     
-    const cKey = buildSessionCacheKey('sprint-backlog', [projectId]);
+    const cKey = buildSessionCacheKey('sprint-backlog', [projectId, showArchived.toString()]);
     let hasCachedData = false;
     if (cKey && !forceNetwork) {
       const cached = getSessionCache<CacheShape>(cKey, { allowStale: true });
@@ -171,14 +174,26 @@ export default function SprintBacklogPage() {
 
     if (showSpinner && !hasCachedData) setLoading(true);
     try {
-      const [sprintsRes, tasksRes] = await Promise.all([
+      const tasksPromises = [
+        api.get(`/api/tasks/project/${projectId}/all`),
+      ];
+      if (showArchived) {
+        tasksPromises.push(api.get(`/api/tasks/project/${projectId}/all?archived=true`));
+      }
+
+      const [sprintsRes, ...tasksResList] = await Promise.all([
         api.get(`/api/sprints/project/${projectId}`),
-        api.get(`/api/tasks/project/${projectId}`),
+        ...tasksPromises,
       ]);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rawSprints = sprintsRes.data as any[];
-      const rawTasks = tasksRes.data as RawTask[];
+      const rawTasks: RawTask[] = [];
+      tasksResList.forEach((res) => {
+        if (res?.data) {
+          rawTasks.push(...(res.data as RawTask[]));
+        }
+      });
       const uniqueRaw = Array.from(new Map(rawTasks.map(t => [t.id, t])).values());
       const mappedTasks = uniqueRaw.map((t) => mapRawTask(t));
 
@@ -228,7 +243,7 @@ export default function SprintBacklogPage() {
     } finally {
       if (showSpinner && !hasCachedData) setLoading(false);
     }
-  }, [projectId, projectIdNum, projectKey, setTasksForProject]);
+  }, [projectId, projectIdNum, projectKey, setTasksForProject, showArchived]);
 
   const createSprint = useCallback(async (name: string, startDate?: string, endDate?: string, goal?: string) => {
     const trimmed = name.trim();
@@ -668,7 +683,11 @@ export default function SprintBacklogPage() {
         sprintId: t.sprintId ?? null,
         status: t.status ?? 'TODO',
         priority: t.priority ?? 'LOW',
+        archived: t.archived ?? false,
       };
+      if (newTask.archived && !showArchived) {
+        return;
+      }
       if (newTask.sprintId) {
         setSprints(prev => prev.map(s =>
           s.id === newTask.sprintId
@@ -691,12 +710,16 @@ export default function SprintBacklogPage() {
         assigneePhotoUrl: t.assigneePhotoUrl ?? null,
         sprintId: t.sprintId ?? null,
         dueDate: t.dueDate ?? '',
+        archived: t.archived ?? false,
       };
 
       const updateList = (prev: TaskItem[], targetSprintId: number | null | undefined) => {
         const existingIndex = prev.findIndex(x => x.id === t.id);
         const existing = existingIndex >= 0 ? prev[existingIndex] : undefined;
         const filtered = prev.filter(x => x.id !== t.id);
+        if (t.archived && !showArchived) {
+          return filtered;
+        }
         if (!t.sprintId && targetSprintId === null) {
           const taskToUse = existing || { id: t.id } as TaskItem;
           if (existingIndex < 0) return [...filtered, { ...taskToUse, ...updated }];
@@ -712,6 +735,9 @@ export default function SprintBacklogPage() {
         const existingIndex = s.tasks.findIndex(x => x.id === t.id);
         const existing = existingIndex >= 0 ? s.tasks[existingIndex] : undefined;
         const filtered = s.tasks.filter(x => x.id !== t.id);
+        if (t.archived && !showArchived) {
+          return { ...s, tasks: filtered };
+        }
         if (s.id === t.sprintId) {
           const taskToUse = existing || { id: t.id } as TaskItem;
           if (existingIndex < 0) {
@@ -730,7 +756,7 @@ export default function SprintBacklogPage() {
         ...s, tasks: s.tasks.filter(x => x.id !== deletedId)
       })));
     }
-  }, []));
+  }, [showArchived]));
 
   useEffect(() => {
     const action = searchParams.get('action');
@@ -778,6 +804,16 @@ export default function SprintBacklogPage() {
             <p className="text-[13px] sm:text-[14px] text-slate-500 font-medium">Plan sprints and manage product tasks</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className={`flex h-11 items-center gap-2 rounded-xl px-4 text-[13px] font-bold shadow-sm transition-all active:scale-95 ${
+                showArchived ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Archive size={18} />
+              <span className="hidden sm:inline">{showArchived ? 'Hide Archived' : 'Show Archived'}</span>
+              <span className="inline sm:hidden">{showArchived ? 'Hide' : 'Show'}</span>
+            </button>
             <button
               onClick={() => setShowVelocity(!showVelocity)}
               className={`flex h-11 items-center gap-2 rounded-xl px-4 text-[13px] font-bold shadow-sm transition-all active:scale-95 ${

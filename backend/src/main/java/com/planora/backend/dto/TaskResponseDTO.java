@@ -53,6 +53,10 @@ public class TaskResponseDTO {
     private java.time.LocalDate recurrenceEnd;
     private Long recurrenceParentId;
     private java.time.LocalDate nextOccurrence;
+    private boolean recurrenceActive;
+    private Integer customInterval;
+    private Integer recurrenceLimit;
+    private int recurrenceCount;
 
     // GitHub integration fields (V8)
     private Long githubIssueNumber;
@@ -100,6 +104,7 @@ public class TaskResponseDTO {
         private Long id;
         private String title;
         private String relation;
+        private String status;
     }
 
     @Data

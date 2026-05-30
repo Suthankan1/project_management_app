@@ -18,6 +18,8 @@ interface RecentProjectCardProps {
     width?: string;
     isFavorite?: boolean;
     onFavoriteToggle?: (isFavorite: boolean) => void;
+    completedTasks?: number;
+    totalTasks?: number;
 }
 
 export default function RecentProjectCard({
@@ -27,7 +29,9 @@ export default function RecentProjectCard({
     type = "Team-managed software",
     width,
     isFavorite: initialIsFavorite = false,
-    onFavoriteToggle
+    onFavoriteToggle,
+    completedTasks = 0,
+    totalTasks = 0,
 }: RecentProjectCardProps) {
     const router = useRouter(); // Helper to change pages
     const [isFavorite, setIsFavorite] = useState(initialIsFavorite); // Local favorite state
@@ -119,6 +123,7 @@ export default function RecentProjectCard({
     };
 
     const stripeColor = getColorStripe(name || id);
+    const pct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
     const stripeStyle = {
         '--project-stripe': stripeColor,
         background:
@@ -173,6 +178,32 @@ export default function RecentProjectCard({
                 <h3 className="font-arimo text-[15px] leading-[22px] text-cu-text-primary font-bold mt-2 line-clamp-2 group-hover:text-cu-primary transition-colors duration-300 tracking-tight">
                     {name}
                 </h3>
+
+                {/* Progress bar — only shown when task data is available */}
+                {totalTasks > 0 && (
+                    <div className="mt-3">
+                        <div className="flex items-center justify-between mb-[3px]">
+                            <span className="text-[10px] text-cu-text-muted">
+                                {completedTasks}/{totalTasks} tasks
+                            </span>
+                            <span
+                                className="text-[10px] font-semibold tabular-nums"
+                                style={{ color: pct === 100 ? 'var(--cu-success)' : stripeColor }}
+                            >
+                                {pct}%
+                            </span>
+                        </div>
+                        <div className="h-[3px] w-full bg-cu-bg-tertiary rounded-full overflow-hidden">
+                            <div
+                                className="h-full rounded-full transition-all duration-700 ease-out"
+                                style={{
+                                    width: `${pct}%`,
+                                    backgroundColor: pct === 100 ? 'var(--cu-success)' : stripeColor,
+                                }}
+                            />
+                        </div>
+                    </div>
+                )}
 
                 {/* Footer: Quick Action Buttons */}
                 <div className="mt-auto">

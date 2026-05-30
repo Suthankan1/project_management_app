@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 import { PhoneInput } from 'react-international-phone';
-import { Activity, BadgeCheck, Bell, BriefcaseBusiness, Camera, Mail, UserRound, Menu } from 'lucide-react';
+import { Activity, BadgeCheck, Bell, BriefcaseBusiness, Camera, Mail, RefreshCw, UserRound, Menu } from 'lucide-react';
 import { useProfile } from './hooks/useProfile';
 import { useChangePassword } from './hooks/useChangePassword';
 import ChangePasswordCard from './components/ChangePasswordCard';
@@ -29,13 +29,33 @@ export default function ProfilePage() {
         lastActive,
         isLoading, isSavingName, isUploadingPhoto,
         errorMessage, successMessage,
+        reloadProfile,
         onSaveProfile, onUploadPhoto,
     } = useProfile();
 
     const changePassword = useChangePassword({ email });
 
     if (isLoading) {
-        return <p className="text-sm text-cu-text-secondary p-8">Loading profile...</p>;
+        return (
+            <div className="mobile-page-padding max-w-[1400px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+                <div className="rounded-2xl border border-cu-border bg-cu-bg px-5 py-5 shadow-cu-sm animate-pulse space-y-4">
+                    <div className="h-6 w-52 rounded bg-cu-bg-tertiary" />
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="rounded-2xl border border-cu-border bg-cu-bg-secondary p-6 space-y-3">
+                            <div className="h-24 rounded-2xl bg-cu-bg-tertiary" />
+                            <div className="h-4 w-32 rounded bg-cu-bg-tertiary" />
+                            <div className="h-10 rounded-xl bg-cu-bg-tertiary" />
+                        </div>
+                        <div className="lg:col-span-2 rounded-2xl border border-cu-border bg-cu-bg-secondary p-6 space-y-3">
+                            <div className="h-4 w-40 rounded bg-cu-bg-tertiary" />
+                            <div className="h-10 rounded-xl bg-cu-bg-tertiary" />
+                            <div className="h-10 rounded-xl bg-cu-bg-tertiary" />
+                            <div className="h-24 rounded-xl bg-cu-bg-tertiary" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -78,8 +98,16 @@ export default function ProfilePage() {
 
             {/* Alerts */}
             {errorMessage && (
-                <div className="mb-4 rounded-xl border border-cu-danger/30 bg-cu-danger/10 px-4 py-3 text-sm text-cu-danger shadow-cu-sm">
-                    {errorMessage}
+                <div className="mb-4 rounded-xl border border-cu-danger/30 bg-cu-danger/10 px-4 py-3 text-sm text-cu-danger shadow-cu-sm flex items-center justify-between gap-3 flex-wrap">
+                    <span>{errorMessage}</span>
+                    <button
+                        type="button"
+                        onClick={reloadProfile}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-cu-danger/20 bg-cu-bg px-3 py-1.5 text-xs font-semibold text-cu-danger hover:bg-cu-danger/10 transition-colors"
+                    >
+                        <RefreshCw size={13} />
+                        Retry
+                    </button>
                 </div>
             )}
             {successMessage && (

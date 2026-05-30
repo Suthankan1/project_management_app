@@ -58,26 +58,26 @@ export default function TimelineControls({
   }, []);
 
   return (
-    <div className="px-4 sm:px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/60">
+    <div className="px-4 sm:px-6 py-4 border-b border-cu-border-light bg-cu-bg-secondary">
       <div className="flex flex-wrap items-center gap-3 justify-between">
         <div>
-          <h2 className="text-lg sm:text-xl font-semibold text-slate-800">Project Timeline</h2>
+          <h2 className="text-lg sm:text-xl font-semibold text-cu-text-primary">Project Timeline</h2>
           {timelineStart && timelineEnd && (
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-cu-text-tertiary mt-0.5">
               {format(timelineStart, 'MMM d, yyyy')} – {format(timelineEnd, 'MMM d, yyyy')}
             </p>
           )}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
-            <span className="rounded-full border border-[#D0D5DD] bg-white px-2 py-0.5 text-[#667085]">scheduled: {scheduledCount}</span>
-            <span className="rounded-full border border-[#FEDF89] bg-[#FFFAEB] px-2 py-0.5 text-[#B54708]">no date: {noDateCount}</span>
-            <span className="rounded-full border border-[#FDA29B] bg-[#FEF3F2] px-2 py-0.5 text-[#B42318]">overdue: {overdueCount}</span>
-            <span className="rounded-full border border-[#D9D6FE] bg-[#F4F3FF] px-2 py-0.5 text-[#5925DC]">milestone linked: {milestoneLinkedCount}</span>
+            <span className="rounded-full border border-cu-border bg-cu-bg px-2 py-0.5 text-cu-text-secondary">scheduled: {scheduledCount}</span>
+            <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-amber-700">no date: {noDateCount}</span>
+            <span className="rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-red-600">overdue: {overdueCount}</span>
+            <span className="rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-purple-600">milestone linked: {milestoneLinkedCount}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-600 w-full sm:w-auto min-w-[220px]">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-cu-border rounded-lg bg-cu-bg text-cu-text-secondary w-full sm:w-auto min-w-[220px]">
+            <Calendar className="w-3.5 h-3.5 text-cu-text-muted" />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -92,7 +92,7 @@ export default function TimelineControls({
                 scrollContainerRef.current.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
               }
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-600 hover:border-red-400 hover:text-red-600 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-cu-border rounded-lg bg-cu-bg text-cu-text-secondary hover:border-red-400 hover:text-red-500 transition-colors"
             title="Scroll to today"
           >
             <Calendar className="w-3.5 h-3.5" />
@@ -102,7 +102,7 @@ export default function TimelineControls({
           <button
             onClick={() => setHideWeekends(h => !h)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs border rounded-lg transition-colors ${
-              hideWeekends ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'
+              hideWeekends ? 'border-cu-primary/30 bg-cu-primary/10 text-cu-primary' : 'border-cu-border bg-cu-bg text-cu-text-secondary hover:border-cu-primary/40'
             }`}
             title={hideWeekends ? 'Show weekends' : 'Hide weekends'}
           >
@@ -115,18 +115,18 @@ export default function TimelineControls({
               <button
                 type="button"
                 onClick={() => setAssigneeDropdownOpen(o => !o)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-600 hover:border-slate-400 transition-colors"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-cu-border rounded-lg bg-cu-bg text-cu-text-secondary hover:border-cu-primary/40 transition-colors"
               >
                 <User className="w-3.5 h-3.5" />
                 <span>{filterAssignee || 'All Assignees'}</span>
-                <ChevronDown size={12} className="text-slate-400" />
+                <ChevronDown size={12} className="text-cu-text-muted" />
               </button>
               {assigneeDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 min-w-[160px] max-h-48 overflow-y-auto py-1">
+                <div className="absolute top-full left-0 mt-1 bg-cu-bg border border-cu-border rounded-xl shadow-lg z-50 min-w-[160px] max-h-48 overflow-y-auto py-1">
                   <button
                     type="button"
                     onClick={() => { setFilterAssignee(''); setAssigneeDropdownOpen(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 transition-colors ${!filterAssignee ? 'font-semibold text-blue-600' : 'text-slate-700'}`}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-cu-hover transition-colors ${!filterAssignee ? 'font-semibold text-cu-primary' : 'text-cu-text-primary'}`}
                   >
                     All Assignees
                   </button>
@@ -135,7 +135,7 @@ export default function TimelineControls({
                       key={name}
                       type="button"
                       onClick={() => { setFilterAssignee(name); setAssigneeDropdownOpen(false); }}
-                      className={`w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 transition-colors ${filterAssignee === name ? 'font-semibold text-blue-600' : 'text-slate-700'}`}
+                      className={`w-full text-left px-3 py-1.5 text-xs hover:bg-cu-hover transition-colors ${filterAssignee === name ? 'font-semibold text-cu-primary' : 'text-cu-text-primary'}`}
                     >
                       {name}
                     </button>
@@ -149,7 +149,7 @@ export default function TimelineControls({
             <button
               type="button"
               onClick={() => setMilestoneDropdownOpen((o) => !o)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-600 hover:border-slate-400 transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-cu-border rounded-lg bg-cu-bg text-cu-text-secondary hover:border-cu-primary/40 transition-colors"
             >
               <Calendar className="w-3.5 h-3.5" />
               <span>
@@ -159,21 +159,21 @@ export default function TimelineControls({
                     ? 'No Milestone'
                     : milestoneOptions.find((option) => String(option.id) === filterMilestone)?.name ?? 'Milestone'}
               </span>
-              <ChevronDown size={12} className="text-slate-400" />
+              <ChevronDown size={12} className="text-cu-text-muted" />
             </button>
             {milestoneDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 min-w-[180px] max-h-56 overflow-y-auto py-1">
+              <div className="absolute top-full left-0 mt-1 bg-cu-bg border border-cu-border rounded-xl shadow-lg z-50 min-w-[180px] max-h-56 overflow-y-auto py-1">
                 <button
                   type="button"
                   onClick={() => { setFilterMilestone(''); setMilestoneDropdownOpen(false); }}
-                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 transition-colors ${filterMilestone === '' ? 'font-semibold text-blue-600' : 'text-slate-700'}`}
+                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-cu-hover transition-colors ${filterMilestone === '' ? 'font-semibold text-cu-primary' : 'text-cu-text-primary'}`}
                 >
                   All Milestones
                 </button>
                 <button
                   type="button"
                   onClick={() => { setFilterMilestone('__none__'); setMilestoneDropdownOpen(false); }}
-                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 transition-colors ${filterMilestone === '__none__' ? 'font-semibold text-blue-600' : 'text-slate-700'}`}
+                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-cu-hover transition-colors ${filterMilestone === '__none__' ? 'font-semibold text-cu-primary' : 'text-cu-text-primary'}`}
                 >
                   No Milestone
                 </button>
@@ -182,7 +182,7 @@ export default function TimelineControls({
                     key={option.id}
                     type="button"
                     onClick={() => { setFilterMilestone(String(option.id)); setMilestoneDropdownOpen(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 transition-colors ${filterMilestone === String(option.id) ? 'font-semibold text-blue-600' : 'text-slate-700'}`}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-cu-hover transition-colors ${filterMilestone === String(option.id) ? 'font-semibold text-cu-primary' : 'text-cu-text-primary'}`}
                   >
                     {option.name}
                   </button>
@@ -193,26 +193,26 @@ export default function TimelineControls({
 
           <button
             onClick={() => setGroupBy((g) => g === 'none' ? 'status' : g === 'status' ? 'assignee' : g === 'assignee' ? 'milestone' : 'none')}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-600 hover:border-slate-400 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-cu-border rounded-lg bg-cu-bg text-cu-text-secondary hover:border-cu-primary/40 transition-colors"
             title="Toggle group by"
           >
             <Layers className="w-3.5 h-3.5" />
             {groupBy === 'none' ? 'Group by' : `By ${groupBy}`}
           </button>
 
-          <div className="inline-flex items-center border border-slate-200 rounded-lg overflow-hidden ml-auto sm:ml-0">
+          <div className="inline-flex items-center border border-cu-border rounded-lg overflow-hidden ml-auto sm:ml-0 bg-cu-bg">
             <button
               onClick={() => { const i = ZOOM_LEVELS.indexOf(zoom); if (i > 0) setZoom(ZOOM_LEVELS[i - 1]); }}
               disabled={zoom === ZOOM_LEVELS[0]}
-              className="px-2 py-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-colors"
+              className="px-2 py-1.5 text-cu-text-secondary hover:bg-cu-hover disabled:opacity-40 transition-colors"
             >
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
-            <span className="px-2 py-1.5 text-xs font-medium text-slate-700 border-x border-slate-200 bg-slate-50">{zoom}</span>
+            <span className="px-2 py-1.5 text-xs font-medium text-cu-text-primary border-x border-cu-border bg-cu-bg-secondary">{zoom}</span>
             <button
               onClick={() => { const i = ZOOM_LEVELS.indexOf(zoom); if (i < ZOOM_LEVELS.length - 1) setZoom(ZOOM_LEVELS[i + 1]); }}
               disabled={zoom === ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
-              className="px-2 py-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-colors"
+              className="px-2 py-1.5 text-cu-text-secondary hover:bg-cu-hover disabled:opacity-40 transition-colors"
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>

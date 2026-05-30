@@ -54,10 +54,10 @@ export default function CalendarToolbar({
   ].reduce((a, b) => a + b, 0);
 
   const controlClassName =
-    'h-10 rounded-md border border-cu-border bg-cu-bg px-3 text-sm font-medium text-cu-text-secondary hover:border-cu-primary hover:bg-cu-hover';
+    'h-10 rounded-md border border-cu-primary/20 bg-cu-bg/80 px-3 text-sm font-medium text-cu-text-secondary shadow-sm hover:border-cu-primary hover:bg-cu-primary/10 hover:text-cu-primary';
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 rounded-xl border border-cu-primary/15 bg-gradient-to-r from-cu-primary/10 via-cyan-500/10 to-emerald-500/10 p-3 shadow-cu-sm">
 
       {/* ── Desktop toolbar (md+) ─────────────────────────────────────────── */}
       <div className="hidden md:flex flex-wrap items-center justify-between gap-2">
@@ -66,7 +66,7 @@ export default function CalendarToolbar({
             value={filters.search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search calendar"
-            className="h-10 w-56 rounded-[4px] border border-cu-border bg-cu-bg-secondary px-3 text-sm text-cu-text-primary outline-none placeholder:text-cu-text-muted focus:border-cu-primary"
+            className="h-10 w-56 rounded-[4px] border border-cu-primary/20 bg-cu-bg/80 px-3 text-sm text-cu-text-primary outline-none placeholder:text-cu-text-muted focus:border-cu-primary focus:bg-cu-bg"
           />
 
           <FilterDropdown
@@ -109,13 +109,13 @@ export default function CalendarToolbar({
         <div className="flex items-center gap-2">
           <button type="button" onClick={onToday} className={controlClassName}>Today</button>
           <button type="button" onClick={onPrev} className={`${controlClassName} w-10 px-0 text-base`} aria-label="Previous">{'<'}</button>
-          <div className="h-10 min-w-[130px] rounded-[4px] border border-cu-border bg-cu-bg px-4 text-center text-sm font-semibold leading-10 text-cu-text-secondary">{currentLabel}</div>
+          <div className="h-10 min-w-[130px] rounded-[4px] border border-violet-500/25 bg-violet-500/10 px-4 text-center text-sm font-semibold leading-10 text-violet-500">{currentLabel}</div>
           <button type="button" onClick={onNext} className={`${controlClassName} w-10 px-0 text-base`} aria-label="Next">{'>'}</button>
           <div className="relative">
             <select
               value={view}
               onChange={(e) => onViewChange(e.target.value as CalendarView)}
-              className="h-10 min-w-[120px] appearance-none rounded-md border border-cu-border bg-cu-bg pl-3 pr-9 text-sm font-medium text-cu-text-secondary outline-none transition-all hover:border-cu-primary hover:bg-cu-hover focus:border-cu-primary"
+              className="h-10 min-w-[120px] appearance-none rounded-md border border-cu-primary/20 bg-cu-bg/80 pl-3 pr-9 text-sm font-medium text-cu-text-secondary outline-none transition-all hover:border-cu-primary hover:bg-cu-primary/10 focus:border-cu-primary"
             >
               <option value="month">Month</option>
               <option value="week">Week</option>
@@ -131,13 +131,13 @@ export default function CalendarToolbar({
       {/* ── Mobile toolbar (<md) ───────────────────────────────────────────── */}
       <div className="flex md:hidden items-center gap-2">
         {/* Nav: prev / label / next */}
-        <button onClick={onPrev} className="p-2 rounded-lg border border-cu-border bg-cu-bg text-cu-text-secondary active:scale-95 transition-transform" aria-label="Previous">
+        <button onClick={onPrev} className="p-2 rounded-lg border border-cu-primary/20 bg-cu-bg/80 text-cu-text-secondary active:scale-95 transition-transform" aria-label="Previous">
           <ChevronLeft size={18} />
         </button>
-        <div className="flex-1 text-center text-sm font-semibold text-cu-text-secondary bg-cu-bg border border-cu-border rounded-lg py-2 px-2 truncate">
+        <div className="flex-1 text-center text-sm font-semibold text-violet-500 bg-violet-500/10 border border-violet-500/25 rounded-lg py-2 px-2 truncate">
           {currentLabel}
         </div>
-        <button onClick={onNext} className="p-2 rounded-lg border border-cu-border bg-cu-bg text-cu-text-secondary active:scale-95 transition-transform" aria-label="Next">
+        <button onClick={onNext} className="p-2 rounded-lg border border-cu-primary/20 bg-cu-bg/80 text-cu-text-secondary active:scale-95 transition-transform" aria-label="Next">
           <ChevronRight size={18} />
         </button>
 
@@ -146,7 +146,7 @@ export default function CalendarToolbar({
           <select
             value={view}
             onChange={(e) => onViewChange(e.target.value as CalendarView)}
-            className="h-9 appearance-none rounded-lg border border-cu-border bg-cu-bg pl-2.5 pr-7 text-xs font-medium text-cu-text-secondary outline-none"
+            className="h-9 appearance-none rounded-lg border border-cu-primary/20 bg-cu-bg/80 pl-2.5 pr-7 text-xs font-medium text-cu-text-secondary outline-none"
           >
             <option value="month">Month</option>
             <option value="week">Week</option>
@@ -160,12 +160,12 @@ export default function CalendarToolbar({
         {/* Filters button */}
         <button
           onClick={() => setFilterSheetOpen(true)}
-          className="relative flex items-center gap-1.5 h-9 px-3 rounded-lg border border-cu-border bg-cu-bg text-sm font-medium text-cu-text-secondary active:scale-95 transition-transform"
+          className="relative flex items-center gap-1.5 h-9 px-3 rounded-lg border border-cu-primary/20 bg-gradient-to-r from-cu-primary/10 to-cyan-500/10 text-cu-primary text-sm font-medium active:scale-95 transition-transform"
         >
           <SlidersHorizontal size={15} />
           <span>Filters</span>
           {activeFilterCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#155DFC] text-white text-[10px] font-bold flex items-center justify-center">
+            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-cu-primary text-white text-[10px] font-bold flex items-center justify-center">
               {activeFilterCount}
             </span>
           )}

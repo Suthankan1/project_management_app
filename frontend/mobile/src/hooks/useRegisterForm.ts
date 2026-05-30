@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../api/axios';
-import { getValidToken } from '../auth/storage';
+import api from '../lib/axios';
+import { getValidToken } from '../lib/auth';
 import { EMAIL_REGEX, validatePassword, getPasswordStrength } from '../lib/validation';
 
 export function useRegisterForm() {

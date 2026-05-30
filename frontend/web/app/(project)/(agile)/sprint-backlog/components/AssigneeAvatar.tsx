@@ -59,7 +59,7 @@ export default function AssigneeAvatar({
   return (
     <span
       className={joinClasses(
-        'inline-flex flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#F2F4F7] text-[#175CD3]',
+        'inline-flex flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-cu-bg-tertiary text-cu-primary',
         fallbackClassName,
         className
       )}
@@ -83,7 +83,7 @@ export default function AssigneeAvatar({
           {initials}
         </span>
       ) : (
-        <UserCircle2 size={iconSize} strokeWidth={1.5} className="text-[#98A2B3]" />
+        <UserCircle2 size={iconSize} strokeWidth={1.5} className="text-cu-text-muted" />
       )}
     </span>
   );

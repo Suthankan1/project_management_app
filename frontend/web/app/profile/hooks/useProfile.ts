@@ -45,6 +45,7 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
 
 export function useProfile() {
     const router = useRouter();
+    const [reloadToken, setReloadToken] = useState(0);
 
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
@@ -76,6 +77,9 @@ export function useProfile() {
             router.push('/login');
             return;
         }
+        setIsLoading(true);
+        setErrorMessage('');
+        setSuccessMessage('');
         setUsername(tokenUser.username || '');
         setEmail(tokenUser.email || '');
 
@@ -103,7 +107,11 @@ export function useProfile() {
             }
         };
         void loadProfile();
-    }, [router]);
+    }, [router, reloadToken]);
+
+    const reloadProfile = () => {
+        setReloadToken((value) => value + 1);
+    };
 
     const onSaveProfile = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -187,6 +195,7 @@ export function useProfile() {
         isUploadingPhoto,
         errorMessage,
         successMessage,
+        reloadProfile,
         onSaveProfile,
         onUploadPhoto,
     };

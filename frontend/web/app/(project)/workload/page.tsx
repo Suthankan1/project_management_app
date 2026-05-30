@@ -6,6 +6,8 @@ import api from '@/lib/axios';
 import { fetchTasksByProject } from '@/app/(project)/kanban/api';
 import { Task } from '@/app/(project)/kanban/types';
 import TaskCardModal from '@/app/taskcard/TaskCardModal';
+import EmptyState from '@/components/shared/EmptyState';
+import { RefreshCw } from 'lucide-react';
 
 interface Member {
     userId: number;
@@ -71,7 +73,7 @@ export default function WorkloadPage() {
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
 
     const loadData = useCallback(async () => {
-        if (!projectId) { setError('No project ID provided.'); return; }
+        if (!projectId) { setError('No project ID provided.'); setIsLoading(false); return; }
         setIsLoading(true);
         setError(null);
         try {
@@ -117,9 +119,37 @@ export default function WorkloadPage() {
 
     useEffect(() => { void loadData(); }, [loadData]);
 
-    if (!projectId) return <p className="p-8 text-sm text-[#6A7282]">No project selected.</p>;
+    if (!projectId) {
+        return (
+            <div className="mobile-page-padding max-w-5xl mx-auto py-12">
+                <EmptyState
+                    title="No project selected"
+                    subtitle="Open a project first, then return to workload to see team allocation."
+                />
+            </div>
+        );
+    }
     if (isLoading) return <p className="p-8 text-sm text-[#6A7282]">Loading workload…</p>;
-    if (error) return <p className="p-8 text-sm text-red-600">{error}</p>;
+    if (error) {
+        return (
+            <div className="mobile-page-padding max-w-5xl mx-auto py-12">
+                <EmptyState
+                    title="Unable to load workload"
+                    subtitle={error}
+                    action={
+                        <button
+                            type="button"
+                            onClick={() => void loadData()}
+                            className="inline-flex items-center gap-2 rounded-xl bg-cu-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-cu-primary-hover transition-colors"
+                        >
+                            <RefreshCw size={14} />
+                            Retry
+                        </button>
+                    }
+                />
+            </div>
+        );
+    }
 
     const totalTasks = workload.reduce((s, w) => s + w.tasks.length, 0) + unassigned.length;
 
@@ -145,7 +175,20 @@ export default function WorkloadPage() {
                 )}
 
                 {workload.length === 0 && unassigned.length === 0 && (
-                    <p className="text-sm text-[#6A7282] text-center py-16">No tasks found for this project.</p>
+                    <EmptyState
+                        title="No workload data yet"
+                        subtitle="Create tasks or assign them to team members to see the workload breakdown here."
+                        action={
+                            <button
+                                type="button"
+                                onClick={() => void loadData()}
+                                className="inline-flex items-center gap-2 rounded-xl bg-cu-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-cu-primary-hover transition-colors"
+                            >
+                                <RefreshCw size={14} />
+                                Refresh data
+                            </button>
+                        }
+                    />
                 )}
             </div>
 

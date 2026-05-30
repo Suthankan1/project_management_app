@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import api from '../api/axios';
-import { clearRefreshToken, getValidToken, saveRefreshToken, saveToken, setRememberMe } from '../auth/storage';
+import api from '../lib/axios';
+import { getValidToken, saveRefreshToken, saveToken, setRememberMe } from '../lib/auth';
 import { EMAIL_REGEX } from '../lib/validation';
 import { registerForPushNotifications } from '../lib/pushNotifications';
 
@@ -42,12 +42,10 @@ export function useLoginForm() {
       });
 
       if (response.data.success) {
-        await saveToken(response.data.token);
         await setRememberMe(remember);
-        if (remember && response.data.refreshToken) {
+        await saveToken(response.data.token);
+        if (response.data.refreshToken) {
           await saveRefreshToken(response.data.refreshToken);
-        } else {
-          await clearRefreshToken();
         }
 
         if (Platform.OS === 'ios' || Platform.OS === 'android') {
@@ -101,3 +99,4 @@ export function useLoginForm() {
     handleLogin,
   };
 }
+

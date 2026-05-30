@@ -64,6 +64,8 @@ class DocumentServiceTest {
     private UserRepository userRepository;
     @Mock
     private S3StorageService s3StorageService;
+    @Mock
+    private VirusScanService virusScanService;
 
     @InjectMocks
     private DocumentService documentService;
@@ -129,7 +131,7 @@ class DocumentServiceTest {
     @Test
     void deleteFolder_withActiveDocuments_cascadesSoftDeletes() {
         TeamMember admin = new TeamMember();
-        admin.setRole(TeamRole.ADMIN);
+        admin.setRole(TeamRole.OWNER);
 
         DocumentFolder folder = new DocumentFolder();
         folder.setId(300L);
@@ -161,7 +163,7 @@ class DocumentServiceTest {
     @Test
     void deleteFolder_withChildFolders_cascadesRecursively() {
         TeamMember admin = new TeamMember();
-        admin.setRole(TeamRole.ADMIN);
+        admin.setRole(TeamRole.OWNER);
 
         DocumentFolder parent = new DocumentFolder();
         parent.setId(300L);

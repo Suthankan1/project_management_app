@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   AlertTriangle, Trash2, LogOut, Settings2,
   Layers, FileText, Shield, Loader2, CheckCircle2,
-  X, Info, ArrowRight, Github,
+  X, Info, ArrowRight, Github, RefreshCw,
 } from 'lucide-react';
 import * as projectsApi from '@/services/projects-service';
 import { toast } from '@/components/ui';
@@ -28,6 +28,7 @@ import {
 import { getUserIdFromToken } from '@/lib/auth';
 import CustomFieldsManager from './CustomFieldsManager';
 import NotificationPreferencesPanel from '@/components/settings/NotificationPreferencesPanel';
+import RecurringSchedulesManager from './RecurringSchedulesManager';
 type ProjectType = 'AGILE' | 'KANBAN';
 
 interface ProjectData {
@@ -986,6 +987,14 @@ export default function ProjectSettingsPage() {
                   icon={<Settings2 size={15} />}
                 >
                   <CustomFieldsManager projectId={projectId} />
+                </SectionCard>
+
+                <SectionCard
+                  title="Recurring Tasks"
+                  description="Manage automated recurring schedules and template tasks in this project"
+                  icon={<RefreshCw size={15} />}
+                >
+                  <RecurringSchedulesManager projectId={projectId} />
                 </SectionCard>
 
                 <GitHubAutoTransitionsCard projectId={projectId} />

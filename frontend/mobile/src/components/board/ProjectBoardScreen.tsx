@@ -20,7 +20,11 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Svg, { Circle, Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { T, STATUS_MAP, StatusKey } from '../../constants/tokens';
+import { Colors } from '../../constants/colors';
+import OfflineStaleBanner from '../ui/OfflineStaleBanner';
+import { offlineSyncManager } from '../../services/offlineSyncManager';
 import {
   BoardMember,
   BoardLabel,
@@ -175,6 +179,8 @@ function TaskCard({
   onEdit,
   onDelete,
   onDueDatePress,
+  onAssigneePress,
+  onConflictPress,
   onDragEnd,
   onDragStateChange,
   onDragMove,
@@ -183,6 +189,8 @@ function TaskCard({
   onEdit: (task: BoardTask) => void;
   onDelete: (task: BoardTask) => void;
   onDueDatePress: (task: BoardTask) => void;
+  onAssigneePress: (task: BoardTask) => void;
+  onConflictPress: (task: BoardTask) => void;
   onDragEnd: (task: BoardTask, dropX: number, translationX: number) => void;
   onDragStateChange: (active: boolean) => void;
   onDragMove: (screenX: number) => void;
@@ -300,6 +308,22 @@ function TaskCard({
               <Text style={[card.priorityText, { color: priority.text }]}>{task.priority}</Text>
             </View>
           ) : <View />}
+
+          {/* Offline Sync Status Indicator */}
+          {task.syncStatus === 'pending' && (
+            <View style={card.syncIndicator}>
+              <ActivityIndicator size="small" color="#94A3B8" />
+            </View>
+          )}
+          {task.syncStatus === 'failed' && (
+            <TouchableOpacity
+              activeOpacity={0.78}
+              onPress={() => onConflictPress(task)}
+              style={[card.syncIndicator, card.syncFailedIndicator]}
+            >
+              <Ionicons name="alert-circle" size={16} color="#DC2626" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <Text style={card.title} numberOfLines={3}>{task.title}</Text>
@@ -345,12 +369,16 @@ function TaskCard({
         )}
 
         <View style={card.footerRow}>
-          <View style={card.assigneeRow}>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            onPress={() => onAssigneePress(task)}
+            style={card.assigneeRow}
+          >
             <View style={card.avatar}>
               <Text style={card.avatarText}>{initialsFromName(task.assigneeName)}</Text>
             </View>
             <Text style={card.assigneeName} numberOfLines={1}>{task.assigneeName || 'Unassigned'}</Text>
-          </View>
+          </TouchableOpacity>
 
           {totalSubtasks > 0 && (
             <View style={card.subtaskWrap}>
@@ -373,6 +401,8 @@ function BoardColumn({
   onDeleteTask,
   onEditTask,
   onDueDatePress,
+  onAssigneePress,
+  onConflictPress,
   onCreateTask,
   onDeleteColumn,
   onDragTask,
@@ -384,6 +414,8 @@ function BoardColumn({
   onDeleteTask: (task: BoardTask) => void;
   onEditTask: (task: BoardTask) => void;
   onDueDatePress: (task: BoardTask) => void;
+  onAssigneePress: (task: BoardTask) => void;
+  onConflictPress: (task: BoardTask) => void;
   onCreateTask: (column: KanbanBoardColumn) => void;
   onDeleteColumn: (column: KanbanBoardColumn) => void;
   onDragTask: (task: BoardTask, column: KanbanBoardColumn, dropX: number, translationX: number) => void;
@@ -439,6 +471,8 @@ function BoardColumn({
               onEdit={onEditTask}
               onDelete={onDeleteTask}
               onDueDatePress={onDueDatePress}
+              onAssigneePress={onAssigneePress}
+              onConflictPress={onConflictPress}
               onDragStateChange={onDragStateChange}
               onDragMove={onDragMove}
               onDragEnd={(draggedTask, dropX, translationX) => onDragTask(draggedTask, column, dropX, translationX)}
@@ -677,8 +711,11 @@ export default function ProjectBoardScreen({
     deleteTask,
     updateTaskTitle,
     updateTaskDueDate,
+    updateTaskAssignee,
     createColumn,
     deleteColumn,
+    isOnline,
+    isStale,
   } = useProjectBoard(projectId);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -697,6 +734,47 @@ export default function ProjectBoardScreen({
   const [showCreateDatePicker, setShowCreateDatePicker] = useState(false);
   const [showAssigneePicker, setShowAssigneePicker] = useState(false);
   const [dateTask, setDateTask] = useState<BoardTask | null>(null);
+  const [assigneePickerTask, setAssigneePickerTask] = useState<BoardTask | null>(null);
+
+  const openAssigneePicker = (task: BoardTask) => {
+    setAssigneePickerTask(task);
+  };
+
+  const handleConflictPress = (task: BoardTask) => {
+    const queue = offlineSyncManager.getQueue();
+    const mutation = queue.find((m) => m.taskId === task.id && m.status === 'failed');
+    if (!mutation) return;
+
+    Alert.alert(
+      'Conflict Detected',
+      `This task was modified on the server while you were offline.\n\n` +
+      `Error: ${mutation.error}\n\n` +
+      `Your change: ${mutation.type.replace('UPDATE_', '')} \n` +
+      `Current Server Status: ${task.status}\n` +
+      `Current Server Due: ${task.dueDate ? task.dueDate.slice(0, 10) : 'None'}\n` +
+      `Current Server Assignee: ${task.assigneeName || 'Unassigned'}\n\n` +
+      `Select a resolution action:`,
+      [
+        {
+          text: 'Force Sync (Keep Mine)',
+          onPress: () => {
+            void offlineSyncManager.resolveConflict(mutation.id, 'overwrite');
+          },
+        },
+        {
+          text: 'Discard (Revert)',
+          style: 'destructive',
+          onPress: () => {
+            void offlineSyncManager.resolveConflict(mutation.id, 'discard');
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [savingDate, setSavingDate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -966,6 +1044,7 @@ export default function ProjectBoardScreen({
   return (
     <SafeAreaView style={s.safe} edges={topOffset ? ['left', 'right'] : ['top', 'left', 'right']}>
       <StatusBar style="dark" />
+      <OfflineStaleBanner isOnline={isOnline} isStale={isStale} />
       <BoardBackdrop />
 
       <ScrollView
@@ -1089,6 +1168,8 @@ export default function ProjectBoardScreen({
                   onDeleteTask={confirmDeleteTask}
                   onEditTask={openEditTask}
                   onDueDatePress={openDatePicker}
+                  onAssigneePress={openAssigneePicker}
+                  onConflictPress={handleConflictPress}
                   onCreateTask={openCreateTask}
                   onDeleteColumn={confirmDeleteColumn}
                   onDragTask={handleDragTask}
@@ -1188,11 +1269,25 @@ export default function ProjectBoardScreen({
       />
 
       <AssigneePickerModal
-        visible={showAssigneePicker}
+        visible={showAssigneePicker || !!assigneePickerTask}
         members={members}
-        selectedId={newTaskAssigneeId}
-        onClose={() => setShowAssigneePicker(false)}
-        onSelect={setNewTaskAssigneeId}
+        selectedId={assigneePickerTask ? (members.find(m => m.name === assigneePickerTask.assigneeName)?.userId ?? null) : newTaskAssigneeId}
+        onClose={() => {
+          setShowAssigneePicker(false);
+          setAssigneePickerTask(null);
+        }}
+        onSelect={async (id) => {
+          if (assigneePickerTask) {
+            try {
+              await updateTaskAssignee(assigneePickerTask.id, id);
+            } catch {
+              Alert.alert('Assignee not updated', 'Please try again.');
+            }
+            setAssigneePickerTask(null);
+          } else {
+            setNewTaskAssigneeId(id);
+          }
+        }}
       />
 
       <Modal visible={showTaskModal} transparent animationType="slide">
@@ -1577,7 +1672,16 @@ const card = StyleSheet.create({
       android: { elevation: 24 },
     }),
   },
-  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 17, paddingRight: 34 },
+  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 17, paddingRight: 34, gap: 6 },
+  syncIndicator: {
+    marginLeft: 'auto',
+    marginRight: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  syncFailedIndicator: {
+    padding: 2,
+  },
   priority: {
     alignSelf: 'flex-start',
     flexDirection: 'row',

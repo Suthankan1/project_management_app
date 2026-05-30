@@ -191,4 +191,49 @@ class DocumentControllerTest {
         mockMvc.perform(delete("/api/projects/10/folders/1").with(csrf()))
                 .andExpect(status().isNoContent());
     }
+
+    @Test
+    @WithMockUserPrincipal
+    void initUpload_invalidPayload_returns400() throws Exception {
+        DocumentUploadInitRequestDTO req = new DocumentUploadInitRequestDTO();
+        req.setFileName(""); // Blank filename
+        req.setContentType("invalid/type"); // Unsupported type
+        req.setFileSize(-50L); // Negative file size
+
+        mockMvc.perform(post("/api/projects/10/documents/upload/init")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void updateMetadata_invalidPayload_returns400() throws Exception {
+        DocumentMetadataUpdateRequestDTO req = new DocumentMetadataUpdateRequestDTO();
+        req.setFolderId(-5L); // Negative folder ID
+
+        mockMvc.perform(patch("/api/projects/10/documents/1")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void updateFolderPermissions_invalidPayload_returns400() throws Exception {
+        List<FolderPermissionRequest> invalidPermissions = List.of(
+                new FolderPermissionRequest("INVALID_ROLE", List.of("READ"))
+        );
+
+        mockMvc.perform(put("/api/projects/10/folders/1/permissions")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidPermissions)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
 }

@@ -15,14 +15,16 @@ import com.planora.backend.dto.UserResponseDTO;
 import com.planora.backend.service.UserPushTokenService;
 import com.planora.backend.service.UserService;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/user")
+@RequiredArgsConstructor
 // Maintaining a dedicated controller or endpoint for the "current user"
 // keeps user-context operations distinct from broader administrative actions (like fetching all users).
 public class UserMeController {
 
-    @Autowired
-    private UserService service;
+    private final UserService service;
 
     @Autowired
     private UserPushTokenService pushTokenService;
@@ -61,6 +63,20 @@ public class UserMeController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         } catch (Exception e) {
             return new ResponseEntity<>("Failed to save push token: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PostMapping("/me/logout-all")
+    public ResponseEntity<?> logoutAllSessions(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return new ResponseEntity<>("User is not authenticated", HttpStatus.UNAUTHORIZED);
+        }
+
+        try {
+            service.logoutAllSessions(authentication.getName());
+            return new ResponseEntity<>(java.util.Map.of("message", "Logged out from all sessions successfully"), HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Failed to logout all sessions: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

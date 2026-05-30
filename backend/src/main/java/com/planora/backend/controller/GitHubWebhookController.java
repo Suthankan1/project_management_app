@@ -22,6 +22,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
+
 /**
  * Receives GitHub webhook events and applies real-time CI status updates to tasks.
  *
@@ -41,6 +43,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping({"/api/github/webhook", "/api/github/webhooks"})
+@RequiredArgsConstructor
 public class GitHubWebhookController {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubWebhookController.class);
@@ -48,17 +51,13 @@ public class GitHubWebhookController {
     @Value("${github.webhook.secret:}")
     private String webhookSecret;
 
-    @Autowired
-    private CiStatusResolver ciStatusResolver;
+    private final CiStatusResolver ciStatusResolver;
 
-    @Autowired
-    private TaskGithubService taskGithubService;
+    private final TaskGithubService taskGithubService;
 
-    @Autowired
-    private GithubNotificationService githubNotificationService;
+    private final GithubNotificationService githubNotificationService;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper;
 
     /**
      * Main webhook receiver. Reads the body as a raw string so the exact bytes

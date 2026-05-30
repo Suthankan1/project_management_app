@@ -148,9 +148,9 @@ export default function SprintHeader({
     const isWarning = !isDanger && daysLeft <= 7;
     return (
       <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[12px] font-bold ${
-        isDanger ? 'border-[#FECDCA] bg-[#FEF3F2] text-[#B42318]' :
-        isWarning ? 'border-[#FEDF89] bg-[#FFFAEB] text-[#B54708]' :
-        'border-[#EAECF0] bg-white text-[#667085]'
+        isDanger ? 'border-cu-danger/30 bg-cu-danger-light text-cu-danger' :
+        isWarning ? 'border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400' :
+        'border-cu-border bg-cu-bg-secondary text-cu-text-secondary'
       }`}>
         {daysLeft}d left
       </span>
@@ -158,14 +158,14 @@ export default function SprintHeader({
   })();
 
   return (
-    <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#EAECF0] pb-4 gap-3 sm:gap-4">
+    <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between border-b border-cu-border pb-4 gap-3 sm:gap-4">
       <div className="flex items-center gap-3">
-        <div className="h-5 w-5 rounded border border-[#98A2B3] bg-transparent" />
+        <div className="h-5 w-5 rounded border border-cu-text-tertiary bg-transparent" />
 
         <button
           type="button"
           onClick={onToggleOpen}
-          className="text-[#344054] p-1 hover:bg-[#F2F4F7] rounded-lg transition-colors duration-150"
+          className="text-cu-text-primary p-1 hover:bg-cu-hover rounded-lg transition-colors duration-150"
         >
           {isOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
         </button>
@@ -187,10 +187,10 @@ export default function SprintHeader({
                   if (e.key === 'Escape') setIsEditingName(false);
                 }}
                 disabled={editingSprintLoading}
-                className="w-full min-w-[200px] border-b border-[#175CD3] bg-transparent text-[14px] font-bold text-[#101828] outline-none"
+                className="w-full min-w-[200px] border-b border-cu-primary bg-transparent text-[14px] font-bold text-cu-text-primary outline-none"
               />
               {nameError ? (
-                <div className="rounded-xl border border-[#F1A7AA] bg-[#FDF2F2] px-3 py-2 text-[13px] text-[#B42318]">
+                <div className="rounded-xl border border-cu-danger/30 bg-cu-danger-light px-3 py-2 text-[13px] text-cu-danger">
                   {nameError}
                 </div>
               ) : null}
@@ -213,7 +213,7 @@ export default function SprintHeader({
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
               onTouchMove={handleTouchMove}
-              className="cursor-text text-[14px] font-bold text-[#101828] select-none"
+              className="cursor-text text-[14px] font-bold text-cu-text-primary select-none"
             >
               {sprintName}
             </span>
@@ -221,7 +221,7 @@ export default function SprintHeader({
 
           <button
             onClick={() => setIsEditingName(!isEditingName)}
-            className="p-1.5 text-[#98A2B3] hover:text-[#175CD3] hover:bg-[#F2F4F7] rounded-lg transition-colors"
+            className="p-1.5 text-cu-text-tertiary hover:text-cu-primary hover:bg-cu-hover rounded-lg transition-colors"
             title="Edit Sprint Name"
           >
             <Pencil size={14} />
@@ -232,14 +232,14 @@ export default function SprintHeader({
       </div>
 
       <div className="relative flex items-center justify-end gap-3 flex-1" ref={sprintMenuRef}>
-        <div className="flex items-center gap-1.5 bg-white border border-[#EAECF0] px-2 py-1 rounded-full shadow-sm">
-          <div className="rounded-full bg-[#F2F4F7] px-2 py-[2px] text-[12px] font-bold text-[#344054]" title="To Do">
+        <div className="flex items-center gap-1.5 bg-cu-bg border border-cu-border px-2 py-1 rounded-full shadow-cu-sm">
+          <div className="rounded-full bg-cu-bg-tertiary px-2 py-[2px] text-[12px] font-bold text-cu-text-primary" title="To Do">
             {totals.todo}
           </div>
-          <div className="rounded-full bg-[#EFF8FF] px-2 py-[2px] text-[12px] font-bold text-[#175CD3]" title="In Progress">
+          <div className="rounded-full bg-cu-primary-light px-2 py-[2px] text-[12px] font-bold text-cu-primary" title="In Progress">
             {totals.inprogress}
           </div>
-          <div className="rounded-full bg-[#ECFDF3] px-2 py-[2px] text-[12px] font-bold text-[#027A48]" title="Done">
+          <div className="rounded-full bg-cu-success-light px-2 py-[2px] text-[12px] font-bold text-cu-success" title="Done">
             {totals.done}
           </div>
         </div>
@@ -248,7 +248,7 @@ export default function SprintHeader({
           {sprintStatus === 'NOT_STARTED' ? (
             <button
               onClick={onStartSprint}
-              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-[#175CD3] bg-[#175CD3] px-3.5 py-2 text-[12px] font-bold text-white hover:bg-[#1849A9] shadow-sm transform active:scale-95 transition-all duration-150"
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-cu-primary bg-cu-primary px-3.5 py-2 text-[12px] font-bold text-white hover:bg-cu-primary-hover shadow-sm transform active:scale-95 transition-all duration-150"
             >
               <Rocket size={14} />
               <span>Start Sprint</span>
@@ -256,7 +256,7 @@ export default function SprintHeader({
           ) : sprintStatus === 'ACTIVE' ? (
             <button
               onClick={onCompleteSprint}
-              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-[#027A48] bg-[#039855] px-3.5 py-2 text-[12px] font-bold text-white hover:bg-[#027A48] shadow-sm transform active:scale-95 transition-all duration-150"
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-3.5 py-2 text-[12px] font-bold text-white hover:bg-emerald-700 shadow-sm transform active:scale-95 transition-all duration-150"
             >
               <Check size={14} />
               <span>Complete Sprint</span>
@@ -265,7 +265,7 @@ export default function SprintHeader({
 
           <button
             onClick={onViewReport}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-[#D0D5DD] bg-white px-3 py-2 text-[12px] font-bold text-[#344054] hover:bg-[#F9FAFB] transition-all"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-cu-border bg-cu-bg px-3 py-2 text-[12px] font-bold text-cu-text-primary hover:bg-cu-hover transition-all"
           >
             <BarChart3 size={14} />
             <span className="hidden sm:inline">Sprint Report</span>
@@ -277,28 +277,28 @@ export default function SprintHeader({
             aria-haspopup="true"
             aria-expanded={showSprintMenu}
             aria-label="Sprint actions"
-            className="p-2 text-[#344054] hover:bg-[#F2F4F7] rounded-lg transition-colors duration-150"
+            className="p-2 text-cu-text-primary hover:bg-cu-hover rounded-lg transition-colors duration-150"
           >
             <MoreHorizontal size={20} />
           </button>
         </div>
 
         {showSprintMenu && (
-          <div role="menu" className="absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-xl border border-[#D0D5DD] bg-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-200">
+          <div role="menu" className="absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-xl border border-cu-border bg-cu-bg shadow-cu-xl animate-in fade-in slide-in-from-top-2 duration-200">
             <button
               onClick={() => { setShowSprintMenu(false); onEditSprint(); }}
-              className="flex w-full items-center gap-3 px-5 py-4 text-left text-[14px] font-bold text-[#101828] hover:bg-[#F9FAFB]"
+              className="flex w-full items-center gap-3 px-5 py-4 text-left text-[14px] font-bold text-cu-text-primary hover:bg-cu-hover"
             >
-              <Pencil size={18} className="text-[#667085]" />
+              <Pencil size={18} className="text-cu-text-secondary" />
               <span>Edit Sprint</span>
             </button>
 
             {sprintStatus === 'NOT_STARTED' && (
               <button
                 onClick={() => { setShowSprintMenu(false); onStartSprint(); }}
-                className="flex w-full items-center gap-3 px-5 py-4 text-left text-[14px] font-bold text-[#101828] hover:bg-[#F9FAFB]"
+                className="flex w-full items-center gap-3 px-5 py-4 text-left text-[14px] font-bold text-cu-text-primary hover:bg-cu-hover"
               >
-                <Rocket size={18} className="text-[#175CD3]" />
+                <Rocket size={18} className="text-cu-primary" />
                 <span>Start Sprint</span>
               </button>
             )}
@@ -306,7 +306,7 @@ export default function SprintHeader({
             {sprintStatus === 'ACTIVE' && (
               <button
                 onClick={() => { setShowSprintMenu(false); onCompleteSprint(); }}
-                className="flex w-full items-center gap-3 px-5 py-4 text-left text-[14px] font-bold text-[#027A48] hover:bg-[#F9FAFB]"
+                className="flex w-full items-center gap-3 px-5 py-4 text-left text-[14px] font-bold text-cu-success hover:bg-cu-hover"
               >
                 <Check size={18} />
                 <span>Complete Sprint</span>
@@ -315,19 +315,19 @@ export default function SprintHeader({
 
             <button
               onClick={() => { onViewReport(); setShowSprintMenu(false); }}
-              className="flex w-full items-center gap-3 px-5 py-4 text-left text-[14px] font-bold text-[#101828] hover:bg-[#F9FAFB]"
+              className="flex w-full items-center gap-3 px-5 py-4 text-left text-[14px] font-bold text-cu-text-primary hover:bg-cu-hover"
             >
-              <BarChart3 size={18} className="text-[#667085]" />
+              <BarChart3 size={18} className="text-cu-text-secondary" />
               <span>View Report</span>
             </button>
 
-            <div className="border-t border-[#EAECF0]" />
+            <div className="border-t border-cu-border" />
 
             <button
               onClick={() => { setShowSprintMenu(false); onDeleteSprint(); }}
               disabled={!canDeleteSprint}
               className={`flex w-full items-center gap-3 px-5 py-4 text-left text-[14px] font-bold ${
-                canDeleteSprint ? 'text-[#F04438] hover:bg-[#FEF3F2]' : 'text-[#98A2B3] cursor-not-allowed'
+                canDeleteSprint ? 'text-cu-danger hover:bg-cu-danger-light' : 'text-cu-text-muted cursor-not-allowed'
               }`}
               title={!canDeleteSprint ? "Only an Admin or Owner can delete a sprint" : ""}
             >
@@ -335,7 +335,7 @@ export default function SprintHeader({
               <div className="flex flex-col">
                 <span>Delete Sprint</span>
                 {!canDeleteSprint && (
-                  <span className="text-[10px] font-medium text-[#98A2B3]">
+                  <span className="text-[10px] font-medium text-cu-text-muted">
                     Admin/Owner only
                   </span>
                 )}

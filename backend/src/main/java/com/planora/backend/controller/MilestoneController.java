@@ -27,13 +27,15 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 // @Tag is used by Swagger/OpenAPI to group these endpoints cleanly in the generated API documentation UI.
 @Tag(name = "Milestones", description = "Milestone management for projects")
+@RequiredArgsConstructor
 public class MilestoneController {
 
-    @Autowired
-    private MilestoneService milestoneService;
+    private final MilestoneService milestoneService;
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;

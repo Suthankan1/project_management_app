@@ -14,13 +14,15 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 
+import lombok.RequiredArgsConstructor;
+
 // Handles operations specifically related to managing the authenticated user's profile.
 @RestController
 @RequestMapping("/api/user/profile")
+@RequiredArgsConstructor
 public class UserProfileController {
 
-    @Autowired
-    UserService service;
+    private final UserService service;
 
     // Centralizing this extraction keeps the controller DRY.
     // If the token structure or authentication mechanism ever changes, we only update it here.

@@ -11,6 +11,8 @@ import DateSection from './sidebar/DateSection';
 import RecurrenceSection from './sidebar/RecurrenceSection';
 import TaskGitHubSection from './sidebar/TaskGitHubSection';
 import SidebarField from './sidebar/SidebarField';
+import CustomFieldsSection from './sidebar/CustomFieldsSection';
+import api from '@/lib/axios';
 import { Check, ChevronDown, Link2, Plus } from 'lucide-react';
 import GitHubIssueBadge from '@/components/github/GitHubIssueBadge';
 import GitHubMark from '@/components/github/GitHubMark';
@@ -21,6 +23,13 @@ interface MultiAssignee {
   userId: number;
   name: string;
   photoUrl: string | null;
+}
+
+interface ProjectCustomField {
+  id: number;
+  name: string;
+  fieldType: string;
+  options?: string[];
 }
 
 interface TaskSidebarProps {
@@ -44,6 +53,8 @@ interface TaskSidebarProps {
   assignees?: MultiAssignee[];
   recurrenceRule?: string | null;
   recurrenceEnd?: string | null;
+  customInterval?: number | null;
+  recurrenceLimit?: number | null;
   dates: {
     created: string;
     updated: string;
@@ -56,7 +67,7 @@ interface TaskSidebarProps {
   onUpdateDueDate?: (dueDate: string | null) => void;
   onUpdateStartDate?: (startDate: string | null) => void;
   onUpdateMilestone?: (milestoneId: number | null) => void;
-  onUpdateRecurrence?: (rule: string | null, end: string | null) => void;
+  onUpdateRecurrence?: (rule: string | null, end: string | null, customInterval: number | null, recurrenceLimit: number | null) => void;
   onUpdateReporter?: (reporterId: number | null) => void;
   onUpdateSprint?: (sprintId: number | null) => void;
   onUpdateLabels?: (labelIds: number[]) => void;
@@ -72,7 +83,8 @@ interface TaskSidebarProps {
 
 const TaskSidebar: React.FC<TaskSidebarProps> = ({
   taskId, projectId, status, assignee, reporter, labels, labelIds = [], priority, sprint, storyPoint,
-  milestoneId, milestoneName, githubIssueNumber = null, githubRepoFullName = null, projectGitHubRepo = null, assignees, recurrenceRule, recurrenceEnd, dates, reporterId, sprintId,
+  milestoneId, milestoneName, githubIssueNumber = null, githubRepoFullName = null, projectGitHubRepo = null, assignees,
+  recurrenceRule, recurrenceEnd, customInterval, recurrenceLimit, dates, reporterId, sprintId,
   onUpdateStatus, onUpdatePriority, onUpdateStoryPoint, onUpdateDueDate, onUpdateMilestone,
   onUpdateRecurrence, onUnassign, onAssigneesChanged, onUpdateReporter, onUpdateSprint, onUpdateLabels, onUpdateStartDate,
   canEdit = true, canChangeReporter = false, members = [], allLabels = [], sprints = [], onCreateGitHubIssue,
@@ -85,6 +97,20 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
   const [labelMenuOpen, setLabelMenuOpen] = React.useState(false);
   const [selectedLabelIds, setSelectedLabelIds] = React.useState<number[]>(labelIds);
   const labelMenuRef = React.useRef<HTMLDivElement>(null);
+  const [projectCustomFields, setProjectCustomFields] = React.useState<ProjectCustomField[]>([]);
+
+  React.useEffect(() => {
+    if (projectId == null) return;
+    let active = true;
+    api.get(`/api/projects/${projectId}/custom-fields`)
+      .then((res) => {
+        if (active) {
+          setProjectCustomFields(res.data || []);
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [projectId]);
 
   React.useEffect(() => {
     setSelectedLabelIds((prev) => {
@@ -240,6 +266,13 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
               )}
             </div>
           </SidebarField>
+          {projectCustomFields.length > 0 && taskId != null && projectId != null && (
+            <CustomFieldsSection
+              taskId={taskId}
+              projectId={projectId}
+              canEdit={canEdit}
+            />
+          )}
           <SidebarField label="Sprint">
             <select
               value={sprintId ?? ''}
@@ -264,6 +297,8 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
             <RecurrenceSection
               recurrenceRule={recurrenceRule}
               recurrenceEnd={recurrenceEnd}
+              customInterval={customInterval}
+              recurrenceLimit={recurrenceLimit}
               onUpdate={canEdit ? onUpdateRecurrence : () => {}}
             />
           )}

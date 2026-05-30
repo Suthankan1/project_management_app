@@ -24,6 +24,10 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 
 import java.time.LocalDate;
@@ -31,25 +35,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/tasks")
+@RequiredArgsConstructor
 public class TaskController {
 
-    @Autowired
-    TaskService service;
+    private final TaskService service;
 
-    @Autowired
-    TaskActivityService activityService;
+    private final TaskActivityService activityService;
 
-    @Autowired
-    TaskTemplateService templateService;
+    private final TaskTemplateService templateService;
 
-    @Autowired
-    TaskGithubService taskGithubService;
+    private final TaskGithubService taskGithubService;
 
     // Spring's WebSocket messaging template used for real-time push notifications.
-    @Autowired
-    SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
 
     //Creates a new task and broadcasts the creation to all connected clients.
     @PostMapping
@@ -191,7 +193,22 @@ public class TaskController {
     @PutMapping("/{taskId}")
     public ResponseEntity<TaskResponseDTO> updateTask(
             @PathVariable Long taskId,
-            @Validated @RequestBody TaskRequestDTO request,
+            @Valid @RequestBody TaskRequestDTO request,
+            @AuthenticationPrincipal UserPrincipal currentUser){
+        Long currentUserId = currentUser.getUserId();
+        TaskResponseDTO task = service.updateTask(taskId, request, currentUserId);
+
+        // REAL-TIME PUSH: Update the task card on everyone's screen.
+        messagingTemplate.convertAndSend(
+                "/topic/project/" + task.getProjectId() + "/tasks",
+                Map.of("type", "TASK_UPDATED", "task", task));
+        return new ResponseEntity<>(task, HttpStatus.OK);
+    }
+
+    @PatchMapping("/{taskId}")
+    public ResponseEntity<TaskResponseDTO> patchTask(
+            @PathVariable Long taskId,
+            @Valid @RequestBody TaskRequestDTO request,
             @AuthenticationPrincipal UserPrincipal currentUser){
         Long currentUserId = currentUser.getUserId();
         TaskResponseDTO task = service.updateTask(taskId, request, currentUserId);
@@ -222,17 +239,33 @@ public class TaskController {
      * Supports multiple optional filters via query parameters.
      */
     @GetMapping("/project/{projectId}")
-    public ResponseEntity<List<TaskResponseDTO>> getTasksByProject(
+    public ResponseEntity<Page<TaskResponseDTO>> getTasksByProject(
+            @PathVariable Long projectId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        Pageable pageable = PageRequest.of(page, size,
+                sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() :
+                        Sort.by(sortBy).descending());
+        return ResponseEntity.ok(service.getTasksByProject(projectId,
+                currentUser.getUserId(), pageable));
+    }
+
+    @GetMapping("/project/{projectId}/all")
+    public ResponseEntity<List<TaskResponseDTO>> getAllTasksByProject(
             @PathVariable Long projectId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long assigneeId,
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) Long sprintId,
             @RequestParam(required = false) Long milestoneId,
+            @RequestParam(required = false, defaultValue = "false") Boolean archived,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
-        return new ResponseEntity<>(service.getTasksByProject(projectId, currentUserId, status, assigneeId, priority, sprintId, milestoneId), HttpStatus.OK);
+        return new ResponseEntity<>(service.getTasksByProject(projectId, currentUserId, status, assigneeId, priority, sprintId, milestoneId, archived), HttpStatus.OK);
     }
 
     @GetMapping("/project/{projectId}/archived")
@@ -381,14 +414,14 @@ public class TaskController {
 
     // ── ASSIGNMENT ──────────────────────────────────────────────────────────────
 
-    @PatchMapping("{taskID}/assign/{userId}")
+    @PatchMapping("/{taskId}/assign/{userId}")
     public ResponseEntity<Void> assignUser(
-            @PathVariable Long taskID,
+            @PathVariable Long taskId,
             @PathVariable Long userId,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
-        service.assignUser(taskID,userId,currentUserId);
+        service.assignUser(taskId, userId, currentUserId);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 

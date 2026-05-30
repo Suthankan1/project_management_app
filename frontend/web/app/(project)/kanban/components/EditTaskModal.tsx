@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { X, Calendar, User, Edit2, Tag, ChevronDown } from 'lucide-react';
+import { X, Calendar, User, Edit2, Tag, ChevronDown, Flag } from 'lucide-react';
 import { Task, Label } from '../types';
 import { fetchProject, fetchTeamMembers, fetchProjectLabels } from '../api';
 
@@ -135,20 +135,20 @@ export default function EditTaskModal({
   if (!isOpen || !task) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-cu-bg rounded-2xl shadow-cu-xl border border-cu-border max-w-md w-full overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
                 <Edit2 size={20} className="text-white" />
               </div>
               <h2 className="text-xl font-semibold text-white">Edit Task</h2>
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 bg-white bg-opacity-20 rounded-lg flex items-center justify-center text-white hover:bg-opacity-30 transition-all duration-200"
+              className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center text-white hover:bg-white/30 transition-all duration-200"
             >
               <X size={18} />
             </button>
@@ -159,9 +159,9 @@ export default function EditTaskModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Title Field */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <div className="w-5 h-5 bg-blue-100 rounded flex items-center justify-center">
-                <span className="text-blue-600 text-xs font-bold">T</span>
+            <label className="text-sm font-medium text-cu-text-primary flex items-center gap-2">
+              <div className="w-5 h-5 bg-cu-primary/10 rounded flex items-center justify-center">
+                <span className="text-cu-primary text-xs font-bold">T</span>
               </div>
               Task Title
             </label>
@@ -174,7 +174,7 @@ export default function EditTaskModal({
                 setTitleLength(e.target.value.length);
               }}
               placeholder="What needs to be done?"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm transition-all duration-200"
+              className="w-full px-4 py-3 border border-cu-border bg-cu-bg text-cu-text-primary placeholder:text-cu-text-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-cu-primary/40 focus:border-transparent text-sm transition-all duration-200"
               disabled={loading}
             />
             {titleLength > 200 && (
@@ -184,7 +184,7 @@ export default function EditTaskModal({
             )}
             {error && (
               <p className="text-red-600 text-xs flex items-center gap-1">
-                <span className="w-4 h-4 bg-red-100 rounded-full flex items-center justify-center">
+                <span className="w-4 h-4 bg-red-500/10 rounded-full flex items-center justify-center">
                   <span className="text-red-600 text-xs">!</span>
                 </span>
                 {error}
@@ -194,32 +194,32 @@ export default function EditTaskModal({
 
           {/* Description Field */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Description</label>
+            <label className="text-sm font-medium text-cu-text-primary">Description</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Add a description... (optional)"
               maxLength={2000}
               rows={3}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm resize-none transition-all duration-200"
+              className="w-full px-4 py-3 border border-cu-border bg-cu-bg text-cu-text-primary placeholder:text-cu-text-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-cu-primary/40 focus:border-transparent text-sm resize-none transition-all duration-200"
               disabled={loading}
             />
-            <p className="text-xs text-gray-400 text-right">{description.length}/2000</p>
+            <p className="text-xs text-cu-text-muted text-right">{description.length}/2000</p>
           </div>
 
           {/* Start Date */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <Calendar size={16} className="text-gray-500" />
+            <label className="text-sm font-medium text-cu-text-primary flex items-center gap-2">
+              <Calendar size={16} className="text-cu-text-tertiary" />
               Start Date
-              <span className="text-xs text-gray-400 font-normal">(Optional)</span>
+              <span className="text-xs text-cu-text-muted font-normal">(Optional)</span>
             </label>
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setShowStartDatePicker(!showStartDatePicker)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 transition-all duration-200 ${
-                  startDate ? 'border-green-200 bg-green-50 text-green-700' : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
+                  startDate ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500' : 'border-cu-border bg-cu-bg-secondary text-cu-text-secondary hover:border-cu-primary/40'
                 }`}
                 disabled={loading}
               >
@@ -229,11 +229,11 @@ export default function EditTaskModal({
                 </span>
               </button>
               {startDate && (
-                <button type="button" onClick={() => setStartDate(null)} className="text-xs text-gray-400 hover:text-gray-600" disabled={loading}>Clear</button>
+                <button type="button" onClick={() => setStartDate(null)} className="text-xs text-cu-text-muted hover:text-cu-text-secondary" disabled={loading}>Clear</button>
               )}
             </div>
             {showStartDatePicker && (
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <div className="bg-cu-bg-secondary rounded-xl p-4 border border-cu-border">
                 <DatePicker selected={startDate} onChange={(d: Date | null) => { setStartDate(d); setShowStartDatePicker(false); }} dateFormat="MMM d, yyyy" inline disabled={loading} />
               </div>
             )}
@@ -241,10 +241,10 @@ export default function EditTaskModal({
 
           {/* Due Date Section */}
           <div className="space-y-3">
-            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <Calendar size={16} className="text-gray-500" />
+            <label className="text-sm font-medium text-cu-text-primary flex items-center gap-2">
+              <Calendar size={16} className="text-cu-text-tertiary" />
               Due Date
-              <span className="text-xs text-gray-400 font-normal">(Optional)</span>
+              <span className="text-xs text-cu-text-muted font-normal">(Optional)</span>
             </label>
 
             <button
@@ -253,7 +253,7 @@ export default function EditTaskModal({
               className={`w-full flex items-center gap-2 px-4 py-2 rounded-xl border-2 transition-all duration-200 ${
                 dueDate
                   ? 'border-blue-200 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100'
+                  : 'border-cu-border bg-cu-bg-secondary text-cu-text-secondary hover:border-cu-primary/40 hover:bg-cu-hover'
               }`}
               disabled={loading}
             >
@@ -272,7 +272,7 @@ export default function EditTaskModal({
             </button>
 
             {showDueDatePicker && (
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <div className="bg-cu-bg-secondary rounded-xl p-4 border border-cu-border">
                 <DatePicker
                   selected={dueDate}
                   onChange={(date: Date | null) => {
@@ -289,30 +289,30 @@ export default function EditTaskModal({
 
           {/* Assignee Section */}
           <div className="space-y-3">
-            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <User size={16} className="text-gray-500" />
+            <label className="text-sm font-medium text-cu-text-primary flex items-center gap-2">
+              <User size={16} className="text-cu-text-tertiary" />
               Assignee
-              <span className="text-xs text-gray-400 font-normal">(Optional)</span>
+              <span className="text-xs text-cu-text-muted font-normal">(Optional)</span>
             </label>
 
             <div ref={assigneeRef} className="relative">
               <button
                 type="button"
                 onClick={() => setAssigneeDropdownOpen(o => !o)}
-                className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-xl text-sm bg-white hover:bg-gray-50 transition-all duration-200"
+                className="w-full flex items-center justify-between px-4 py-3 border border-cu-border rounded-xl text-sm bg-cu-bg text-cu-text-primary hover:bg-cu-hover transition-all duration-200"
                 disabled={loading || loadingMembers}
               >
-                <span className="text-gray-700">
+                <span className="text-cu-text-primary">
                   {assignee ? `👤 ${safeTeamMembers.find(m => m.id === assignee)?.name || 'Selected'}` : '👤 Unassigned'}
                 </span>
-                <ChevronDown size={14} className="text-gray-400" />
+                <ChevronDown size={14} className="text-cu-text-muted" />
               </button>
               {assigneeDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#D0D5DD] rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-cu-bg border border-cu-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
                   <button
                     type="button"
                     onClick={() => { setAssignee(''); setAssigneeDropdownOpen(false); }}
-                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors ${!assignee ? 'font-semibold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}
+                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-cu-primary/10 hover:text-cu-primary transition-colors ${!assignee ? 'font-semibold text-cu-primary bg-cu-primary/10' : 'text-cu-text-primary'}`}
                   >
                     👤 Unassigned
                   </button>
@@ -321,7 +321,7 @@ export default function EditTaskModal({
                       key={member.id}
                       type="button"
                       onClick={() => { setAssignee(member.id); setAssigneeDropdownOpen(false); }}
-                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors ${assignee === member.id ? 'font-semibold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}
+                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-cu-primary/10 hover:text-cu-primary transition-colors ${assignee === member.id ? 'font-semibold text-cu-primary bg-cu-primary/10' : 'text-cu-text-primary'}`}
                     >
                       👤 {member.name}
                     </button>
@@ -331,8 +331,8 @@ export default function EditTaskModal({
             </div>
 
             {loadingMembers && (
-              <div className="text-gray-500 text-xs flex items-center gap-2">
-                <div className="w-3 h-3 border border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
+              <div className="text-cu-text-tertiary text-xs flex items-center gap-2">
+                <div className="w-3 h-3 border border-cu-border border-t-cu-primary rounded-full animate-spin"></div>
                 Loading team members...
               </div>
             )}
@@ -341,29 +341,29 @@ export default function EditTaskModal({
           {/* Label picker */}
           {labels.length > 0 && (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                <Tag size={16} className="text-gray-500" />
+              <label className="text-sm font-medium text-cu-text-primary flex items-center gap-2">
+                <Tag size={16} className="text-cu-text-tertiary" />
                 Label
-                <span className="text-xs text-gray-400 font-normal">(Optional)</span>
+                <span className="text-xs text-cu-text-muted font-normal">(Optional)</span>
               </label>
               <div ref={labelRef} className="relative">
                 <button
                   type="button"
                   onClick={() => setLabelDropdownOpen(o => !o)}
-                  className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-xl text-sm bg-white hover:bg-gray-50 transition-all duration-200"
+                  className="w-full flex items-center justify-between px-4 py-3 border border-cu-border rounded-xl text-sm bg-cu-bg text-cu-text-primary hover:bg-cu-hover transition-all duration-200"
                   disabled={loading}
                 >
-                  <span className="text-gray-700">
+                  <span className="text-cu-text-primary">
                     {selectedLabelId ? labels.find(l => l.id === selectedLabelId)?.name ?? 'No label' : 'No label'}
                   </span>
-                  <ChevronDown size={14} className="text-gray-400" />
+                  <ChevronDown size={14} className="text-cu-text-muted" />
                 </button>
                 {labelDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#D0D5DD] rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-cu-bg border border-cu-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
                     <button
                       type="button"
                       onClick={() => { setSelectedLabelId(null); setLabelDropdownOpen(false); }}
-                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors ${!selectedLabelId ? 'font-semibold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}
+                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-cu-primary/10 hover:text-cu-primary transition-colors ${!selectedLabelId ? 'font-semibold text-cu-primary bg-cu-primary/10' : 'text-cu-text-primary'}`}
                     >
                       No label
                     </button>
@@ -372,7 +372,7 @@ export default function EditTaskModal({
                         key={l.id}
                         type="button"
                         onClick={() => { setSelectedLabelId(l.id); setLabelDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors ${selectedLabelId === l.id ? 'font-semibold text-blue-600 bg-blue-50/50' : 'text-gray-700'}`}
+                        className={`w-full text-left px-4 py-2.5 text-sm hover:bg-cu-primary/10 hover:text-cu-primary transition-colors ${selectedLabelId === l.id ? 'font-semibold text-cu-primary bg-cu-primary/10' : 'text-cu-text-primary'}`}
                       >
                         {l.name}
                       </button>
@@ -385,17 +385,17 @@ export default function EditTaskModal({
 
           {/* Priority Section */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <span className="text-xs">🏷️</span>
+            <label className="text-sm font-medium text-cu-text-primary flex items-center gap-2">
+              <Flag size={14} className="text-cu-text-muted" />
               Priority
             </label>
             <div className="grid grid-cols-4 gap-1">
               {(['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const).map((p) => {
                 const colors: Record<string, string> = {
-                  LOW: 'border-gray-300 text-gray-500 bg-gray-50 data-[active=true]:bg-gray-200 data-[active=true]:border-gray-500 data-[active=true]:text-gray-700',
-                  MEDIUM: 'border-amber-300 text-amber-600 bg-amber-50 data-[active=true]:bg-amber-200 data-[active=true]:border-amber-500',
-                  HIGH: 'border-orange-300 text-orange-600 bg-orange-50 data-[active=true]:bg-orange-200 data-[active=true]:border-orange-500',
-                  URGENT: 'border-red-300 text-red-600 bg-red-50 data-[active=true]:bg-red-200 data-[active=true]:border-red-500',
+                  LOW: 'border-slate-400/40 text-cu-text-tertiary bg-cu-bg-secondary data-[active=true]:bg-slate-500/20 data-[active=true]:border-slate-500 data-[active=true]:text-cu-text-primary',
+                  MEDIUM: 'border-amber-500/30 text-amber-500 bg-amber-400/10 data-[active=true]:bg-amber-400/20 data-[active=true]:border-amber-500',
+                  HIGH: 'border-orange-500/30 text-orange-500 bg-orange-500/10 data-[active=true]:bg-orange-500/20 data-[active=true]:border-orange-500',
+                  URGENT: 'border-red-500/30 text-red-500 bg-red-500/10 data-[active=true]:bg-red-500/20 data-[active=true]:border-red-500',
                 };
                 return (
                   <button
@@ -415,8 +415,8 @@ export default function EditTaskModal({
 
           {/* Error Message */}
           {submitError && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-start gap-3">
-              <div className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+            <div className="p-4 bg-red-500/10 border border-red-500/25 rounded-xl text-red-500 text-sm flex items-start gap-3">
+              <div className="w-5 h-5 bg-red-500/10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                 <span className="text-red-600 text-xs font-bold">!</span>
               </div>
               <div>
@@ -431,14 +431,14 @@ export default function EditTaskModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium text-sm hover:bg-gray-50 transition-all duration-200"
+              className="flex-1 px-4 py-3 border border-cu-border text-cu-text-secondary rounded-xl font-medium text-sm hover:bg-cu-hover transition-all duration-200"
               disabled={loading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-medium text-sm hover:from-blue-600 hover:to-blue-700 transition-all duration-200 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-cu-primary to-cu-primary-hover text-white rounded-xl font-medium text-sm hover:from-cu-primary-hover hover:to-cu-primary transition-all duration-200 disabled:from-cu-bg-tertiary disabled:to-cu-bg-tertiary disabled:text-cu-text-muted disabled:cursor-not-allowed shadow-cu-md hover:shadow-cu-lg"
               disabled={loading}
             >
               {loading ? (

@@ -146,7 +146,7 @@ export default function SprintBoardPage() {
   if (!isAgile) return <BoardEmptyStates type="not-agile" />;
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 h-full bg-[#F0F2F5] overflow-hidden">
+    <div className="flex-1 flex flex-col min-w-0 h-full bg-cu-bg-secondary overflow-hidden">
       {loading ? <BoardEmptyStates type="loading" /> :
        error ? <BoardEmptyStates type="error" error={error} onRetry={forceRefresh} /> :
        !sprintboard || !board ? <BoardEmptyStates type="no-sprint" onGoToBacklog={() => router.push(`/sprint-backlog?projectId=${projectIdStr}`)} /> : (
@@ -161,8 +161,8 @@ export default function SprintBoardPage() {
             isLoading={actions.isUpdating} onOpenShortcuts={() => setShowShortcuts(true)}
             teamMembers={teamMembers}
           />
-          <div className="px-4 md:px-6 py-1 border-b border-[#EAECF0] bg-white">
-            <button type="button" onClick={() => setDenseMode((prev) => !prev)} className="rounded-lg border border-[#D0D5DD] px-2 py-1 text-xs text-[#344054]">
+          <div className="px-4 md:px-6 py-1 border-b border-cu-border bg-cu-bg">
+            <button type="button" onClick={() => setDenseMode((prev) => !prev)} className="rounded-lg border border-cu-border bg-cu-bg-secondary px-2 py-1 text-xs text-cu-text-secondary hover:bg-cu-hover hover:text-cu-text-primary transition-colors">
               {denseMode ? 'Switch to comfort spacing' : 'Switch to dense spacing'}
             </button>
           </div>
@@ -173,13 +173,13 @@ export default function SprintBoardPage() {
           <div className="flex-1 overflow-x-auto px-3 md:px-5 py-3 snap-x snap-mandatory hide-scrollbar">
             <UndoMoveToast lastMove={lastMove} onUndo={actions.handleUndoMove} />
             <CompleteSprintModal open={actions.showCompleteConfirm} allActiveSprints={allActiveSprints} sprintIdToComplete={actions.sprintIdToComplete} onSelectSprint={actions.setSprintIdToComplete} onComplete={actions.handleCompleteSprint} onCancel={() => actions.setShowCompleteConfirm(false)} />
-            {actions.successMsg && <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-[#6CE9A6] bg-[#ECFDF3] px-5 py-2 text-sm font-semibold text-[#027A48]">{actions.successMsg}</div>}
+            {actions.successMsg && <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-2 text-sm font-semibold text-emerald-500 shadow-cu-lg">{actions.successMsg}</div>}
 
             <SprintDragDropProvider tasks={board.columns.flatMap((col) => col.tasks)} onDragEnd={actions.handleDragEnd}>
               <div className="flex items-start gap-4 sm:gap-3 h-full min-h-[calc(100vh-250px)] pb-3">
                 {(swimlanes ?? [{ key: 'default', columns: filteredColumns }]).map((lane) => (
                   <div key={lane.key} className="space-y-2">
-                    {swimlanes && <div className="rounded-lg border border-[#D0D5DD] bg-white px-3 py-1 text-xs font-semibold text-[#344054]">{lane.key}</div>}
+                    {swimlanes && <div className="rounded-lg border border-cu-border bg-cu-bg px-3 py-1 text-xs font-semibold text-cu-text-secondary shadow-cu-sm">{lane.key}</div>}
                     <SortableContext items={lane.columns.map((column) => `column-${column.id}`)} strategy={horizontalListSortingStrategy}>
                       <div className="flex items-start gap-3">
                         {lane.columns.map((column) => (
