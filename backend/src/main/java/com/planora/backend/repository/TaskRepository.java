@@ -49,7 +49,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            """)
     List<Task> findByProjectIdWithScalars(@Param("projectId") Long projectId);
 
-    @EntityGraph(attributePaths = {"labels", "assignees", "assignees.user", "assignee", "assignee.user", "reporter", "reporter.user", "subTasks", "attachments"})
+    @EntityGraph(attributePaths = {"labels", "assignees", "assignees.user", "assignee", "assignee.user", "reporter", "reporter.user", "subTasks", "attachments", "dependencies"})
     @Query("SELECT DISTINCT t FROM Task t WHERE t.id IN :ids")
     List<Task> findByIdInWithCollections(@Param("ids") List<Long> ids);
 
@@ -287,12 +287,20 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Object[]> aggregateVelocityBySprintIds(@Param("sprintIds") List<Long> sprintIds);
 
     @Query("""
-           SELECT t.id, d.id, d.title
+           SELECT t.id, d.id, d.title, d.status
            FROM Task t
            LEFT JOIN t.dependencies d
            WHERE t.id IN :taskIds
            """)
     List<Object[]> findDependencyRowsByTaskIds(@Param("taskIds") List<Long> taskIds);
+
+    @Query("""
+           SELECT t.id, d.id, d.title, d.status
+           FROM Task t
+           LEFT JOIN t.dependents d
+           WHERE t.id IN :taskIds
+           """)
+    List<Object[]> findDependentRowsByTaskIds(@Param("taskIds") List<Long> taskIds);
 
     @Query("""
            SELECT t.id, d.id

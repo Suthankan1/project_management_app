@@ -440,6 +440,11 @@ public class SprintboardService {
             dto.setLabelName(label.getName());
             dto.setLabelColor(label.getColor());
         }
+        
+        boolean isBlocked = task.getDependencies() != null && task.getDependencies().stream()
+                .anyMatch(dep -> !"DONE".equalsIgnoreCase(dep.getStatus()));
+        dto.setBlocked(isBlocked);
+
         return dto;
     }
 }

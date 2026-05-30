@@ -211,7 +211,7 @@ function TaskPageContent() {
           <h2 className="text-red-600 font-semibold mb-2">Error Loading Task</h2>
           <p className="text-gray-600 mb-4">{error || 'Task not found'}</p>
           <button
-            onClick={handleClose}
+            onClick={() => handleClose()}
             className="w-full bg-[#155DFC] text-white py-2 rounded-xl hover:bg-[#0042A8] transition-colors"
           >
             Go Back

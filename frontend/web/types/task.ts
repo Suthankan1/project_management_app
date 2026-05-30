@@ -38,6 +38,7 @@ export interface Dependency {
   id: number;
   title: string;
   relation: string;
+  status?: string;
 }
 
 export interface TaskAttachmentSummary {

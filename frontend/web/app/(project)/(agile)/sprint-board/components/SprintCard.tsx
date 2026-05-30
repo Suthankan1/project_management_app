@@ -4,7 +4,7 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { SprintboardTask } from '../types';
-import { Calendar, GripVertical } from 'lucide-react';
+import { Calendar, GripVertical, Lock } from 'lucide-react';
 import AssigneeAvatar from '../../sprint-backlog/components/AssigneeAvatar';
 import { hexToLabelStyle } from '@/components/shared/LabelPicker';
 import { SprintTeamMemberOption } from '../api';
@@ -205,7 +205,12 @@ export default function SprintCard({
 
       {/* Bottom row: Priority badge, Story points & Assignee */}
       <div className={`flex items-center justify-between mt-auto ${dense ? 'pt-1' : 'pt-1.5'}`}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {task.blocked && (
+            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-500">
+              <Lock size={10} className="flex-shrink-0" /> Blocked
+            </span>
+          )}
           {priorityStyle && (
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${priorityStyle.bg} ${priorityStyle.text}`}>
               {priorityStyle.label}

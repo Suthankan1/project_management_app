@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Task, Label } from '../types';
-import { Calendar, GitBranch, GitPullRequest, MessageSquare, Paperclip, Check, X, Tag, Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Calendar, GitBranch, GitPullRequest, MessageSquare, Paperclip, Check, X, Tag, Plus, ChevronDown, ChevronRight, Lock } from 'lucide-react';
 import { CIStatusBadge } from '@/components/ui';
 
 interface KanbanCardProps {
@@ -40,6 +40,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
 
   const pStyle = task.priority ? PRIORITY_COLORS[task.priority] : null;
   const priorityBorder = pStyle ? pStyle.border : 'border-l-transparent';
+  const isBlocked = task.dependencies?.some(d => d.relation === 'BLOCKED_BY' && d.status !== 'DONE') ?? false;
 
   // Inline editing state
   const [isEditing, setIsEditing] = useState(false);
@@ -230,12 +231,19 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
         {/* Title */}
         <p className="text-[13px] font-medium text-cu-text-primary leading-snug line-clamp-2 mb-2">{task.title}</p>
 
-        {/* Priority badge */}
-        {pStyle && task.priority && (
-          <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold mb-2 ${pStyle.text} ${pStyle.bg}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${pStyle.dot}`} /> {task.priority}
-          </div>
-        )}
+        {/* Priority and Blocked badges */}
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {isBlocked && (
+            <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-500">
+              <Lock size={10} className="flex-shrink-0" /> Blocked
+            </div>
+          )}
+          {pStyle && task.priority && (
+            <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${pStyle.text} ${pStyle.bg}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${pStyle.dot}`} /> {task.priority}
+            </div>
+          )}
+        </div>
 
         {/* Subtask checklist: ClickUp style */}
         {totalSubtasks > 0 && (

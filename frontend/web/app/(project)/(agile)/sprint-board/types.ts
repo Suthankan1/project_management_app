@@ -12,6 +12,7 @@ export interface SprintboardTask {
   attachmentCount?: number;
   commentCount?: number;
   label?: { name: string; color?: string };
+  blocked?: boolean;
 }
 
 export interface Sprintcolumn {

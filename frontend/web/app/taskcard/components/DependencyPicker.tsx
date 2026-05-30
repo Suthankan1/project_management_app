@@ -29,7 +29,7 @@ const DependencyPicker: React.FC<DependencyPickerProps> = ({
 
   useEffect(() => {
     setLoading(true);
-    api.get<ProjectTask[]>(`/api/tasks/project/${projectId}`)
+    api.get<ProjectTask[]>(`/api/tasks/project/${projectId}/all`)
       .then((r) => setTasks(r.data))
       .catch(() => setTasks([]))
       .finally(() => setLoading(false));

@@ -100,6 +100,7 @@ public class TaskResponseDTO {
         private Long id;
         private String title;
         private String relation;
+        private String status;
     }
 
     @Data

@@ -657,6 +657,11 @@ public class TaskService {
             throw new IllegalArgumentException("A task cannot depend on itself");
         }
 
+        Task blocker = findTaskWithProjectTeam(blockerId);
+
+        // Prevent dependency across inaccessible projects
+        requireMinimumRole(blocker.getProject().getTeam().getId(), currentUserId, null);
+
         // Check: would adding (taskId -> blockerId) create a cycle?
         // i.e., is taskId already reachable from blockerId through existing dependencies?
         if (wouldCreateCycle(blockerId, taskId)) {
@@ -665,7 +670,6 @@ public class TaskService {
             );
         }
 
-        Task blocker = findTaskWithProjectTeam(blockerId);
         task.getDependencies().add(blocker);
         task.setLastModifiedBy(userRepository.findById(currentUserId).orElseThrow());
         taskRepository.save(task);
@@ -1316,10 +1320,8 @@ public class TaskService {
         // Map dependencies
         if (dependencyMap != null) {
             dto.setDependencies(dependencyMap.getOrDefault(task.getId(), List.of()));
-        } else if(task.getDependencies() != null){
-            dto.setDependencies(new ArrayList<>(task.getDependencies()).stream()
-                .map(d -> new DependencyDTO(d.getId(), d.getTitle(), "BLOCKED_BY"))
-                .collect(Collectors.toList()));
+        } else {
+            dto.setDependencies(buildDependencyMap(List.of(task.getId())).getOrDefault(task.getId(), List.of()));
         }
 
         // Map attachments
@@ -1376,18 +1378,33 @@ public class TaskService {
         }
         java.util.Map<Long, List<DependencyDTO>> map = new java.util.HashMap<>();
         List<Object[]> rows = taskRepository.findDependencyRowsByTaskIds(taskIds);
-        if (rows == null) {
-            return map;
-        }
-        for (Object[] row : rows) {
-            Long blockedTaskId = (Long) row[0];
-            Long blockerTaskId = (Long) row[1];
-            String blockerTitle = (String) row[2];
-            if (blockedTaskId == null || blockerTaskId == null) {
-                continue;
+        if (rows != null) {
+            for (Object[] row : rows) {
+                Long blockedTaskId = (Long) row[0];
+                Long blockerTaskId = (Long) row[1];
+                String blockerTitle = (String) row[2];
+                String blockerStatus = (String) row[3];
+                if (blockedTaskId == null || blockerTaskId == null) {
+                    continue;
+                }
+                map.computeIfAbsent(blockedTaskId, ignored -> new ArrayList<>())
+                        .add(new DependencyDTO(blockerTaskId, blockerTitle, "BLOCKED_BY", blockerStatus));
             }
-            map.computeIfAbsent(blockedTaskId, ignored -> new ArrayList<>())
-                    .add(new DependencyDTO(blockerTaskId, blockerTitle, "BLOCKED_BY"));
+        }
+
+        List<Object[]> depRows = taskRepository.findDependentRowsByTaskIds(taskIds);
+        if (depRows != null) {
+            for (Object[] row : depRows) {
+                Long blockerTaskId = (Long) row[0];
+                Long blockedTaskId = (Long) row[1];
+                String blockedTitle = (String) row[2];
+                String blockedStatus = (String) row[3];
+                if (blockerTaskId == null || blockedTaskId == null) {
+                    continue;
+                }
+                map.computeIfAbsent(blockerTaskId, ignored -> new ArrayList<>())
+                        .add(new DependencyDTO(blockedTaskId, blockedTitle, "BLOCKS", blockedStatus));
+            }
         }
         return map;
     }

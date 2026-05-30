@@ -34,6 +34,7 @@ export interface Dependency {
   id: number;
   title: string;
   relation: string; // BLOCKED_BY | BLOCKS | RELATES_TO
+  status?: string;
 }
 
 // Task interface matching backend response

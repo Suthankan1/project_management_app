@@ -243,7 +243,9 @@ class TaskServiceTest {
         when(taskRepository.findByProjectIdWithScalarsAndArchived(10L, false)).thenReturn(List.of(taskOne, taskTwo));
         when(taskRepository.findByIdInWithCollections(List.of(71L, 72L))).thenReturn(List.of(taskOne, taskTwo));
         when(taskRepository.findDependencyRowsByTaskIds(List.of(71L, 72L)))
-                .thenReturn(java.util.Collections.singletonList(new Object[] {71L, 99L, "Foundation task"}));
+                .thenReturn(java.util.Collections.singletonList(new Object[] {71L, 99L, "Foundation task", "TODO"}));
+        when(taskRepository.findDependentRowsByTaskIds(List.of(71L, 72L)))
+                .thenReturn(java.util.Collections.emptyList());
 
         List<TaskResponseDTO> result = taskService.getTasksByProject(10L, 500L, null, null, null, null, null);
 
@@ -267,7 +269,9 @@ class TaskServiceTest {
                 .thenReturn(new PageImpl<>(List.of(taskOne, taskTwo), pageable, 2));
         when(taskRepository.findByIdInWithCollections(List.of(71L, 72L))).thenReturn(List.of(taskOne, taskTwo));
         when(taskRepository.findDependencyRowsByTaskIds(List.of(71L, 72L)))
-                .thenReturn(java.util.Collections.singletonList(new Object[] {71L, 99L, "Foundation task"}));
+                .thenReturn(java.util.Collections.singletonList(new Object[] {71L, 99L, "Foundation task", "TODO"}));
+        when(taskRepository.findDependentRowsByTaskIds(List.of(71L, 72L)))
+                .thenReturn(java.util.Collections.emptyList());
 
         Page<TaskResponseDTO> result = taskService.getTasksByProject(10L, 500L, pageable);
 
@@ -576,6 +580,59 @@ class TaskServiceTest {
 
         assertThrows(IllegalArgumentException.class,
                 () -> taskService.addDependency(50L, 50L, 500L));
+    }
+
+    @Test
+    void addDependency_createsCycle_throwsIllegalArgumentException() {
+        Task task50 = buildTask(50L);
+        Task task60 = buildTask(60L);
+        Task task70 = buildTask(70L);
+
+        // Chain: 60 depends on 70, 70 depends on 50
+        task60.getDependencies().add(task70);
+        task70.getDependencies().add(task50);
+
+        when(taskRepository.findByIdWithProjectTeam(50L)).thenReturn(Optional.of(task50));
+        when(taskRepository.findByIdWithProjectTeam(60L)).thenReturn(Optional.of(task60));
+
+        when(taskRepository.findByIdWithDependencies(60L)).thenReturn(Optional.of(task60));
+        when(taskRepository.findByIdWithDependencies(70L)).thenReturn(Optional.of(task70));
+        when(taskRepository.findByIdWithDependencies(50L)).thenReturn(Optional.of(task50));
+
+        when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
+
+        // Adding 50 depends on 60 would close the loop: 50 -> 60 -> 70 -> 50
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> taskService.addDependency(50L, 60L, 500L));
+
+        assertEquals("Adding this dependency would create a circular dependency chain.", exception.getMessage());
+    }
+
+    @Test
+    void addDependency_crossProjectInaccessible_throwsForbiddenException() {
+        Task task50 = buildTask(50L);
+
+        // Blocker is in team 99
+        Team otherTeam = new Team();
+        otherTeam.setId(99L);
+        Project otherProject = new Project();
+        otherProject.setId(55L);
+        otherProject.setTeam(otherTeam);
+
+        Task task60 = new Task();
+        task60.setId(60L);
+        task60.setProject(otherProject);
+
+        when(taskRepository.findByIdWithProjectTeam(50L)).thenReturn(Optional.of(task50));
+        when(taskRepository.findByIdWithProjectTeam(60L)).thenReturn(Optional.of(task60));
+
+        // teamMembershipLookupService will return null for team 99 and user 500L
+        when(teamMembershipLookupService.getTeamMember(99L, 500L)).thenReturn(null);
+
+        ForbiddenException exception = assertThrows(ForbiddenException.class,
+                () -> taskService.addDependency(50L, 60L, 500L));
+
+        assertEquals("User is not a member of this team", exception.getMessage());
     }
 
     @Test
