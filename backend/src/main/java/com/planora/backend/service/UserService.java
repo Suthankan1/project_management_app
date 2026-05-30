@@ -784,7 +784,7 @@ public class UserService {
      * Accepts either a raw S3 object key or a legacy full S3 URL for backward compatibility.
      * Returns null/empty for null/empty input. Results are cached via Spring Cache (userPhotoUrls).
      */
-    @Cacheable(value = "userPhotoUrls", key = "#photoKey", unless = "#result == null")
+    @Cacheable(value = "userPhotoUrls", key = "#photoKey", condition = "#photoKey != null", unless = "#result == null")
     public String generatePresignedUrl(String photoKey) {
         // Step 1. Handle empty states gracefully.
         if (photoKey == null || photoKey.isEmpty()) {
