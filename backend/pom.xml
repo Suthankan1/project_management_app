@@ -283,4 +283,43 @@
 		</plugins>
 	</build>
 
+	<profiles>
+		<profile>
+			<id>security</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.owasp</groupId>
+						<artifactId>dependency-check-maven</artifactId>
+						<version>12.1.0</version>
+						<configuration>
+							<failBuildOnCVSS>7.0</failBuildOnCVSS>
+							<assemblyAnalyzerEnabled>false</assemblyAnalyzerEnabled>
+							<nugetconfAnalyzerEnabled>false</nugetconfAnalyzerEnabled>
+							<nuspecAnalyzerEnabled>false</nuspecAnalyzerEnabled>
+							<nodeAnalyzerEnabled>false</nodeAnalyzerEnabled>
+							<npmAnalyzerEnabled>false</npmAnalyzerEnabled>
+							<pnpmAnalyzerEnabled>false</pnpmAnalyzerEnabled>
+							<yarnAnalyzerEnabled>false</yarnAnalyzerEnabled>
+							<bowerAnalyzerEnabled>false</bowerAnalyzerEnabled>
+							<composerAnalyzerEnabled>false</composerAnalyzerEnabled>
+							<cocoapodAnalyzerEnabled>false</cocoapodAnalyzerEnabled>
+							<carthageAnalyzerEnabled>false</carthageAnalyzerEnabled>
+							<rubygemsAnalyzerEnabled>false</rubygemsAnalyzerEnabled>
+							<pyDistributionAnalyzerEnabled>false</pyDistributionAnalyzerEnabled>
+							<pyPackageAnalyzerEnabled>false</pyPackageAnalyzerEnabled>
+						</configuration>
+						<executions>
+							<execution>
+								<goals>
+									<goal>check</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+
 </project>

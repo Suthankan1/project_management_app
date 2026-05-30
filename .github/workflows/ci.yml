@@ -26,6 +26,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      mobile: ${{ steps.filter.outputs.mobile }}
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -38,8 +39,27 @@ jobs:
             - 'backend/**'
             - '.github/workflows/ci.yml'
           frontend:
-            - 'frontend/**'
+            - 'frontend/web/**'
             - '.github/workflows/ci.yml'
+          mobile:
+            - 'frontend/mobile/**'
+            - '.github/workflows/ci.yml'
+
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Run Gitleaks Scan
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   backend-build:
     name: Build Backend
@@ -69,6 +89,9 @@ jobs:
         
     - name: Run Integration Tests
       run: ./mvnw -B failsafe:integration-test failsafe:verify --file pom.xml
+      
+    - name: Run OWASP Dependency Check
+      run: ./mvnw -B dependency-check:check -Psecurity --file pom.xml
       
   frontend-build:
     name: Build Frontend
@@ -103,9 +126,8 @@ jobs:
     - name: Install Dependencies
       run: npm ci
 
-    - name: Audit Dependencies
-      run: npm audit --audit-level=high
-      continue-on-error: true
+    - name: Audit Dependencies (Explicit Policy)
+      run: npm run security-audit
 
     - name: Lint Next.js App
       run: npm run lint
@@ -115,3 +137,53 @@ jobs:
 
     - name: Build Next.js App
       run: npm run build
+
+  mobile-build:
+    name: Build Mobile
+    needs: changes
+    if: ${{ needs.changes.outputs.mobile == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+    defaults:
+      run:
+        working-directory: ./frontend/mobile
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: 'frontend/mobile/.nvmrc'
+        cache: 'npm'
+        cache-dependency-path: './frontend/mobile/package-lock.json'
+        
+    - name: Install Dependencies
+      run: npm ci
+
+    - name: Expo Doctor Check
+      run: npx expo-doctor
+      continue-on-error: true
+
+    - name: Lint Mobile App
+      run: npm run lint
+
+    - name: TypeScript Check
+      run: npx tsc --noEmit
+
+    - name: Smoke Check EAS Build Profiles
+      run: |
+        node -e "
+        const fs = require('fs');
+        const config = JSON.parse(fs.readFileSync('eas.json', 'utf8'));
+        const requiredProfiles = ['development', 'preview', 'production'];
+        for (const profile of requiredProfiles) {
+          if (!config.build[profile]) {
+            console.error('Missing required build profile: ' + profile);
+            process.exit(1);
+          }
+        }
+        console.log('EAS build profiles validated successfully!');
+        "
