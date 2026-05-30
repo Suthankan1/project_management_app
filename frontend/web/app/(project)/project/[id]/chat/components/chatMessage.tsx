@@ -165,6 +165,7 @@ export const ChatMessages = ({
   const [loadingFileId, setLoadingFileId] = useState<number | null>(null);
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [messageToDelete, setMessageToDelete] = useState<number | null>(null);
+  const [activeMessageId, setActiveMessageId] = useState<number | null>(null);
   // Track whether the user is scrolled near the bottom so we don't interrupt
   // reading history when new messages arrive.
   const isAtBottomRef = useRef(true);
@@ -240,6 +241,13 @@ export const ChatMessages = ({
     virtualizer.scrollToIndex(targetIndex, { align: 'center' });
   }, [targetMessageId, visibleMessages]);
 
+  useEffect(() => {
+    if (activeMessageId == null) return;
+    if (!visibleMessages.some((message) => message.id === activeMessageId)) {
+      setActiveMessageId(null);
+    }
+  }, [activeMessageId, visibleMessages]);
+
   const handleDocumentClick = async (
     e: React.MouseEvent<HTMLAnchorElement>,
     originalUrl: string,
@@ -275,6 +283,7 @@ export const ChatMessages = ({
   return (
     <div
       ref={scrollRef}
+      onClick={() => setActiveMessageId(null)}
       className="flex-1 min-h-0 overflow-y-auto px-2 sm:px-4 py-2.5 sm:py-4 space-y-0.5 overscroll-y-contain touch-pan-y"
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
@@ -298,6 +307,7 @@ export const ChatMessages = ({
             const fileDoc = !msg.deleted && isFileDocument(msg.content);
             const isLoadingFile = loadingFileId === msg.id;
             const isMentioned = !isMe && !msg.deleted && !fileDoc && messageIsMentioned(msg.content, aliasSet);
+            const isActiveMessage = !!msg.id && activeMessageId === msg.id;
 
             return (
               <div
@@ -324,7 +334,13 @@ export const ChatMessages = ({
               )}
 
               <div
-                className={`flex items-end ${hasAvatar ? 'gap-2.5' : 'gap-1.5'} group relative ${grouped ? 'mt-0.5' : 'mt-3'} ${isMe ? 'flex-row-reverse' : 'flex-row'} ${isMentioned ? 'pl-1.5 border-l-2 border-amber-400 rounded-l' : ''}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (msg.id) {
+                    setActiveMessageId(msg.id);
+                  }
+                }}
+                className={`flex cursor-pointer items-end ${hasAvatar ? 'gap-2.5' : 'gap-1.5'} relative ${grouped ? 'mt-0.5' : 'mt-3'} ${isMe ? 'flex-row-reverse' : 'flex-row'} ${isMentioned ? 'pl-1.5 border-l-2 border-amber-400 rounded-l' : ''}`}
               >
                 {/* Avatar */}
                 {hasAvatar && (
@@ -357,8 +373,8 @@ export const ChatMessages = ({
                   {/* Bubble + action bar wrapper */}
                   <div className="relative">
                     {/* Hover action bar */}
-                    {!!msg.id && (
-                      <div className={`absolute bottom-full mb-1 ${isMe ? 'right-0' : 'left-0'} opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center gap-1 bg-cu-bg border border-cu-border shadow-cu-lg rounded-xl px-2 py-2`}>
+                    {!!msg.id && isActiveMessage && (
+                      <div className={`absolute bottom-full mb-1 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-1 bg-cu-bg border border-cu-border shadow-cu-lg rounded-xl px-2 py-2`}>
                         {/* Quick reactions */}
                         {QUICK_REACTIONS.map((emoji) => (
                           <button
@@ -466,7 +482,7 @@ export const ChatMessages = ({
                   </div>
 
                   {/* Reactions row */}
-                  {!!msg.id && !msg.deleted && msgReactions.length > 0 && (
+                  {!!msg.id && isActiveMessage && !msg.deleted && msgReactions.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {msgReactions.map((reaction) => (
                         <button
