@@ -6,7 +6,7 @@ import { Task, TeamMemberInfo } from '@/types';
 import MotionWrapper from '../MotionWrapper';
 import { Briefcase } from 'lucide-react';
 import useSWR from 'swr';
-import api from '@/lib/axios';
+import { projectsApi, authApi } from '@/services/api-contract';
 
 import { WorkloadEntry } from './types';
 import { WorkloadPieChart } from './WorkloadPieChart';
@@ -35,18 +35,16 @@ interface UserProfileItem {
 
 export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: number | string; tasks: Task[] }) {
   const [activeIndex, setActiveIndex] = useState(-1);
-  const fetcher = (url: string) => api.get(url).then(res => res.data);
-
   // Fetch members
   const { data: members = [] } = useSWR<TeamMemberInfo[]>(
-    projectId ? `/api/projects/${projectId}/members` : null,
-    fetcher
+    projectId ? `project-members:${projectId}` : null,
+    () => projectsApi.getMembers(projectId) as unknown as Promise<TeamMemberInfo[]>
   );
 
   // Fetch user profiles globally to resolve mis-mapped avatars
   const { data: usersData = [] } = useSWR<UserProfileItem[]>(
-    members.length > 0 ? '/api/auth/users' : null,
-    fetcher
+    members.length > 0 ? 'auth-users' : null,
+    () => authApi.getAllUsers() as unknown as Promise<UserProfileItem[]>
   );
 
   const userProfiles = useMemo<Record<string, string>>(() => {

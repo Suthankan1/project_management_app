@@ -2,12 +2,13 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { AlertCircle, Flag, Loader2, Plus } from 'lucide-react';
+import { AlertCircle, Flag, Loader2, Plus, RefreshCw } from 'lucide-react';
 import { getMilestones, createMilestone, updateMilestone, deleteMilestone } from '@/services/milestone-service';
 import type { MilestoneResponse } from '@/types';
 import { type MilestoneStatus } from './components/milestoneConfig';
 import MilestoneCard from './components/MilestoneCard';
 import MilestoneForm from './components/MilestoneForm';
+import EmptyState from '@/components/shared/EmptyState';
 
 export default function MilestonesPage() {
   const searchParams = useSearchParams();
@@ -147,8 +148,16 @@ export default function MilestonesPage() {
         </div>
 
         {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg flex items-center gap-2">
-            <AlertCircle size={15} /> {error}
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg flex items-center justify-between gap-3 flex-wrap">
+            <span className="inline-flex items-center gap-2"><AlertCircle size={15} /> {error}</span>
+            <button
+              type="button"
+              onClick={() => void loadMilestones()}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-red-700 border border-red-200 hover:bg-red-100 transition-colors"
+            >
+              <RefreshCw size={13} />
+              Retry
+            </button>
           </div>
         )}
 
@@ -165,11 +174,21 @@ export default function MilestonesPage() {
             <Loader2 size={28} className="animate-spin text-blue-500" />
           </div>
         ) : milestones.length === 0 && !showCreate ? (
-          <div className="text-center py-20">
-            <Flag size={36} className="text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500 font-medium">No milestones yet</p>
-            <p className="text-sm text-gray-400 mt-1">Create one to track major goals</p>
-          </div>
+          <EmptyState
+            icon={<Flag size={28} />}
+            title="No milestones yet"
+            subtitle="Create one to track major goals and checkpoints for this project."
+            action={
+              <button
+                type="button"
+                onClick={() => { setShowCreate(true); setEditing(null); }}
+                className="inline-flex items-center gap-2 rounded-xl bg-cu-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-cu-primary-hover transition-colors"
+              >
+                <Plus size={14} />
+                New Milestone
+              </button>
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {milestones.map((m) =>

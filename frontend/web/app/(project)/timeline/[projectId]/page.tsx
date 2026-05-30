@@ -1,17 +1,19 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import TimelineView from '../../kanban/components/TimelineView';
 import { Task } from '../../kanban/types';
 import { fetchTasksByProject } from '../../kanban/api';
-import { AlertCircle, CalendarRange, Diamond, ListChecks } from 'lucide-react';
+import { AlertCircle, CalendarRange, Diamond, ListChecks, RefreshCw } from 'lucide-react';
 import TaskCardModal from '@/app/taskcard/TaskCardModal';
 import { useTaskWebSocket } from '@/hooks/useTaskWebSocket';
 import { getMilestones } from '@/services/milestone-service';
 import type { MilestoneResponse } from '@/types';
+import EmptyState from '@/components/shared/EmptyState';
 
 export default function TimelinePage() {
+  const router = useRouter();
   const { projectId } = useParams<{ projectId: string }>();
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -135,13 +137,49 @@ export default function TimelinePage() {
 
         {/* Error */}
         {error && (
-          <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 mb-5">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-sm">Error</p>
-              <p className="text-xs">{error}</p>
-            </div>
+          <div className="mb-5">
+            <EmptyState
+              icon={<AlertCircle size={24} />}
+              title="Unable to load timeline"
+              subtitle={error}
+              action={
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void loadTasks()}
+                    className="inline-flex items-center gap-2 rounded-xl bg-cu-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-cu-primary-hover transition-colors"
+                  >
+                    <RefreshCw size={14} />
+                    Retry
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/backlog?projectId=${projectId}`)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-cu-border bg-cu-bg px-4 py-2.5 text-sm font-semibold text-cu-text-primary hover:bg-cu-hover transition-colors"
+                  >
+                    Open backlog
+                  </button>
+                </div>
+              }
+            />
           </div>
+        )}
+
+        {!loading && !error && tasks.length === 0 && (
+          <EmptyState
+            icon={<CalendarRange size={24} />}
+            title="No scheduled tasks yet"
+            subtitle="Add due dates or start dates to tasks to see them on the timeline."
+            action={
+              <button
+                type="button"
+                onClick={() => router.push(`/backlog?projectId=${projectId}`)}
+                className="inline-flex items-center gap-2 rounded-xl bg-cu-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-cu-primary-hover transition-colors"
+              >
+                Open backlog
+              </button>
+            }
+          />
         )}
 
         {/* Loading skeleton */}

@@ -181,7 +181,10 @@ public class TaskService {
         if (request.getRecurrenceRule() != null) {
             task.setRecurrenceRule(request.getRecurrenceRule());
             task.setRecurrenceEnd(request.getRecurrenceEnd());
-            task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule()));
+            task.setRecurrenceActive(request.getRecurrenceActive() != null ? request.getRecurrenceActive() : true);
+            task.setCustomInterval(request.getCustomInterval());
+            task.setRecurrenceLimit(request.getRecurrenceLimit());
+            task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule(), request.getCustomInterval()));
         }
 
         Task savedTask = taskRepository.save(task);
@@ -353,9 +356,25 @@ public class TaskService {
 
         // update recurrence (V7)
         if (request.getRecurrenceRule() != null) {
-            task.setRecurrenceRule(request.getRecurrenceRule());
-            task.setRecurrenceEnd(request.getRecurrenceEnd());
-            task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule()));
+            if (request.getRecurrenceRule().trim().isEmpty() || "NONE".equalsIgnoreCase(request.getRecurrenceRule())) {
+                task.setRecurrenceRule(null);
+                task.setRecurrenceEnd(null);
+                task.setNextOccurrence(null);
+                task.setCustomInterval(null);
+                task.setRecurrenceLimit(null);
+                task.setRecurrenceActive(false);
+            } else {
+                task.setRecurrenceRule(request.getRecurrenceRule());
+                task.setRecurrenceEnd(request.getRecurrenceEnd());
+                if (request.getRecurrenceActive() != null) {
+                    task.setRecurrenceActive(request.getRecurrenceActive());
+                }
+                task.setCustomInterval(request.getCustomInterval());
+                task.setRecurrenceLimit(request.getRecurrenceLimit());
+                task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule(), request.getCustomInterval()));
+            }
+        } else if (request.getRecurrenceActive() != null) {
+            task.setRecurrenceActive(request.getRecurrenceActive());
         }
 
         // Handle archiving/unarchiving
@@ -513,7 +532,7 @@ public class TaskService {
         List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
         java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(ids);
         java.util.Map<Long, Task> enrichedMap = enriched.stream()
-                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t));
+                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
 
         return taskPage.map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap));
     }
@@ -548,7 +567,7 @@ public class TaskService {
             List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
             java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(ids);
             java.util.Map<Long, Task> enrichedMap = enriched.stream()
-                    .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t));
+                    .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
             return filteredTasks.stream()
                     .map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap))
                     .collect(Collectors.toList());
@@ -561,7 +580,7 @@ public class TaskService {
         List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
         java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(ids);
         java.util.Map<Long, Task> enrichedMap = enriched.stream()
-                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t));
+                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
         return tasks.stream()
                 .map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap))
                 .collect(Collectors.toList());
@@ -657,6 +676,11 @@ public class TaskService {
             throw new IllegalArgumentException("A task cannot depend on itself");
         }
 
+        Task blocker = findTaskWithProjectTeam(blockerId);
+
+        // Prevent dependency across inaccessible projects
+        requireMinimumRole(blocker.getProject().getTeam().getId(), currentUserId, null);
+
         // Check: would adding (taskId -> blockerId) create a cycle?
         // i.e., is taskId already reachable from blockerId through existing dependencies?
         if (wouldCreateCycle(blockerId, taskId)) {
@@ -665,7 +689,6 @@ public class TaskService {
             );
         }
 
-        Task blocker = findTaskWithProjectTeam(blockerId);
         task.getDependencies().add(blocker);
         task.setLastModifiedBy(userRepository.findById(currentUserId).orElseThrow());
         taskRepository.save(task);
@@ -1316,10 +1339,8 @@ public class TaskService {
         // Map dependencies
         if (dependencyMap != null) {
             dto.setDependencies(dependencyMap.getOrDefault(task.getId(), List.of()));
-        } else if(task.getDependencies() != null){
-            dto.setDependencies(new ArrayList<>(task.getDependencies()).stream()
-                .map(d -> new DependencyDTO(d.getId(), d.getTitle(), "BLOCKED_BY"))
-                .collect(Collectors.toList()));
+        } else {
+            dto.setDependencies(buildDependencyMap(List.of(task.getId())).getOrDefault(task.getId(), List.of()));
         }
 
         // Map attachments
@@ -1335,6 +1356,10 @@ public class TaskService {
         dto.setRecurrenceRule(task.getRecurrenceRule());
         dto.setRecurrenceEnd(task.getRecurrenceEnd());
         dto.setNextOccurrence(task.getNextOccurrence());
+        dto.setRecurrenceActive(task.isRecurrenceActive());
+        dto.setCustomInterval(task.getCustomInterval());
+        dto.setRecurrenceLimit(task.getRecurrenceLimit());
+        dto.setRecurrenceCount(task.getRecurrenceCount());
         if (task.getRecurrenceParent() != null) {
             dto.setRecurrenceParentId(task.getRecurrenceParent().getId());
         }
@@ -1376,18 +1401,33 @@ public class TaskService {
         }
         java.util.Map<Long, List<DependencyDTO>> map = new java.util.HashMap<>();
         List<Object[]> rows = taskRepository.findDependencyRowsByTaskIds(taskIds);
-        if (rows == null) {
-            return map;
-        }
-        for (Object[] row : rows) {
-            Long blockedTaskId = (Long) row[0];
-            Long blockerTaskId = (Long) row[1];
-            String blockerTitle = (String) row[2];
-            if (blockedTaskId == null || blockerTaskId == null) {
-                continue;
+        if (rows != null) {
+            for (Object[] row : rows) {
+                Long blockedTaskId = (Long) row[0];
+                Long blockerTaskId = (Long) row[1];
+                String blockerTitle = (String) row[2];
+                String blockerStatus = (String) row[3];
+                if (blockedTaskId == null || blockerTaskId == null) {
+                    continue;
+                }
+                map.computeIfAbsent(blockedTaskId, ignored -> new ArrayList<>())
+                        .add(new DependencyDTO(blockerTaskId, blockerTitle, "BLOCKED_BY", blockerStatus));
             }
-            map.computeIfAbsent(blockedTaskId, ignored -> new ArrayList<>())
-                    .add(new DependencyDTO(blockerTaskId, blockerTitle, "BLOCKED_BY"));
+        }
+
+        List<Object[]> depRows = taskRepository.findDependentRowsByTaskIds(taskIds);
+        if (depRows != null) {
+            for (Object[] row : depRows) {
+                Long blockerTaskId = (Long) row[0];
+                Long blockedTaskId = (Long) row[1];
+                String blockedTitle = (String) row[2];
+                String blockedStatus = (String) row[3];
+                if (blockerTaskId == null || blockedTaskId == null) {
+                    continue;
+                }
+                map.computeIfAbsent(blockerTaskId, ignored -> new ArrayList<>())
+                        .add(new DependencyDTO(blockedTaskId, blockedTitle, "BLOCKS", blockedStatus));
+            }
         }
         return map;
     }
@@ -1404,9 +1444,9 @@ public class TaskService {
         }
         List<Task> enrichedTasks = taskRepository.findByIdInWithCollections(taskIds);
         java.util.Map<Long, Task> scalarById = scalarTasks.stream()
-                .collect(Collectors.toMap(Task::getId, t -> t));
+                .collect(Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
         java.util.Map<Long, Task> enrichedById = enrichedTasks.stream()
-                .collect(Collectors.toMap(Task::getId, t -> t));
+                .collect(Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
         java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(taskIds);
 
         return taskIds.stream()
@@ -1454,7 +1494,7 @@ public class TaskService {
         }
         User actor = userRepository.findById(currentUserId).orElseThrow();
         java.util.Map<Long, Task> taskById = tasks.stream()
-                .collect(Collectors.toMap(Task::getId, task -> task));
+                .collect(Collectors.toMap(Task::getId, task -> task, (t1, t2) -> t1));
 
         // Iterate through the newly provided list and rewrite the position index integers
         for (int index = 0; index < orderedTaskIds.size(); index++) {
@@ -1478,15 +1518,16 @@ public class TaskService {
     }
 
     // Computes the next occurrence date after today based on recurrence rule.
-    private LocalDate computeNextOccurrence(LocalDate base, String rule) {
+    private LocalDate computeNextOccurrence(LocalDate base, String rule, Integer customInterval) {
         LocalDate from = (base != null && base.isAfter(LocalDate.now())) ? base : LocalDate.now();
         if (rule == null) return null;
+        int delta = (customInterval != null && customInterval > 0) ? customInterval : 1;
         return switch (rule.toUpperCase()) {
-            case "DAILY"   -> from.plusDays(1);
-            case "WEEKLY"  -> from.plusWeeks(1);
-            case "MONTHLY" -> from.plusMonths(1);
-            case "YEARLY"  -> from.plusYears(1);
-            default        -> null;
+            case "DAILY", "CUSTOM_DAYS"     -> from.plusDays(delta);
+            case "WEEKLY", "CUSTOM_WEEKS"   -> from.plusWeeks(delta);
+            case "MONTHLY", "CUSTOM_MONTHS" -> from.plusMonths(delta);
+            case "YEARLY", "CUSTOM_YEARS"   -> from.plusYears(delta);
+            default                         -> null;
         };
     }
 }

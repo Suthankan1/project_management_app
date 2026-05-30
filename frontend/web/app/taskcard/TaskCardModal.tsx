@@ -41,6 +41,8 @@ interface TaskData {
   assignees?: MultiAssignee[];
   recurrenceRule?: string | null;
   recurrenceEnd?: string | null;
+  customInterval?: number | null;
+  recurrenceLimit?: number | null;
   reporterId?: number | null;
   sprintId?: number | null;
   startDate?: string | null;
@@ -226,6 +228,8 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
     milestoneId: number | null;
     recurrenceRule: string | null;
     recurrenceEnd: string | null;
+    customInterval: number | null;
+    recurrenceLimit: number | null;
     reporterId: number | null;
     sprintId: number | null;
     startDate: string | null;
@@ -403,7 +407,9 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
                   onAssigneesChanged={fetchTaskData}
                   recurrenceRule={taskData.recurrenceRule}
                   recurrenceEnd={taskData.recurrenceEnd}
-                  onUpdateRecurrence={(rule, end) => canEdit && updateTask({ recurrenceRule: rule, recurrenceEnd: end })}
+                  customInterval={taskData.customInterval}
+                  recurrenceLimit={taskData.recurrenceLimit}
+                  onUpdateRecurrence={(rule, end, customInterval, recurrenceLimit) => canEdit && updateTask({ recurrenceRule: rule, recurrenceEnd: end, customInterval, recurrenceLimit })}
                   canEdit={canEdit}
                   members={projectMembers}
                   allLabels={projectLabels}

@@ -57,7 +57,7 @@ export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenConten
     sendMessage, sendRoomMessage, sendThreadReply,
     openThread, closeThread,
     editMessage, deleteMessage, toggleReaction,
-    loadPrivateHistory, loadRoomHistory,
+    loadRoomHistory,
     createRoom, deleteRoom, updateRoomMeta, pinRoomMessage,
     sendTyping, searchMessages, retryConnection,
   } = useChat(projectId as string);

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { CalendarDays, ChevronDown, Minus, MoreHorizontal, Plus } from 'lucide-react';
+import { CalendarDays, ChevronDown, Minus, MoreHorizontal, Plus, Lock, RefreshCw } from 'lucide-react';
 import { hexToLabelStyle } from '@/components/shared/LabelPicker';
 import { AvatarStack } from '@/components/ui/Avatar';
 import api from '@/lib/axios';
@@ -79,6 +79,8 @@ const TaskRow = React.memo(function TaskRow({
     task.status !== 'DONE' &&
     new Date(task.dueDate + 'T00:00:00') < new Date(new Date().toDateString())
   );
+
+  const isBlocked = task.dependencies?.some(d => d.relation === 'BLOCKED_BY' && d.status !== 'DONE') ?? false;
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -220,9 +222,29 @@ const TaskRow = React.memo(function TaskRow({
       </div>
 
       {/* Title */}
-      <p className="flex-1 min-w-0 text-[13px] font-medium truncate text-cu-text-primary">
-        {task.title}
-      </p>
+      <div className="flex-1 min-w-0 flex items-center gap-1.5">
+        <p className="text-[13px] font-medium truncate text-cu-text-primary">
+          {task.title}
+        </p>
+        {task.recurrenceRule && (
+          <span
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+              task.recurrenceActive === false
+                ? 'bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/30'
+                : 'bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/30'
+            }`}
+            title={task.recurrenceActive === false ? 'Recurring (Paused)' : `Recurring (${task.recurrenceRule})`}
+          >
+            <RefreshCw size={9} className="flex-shrink-0" />
+            <span>Recurring{task.recurrenceActive === false ? ' (Paused)' : ''}</span>
+          </span>
+        )}
+        {isBlocked && (
+          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-500 shrink-0">
+            <Lock size={9} className="flex-shrink-0" /> Blocked
+          </span>
+        )}
+      </div>
 
       {/* Labels */}
       <div className="w-32 shrink-0 hidden lg:block relative" ref={labelsRef} onClick={(e) => e.stopPropagation()}>

@@ -29,6 +29,8 @@
 	<properties>
 		<java.version>21</java.version>
 		<lombok.version>1.18.38</lombok.version>
+		<tomcat.version>10.1.55</tomcat.version>
+		<netty.version>4.1.133.Final</netty.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -39,6 +41,7 @@
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
+			<version>42.7.11</version>
 			<scope>runtime</scope>
 		</dependency>
 
@@ -142,7 +145,7 @@
 		<dependency>
 			<groupId>org.apache.tika</groupId>
 			<artifactId>tika-core</artifactId>
-			<version>2.9.1</version>
+			<version>3.2.2</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -282,5 +285,44 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<profile>
+			<id>security</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.owasp</groupId>
+						<artifactId>dependency-check-maven</artifactId>
+						<version>12.1.0</version>
+						<configuration>
+							<failBuildOnCVSS>7.0</failBuildOnCVSS>
+							<assemblyAnalyzerEnabled>false</assemblyAnalyzerEnabled>
+							<nugetconfAnalyzerEnabled>false</nugetconfAnalyzerEnabled>
+							<nuspecAnalyzerEnabled>false</nuspecAnalyzerEnabled>
+							<nodeAnalyzerEnabled>false</nodeAnalyzerEnabled>
+							<npmAnalyzerEnabled>false</npmAnalyzerEnabled>
+							<pnpmAnalyzerEnabled>false</pnpmAnalyzerEnabled>
+							<yarnAnalyzerEnabled>false</yarnAnalyzerEnabled>
+							<bowerAnalyzerEnabled>false</bowerAnalyzerEnabled>
+							<composerAnalyzerEnabled>false</composerAnalyzerEnabled>
+							<cocoapodAnalyzerEnabled>false</cocoapodAnalyzerEnabled>
+							<carthageAnalyzerEnabled>false</carthageAnalyzerEnabled>
+							<rubygemsAnalyzerEnabled>false</rubygemsAnalyzerEnabled>
+							<pyDistributionAnalyzerEnabled>false</pyDistributionAnalyzerEnabled>
+							<pyPackageAnalyzerEnabled>false</pyPackageAnalyzerEnabled>
+						</configuration>
+						<executions>
+							<execution>
+								<goals>
+									<goal>check</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 
 </project>

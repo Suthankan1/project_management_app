@@ -272,6 +272,27 @@ public class DocumentController {
         return ResponseEntity.ok(Map.of("message", "Folder permissions updated"));
     }
 
+    @GetMapping("/folders/{folderId}/permissions")
+    public ResponseEntity<List<FolderPermissionRequest>> getFolderPermissions(
+            @PathVariable Long projectId,
+            @PathVariable Long folderId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(
+                documentService.getFolderPermissions(projectId, folderId, principal.getUserId()),
+                HttpStatus.OK
+        );
+    }
+
+    @GetMapping("/storage-quota")
+    public ResponseEntity<ProjectStorageQuotaResponseDTO> getStorageQuota(
+            @PathVariable Long projectId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(
+                documentService.getStorageQuota(projectId, principal.getUserId()),
+                HttpStatus.OK
+        );
+    }
+
     /*
      * Deleting a folder will recursively soft-delete all child folders and documents inside it.
      */

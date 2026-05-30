@@ -8,6 +8,7 @@ import { Platform, View, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import SplashAnimation from '@/src/components/SplashAnimation';
 import { getValidToken } from '@/src/auth/storage';
+import { offlineSyncManager } from '@/src/services/offlineSyncManager';
 
 // Prevent the native splash from auto-hiding — we control it
 SplashScreen.preventAutoHideAsync();
@@ -141,6 +142,7 @@ export default function RootLayout() {
     SplashScreen.hideAsync();
 
     (async () => {
+      await offlineSyncManager.init();
       const token = await getValidToken();
       setIsAuthed(!!token);
       setAuthChecked(true);

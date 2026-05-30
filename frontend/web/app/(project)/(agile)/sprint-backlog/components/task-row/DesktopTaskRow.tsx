@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { CalendarDays, ChevronDown, Pencil, Tag, Trash2, UserPlus } from 'lucide-react';
+import { CalendarDays, ChevronDown, Pencil, Tag, Trash2, UserPlus, RefreshCw } from 'lucide-react';
 import AssigneeAvatar from '../AssigneeAvatar';
 import { hexToLabelStyle } from '@/components/shared/LabelPicker';
 import { STATUS_LABELS, DUE_CHIP_STYLES, type TaskStatus, formatDate } from './TaskRowConstants';
@@ -125,6 +125,19 @@ export default function DesktopTaskRow(props: TaskRowProps) {
             >
               {task.title}
             </span>
+            {task.recurrenceRule && (
+              <span
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                  task.recurrenceActive === false
+                    ? 'bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/30'
+                    : 'bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/30'
+                }`}
+                title={task.recurrenceActive === false ? 'Recurring (Paused)' : `Recurring (${task.recurrenceRule})`}
+              >
+                <RefreshCw size={9} className="flex-shrink-0" />
+                <span>Recurring{task.recurrenceActive === false ? ' (Paused)' : ''}</span>
+              </span>
+            )}
             {task.archived && <ArchiveBadge />}
             {task.labels?.[0] && (
               <span style={hexToLabelStyle(task.labels[0].color ?? '#6366F1')} className="flex-shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap border border-white/40">

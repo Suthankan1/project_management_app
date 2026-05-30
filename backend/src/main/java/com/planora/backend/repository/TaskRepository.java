@@ -49,7 +49,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            """)
     List<Task> findByProjectIdWithScalars(@Param("projectId") Long projectId);
 
-    @EntityGraph(attributePaths = {"labels", "assignees", "assignees.user", "assignee", "assignee.user", "reporter", "reporter.user", "subTasks", "attachments"})
+    @EntityGraph(attributePaths = {"labels", "assignees", "assignees.user", "assignee", "assignee.user", "reporter", "reporter.user", "subTasks", "attachments", "dependencies"})
     @Query("SELECT DISTINCT t FROM Task t WHERE t.id IN :ids")
     List<Task> findByIdInWithCollections(@Param("ids") List<Long> ids);
 
@@ -214,6 +214,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            "AND t.project.team.id IN (SELECT tm.team.id FROM TeamMember tm WHERE tm.user.userId = :userId)")
     List<Task> searchTasksByTitle(@Param("query") String query, @Param("userId") Long userId, Pageable pageable);
 
+    boolean existsByRecurrenceParentIdAndDueDate(Long parentId, LocalDate dueDate);
+
     /** Recurring tasks whose next spawn date is today or earlier and still active. */
     @Query("SELECT t FROM Task t " +
            "LEFT JOIN FETCH t.project " +
@@ -224,7 +226,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            "LEFT JOIN FETCH t.reporter r " +
            "LEFT JOIN FETCH r.user " +
            "LEFT JOIN FETCH t.milestone " +
-           "WHERE t.archived = false AND t.nextOccurrence IS NOT NULL AND t.nextOccurrence <= :today AND t.recurrenceRule IS NOT NULL")
+           "WHERE t.archived = false AND t.recurrenceActive = true AND t.nextOccurrence IS NOT NULL AND t.nextOccurrence <= :today AND t.recurrenceRule IS NOT NULL")
     List<Task> findByNextOccurrenceBeforeOrEqualWithAssociations(@Param("today") LocalDate today);
 
     @Query("SELECT DISTINCT t FROM Task t " +
@@ -287,12 +289,20 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Object[]> aggregateVelocityBySprintIds(@Param("sprintIds") List<Long> sprintIds);
 
     @Query("""
-           SELECT t.id, d.id, d.title
+           SELECT t.id, d.id, d.title, d.status
            FROM Task t
            LEFT JOIN t.dependencies d
            WHERE t.id IN :taskIds
            """)
     List<Object[]> findDependencyRowsByTaskIds(@Param("taskIds") List<Long> taskIds);
+
+    @Query("""
+           SELECT t.id, d.id, d.title, d.status
+           FROM Task t
+           LEFT JOIN t.dependents d
+           WHERE t.id IN :taskIds
+           """)
+    List<Object[]> findDependentRowsByTaskIds(@Param("taskIds") List<Long> taskIds);
 
     @Query("""
            SELECT t.id, d.id

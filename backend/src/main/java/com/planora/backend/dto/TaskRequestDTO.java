@@ -83,10 +83,13 @@ public class TaskRequestDTO {
     }
 
     // Recurring task fields (V7)
-    @Pattern(regexp = "^(DAILY|WEEKLY|MONTHLY|YEARLY)$",
-             message = "Recurrence rule must be DAILY, WEEKLY, MONTHLY, or YEARLY")
-    private String recurrenceRule;    // DAILY | WEEKLY | MONTHLY | YEARLY
+    @Pattern(regexp = "^(DAILY|WEEKLY|MONTHLY|YEARLY|CUSTOM_DAYS|CUSTOM_WEEKS|CUSTOM_MONTHS|CUSTOM_YEARS)$",
+             message = "Recurrence rule must be valid (DAILY, WEEKLY, MONTHLY, YEARLY, or CUSTOM_DAYS/WEEKS/MONTHS/YEARS)")
+    private String recurrenceRule;    // DAILY | WEEKLY | MONTHLY | YEARLY | CUSTOM_...
     private java.time.LocalDate recurrenceEnd;
+    private Boolean recurrenceActive;
+    private Integer customInterval;
+    private Integer recurrenceLimit;
 
     private Boolean archived;
 }

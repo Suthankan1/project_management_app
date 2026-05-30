@@ -536,6 +536,16 @@ public class UserService {
         return mapToUserResponseDTO(userRepository.save(user));
     }
 
+    @Transactional
+    public void logoutAllSessions(String email) {
+        User user = getUserByEmail(email);
+        VerificationToken existing = tokenRepository.findByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN);
+        if (existing != null) {
+            tokenRepository.delete(existing);
+            tokenRepository.flush();
+        }
+    }
+
     private void validateGithubUsernameUniqueness(User currentUser, String githubUsername) {
         if (githubUsername == null || githubUsername.isBlank()) {
             return;
@@ -774,7 +784,7 @@ public class UserService {
      * Accepts either a raw S3 object key or a legacy full S3 URL for backward compatibility.
      * Returns null/empty for null/empty input. Results are cached via Spring Cache (userPhotoUrls).
      */
-    @Cacheable(value = "userPhotoUrls", key = "#photoKey", unless = "#result == null")
+    @Cacheable(value = "userPhotoUrls", key = "#photoKey", condition = "#photoKey != null", unless = "#result == null")
     public String generatePresignedUrl(String photoKey) {
         // Step 1. Handle empty states gracefully.
         if (photoKey == null || photoKey.isEmpty()) {

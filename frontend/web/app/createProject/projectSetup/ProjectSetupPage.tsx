@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import api from '@/lib/axios';
+import { projectsApi } from '@/services/api-contract';
 import type { ProjectSetupConfig } from './types';
 
 type TeamOption = 'NEW' | 'EXISTING';
@@ -55,8 +55,8 @@ export default function ProjectSetupPage({
 
             setCheckingKey(true);
             try {
-                const res = await api.get(`/api/projects/check-key?key=${currentGenerated.trim()}`);
-                setIsKeyValid(res.data);
+                const res = await projectsApi.checkKey(currentGenerated.trim());
+                setIsKeyValid(res);
             } catch (err) {
                 console.error('Key check error:', err);
                 setIsKeyValid(null);
@@ -79,8 +79,8 @@ export default function ProjectSetupPage({
 
             setCheckingTeam(true);
             try {
-                const res = await api.get(`/api/teams/check-name?name=${teamName.trim()}`);
-                const { exists, isMember } = res.data;
+                const res = await projectsApi.checkTeamName(teamName.trim());
+                const { exists, isMember } = res;
 
                 if (teamOption === 'NEW') {
                     setIsTeamValid(!exists);
@@ -118,7 +118,7 @@ export default function ProjectSetupPage({
         try {
             setLoading(true);
             // Create project with shared fields plus methodology-specific type.
-            const res = await api.post('/api/projects', {
+            const res = await projectsApi.create({
                 name: projectName,
                 projectKey: currentGenerated,
                 description,
@@ -129,15 +129,15 @@ export default function ProjectSetupPage({
 
             if (typeof window !== 'undefined') {
                 localStorage.setItem('currentProjectName', projectName);
-                localStorage.setItem('currentProjectId', res.data.id.toString());
+                localStorage.setItem('currentProjectId', res.id.toString());
                 localStorage.setItem('currentProjectKey', currentGenerated);
             }
 
             // Existing team goes to summary; new team continues with invite flow.
             if (teamOption === 'EXISTING') {
-                router.push(`/summary/${res.data.id}`);
+                router.push(`/summary/${res.id}`);
             } else {
-                router.push(`/createProject/inviteMembers?projectId=${res.data.id}&projectKey=${currentGenerated}`);
+                router.push(`/createProject/inviteMembers?projectId=${res.id}&projectKey=${currentGenerated}`);
             }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {

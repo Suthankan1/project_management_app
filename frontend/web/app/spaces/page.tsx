@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getUserFromToken, User } from '@/lib/auth';
-import api from '@/lib/axios';
+import { projectsApi } from '@/services/api-contract';
 import RecentProjectCard from '../dashboard/components/recentspaces/RecentProjectCard';
 
 import Link from 'next/link';
@@ -39,8 +39,8 @@ export default function SpacesPage() {
 
     const fetchProjects = async () => {
         try {
-            const response = await api.get('/api/projects');
-            setProjects(response.data);
+            const response = await projectsApi.list();
+            setProjects(response as SpaceProject[]);
         } catch (error) {
             console.error('Failed to fetch projects:', error);
         } finally {
@@ -335,7 +335,7 @@ export default function SpacesPage() {
                                                 <button
                                                     onClick={async () => {
                                                         try {
-                                                            await api.post(`/api/projects/${project.id}/favorite`);
+                                                            await projectsApi.toggleFavorite(project.id);
                                                             window.dispatchEvent(new CustomEvent('planora:favorite-toggled'));
                                                             void fetchProjects();
                                                         } catch (error) {

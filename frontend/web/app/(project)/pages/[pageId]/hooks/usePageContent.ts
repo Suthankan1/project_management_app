@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { PageItem, PageHistoryItem } from '../../components/types';
 import { predefinedTemplates } from '../../data/templates';
 import { usePages } from '../../components/usePages';
-import axiosInstance from '../../../../../lib/axios';
+import { pagesApi } from '@/services/api-contract';
 
 export function usePageContent(pageId: string, projectId: string | null) {
     const searchParams = useSearchParams();
@@ -40,18 +40,12 @@ export function usePageContent(pageId: string, projectId: string | null) {
         const fetchPageDetail = async () => {
             setLoadingPage(true);
             try {
-                const response = await axiosInstance.get<{
-                    id: string | number;
-                    title: string;
-                    content?: string;
-                    updatedAt?: string;
-                    createdAt?: string;
-                }>(`/api/pages/${pageId}`);
+                const response = await pagesApi.get(pageId);
                 const pageData: PageItem = {
-                    id: response.data.id,
-                    title: response.data.title,
-                    content: response.data.content || '',
-                    updatedAt: response.data.updatedAt,
+                    id: response.id,
+                    title: response.title,
+                    content: response.content || '',
+                    updatedAt: response.updatedAt,
                     isStarred: false,
                 };
                 // Both updates inside an async callback — not synchronous setState in effect body
@@ -60,17 +54,17 @@ export function usePageContent(pageId: string, projectId: string | null) {
                 setHistoryMock([
                     {
                         id: 'h1',
-                        pageId: response.data.id,
+                        pageId: response.id,
                         action: 'edited',
                         editedBy: 'Current User',
-                        editedAt: response.data.updatedAt || new Date().toISOString(),
+                        editedAt: response.updatedAt || new Date().toISOString(),
                     },
                     {
                         id: 'h2',
-                        pageId: response.data.id,
+                        pageId: response.id,
                         action: 'created',
                         editedBy: 'Document Owner',
-                        editedAt: response.data.createdAt || new Date(Date.now() - 86_400_000).toISOString(),
+                        editedAt: response.createdAt || new Date(Date.now() - 86_400_000).toISOString(),
                     },
                 ]);
             } catch (err) {

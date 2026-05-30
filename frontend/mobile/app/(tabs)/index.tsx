@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import DashboardHeader from '@/src/components/dashboard/DashboardHeader';
 import RecentSpacesSection from '@/src/components/dashboard/RecentSpacesSection';
 import TasksSection from '@/src/components/dashboard/TasksSection';
+import OfflineStaleBanner from '@/src/components/ui/OfflineStaleBanner';
 import { useDashboard } from '@/src/hooks/useDashboard';
 
 // ─── Animated section wrapper — staggered fade + slide up ─────────────────────
@@ -38,7 +39,7 @@ function FadeSlideIn({
         friction: 20,
       }),
     ]).start();
-  }, []);
+  }, [delay, opacity, translateY]);
 
   return (
     <Animated.View style={{ opacity, transform: [{ translateY }] }}>
@@ -62,6 +63,8 @@ export default function DashboardScreen() {
     refreshTab,
     toggleFavorite,
     recordAccess,
+    isOnline,
+    isStale,
   } = useDashboard();
 
   const isRefreshing = loadingProjects;
@@ -74,6 +77,7 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <StatusBar style="dark" />
+      <OfflineStaleBanner isOnline={isOnline} isStale={isStale} />
 
       {/* ── Sticky Dashboard Header ── */}
       <FadeSlideIn delay={0}>
