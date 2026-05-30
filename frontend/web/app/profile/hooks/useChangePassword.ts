@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { AxiosError } from 'axios';
-import api from '@/lib/axios';
 import { validatePassword } from '@/lib/passwordValidation';
+import { authApi } from '@/services/api-contract';
 
 type PwStep = 'idle' | 'sent' | 'done';
 
@@ -35,7 +35,7 @@ export function useChangePassword({ email }: { email: string }) {
         setSuccess('');
         try {
             setIsSendingOtp(true);
-            await api.post('/api/auth/forgot', { email });
+            await authApi.forgotPassword({ email });
             setPwStep('sent');
         } catch (err: unknown) {
             setError(normalizeError(err, 'Failed to send verification code.'));
@@ -58,7 +58,7 @@ export function useChangePassword({ email }: { email: string }) {
         setSuccess('');
         try {
             setIsResettingPw(true);
-            await api.post('/api/auth/reset', { token: otp, newPassword });
+            await authApi.resetPassword({ token: otp, newPassword });
             setSuccess('Password updated successfully.');
             setPwStep('done');
             setOtp('');

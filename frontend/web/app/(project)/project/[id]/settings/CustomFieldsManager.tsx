@@ -1,9 +1,9 @@
 'use client';
 import React, { useEffect, useState, useCallback } from 'react';
 import { Plus, Trash2, GripVertical, ChevronDown } from 'lucide-react';
-import api from '@/lib/axios';
 import { toast } from '@/components/ui';
 import type { CustomField } from '@/types';
+import { projectsApi } from '@/services/api-contract';
 
 interface Props {
   projectId: number;
@@ -22,8 +22,8 @@ export default function CustomFieldsManager({ projectId }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const res = await api.get(`/api/projects/${projectId}/custom-fields`);
-      setFields(res.data);
+      const res = await projectsApi.getCustomFields(projectId);
+      setFields(res);
     } catch {
       toast('Failed to load custom fields', 'error');
     } finally {
@@ -40,7 +40,7 @@ export default function CustomFieldsManager({ projectId }: Props) {
       const options = newType === 'SELECT'
         ? newOptions.split(',').map((o) => o.trim()).filter(Boolean)
         : [];
-      await api.post(`/api/projects/${projectId}/custom-fields`, {
+      await projectsApi.createCustomField(projectId, {
         name: newName.trim(),
         fieldType: newType,
         options,
@@ -62,7 +62,7 @@ export default function CustomFieldsManager({ projectId }: Props) {
   const handleDelete = async (fieldId: number) => {
     if (!confirm('Delete this custom field? All stored values will be removed.')) return;
     try {
-      await api.delete(`/api/projects/${projectId}/custom-fields/${fieldId}`);
+      await projectsApi.deleteCustomField(projectId, fieldId);
       toast('Field deleted', 'success');
       setFields((prev) => prev.filter((f) => f.id !== fieldId));
     } catch {

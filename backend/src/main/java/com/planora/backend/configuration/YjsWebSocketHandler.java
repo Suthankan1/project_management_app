@@ -1,19 +1,5 @@
 package com.planora.backend.configuration;
 
-import com.planora.backend.model.ProjectPage;
-import com.planora.backend.model.User;
-import com.planora.backend.repository.ProjectPageRepository;
-import com.planora.backend.service.JWTService;
-import com.planora.backend.service.ProjectMembershipService;
-import com.planora.backend.service.UserCacheService;
-import io.jsonwebtoken.JwtException;
-import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Component;
-import org.springframework.web.socket.BinaryMessage;
-import org.springframework.web.socket.CloseStatus;
-import org.springframework.web.socket.WebSocketSession;
-import org.springframework.web.socket.handler.BinaryWebSocketHandler;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -22,6 +8,22 @@ import java.util.HashMap;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Component;
+import org.springframework.web.socket.BinaryMessage;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.BinaryWebSocketHandler;
+
+import com.planora.backend.model.ProjectPage;
+import com.planora.backend.model.User;
+import com.planora.backend.repository.ProjectPageRepository;
+import com.planora.backend.service.JWTService;
+import com.planora.backend.service.ProjectMembershipService;
+import com.planora.backend.service.UserCacheService;
+
+import io.jsonwebtoken.JwtException;
 
 @Component
 public class YjsWebSocketHandler extends BinaryWebSocketHandler {

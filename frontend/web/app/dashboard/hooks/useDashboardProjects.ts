@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import api from '@/lib/axios';
 import { getUserFromToken, User } from '@/lib/auth';
 import {
   buildSessionCacheKey,
   getSessionCache,
   setSessionCache,
 } from '@/lib/session-cache';
+import { projectsApi } from '@/services/api-contract';
 
 // Data will stay fresh in cache for 2 minutes
 const DASHBOARD_PROJECTS_CACHE_TTL = 2 * 60_000;
@@ -66,13 +66,10 @@ export function useDashboardProjects(): UseDashboardProjectsReturn {
 
       try {
         // Fetch both recent and favorite projects in parallel
-        const [recentRes, favRes] = await Promise.all([
-          api.get('/api/projects/recent'),
-          api.get('/api/projects/favorites'),
+        const [recent, favorites] = await Promise.all([
+          projectsApi.getRecent(),
+          projectsApi.getFavorites(),
         ]);
-
-        const recent: ProjectSummary[] = recentRes.data || [];
-        const favorites: ProjectSummary[] = favRes.data || [];
 
         // Collect unique project IDs across both lists
         const uniqueIds = [...new Set([...recent, ...favorites].map((p) => p.id))];
@@ -80,7 +77,7 @@ export function useDashboardProjects(): UseDashboardProjectsReturn {
         // Fetch task completion metrics for all projects in parallel (best-effort)
         const metricsResults = await Promise.allSettled(
           uniqueIds.map((id) =>
-            api.get(`/api/projects/${id}/metrics`).then((r) => ({ id, data: r.data }))
+            projectsApi.getMetrics(id).then((data) => ({ id, data }))
           )
         );
         const metricsMap = new Map<number, { completedTasks: number; totalTasks: number }>();

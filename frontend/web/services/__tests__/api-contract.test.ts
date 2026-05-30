@@ -3,6 +3,7 @@ import {
   normalizeDate,
   normalizeDateToISO,
   formatLocalDate,
+  formatLocalDateTime,
 } from '../api-contract';
 import api from '@/lib/axios';
 
@@ -57,6 +58,11 @@ describe('API Contract & Utilities', () => {
       const date = new Date(Date.UTC(2023, 9, 27, 10, 15, 30));
       expect(normalizeDateToISO(date)).toBe(date.toISOString());
       expect(normalizeDateToISO(null)).toBeNull();
+    });
+
+    it('formatLocalDateTime formats to a local ISO-like timestamp', () => {
+      expect(formatLocalDateTime([2023, 10, 27, 10, 15, 30, 125])).toBe('2023-10-27T10:15:30.125');
+      expect(formatLocalDateTime(null)).toBeNull();
     });
 
     it('formatLocalDate formats to YYYY-MM-DD', () => {
@@ -193,6 +199,32 @@ describe('API Contract & Utilities', () => {
       const res = await apiContract.documents.listByProject(12, true);
       expect(mockedApi.get).toHaveBeenCalledWith('/api/projects/12/documents', { params: { includeDeleted: true } });
       expect(res).toEqual([{ id: 1, fileName: 'd1.pdf' }]);
+    });
+  });
+
+  describe('Project Custom Fields', () => {
+    it('deleteCustomField calls the custom field delete endpoint', async () => {
+      mockedApi.delete.mockResolvedValueOnce({});
+      await apiContract.projects.deleteCustomField(12, 44);
+      expect(mockedApi.delete).toHaveBeenCalledWith('/api/projects/12/custom-fields/44');
+    });
+  });
+
+  describe('Task list helpers', () => {
+    it('getAssigned fetches assigned tasks', async () => {
+      mockedApi.get.mockResolvedValueOnce({ data: [{ id: 1, title: 'Assigned' }] });
+      const res = await apiContract.tasks.getAssigned({ limit: 100 });
+      expect(mockedApi.get).toHaveBeenCalledWith('/api/tasks/assigned', { params: { limit: 100 } });
+      expect(res).toEqual([{ id: 1, title: 'Assigned' }]);
+    });
+
+    it('updateDates serializes local date strings', async () => {
+      mockedApi.patch.mockResolvedValueOnce({});
+      await apiContract.tasks.updateDates(9, { startDate: '2023-10-27', dueDate: '2023-10-28' });
+      expect(mockedApi.patch).toHaveBeenCalledWith('/api/tasks/9/dates', {
+        startDate: '2023-10-27',
+        dueDate: '2023-10-28',
+      });
     });
   });
 

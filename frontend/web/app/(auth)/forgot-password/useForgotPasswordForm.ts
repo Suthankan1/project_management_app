@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import api from '@/lib/axios';
+import { authApi } from '@/services/api-contract';
 
 /*
  * Headless Business Logic Hook.
@@ -52,12 +52,12 @@ export function useForgotPasswordForm() {
     try {
       // API CONTRACT: Send the email as a JSON payload to our Spring Boot endpoint.
       // We enforce lowercase here again just as a strict safety measure before it hits the DB.
-      const response = await api.post('/api/auth/forgot', {
+      const response = await authApi.forgotPassword({
         email: email.toLowerCase(),
       });
 
       // On success:
-      setSuccess(response.data);
+      setSuccess(response.message || 'Verification code sent.');
       setSubmitted(true);
       setCooldown(60);
       setEmail(''); // Clear the input field for security/cleanliness.

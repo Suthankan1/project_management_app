@@ -202,17 +202,15 @@ export default function CalendarPage() {
 
   const handleCreateTask = async (data: CreateTaskData) => {
     if (!projectId) return;
-    await import('@/lib/axios').then(({ default: api }) =>
-      api.post('/api/tasks', {
-        projectId: parseInt(projectId, 10),
-        title: data.title,
-        priority: data.priority,
-        storyPoint: data.storyPoint,
-        assigneeId: data.assigneeId,
-        labelIds: data.labelIds,
-        dueDate: data.dueDate,
-      })
-    );
+    await tasksApi.create({
+      projectId: parseInt(projectId, 10),
+      title: data.title,
+      priority: data.priority,
+      storyPoint: data.storyPoint,
+      assigneeId: data.assigneeId,
+      labelIds: data.labelIds,
+      dueDate: data.dueDate,
+    });
     void loadEvents();
   };
 

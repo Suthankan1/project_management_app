@@ -1,11 +1,11 @@
 package com.planora.backend.configuration;
 
-import com.planora.backend.model.User;
-import com.planora.backend.service.JWTService;
-import com.planora.backend.service.ProjectMembershipService;
-import com.planora.backend.service.UserCacheService;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
+import java.security.Principal;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.Message;
@@ -18,11 +18,13 @@ import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
-import java.security.Principal;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.planora.backend.model.User;
+import com.planora.backend.service.JWTService;
+import com.planora.backend.service.ProjectMembershipService;
+import com.planora.backend.service.UserCacheService;
+
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 
 @Component
 public class PlanoraStompInboundInterceptor implements ChannelInterceptor {

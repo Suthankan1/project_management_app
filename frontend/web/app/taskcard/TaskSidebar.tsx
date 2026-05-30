@@ -12,10 +12,10 @@ import RecurrenceSection from './sidebar/RecurrenceSection';
 import TaskGitHubSection from './sidebar/TaskGitHubSection';
 import SidebarField from './sidebar/SidebarField';
 import CustomFieldsSection from './sidebar/CustomFieldsSection';
-import api from '@/lib/axios';
 import { Check, ChevronDown, Link2, Plus } from 'lucide-react';
 import GitHubIssueBadge from '@/components/github/GitHubIssueBadge';
 import GitHubMark from '@/components/github/GitHubMark';
+import { projectsApi } from '@/services/projects-contract';
 import type { ProjectGitHubConnection } from '@/services/githubService';
 
 interface MultiAssignee {
@@ -102,10 +102,10 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
   React.useEffect(() => {
     if (projectId == null) return;
     let active = true;
-    api.get(`/api/projects/${projectId}/custom-fields`)
+    projectsApi.getCustomFields(projectId)
       .then((res) => {
         if (active) {
-          setProjectCustomFields(res.data || []);
+          setProjectCustomFields(res || []);
         }
       })
       .catch(() => {});

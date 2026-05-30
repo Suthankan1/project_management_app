@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import api from '@/lib/axios'; // Centralized Axios instance (hopefully configured with base URLs and interceptors)
+import { authApi } from '@/services/api-contract';
 
 import AuthCard from './UI/AuthCard';
 import Button from './UI/Button';
@@ -55,7 +55,7 @@ export default function VerifyEmailForm() {
 
     try {
       // Hit the Spring Boot backend
-      await api.post('/api/auth/reg/verify', { email, otp });
+      await authApi.verifyEmail({ email: email!, otp });
 
       setSuccessMsg('Email verified! Redirecting to login...');
       // UX: Give the user 1.5 seconds to read the success message before kicking them to login.
@@ -98,10 +98,10 @@ export default function VerifyEmailForm() {
     setError('');
 
     try {
-      const response = await api.post('/api/auth/resend', { email });
+      const response = await authApi.resendOtp({ email: email! });
       setError('');
 
-      const msg = typeof response.data === 'string' ? response.data : 'Verification code resent.';
+      const msg = (response as { message?: string }).message || 'Verification code resent.';
       setSuccessMsg(msg);
       setResendCooldown(60);
     } catch (_err: unknown) {

@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import TaskHeader from './TaskHeader';
 import TaskMainContent from './TaskMainContent';
 import TaskSidebar from './TaskSidebar';
-import api from '@/lib/axios';
 import { toast } from '@/components/ui';
 import { motion } from 'framer-motion';
 import { useStomp } from '@/ws/stomp-provider';
 import { getProjectGitHubRepo } from '@/services/githubService';
 import CreateIssueFromTaskModal from '@/components/github/CreateIssueFromTaskModal';
+import { authApi } from '@/services/auth-contract';
+import { labelsApi, projectsApi, sprintsApi, tasksApi } from '@/services/api-contract';
 
 interface MultiAssignee {
   memberId: number;
@@ -92,12 +93,12 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
   const fetchTaskData = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/tasks/${taskId}`);
-      setTaskData(response.data);
-      localStorage.setItem(`planora:task:${taskId}`, JSON.stringify({ ...response.data, timestamp: Date.now() }));
+      const response = await tasksApi.get(taskId);
+      setTaskData(response);
+      localStorage.setItem(`planora:task:${taskId}`, JSON.stringify({ ...response, timestamp: Date.now() }));
       setError(null);
-      if (response.data?.projectId) {
-        void loadTaskMeta(response.data.projectId);
+      if (response?.projectId) {
+        void loadTaskMeta(response.projectId);
       }
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };
@@ -117,15 +118,15 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
   const loadTaskMeta = async (projectId: number) => {
     try {
       const [projectRes, currentUserRes, membersRes, labelsRes, sprintsRes] = await Promise.all([
-        api.get(`/api/projects/${projectId}`),
-        api.get('/api/user/me'),
-        api.get(`/api/projects/${projectId}/members`),
-        api.get(`/api/labels/project/${projectId}`),
-        api.get(`/api/sprints/project/${projectId}`).catch(() => ({ data: [] })),
+        projectsApi.get(projectId),
+        authApi.getCurrentUser(),
+        projectsApi.getMembers(projectId),
+        labelsApi.listByProject(projectId),
+        sprintsApi.listByProject(projectId).catch(() => []),
       ]);
-      const teamId = projectRes.data?.teamId as number | undefined;
-      const currentUserId = currentUserRes.data?.userId as number | undefined;
-      const membersRaw = (membersRes.data || []) as Array<{ id: number; role?: string; user?: { userId: number; username: string } }>;
+      const teamId = projectRes?.teamId as number | undefined;
+      const currentUserId = currentUserRes?.userId as number | undefined;
+      const membersRaw = (membersRes || []) as Array<{ id: number; role?: string; user?: { userId: number; username: string } }>;
       const currentMember = membersRaw.find((member) => member.user?.userId === currentUserId);
       const role = currentMember?.role || 'MEMBER';
       setCanEdit(role !== 'VIEWER');
@@ -139,9 +140,9 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
             name: member.user!.username,
           })),
       );
-      const labelsRaw = (labelsRes.data || []) as Array<{ id: number; name: string }>;
+      const labelsRaw = (labelsRes || []) as Array<{ id: number; name: string }>;
       setProjectLabels(labelsRaw.map((label) => ({ id: label.id, name: label.name })));
-      const sprintsRaw = (sprintsRes.data || []) as Array<{ id: number; name: string; status?: string }>;
+      const sprintsRaw = (sprintsRes || []) as Array<{ id: number; name: string; status?: string }>;
       setProjectSprints(
         sprintsRaw
           .filter((sprint) => sprint.status !== 'COMPLETED')

@@ -10,11 +10,11 @@ import {
     TeamMemberOption,
     unarchiveTask,
 } from '../../kanban/api';
-import api from '@/lib/axios';
 import { useTaskWebSocket } from '@/hooks/useTaskWebSocket';
 import { type CreateTaskData } from '@/components/shared/CreateTaskModal';
 import { buildSessionCacheKey, getSessionCache, setSessionCache, removeSessionCache } from '@/lib/session-cache';
 import { toast } from '@/components/ui';
+import { tasksApi } from '@/services/api-contract';
 
 export function useBacklogData(projectId: string | null, showArchived = false) {
 
@@ -169,11 +169,11 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         const task = tasks.find(t => t.id === id);
         setTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'DONE' } : t));
         try {
-            await api.patch(`/api/tasks/${id}/status`, { status: 'DONE' });
+            await tasksApi.updateStatus(id, 'DONE');
         } catch (e: unknown) {
             const status = (e as { response?: { status?: number } })?.response?.status;
             if ((status === 401 || status === 404) && task?.title) {
-                try { await api.put(`/api/tasks/${id}`, { title: task.title, status: 'DONE' }); forceRefresh(); return; } catch { /* fall through */ }
+                try { await tasksApi.update(id, { title: task.title, status: 'DONE' }); forceRefresh(); return; } catch { /* fall through */ }
             }
             forceRefresh();
         }
@@ -181,20 +181,20 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
 
     const handleDelete = useCallback(async (id: number) => {
         setTasks(prev => prev.filter(t => t.id !== id));
-        try { await api.delete(`/api/tasks/${id}`); forceRefresh(); } catch { forceRefresh(); }
+        try { await tasksApi.delete(id); forceRefresh(); } catch { forceRefresh(); }
     }, [forceRefresh]);
 
     const handleAddTask = useCallback(async (data: CreateTaskData) => {
         if (!projectId) return;
         try {
-            const res = await api.post('/api/tasks', {
+            const res = await tasksApi.create({
                 projectId: parseInt(projectId, 10),
                 title: data.title,
                 priority: data.priority,
                 assigneeId: data.assigneeId,
                 labelIds: data.labelIds,
             });
-            const newTask = res.data as Task;
+            const newTask = res as Task;
             // Deduplicate: WebSocket may have already added this task
             setTasks(prev => prev.some(t => t.id === newTask.id) ? prev : [...prev, newTask]);
             const key = buildSessionCacheKey('kanban-backlog', [projectId]);
@@ -209,11 +209,11 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         const task = tasks.find(t => t.id === id);
         setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
         try {
-            await api.patch(`/api/tasks/${id}/status`, { status });
+            await tasksApi.updateStatus(id, status);
         } catch (e: unknown) {
             const errStatus = (e as { response?: { status?: number } })?.response?.status;
             if ((errStatus === 401 || errStatus === 404) && task?.title) {
-                try { await api.put(`/api/tasks/${id}`, { title: task.title, status }); forceRefresh(); return; } catch { /* fall through */ }
+                try { await tasksApi.update(id, { title: task.title, status }); forceRefresh(); return; } catch { /* fall through */ }
             }
             forceRefresh();
         }
@@ -223,7 +223,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         const task = tasks.find(t => t.id === id);
         setTasks(prev => prev.map(t => t.id === id ? { ...t, dueDate: dueDate || undefined } : t));
         try {
-            await api.patch(`/api/tasks/${id}/due-date`, { dueDate });
+            await tasksApi.updateDates(id, { dueDate });
             const cKey = buildSessionCacheKey('kanban-backlog', [projectId]);
             if (cKey) removeSessionCache(cKey);
             window.dispatchEvent(new CustomEvent('planora:task-updated'));
@@ -231,7 +231,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
             const errStatus = (e as { response?: { status?: number } })?.response?.status;
             if ((errStatus === 401 || errStatus === 404) && task?.title) {
                 try {
-                    await api.put(`/api/tasks/${id}`, { title: task.title, dueDate });
+                    await tasksApi.update(id, { title: task.title, dueDate });
                     const cKey = buildSessionCacheKey('kanban-backlog', [projectId]);
                     if (cKey) removeSessionCache(cKey);
                     window.dispatchEvent(new CustomEvent('planora:task-updated'));
@@ -278,7 +278,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         const ids = [...selectedIds];
         setTasks(prev => prev.filter(t => !ids.includes(t.id)));
         setSelectedIds(new Set());
-        try { await Promise.all(ids.map(id => api.delete(`/api/tasks/${id}`))); forceRefresh(); } catch { forceRefresh(); }
+        try { await Promise.all(ids.map(id => tasksApi.delete(id))); forceRefresh(); } catch { forceRefresh(); }
     }, [selectedIds, forceRefresh]);
 
     const handleBulkDone = useCallback(async () => {
@@ -286,13 +286,13 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, status: 'DONE' } : t));
         setSelectedIds(new Set());
         try {
-            await api.patch('/api/tasks/bulk/status', { taskIds: ids, status: 'DONE' });
+            await tasksApi.bulkUpdateStatus({ taskIds: ids, status: 'DONE' });
             forceRefresh();
         } catch {
             // Fallback: update each task individually with PUT
             try {
                 const tasksToUpdate = tasks.filter(t => ids.includes(t.id));
-                await Promise.all(tasksToUpdate.map(t => api.put(`/api/tasks/${t.id}`, { title: t.title, status: 'DONE' })));
+                await Promise.all(tasksToUpdate.map(t => tasksApi.update(t.id, { title: t.title, status: 'DONE' })));
                 forceRefresh();
             } catch { forceRefresh(); }
         }

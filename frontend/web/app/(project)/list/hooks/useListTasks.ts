@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import api from '@/lib/axios';
 import { fetchTasksByProject } from '@/app/(project)/kanban/api';
 import { getMilestones, assignTaskToMilestone } from '@/services/milestone-service';
 import { useTaskWebSocket } from '@/hooks/useTaskWebSocket';
 import type { CreateTaskData } from '@/components/shared/CreateTaskModal';
 import type { Label, MilestoneResponse, Task } from '@/types';
+import { labelsApi, projectsApi, tasksApi } from '@/services/api-contract';
 
 const MEMBERS_CACHE_TTL_MS = 1000 * 60 * 30;
 
@@ -119,9 +119,9 @@ export function useListTasks() {
       }
     }
     try {
-      const res = await api.get(`/api/projects/${projectId}/members`);
+      const res = await projectsApi.getMembers(projectId);
       const map: Record<number, string | null> = {};
-      (res.data as { user: { userId: number; profilePicUrl?: string } }[]).forEach((m) => {
+      (res as { user: { userId: number; profilePicUrl?: string } }[]).forEach((m) => {
         map[m.user.userId] = isHttpUrl(m.user.profilePicUrl) ? m.user.profilePicUrl : null;
       });
       const entry: MembersCacheEntry = {
@@ -169,11 +169,11 @@ export function useListTasks() {
     if (!projectId) return;
     try {
       const [membersRes, labelsRes, milestonesRes] = await Promise.all([
-        api.get(`/api/projects/${projectId}/members`),
-        api.get(`/api/labels/project/${projectId}`),
+        projectsApi.getMembers(projectId),
+        labelsApi.listByProject(projectId),
         getMilestones(projectId),
       ]);
-      const normalizedMembers = (membersRes.data as Array<{
+      const normalizedMembers = (membersRes as Array<{
         id?: number;
         user?: { userId?: number; fullName?: string; username?: string; profilePicUrl?: string | null };
       }>).map((item) => {
@@ -187,7 +187,7 @@ export function useListTasks() {
         };
       }).filter((m) => Number.isFinite(m.id));
       setMembers(normalizedMembers);
-      setLabels(Array.isArray(labelsRes.data) ? labelsRes.data : []);
+      setLabels(Array.isArray(labelsRes) ? labelsRes : []);
       setMilestones(Array.isArray(milestonesRes) ? milestonesRes : []);
     } catch {
       setMembers([]);
@@ -230,10 +230,10 @@ export function useListTasks() {
       });
     } else if (event.type === 'TASK_CREATED' && event.task) {
       // Fetch the single new task for full data (labels, milestones etc.)
-      void api.get(`/api/tasks/${event.task.id}`).then((res) => {
+      void tasksApi.get(event.task.id).then((res) => {
         setTasks((prev) => {
           if (prev.some((t) => t.id === event.task!.id)) return prev;
-          const next = [...prev, normalizeAssignees(sanitizeTaskPhoto(res.data as Task))];
+          const next = [...prev, normalizeAssignees(sanitizeTaskPhoto(res as Task))];
           if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
           return next;
         });
@@ -278,10 +278,10 @@ export function useListTasks() {
       return next;
     });
     try {
-      await api.patch('/api/tasks/bulk/status', { taskIds, status: newStatus });
+      await tasksApi.bulkUpdateStatus({ taskIds, status: newStatus });
     } catch {
       // Fallback for environments without bulk endpoint support
-      await Promise.all(taskIds.map((id) => api.put(`/api/tasks/${id}`, { status: newStatus }).catch(() => null)));
+      await Promise.all(taskIds.map((id) => tasksApi.update(id, { status: newStatus }).catch(() => null)));
       if (cacheKey) localStorage.removeItem(cacheKey);
       void loadTasks();
     }
@@ -296,9 +296,9 @@ export function useListTasks() {
       return next;
     });
     try {
-      await api.delete('/api/tasks/bulk', { data: { taskIds } });
+      await tasksApi.bulkDelete({ taskIds });
     } catch {
-      await Promise.all(taskIds.map((id) => api.delete(`/api/tasks/${id}`).catch(() => null)));
+      await Promise.all(taskIds.map((id) => tasksApi.delete(id).catch(() => null)));
       if (cacheKey) localStorage.removeItem(cacheKey);
       void loadTasks();
     }
@@ -316,7 +316,7 @@ export function useListTasks() {
     const previous = tasks.find((t) => t.id === taskId)?.dueDate;
     patchTaskOptimistic(taskId, { dueDate: dueDate ?? undefined });
     try {
-      await api.patch(`/api/tasks/${taskId}/dates`, { dueDate });
+      await tasksApi.updateDates(taskId, { dueDate });
     } catch {
       patchTaskOptimistic(taskId, { dueDate: previous });
     }
@@ -331,8 +331,8 @@ export function useListTasks() {
       assigneePhotoUrl: selectedMember?.photoUrl ?? undefined,
     });
     try {
-      if (assigneeId === null) await api.put(`/api/tasks/${taskId}`, { assigneeId: null });
-      else await api.patch(`/api/tasks/${taskId}/assign/${assigneeId}`);
+      if (assigneeId === null) await tasksApi.update(taskId, { assigneeId: null });
+      else await tasksApi.assignTaskSingle(taskId, assigneeId);
     } catch {
       if (previous) {
         patchTaskOptimistic(taskId, {
@@ -362,7 +362,7 @@ export function useListTasks() {
     });
 
     try {
-      await api.patch(`/api/tasks/${taskId}/assignees`, { assigneeIds });
+      await tasksApi.assignTaskMultiple(taskId, { assigneeIds });
     } catch {
       if (previous) {
         patchTaskOptimistic(taskId, {
@@ -382,8 +382,8 @@ export function useListTasks() {
       labels: shouldAttach ? [...previous, label] : previous.filter((l) => l.id !== label.id),
     });
     try {
-      if (shouldAttach) await api.post(`/api/tasks/${taskId}/label/${label.id}`);
-      else await api.delete(`/api/tasks/${taskId}/label/${label.id}`);
+      if (shouldAttach) await tasksApi.addLabel(taskId, label.id);
+      else await tasksApi.removeLabel(taskId, label.id);
     } catch {
       patchTaskOptimistic(taskId, { labels: previous });
     }
@@ -411,7 +411,7 @@ export function useListTasks() {
   const handleAddTask = useCallback(async (data: CreateTaskData) => {
     if (!projectId) return;
     try {
-      const res = await api.post('/api/tasks', {
+      const res = await tasksApi.create({
         projectId,
         title: data.title,
         storyPoint: data.storyPoint,
@@ -421,7 +421,7 @@ export function useListTasks() {
         dueDate: data.dueDate,
       });
       setTasks((prev) => {
-        const next = [...prev, res.data as Task];
+        const next = [...prev, res as Task];
         if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
         return next;
       });
