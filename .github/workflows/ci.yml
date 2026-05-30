@@ -60,6 +60,14 @@ jobs:
       uses: gitleaks/gitleaks-action@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Run Trivy Security Scan (Backend)
+      uses: aquasecurity/trivy-action@v0.28.0
+      with:
+        scan-type: 'fs'
+        scan-ref: './backend'
+        exit-code: '1'
+        severity: 'CRITICAL,HIGH'
+        vuln-type: 'library'
 
   backend-build:
     name: Build Backend
@@ -89,9 +97,6 @@ jobs:
         
     - name: Run Integration Tests
       run: ./mvnw -B failsafe:integration-test failsafe:verify --file pom.xml
-      
-    - name: Run OWASP Dependency Check
-      run: ./mvnw -B dependency-check:check -Psecurity --file pom.xml
       
   frontend-build:
     name: Build Frontend
