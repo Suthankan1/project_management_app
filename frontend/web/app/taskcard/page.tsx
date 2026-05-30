@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TaskHeader from './TaskHeader';
 import TaskMainContent from './TaskMainContent';
@@ -8,6 +8,7 @@ import api from '@/lib/axios';
 import { toast } from '@/components/ui';
 import { getProjectGitHubRepo } from '@/services/githubService';
 import CreateIssueFromTaskModal from '@/components/github/CreateIssueFromTaskModal';
+import { useTaskWebSocket } from '@/hooks/useTaskWebSocket';
 
 interface TaskData {
   id: number;
@@ -30,6 +31,12 @@ interface TaskData {
   githubIssueNumber?: number | null;
   githubRepoFullName?: string | null;
   archived?: boolean;
+  archivedAt?: string | null;
+}
+
+interface TaskCache {
+  data: TaskData;
+  timestamp: number;
 }
 
 // Wrapper component that uses searchParams
@@ -47,33 +54,48 @@ function TaskPageContent() {
     setMounted(true);
   }, []);
 
-  const fetchTaskData = async () => {
+  const fetchTaskData = useCallback(async () => {
     if (!taskId) return;
     const cacheKey = `planora:task:${taskId}`;
     // Stale-while-revalidate: show cached data instantly so the modal feels responsive,
     // then overwrite with fresh data once the API responds.
     const cached = localStorage.getItem(cacheKey);
+    let cachedLoaded = false;
     if (cached) {
       try {
-        setTaskData(JSON.parse(cached) as TaskData);
-        setLoading(false);
-      } catch { /* ignore corrupt cache */ }
+        const parsed = JSON.parse(cached) as TaskCache;
+        const now = Date.now();
+        const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+        if (parsed && typeof parsed === 'object' && parsed.data && typeof parsed.timestamp === 'number') {
+          if (now - parsed.timestamp < CACHE_TTL_MS) {
+            setTaskData(parsed.data);
+            setLoading(false);
+            cachedLoaded = true;
+          } else {
+            localStorage.removeItem(cacheKey);
+          }
+        } else {
+          localStorage.removeItem(cacheKey);
+        }
+      } catch {
+        localStorage.removeItem(cacheKey);
+      }
     }
     try {
       const response = await api.get(`/api/tasks/${taskId}`);
       setTaskData(response.data);
-      localStorage.setItem(cacheKey, JSON.stringify({ ...response.data, timestamp: Date.now() }));
+      localStorage.setItem(cacheKey, JSON.stringify({ data: response.data, timestamp: Date.now() }));
       setError(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      if (!cached) {
+      if (!cachedLoaded) {
         setError(err.response?.data?.message || 'Failed to fetch task data');
         setTaskData(null);
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [taskId]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -85,8 +107,42 @@ function TaskPageContent() {
     }
 
     fetchTaskData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskId, mounted]);
+  }, [taskId, mounted, fetchTaskData]);
+
+  // Listen to planora:task-updated CustomEvent to invalidate cache and refetch
+  useEffect(() => {
+    if (!mounted || !taskId) return;
+
+    const handleTaskUpdatedEvent = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail && customEvent.detail.taskId) {
+        if (String(customEvent.detail.taskId) === String(taskId)) {
+          localStorage.removeItem(`planora:task:${taskId}`);
+          fetchTaskData();
+        }
+      } else {
+        localStorage.removeItem(`planora:task:${taskId}`);
+        fetchTaskData();
+      }
+    };
+
+    window.addEventListener('planora:task-updated', handleTaskUpdatedEvent);
+    return () => {
+      window.removeEventListener('planora:task-updated', handleTaskUpdatedEvent);
+    };
+  }, [mounted, taskId, fetchTaskData]);
+
+  // Listen to WebSocket events to invalidate cache and refetch
+  useTaskWebSocket(
+    taskData?.projectId ? String(taskData.projectId) : null,
+    useCallback((event) => {
+      const eventTaskId = event.taskId || event.task?.id;
+      if (eventTaskId && String(eventTaskId) === String(taskId)) {
+        localStorage.removeItem(`planora:task:${taskId}`);
+        fetchTaskData();
+      }
+    }, [taskId, fetchTaskData])
+  );
 
   const updateTask = async (updates: Partial<{
     title: string;
@@ -120,10 +176,13 @@ function TaskPageContent() {
       githubRepoFullName: taskData.githubRepoFullName ?? projectGitHubRepo?.repoFullName ?? null,
     };
     setTaskData(nextTaskData);
-    localStorage.setItem(`planora:task:${taskId}`, JSON.stringify({ ...nextTaskData, timestamp: Date.now() }));
+    localStorage.setItem(`planora:task:${taskId}`, JSON.stringify({ data: nextTaskData, timestamp: Date.now() }));
   };
 
-  const handleClose = () => {
+  const handleClose = (wasModified?: boolean) => {
+    if (wasModified && taskId) {
+      localStorage.removeItem(`planora:task:${taskId}`);
+    }
     window.history.back();
   };
 
