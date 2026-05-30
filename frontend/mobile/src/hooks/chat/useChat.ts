@@ -10,7 +10,7 @@ import { useChatReactions } from './useChatReactions';
 import { useChatSearch } from './useChatSearch';
 import { useChatThreads } from './useChatThreads';
 import { useChatUnread } from './useChatUnread';
-import { getValidToken } from '@/src/auth/storage';
+import { ensureValidToken } from '@/src/auth/storage';
 
 // ── Minimal inline STOMP builder/parser ──────────────────────────────────────
 
@@ -90,6 +90,7 @@ export function useChat(projectId: string) {
   const selectedRoomIdRef = useRef<number | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptRef = useRef(0);
   const isConnectingRef = useRef(false);
   // Track which rooms we've subscribed to already
   const subscribedRoomsRef = useRef<Set<number>>(new Set());
@@ -229,7 +230,7 @@ export function useChat(projectId: string) {
     isConnectingRef.current = true;
 
     try {
-      const token = await getValidToken();
+      const token = await ensureValidToken();
       if (!token) { setError('Not authenticated'); isConnectingRef.current = false; return; }
 
       const base = API_BASE_URL.replace(/\/api$/, '');
@@ -260,6 +261,7 @@ export function useChat(projectId: string) {
           const frame = parseFrame(raw);
           if (frame.command === 'CONNECTED') {
             console.info('[Chat] STOMP CONNECTED');
+            reconnectAttemptRef.current = 0;
             setIsSocketConnected(true);
             setError('');
             subscribedRoomsRef.current.clear();
@@ -283,6 +285,29 @@ export function useChat(projectId: string) {
             handleMessage(frame);
           } else if (frame.command === 'ERROR') {
             console.error('[Chat] STOMP ERROR', frame.body);
+            const normalizedBody = (frame.body || '').toLowerCase();
+            const isAuthError = normalizedBody.includes('jwt')
+              || normalizedBody.includes('auth')
+              || normalizedBody.includes('token')
+              || normalizedBody.includes('expired')
+              || normalizedBody.includes('invalid');
+
+            if (isAuthError) {
+              void ensureValidToken().then((refreshedToken) => {
+                if (!refreshedToken) {
+                  setError('Your session expired. Please sign in again.');
+                  return;
+                }
+                if (!reconnectRef.current) {
+                  reconnectRef.current = setTimeout(() => {
+                    reconnectRef.current = null;
+                    connectWebSocket();
+                  }, 500);
+                }
+              });
+              return;
+            }
+
             setError('Chat server error. Please reconnect.');
           }
         } catch (err) {
@@ -296,11 +321,23 @@ export function useChat(projectId: string) {
         setIsSocketConnected(false);
         socketRef.current = null;
         isConnectingRef.current = false;
+
+        const closeReason = `${event.reason || ''}`.toLowerCase();
+        const isAuthClose = closeReason.includes('jwt')
+          || closeReason.includes('auth')
+          || closeReason.includes('token')
+          || closeReason.includes('expired')
+          || closeReason.includes('invalid');
+
         if (!reconnectRef.current) {
+          const delay = isAuthClose
+            ? 500
+            : Math.min(30000, Math.pow(2, reconnectAttemptRef.current) * 1000);
+          reconnectAttemptRef.current += 1;
           reconnectRef.current = setTimeout(() => {
             reconnectRef.current = null;
             connectWebSocket();
-          }, 5000);
+          }, delay);
         }
       };
 
@@ -374,6 +411,7 @@ export function useChat(projectId: string) {
     return () => {
       cancelled = true;
       isConnectingRef.current = false;
+      reconnectAttemptRef.current = 0;
       const dying = socketRef.current;
       socketRef.current = null;
       dying?.close();
