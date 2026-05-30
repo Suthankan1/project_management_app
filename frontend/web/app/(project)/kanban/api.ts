@@ -331,36 +331,35 @@ export async function fetchProject(projectId: number): Promise<{ teamId?: number
 export async function fetchTeamMembers(teamId: number): Promise<TeamMemberOption[]> {
   try {
     const payload = await projectsApi.getTeamMembers(teamId);
+    const raw = payload as unknown as { members?: unknown[]; data?: unknown[]; content?: unknown[] } | unknown[];
 
-    const rawMembers = Array.isArray(payload)
-      ? payload
-      : Array.isArray(payload?.members)
-        ? payload.members
-        : Array.isArray(payload?.data)
-          ? payload.data
-          : Array.isArray(payload?.content)
-            ? payload.content
+    const rawMembers: unknown[] = Array.isArray(raw)
+      ? raw
+      : Array.isArray((raw as { members?: unknown[] }).members)
+        ? (raw as { members: unknown[] }).members
+        : Array.isArray((raw as { data?: unknown[] }).data)
+          ? (raw as { data: unknown[] }).data
+          : Array.isArray((raw as { content?: unknown[] }).content)
+            ? (raw as { content: unknown[] }).content
             : [];
 
-    return rawMembers
-      .map((member: Record<string, unknown> & { user?: Record<string, unknown> }) => {
-        const id = Number(member?.id);
-        const name =
-          (member?.name as string) ??
-          (member?.username as string) ??
-          (member?.fullName as string) ??
-          (member?.user?.username as string) ??
-          (member?.user?.fullName as string) ??
-          (member?.user?.email as string) ??
-          '';
+    const results: TeamMemberOption[] = [];
+    for (const entry of rawMembers) {
+      const member = entry as Record<string, unknown> & { user?: Record<string, unknown> };
+      const id = Number(member?.id);
+      const name =
+        (member?.name as string) ??
+        (member?.username as string) ??
+        (member?.fullName as string) ??
+        (member?.user?.username as string) ??
+        (member?.user?.fullName as string) ??
+        (member?.user?.email as string) ??
+        '';
 
-        if (!Number.isFinite(id) || !name) {
-          return null;
-        }
-
-        return { id, name };
-      })
-      .filter((member: TeamMemberOption | null): member is TeamMemberOption => member !== null);
+      if (!Number.isFinite(id) || !name) continue;
+      results.push({ id, name });
+    }
+    return results;
   } catch (error) {
     console.error('Error fetching team members:', error);
     throw error;
@@ -372,11 +371,12 @@ export async function fetchTeamMembers(teamId: number): Promise<TeamMemberOption
  */
 export async function createKanbanColumn(kanbanId: number, name: string, position: number): Promise<KanbanColumnConfig> {
   try {
-    const col = await kanbanApi.createColumn({
+    const colRaw = await kanbanApi.createColumn({
       kanbanId,
       name,
       position,
     });
+    const col = colRaw as { id: number; status?: string; name?: string; color?: string; wipLimit?: number };
     return {
       id: col.id,
       status: col.status || col.name?.toUpperCase().replace(/\s+/g, '_') || name.toUpperCase().replace(/\s+/g, '_'),

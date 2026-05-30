@@ -7,7 +7,7 @@ jest.mock('./TaskHeader', () => ({
   __esModule: true,
   default: ({ onClose, project, taskId }: { onClose: (wasModified: boolean) => void; project: unknown; taskId: unknown }) => (
     <div data-testid="task-header">
-      <span>Header: {project} / {taskId}</span>
+      <span>Header: {String(project)} / {String(taskId)}</span>
       <button data-testid="archive-btn" onClick={() => onClose(true)}>Archive (onClose true)</button>
       <button data-testid="close-btn" onClick={() => onClose(false)}>Close (onClose false)</button>
     </div>

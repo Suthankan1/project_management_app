@@ -112,18 +112,20 @@ export interface SprintTeamMemberOption {
 
 export async function fetchTeamMembers(teamId: number): Promise<SprintTeamMemberOption[]> {
   const payload = await projectsApi.getTeamMembers(teamId);
-  const items = Array.isArray(payload) ? payload : payload?.members ?? payload?.data ?? payload?.content ?? [];
-  return items
-    .map((member: Record<string, unknown> & { user?: Record<string, unknown> }) => {
-      const id = Number(member?.id);
-      const userId = Number(member?.user?.userId ?? member?.userId);
-      const name = (member?.user?.fullName as string)
-        || (member?.user?.username as string)
-        || (member?.fullName as string)
-        || (member?.username as string);
-      const photoUrl = (member?.user?.profilePicUrl as string) || null;
-      if (!Number.isFinite(id) || !Number.isFinite(userId) || !name) return null;
-      return { id, userId, name, photoUrl };
-    })
-    .filter((item: SprintTeamMemberOption | null): item is SprintTeamMemberOption => item !== null);
+  const raw = payload as unknown as { members?: unknown[]; data?: unknown[]; content?: unknown[] } | unknown[];
+  const items: unknown[] = Array.isArray(raw) ? raw : (raw as { members?: unknown[]; data?: unknown[]; content?: unknown[] })?.members ?? (raw as { members?: unknown[]; data?: unknown[]; content?: unknown[] })?.data ?? (raw as { members?: unknown[]; data?: unknown[]; content?: unknown[] })?.content ?? [];
+  const results: SprintTeamMemberOption[] = [];
+  for (const entry of items) {
+    const member = entry as Record<string, unknown> & { user?: Record<string, unknown> };
+    const id = Number(member?.id);
+    const userId = Number(member?.user?.userId ?? member?.userId);
+    const name = (member?.user?.fullName as string)
+      || (member?.user?.username as string)
+      || (member?.fullName as string)
+      || (member?.username as string);
+    const photoUrl = (member?.user?.profilePicUrl as string) || null;
+    if (!Number.isFinite(id) || !Number.isFinite(userId) || !name) continue;
+    results.push({ id, userId, name, photoUrl });
+  }
+  return results;
 }

@@ -43,7 +43,8 @@ function triggerBrowserDownload(blob: Blob, fileName: string) {
 }
 
 export async function downloadProjectReport(projectId: number, format: ReportDownloadFormat): Promise<void> {
-  const response = await reportsApi.download(projectId, resolveFormatParam(format));
+  const rawResponse = await reportsApi.download(projectId, resolveFormatParam(format));
+  const response = rawResponse as { headers: Record<string, string | undefined>; data: BlobPart };
 
   // Ensure contentType is a string for Blob options — headers can be typed loosely by axios
   const rawContentType = response.headers['content-type'] || CONTENT_TYPE_BY_FORMAT[format];

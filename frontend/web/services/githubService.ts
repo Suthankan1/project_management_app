@@ -134,7 +134,7 @@ interface GitHubApiIssue {
 }
 
 export async function fetchRepositories(): Promise<GitHubRepository[]> {
-  return gitHubApi.fetchRepositories();
+  return gitHubApi.fetchRepositories() as Promise<GitHubRepository[]>;
 }
 
 export async function fetchIssues(
@@ -345,10 +345,11 @@ export async function fetchImportedGitHubIssueNumbers(
   const content = data.content || [];
   const normalizedRepoName = repoFullName.toLowerCase();
 
-  return content
-    .filter((task: Record<string, unknown> & { githubRepoFullName?: string }) => task.githubRepoFullName?.toLowerCase() === normalizedRepoName)
-    .map((task: Record<string, unknown> & { githubIssueNumber?: number }) => task.githubIssueNumber)
-    .filter((issueNumber: unknown): issueNumber is number => typeof issueNumber === 'number');
+  const tasks = content as Array<{ githubRepoFullName?: string; githubIssueNumber?: number }>;
+  return tasks
+    .filter(task => task.githubRepoFullName?.toLowerCase() === normalizedRepoName)
+    .map(task => task.githubIssueNumber)
+    .filter((n): n is number => typeof n === 'number');
 }
 
 export async function createGitHubAutomationRule(
