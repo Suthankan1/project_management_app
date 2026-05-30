@@ -65,4 +65,18 @@ public class UserMeController {
             return new ResponseEntity<>("Failed to save push token: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+    @PostMapping("/me/logout-all")
+    public ResponseEntity<?> logoutAllSessions(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return new ResponseEntity<>("User is not authenticated", HttpStatus.UNAUTHORIZED);
+        }
+
+        try {
+            service.logoutAllSessions(authentication.getName());
+            return new ResponseEntity<>(java.util.Map.of("message", "Logged out from all sessions successfully"), HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Failed to logout all sessions: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 }

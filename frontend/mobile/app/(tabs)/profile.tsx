@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Platform, Alert, Animated, Image,
+  StyleSheet, Platform, Alert, Animated, Image, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -11,6 +11,9 @@ import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { T } from '@/src/constants/tokens';
 import { getValidToken, clearTokens } from '@/src/auth/storage';
 import api from '@/src/api/axios';
+import PasswordInput from '@/src/components/ui/PasswordInput';
+import { validatePassword, getPasswordStrength } from '@/src/lib/validation';
+import PasswordStrengthBar from '@/src/components/ui/PasswordStrengthBar';
 
 // ─── Types (mirrors web useProfileData.ts UserResponse exactly) ───────────────
 
@@ -25,10 +28,13 @@ interface UserProfile {
   firstName: string | null;
   lastName: string | null;
   contactNumber: string | null;
+  countryCode: string | null;
   jobTitle: string | null;
   company: string | null;
   position: string | null;
   bio: string | null;
+  githubUsername: string | null;
+  notifyDueDateReminders: boolean;
 }
 
 const BIO_MAX = 300;
@@ -162,13 +168,20 @@ function ChangePasswordSection({ email }: { email: string }) {
 
   const resetPw = async () => {
     if (!otp.trim())       return showMsg('Enter the reset code.', true);
-    if (newPw.length < 6)  return showMsg('Password must be at least 6 chars.', true);
+    
+    const { valid, message } = validatePassword(newPw);
+    if (!valid)            return showMsg(message, true);
+    
     if (newPw !== confirm)  return showMsg('Passwords do not match.', true);
+    
     setResetting(true);
     try {
       await api.post('/api/auth/reset', { token: otp.trim(), newPassword: newPw });
       setStep('done');
       showMsg('Password changed successfully!');
+      setOtp('');
+      setNewPw('');
+      setConfirm('');
     } catch { showMsg('Failed to reset. Check your code.', true); }
     finally { setResetting(false); }
   };
@@ -192,8 +205,21 @@ function ChangePasswordSection({ email }: { email: string }) {
       {step === 'sent' && (
         <View style={{ gap: 10 }}>
           <Field label="Reset Code" value={otp} onChange={setOtp} placeholder="Enter OTP from email" />
-          <Field label="New Password" value={newPw} onChange={setNewPw} placeholder="Min 6 characters" />
-          <Field label="Confirm Password" value={confirm} onChange={setConfirm} placeholder="Repeat new password" />
+          <PasswordInput
+            label="New Password"
+            value={newPw}
+            onChangeText={setNewPw}
+            placeholder="Min 8 chars, upper, lower, digit, symbol"
+          />
+          {newPw.length > 0 && (
+            <PasswordStrengthBar strength={getPasswordStrength(newPw)} password={newPw} />
+          )}
+          <PasswordInput
+            label="Confirm Password"
+            value={confirm}
+            onChangeText={setConfirm}
+            placeholder="Repeat new password"
+          />
           <TouchableOpacity style={pw.sendBtn} onPress={resetPw} disabled={resetting}>
             <Text style={pw.sendBtnTxt}>{resetting ? 'Changing…' : 'Change Password'}</Text>
           </TouchableOpacity>
@@ -239,6 +265,15 @@ export default function ProfileScreen() {
   const [position,   setPosition]   = useState('');
   const [bio,        setBio]        = useState('');
   const [phone,      setPhone]      = useState('');
+  const [countryCode, setCountryCode] = useState('');
+  const [githubUsername, setGithubUsername] = useState<string | null>(null);
+  const [notifyDueDateReminders, setNotifyDueDateReminders] = useState(false);
+
+  // GitHub actions states
+  const [githubInput, setGithubInput] = useState('');
+  const [githubLinking, setGithubLinking] = useState(false);
+  const [githubUnlinking, setGithubUnlinking] = useState(false);
+  const [loggingOutAll, setLoggingOutAll] = useState(false);
 
   // ── Load — mirrors web: GET /api/user/profile ─────────────────────────────
   const loadProfile = useCallback(async () => {
@@ -256,6 +291,9 @@ export default function ProfileScreen() {
       setPosition(p.position ?? '');
       setBio(p.bio ?? '');
       setPhone(p.contactNumber ?? '');
+      setCountryCode(p.countryCode ?? '');
+      setGithubUsername(p.githubUsername ?? null);
+      setNotifyDueDateReminders(p.notifyDueDateReminders ?? false);
     } catch { setErrMsg('Failed to load profile.'); }
     finally { setLoading(false); }
   }, [router]);
@@ -272,15 +310,21 @@ export default function ProfileScreen() {
         firstName:     firstName.trim() || null,
         lastName:      lastName.trim()  || null,
         contactNumber: phone.trim()     || null,
+        countryCode:   countryCode.trim() || null,
         jobTitle:      jobTitle.trim()  || null,
         company:       company.trim()   || null,
         position:      position.trim()  || null,
         bio:           bio.trim()       || null,
+        notifyDueDateReminders: notifyDueDateReminders,
       });
       const p = res.data;
+      setProfile(p);
       setFullName(p.fullName ?? '');
       setFirstName(p.firstName ?? '');
       setLastName(p.lastName ?? '');
+      setPhone(p.contactNumber ?? '');
+      setCountryCode(p.countryCode ?? '');
+      setNotifyDueDateReminders(p.notifyDueDateReminders ?? false);
       setSuccessMsg('Profile updated successfully.');
     } catch { setErrMsg('Failed to update profile.'); }
     finally { setSaving(false); }
@@ -312,6 +356,67 @@ export default function ProfileScreen() {
     Alert.alert('Sign Out', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: async () => { await clearTokens(); router.replace('/(auth)/login'); } },
+    ]);
+  };
+
+  const handleLinkGithub = async () => {
+    if (!githubInput.trim()) {
+      Alert.alert('Error', 'GitHub username cannot be empty');
+      return;
+    }
+    setGithubLinking(true);
+    setErrMsg(''); setSuccessMsg('');
+    try {
+      const res = await api.put<UserProfile>('/api/users/me/github-username', {
+        githubUsername: githubInput.trim()
+      });
+      setProfile(res.data);
+      setGithubUsername(res.data.githubUsername);
+      setGithubInput('');
+      setSuccessMsg('GitHub account linked successfully.');
+    } catch (err: any) {
+      const msg = err.response?.data;
+      setErrMsg(typeof msg === 'string' && msg ? msg : 'Failed to link GitHub account.');
+    } finally {
+      setGithubLinking(false);
+    }
+  };
+
+  const handleUnlinkGithub = async () => {
+    Alert.alert('Disconnect GitHub', 'Are you sure you want to disconnect your GitHub account?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Disconnect', style: 'destructive', onPress: async () => {
+        setGithubUnlinking(true);
+        setErrMsg(''); setSuccessMsg('');
+        try {
+          const res = await api.delete<UserProfile>('/api/users/me/github-username');
+          setProfile(res.data);
+          setGithubUsername(res.data.githubUsername);
+          setSuccessMsg('GitHub account unlinked successfully.');
+        } catch (err: any) {
+          setErrMsg('Failed to unlink GitHub account.');
+        } finally {
+          setGithubUnlinking(false);
+        }
+      }}
+    ]);
+  };
+
+  const handleLogoutAll = () => {
+    Alert.alert('Sign Out All Sessions', 'This will log you out of all devices and active sessions. Continue?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out All', style: 'destructive', onPress: async () => {
+        setLoggingOutAll(true);
+        try {
+          await api.post('/api/user/me/logout-all');
+          await clearTokens();
+          router.replace('/(auth)/login');
+        } catch (err) {
+          Alert.alert('Error', 'Failed to log out of all sessions. Please try again.');
+        } finally {
+          setLoggingOutAll(false);
+        }
+      } },
     ]);
   };
 
@@ -391,7 +496,14 @@ export default function ProfileScreen() {
           <SectionCard title="Contact"
             icon={<Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={T.primary} strokeWidth={2} strokeLinecap="round"><Path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5 19.79 19.79 0 0 1 1.6 4.9 2 2 0 0 1 3.59 2.72h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 10a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></Svg>}
           >
-            <Field label="Phone Number" value={phone} onChange={setPhone} placeholder="+1 (555) 000-0000" />
+            <View style={s.row2}>
+              <View style={{ width: 80 }}>
+                <Field label="Code" value={countryCode} onChange={setCountryCode} placeholder="+1" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Field label="Phone Number" value={phone} onChange={setPhone} placeholder="(555) 000-0000" />
+              </View>
+            </View>
           </SectionCard>
 
           {/* Professional */}
@@ -424,6 +536,61 @@ export default function ProfileScreen() {
             <Text style={bio_s.counter}>{bio.length}/{BIO_MAX}</Text>
           </SectionCard>
 
+          {/* Preferences */}
+          <SectionCard title="Preferences"
+            icon={<Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={T.primary} strokeWidth={2} strokeLinecap="round"><Path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /><Circle cx={12} cy={12} r={4} /></Svg>}
+          >
+            <View style={s.preferenceRow}>
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <Text style={s.preferenceTitle}>Due-Date Reminders</Text>
+                <Text style={s.preferenceDesc}>Receive alerts for due dates and overdue tasks.</Text>
+              </View>
+              <Switch
+                value={notifyDueDateReminders}
+                onValueChange={setNotifyDueDateReminders}
+                trackColor={{ false: '#D1D5DB', true: T.primary }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+          </SectionCard>
+
+          {/* GitHub Integration */}
+          <SectionCard title="GitHub Integration"
+            icon={<Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={T.primary} strokeWidth={2} strokeLinecap="round"><Path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" /></Svg>}
+          >
+            {githubUsername ? (
+              <View style={{ gap: 10 }}>
+                <View style={s.githubConnected}>
+                  <Text style={s.githubConnectedTxt}>Connected as </Text>
+                  <Text style={s.githubUsernameTxt}>@{githubUsername}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[s.githubBtn, s.githubBtnUnlink]}
+                  onPress={handleUnlinkGithub}
+                  disabled={githubUnlinking}
+                >
+                  <Text style={s.githubBtnTxtUnlink}>{githubUnlinking ? 'Disconnecting…' : 'Disconnect Account'}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={{ gap: 10 }}>
+                <Field
+                  label="GitHub Username"
+                  value={githubInput}
+                  onChange={setGithubInput}
+                  placeholder="Enter your GitHub username"
+                />
+                <TouchableOpacity
+                  style={s.githubBtn}
+                  onPress={handleLinkGithub}
+                  disabled={githubLinking}
+                >
+                  <Text style={s.githubBtnTxt}>{githubLinking ? 'Linking…' : 'Link GitHub Account'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </SectionCard>
+
           {/* Save button */}
           <TouchableOpacity
             style={[s.saveBtn, saving && s.saveBtnDisabled]}
@@ -436,11 +603,18 @@ export default function ProfileScreen() {
           {/* Change password */}
           <ChangePasswordSection email={email} />
 
-          {/* Sign out */}
-          <TouchableOpacity style={s.signOutBtn} onPress={handleLogout}>
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={2} strokeLinecap="round"><Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><Path d="M16 17l5-5-5-5M21 12H9" /></Svg>
-            <Text style={s.signOutTxt}>Sign Out</Text>
-          </TouchableOpacity>
+          {/* Sign out and revoke sessions */}
+          <View style={{ gap: 10 }}>
+            <TouchableOpacity style={s.signOutBtn} onPress={handleLogout}>
+              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={2} strokeLinecap="round"><Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><Path d="M16 17l5-5-5-5M21 12H9" /></Svg>
+              <Text style={s.signOutTxt}>Sign Out</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.logoutAllBtn} onPress={handleLogoutAll} disabled={loggingOutAll}>
+              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={2} strokeLinecap="round"><Circle cx={12} cy={12} r={10} /><Path d="m15 9-6 6M9 9l6 6" /></Svg>
+              <Text style={s.logoutAllTxt}>{loggingOutAll ? 'Signing out all...' : 'Sign Out All Sessions'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={{ height: 110 }} />
@@ -485,4 +659,19 @@ const s = StyleSheet.create({
 
   signOutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#FFF5F5', borderRadius: 12, paddingVertical: 13, borderWidth: 1, borderColor: '#FECACA' },
   signOutTxt: { fontSize: 14, fontWeight: '700', color: '#DC2626' },
+
+  preferenceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
+  preferenceTitle: { fontSize: 14, fontWeight: '600', color: '#101828' },
+  preferenceDesc: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+
+  githubConnected: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#E2E8F0' },
+  githubConnectedTxt: { fontSize: 13, color: '#475569' },
+  githubUsernameTxt: { fontSize: 13, fontWeight: '700', color: '#0F172A' },
+  githubBtn: { backgroundColor: '#24292F', borderRadius: 12, paddingVertical: 12, alignItems: 'center', ...Platform.select({ ios: { shadowColor: '#24292F', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 }, android: { elevation: 3 } }) },
+  githubBtnTxt: { color: '#FFF', fontSize: 14, fontWeight: '700' },
+  githubBtnUnlink: { backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FECACA' },
+  githubBtnTxtUnlink: { color: '#DC2626', fontSize: 14, fontWeight: '700' },
+
+  logoutAllBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#FFF', borderRadius: 12, paddingVertical: 13, borderWidth: 1, borderColor: '#E4E7EC', ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3 }, android: { elevation: 1 } }) },
+  logoutAllTxt: { fontSize: 14, fontWeight: '700', color: '#DC2626' },
 });

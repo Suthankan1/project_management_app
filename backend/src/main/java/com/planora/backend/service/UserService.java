@@ -536,6 +536,16 @@ public class UserService {
         return mapToUserResponseDTO(userRepository.save(user));
     }
 
+    @Transactional
+    public void logoutAllSessions(String email) {
+        User user = getUserByEmail(email);
+        VerificationToken existing = tokenRepository.findByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN);
+        if (existing != null) {
+            tokenRepository.delete(existing);
+            tokenRepository.flush();
+        }
+    }
+
     private void validateGithubUsernameUniqueness(User currentUser, String githubUsername) {
         if (githubUsername == null || githubUsername.isBlank()) {
             return;
