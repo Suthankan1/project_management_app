@@ -8,8 +8,8 @@ import {
     FolderPermissionRequest 
 } from '@/lib/dms';
 import { 
-    Info, Pencil, Users, X, Lock, Shield, Check, Loader2, 
-    ArrowLeftRight, FileText, Download, Eye, Clock, AlertTriangle 
+    Info, Pencil, X, Lock, Shield, Check, Loader2, 
+    ArrowLeftRight, FileText, Download, Eye, Clock 
 } from 'lucide-react';
 import { formatBytes, toDateLabel } from '@/app/folders/components/dmsUtils';
 
@@ -67,7 +67,7 @@ export default function DmsModals({
     savingPerms,
     onSaveFolderPermissions,
     onCloseFolderPermissions,
-    projectId,
+    projectId: _projectId,
 
     previewDoc,
     setPreviewDoc,

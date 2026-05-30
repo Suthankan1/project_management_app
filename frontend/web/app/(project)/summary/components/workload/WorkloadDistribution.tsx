@@ -38,13 +38,13 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
   // Fetch members
   const { data: members = [] } = useSWR<TeamMemberInfo[]>(
     projectId ? `project-members:${projectId}` : null,
-    () => projectsApi.getMembers(projectId) as any
+    () => projectsApi.getMembers(projectId) as unknown as Promise<TeamMemberInfo[]>
   );
 
   // Fetch user profiles globally to resolve mis-mapped avatars
   const { data: usersData = [] } = useSWR<UserProfileItem[]>(
     members.length > 0 ? 'auth-users' : null,
-    () => authApi.getAllUsers() as any
+    () => authApi.getAllUsers() as unknown as Promise<UserProfileItem[]>
   );
 
   const userProfiles = useMemo<Record<string, string>>(() => {

@@ -261,7 +261,7 @@ export async function fetchKanbanBoard(projectId: number): Promise<KanbanBoardRe
       kanbanId: data.kanbanId,
       name: data.name,
       projectId: data.projectId,
-      columns: (data.columns || []).map((col: any) => ({
+      columns: (data.columns || []).map((col: { id: number; status?: string; title?: string; name?: string; color?: string; wipLimit?: number }) => ({
         id: col.id as number,
         status: (col.status as string) || (col.title as string || col.name as string || '').toUpperCase().replace(/\s+/g, '_'),
         title: (col.title as string) || (col.name as string) || '',

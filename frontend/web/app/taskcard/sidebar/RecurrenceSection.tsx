@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { RefreshCw, X, Calendar, Hash } from 'lucide-react';
 import SidebarField from './SidebarField';
 
@@ -58,8 +58,27 @@ export default function RecurrenceSection({
   const [endDate, setEndDate] = useState<string>(recurrenceEnd ?? '');
   const [occurrencesLimit, setOccurrencesLimit] = useState<number>(recurrenceLimit ?? 10);
 
-  // Sync state with props when they change (e.g. task switch)
-  useEffect(() => {
+  // Track prev props to adjust state during render when props change (React 18 standard pattern)
+  const [prevProps, setPrevProps] = useState({
+    recurrenceRule,
+    recurrenceEnd,
+    customInterval,
+    recurrenceLimit
+  });
+
+  if (
+    recurrenceRule !== prevProps.recurrenceRule ||
+    recurrenceEnd !== prevProps.recurrenceEnd ||
+    customInterval !== prevProps.customInterval ||
+    recurrenceLimit !== prevProps.recurrenceLimit
+  ) {
+    setPrevProps({
+      recurrenceRule,
+      recurrenceEnd,
+      customInterval,
+      recurrenceLimit
+    });
+
     const isCustom = recurrenceRule?.startsWith('CUSTOM_') ?? false;
     setFrequency(recurrenceRule ? (isCustom ? 'CUSTOM' : recurrenceRule) : '');
     if (isCustom) {
@@ -69,7 +88,7 @@ export default function RecurrenceSection({
     setEndDate(recurrenceEnd ?? '');
     setOccurrencesLimit(recurrenceLimit ?? 10);
     setEndCondition(recurrenceEnd ? 'DATE' : (recurrenceLimit && recurrenceLimit > 0 ? 'LIMIT' : 'NEVER'));
-  }, [recurrenceRule, recurrenceEnd, customInterval, recurrenceLimit]);
+  }
 
   const handleApplyChanges = (
     newFreq: string,

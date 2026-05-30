@@ -273,7 +273,7 @@ export const gitHubApi = {
   syncProject: async (projectId: number): Promise<void> => {
     await api.post(`/api/github/project/${projectId}/sync`);
   },
-  fetchRepositories: async (): Promise<any[]> => {
+  fetchRepositories: async (): Promise<unknown[]> => {
     const { data } = await api.get('/api/github/repositories');
     return data;
   },
@@ -299,7 +299,7 @@ export const reportsApi = {
     const { data } = await api.patch(`/api/scheduled-reports/${id}/resume`);
     return data;
   },
-  download: async (projectId: number, format: 'PDF' | 'EXCEL'): Promise<any> => {
+  download: async (projectId: number, format: 'PDF' | 'EXCEL'): Promise<unknown> => {
     return api.get(`/api/projects/${projectId}/reports/download`, {
       params: { format },
       responseType: 'arraybuffer',

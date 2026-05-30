@@ -1,5 +1,6 @@
 import { tasksApi, sprintboardsApi, sprintsApi, projectsApi } from '@/services/api-contract';
-import { Sprintboard, SprintboardFullResponse } from './types';
+import { Sprintboard, SprintboardFullResponse, Sprintcolumn } from './types';
+import type { Sprint } from '@/types';
 
 /**
  * Fetch sprint board for a specific sprint
@@ -22,7 +23,7 @@ export async function fetchSprintboardBySprintId(sprintId: number): Promise<Spri
 
   return {
     ...sprintboard,
-    columns: columnsWithTasks as any
+    columns: columnsWithTasks as Sprintcolumn[]
   };
 }
 
@@ -43,7 +44,7 @@ export async function moveTaskToColumn(taskId: number, sprintboardId: number, ne
 /**
  * Fetch all sprints for a project to find the active one
  */
-export async function fetchSprintsByProject(projectId: number): Promise<any[]> {
+export async function fetchSprintsByProject(projectId: number): Promise<Sprint[]> {
   return await sprintsApi.listByProject(projectId);
 }
 

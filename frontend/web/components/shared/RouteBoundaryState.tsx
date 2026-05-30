@@ -75,7 +75,7 @@ function LoadingSkeleton({ variant }: { variant: LoadingVariant }) {
   );
 }
 
-export function RouteLoadingState({ title, subtitle, variant = 'cards' }: RouteLoadingStateProps) {
+export function RouteLoadingState({ title: _title, subtitle, variant = 'cards' }: RouteLoadingStateProps) {
   return (
     <div className="min-h-[calc(100vh-140px)] bg-cu-bg-secondary px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto w-full max-w-[1400px]">

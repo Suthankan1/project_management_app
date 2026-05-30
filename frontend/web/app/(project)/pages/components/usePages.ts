@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { pagesApi } from '@/services/api-contract';
-import type { PageSummaryDto, PageDetailDto } from '@/services/api-contract';
 
 import { PageItem } from './types';
 export type { PageItem };

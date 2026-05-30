@@ -8,8 +8,6 @@ import type {
   Task,
   Subtask,
   Label,
-  TaskAttachmentSummary,
-  TaskTemplate,
 } from '@/types';
 
 export interface TaskAttachment {
@@ -205,7 +203,7 @@ export const tasksApi = {
   assignTaskMultiple: async (taskId: number | string, payload: { assigneeIds: number[] }): Promise<void> => {
     await api.patch(`/api/tasks/${taskId}/assignees`, payload);
   },
-  getCalendarEvents: async (projectId: number | string): Promise<any[]> => {
+  getCalendarEvents: async (projectId: number | string): Promise<Record<string, unknown>[]> => {
     const { data } = await api.get(`/api/calendar/events?projectId=${projectId}`);
     return data;
   },
@@ -241,7 +239,7 @@ export const sprintboardsApi = {
     const { data } = await api.get(`/api/sprintboards/sprint/${sprintId}`);
     return {
       ...data,
-      columns: data.columns?.map((col: any) => ({
+      columns: data.columns?.map((col: Record<string, unknown>) => ({
         ...col,
         tasks: []
       }))
@@ -251,22 +249,22 @@ export const sprintboardsApi = {
     const { data } = await api.get(`/api/sprintboards/sprint/${sprintId}/full`);
     return {
       ...data,
-      columns: data.columns?.map((col: any) => ({
+      columns: data.columns?.map((col: Record<string, unknown> & { tasks?: Record<string, unknown>[] }) => ({
         ...col,
-        tasks: col.tasks?.map((t: any) => ({
+        tasks: col.tasks?.map((t: Record<string, unknown> & { labelName?: string; labelColor?: string }) => ({
           ...t,
           label: t.labelName ? { name: t.labelName, color: t.labelColor } : undefined
         })) || []
       }))
     };
   },
-  getRecent: async (limit = 20): Promise<any> => {
+  getRecent: async (limit = 20): Promise<unknown> => {
     const { data } = await api.get('/api/sprintboards/user/recent', { params: { limit } });
     return data;
   },
   getTasksInColumn: async (sprintboardId: number | string, columnStatus: string): Promise<SprintboardTask[]> => {
     const { data } = await api.get(`/api/sprintboards/${sprintboardId}/columns/${columnStatus}/tasks`);
-    return data.map((t: any) => ({
+    return data.map((t: Record<string, unknown> & { labelName?: string; labelColor?: string }) => ({
       ...t,
       label: t.labelName ? { name: t.labelName, color: t.labelColor } : undefined
     }));
@@ -274,7 +272,7 @@ export const sprintboardsApi = {
   moveTask: async (taskId: number | string, payload: { sprintboardId: number; newColumnStatus: string }): Promise<void> => {
     await api.put(`/api/sprintboards/tasks/${taskId}/move`, payload);
   },
-  addColumn: async (sprintboardId: number | string, payload: { name: string; status: string }): Promise<any> => {
+  addColumn: async (sprintboardId: number | string, payload: { name: string; status: string }): Promise<unknown> => {
     const { data } = await api.post(`/api/sprintboards/${sprintboardId}/columns`, payload);
     return data;
   },
@@ -288,14 +286,14 @@ export const kanbanApi = {
     const { data } = await api.get(`/api/kanbans/project/${projectId}/board`);
     return {
       ...data,
-      columns: data.columns?.map((col: any) => ({
+      columns: data.columns?.map((col: Record<string, unknown> & { name?: string; title?: string }) => ({
         ...col,
         name: col.name || col.title || '',
         title: col.title || col.name || '',
       })) || [],
     };
   },
-  createColumn: async (payload: { kanbanId: number; name: string; position: number }): Promise<any> => {
+  createColumn: async (payload: { kanbanId: number; name: string; position: number }): Promise<unknown> => {
     const { data } = await api.post('/api/kanban-columns', payload);
     return data;
   },

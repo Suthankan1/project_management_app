@@ -64,7 +64,7 @@ export interface ChatInboxResponse {
 }
 
 export const documentsApi = {
-  listByProject: async (projectId: number | string, includeDeleted = false): Promise<any[]> => {
+  listByProject: async (projectId: number | string, includeDeleted = false): Promise<unknown[]> => {
     const { data } = await api.get(`/api/projects/${projectId}/documents`, {
       params: { includeDeleted },
     });

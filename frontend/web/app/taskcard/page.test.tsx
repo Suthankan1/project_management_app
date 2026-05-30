@@ -1,12 +1,11 @@
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import TaskPage from './page';
 import api from '@/lib/axios';
-import { useSearchParams } from 'next/navigation';
 
 // Mock components
 jest.mock('./TaskHeader', () => ({
   __esModule: true,
-  default: ({ onClose, project, taskId }: any) => (
+  default: ({ onClose, project, taskId }: { onClose: (wasModified: boolean) => void; project: unknown; taskId: unknown }) => (
     <div data-testid="task-header">
       <span>Header: {project} / {taskId}</span>
       <button data-testid="archive-btn" onClick={() => onClose(true)}>Archive (onClose true)</button>
@@ -17,7 +16,7 @@ jest.mock('./TaskHeader', () => ({
 
 jest.mock('./TaskMainContent', () => ({
   __esModule: true,
-  default: ({ title, onUpdateTitle }: any) => (
+  default: ({ title, onUpdateTitle }: { title: string; onUpdateTitle: (title: string) => void }) => (
     <div data-testid="task-main-content">
       <span>Main Content: {title}</span>
       <button data-testid="update-title-btn" onClick={() => onUpdateTitle('Updated Title')}>Update Title</button>
@@ -27,7 +26,7 @@ jest.mock('./TaskMainContent', () => ({
 
 jest.mock('./TaskSidebar', () => ({
   __esModule: true,
-  default: ({ status }: any) => <div data-testid="task-sidebar">Sidebar: {status}</div>,
+  default: ({ status }: { status: string }) => <div data-testid="task-sidebar">Sidebar: {status}</div>,
 }));
 
 jest.mock('@/components/github/CreateIssueFromTaskModal', () => ({
@@ -63,7 +62,7 @@ jest.mock('next/navigation', () => ({
   }),
 }));
 
-let webSocketCallback: ((event: any) => void) | null = null;
+let webSocketCallback: ((event: { type: string; taskId: number }) => void) | null = null;
 jest.mock('@/hooks/useTaskWebSocket', () => ({
   useTaskWebSocket: jest.fn((projectId, cb) => {
     webSocketCallback = cb;

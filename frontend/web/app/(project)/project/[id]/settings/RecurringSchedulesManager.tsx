@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Play, Pause, Trash2, Loader2, AlertCircle, Info, Calendar } from 'lucide-react';
+import { RefreshCw, Play, Pause, Trash2, Loader2, Info, Calendar } from 'lucide-react';
 import api from '@/lib/axios';
 import { toast } from '@/components/ui';
 
@@ -142,7 +142,7 @@ export default function RecurringSchedulesManager({ projectId }: RecurringSchedu
           <div>
             <p className="text-sm font-bold text-cu-text-primary">No recurring schedules</p>
             <p className="text-xs text-cu-text-secondary mt-1 max-w-sm mx-auto">
-              Create a recurring schedule from the recurrence editor in a task's sidebar to automate task creation.
+              Create a recurring schedule from the recurrence editor in a task&apos;s sidebar to automate task creation.
             </p>
           </div>
         </div>

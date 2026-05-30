@@ -143,15 +143,15 @@ export const projectsApi = {
     const { data } = await api.post('/api/projects', payload);
     return data;
   },
-  getCustomFields: async (projectId: number | string): Promise<any[]> => {
+  getCustomFields: async (projectId: number | string): Promise<unknown[]> => {
     const { data } = await api.get(`/api/projects/${projectId}/custom-fields`);
     return data;
   },
-  createCustomField: async (projectId: number | string, payload: Record<string, unknown>): Promise<any> => {
+  createCustomField: async (projectId: number | string, payload: Record<string, unknown>): Promise<unknown> => {
     const { data } = await api.post(`/api/projects/${projectId}/custom-fields`, payload);
     return data;
   },
-  getTeamMembers: async (teamId: number | string): Promise<any> => {
+  getTeamMembers: async (teamId: number | string): Promise<unknown> => {
     const { data } = await api.get(`/api/teams/${teamId}/members`);
     return data;
   },

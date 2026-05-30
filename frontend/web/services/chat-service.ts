@@ -5,10 +5,7 @@ import type {
   ChatReactionSummary,
   ChatRoom,
   ChatSearchResult,
-  DirectChatSummary,
   PresenceResponse,
-  RoomChatSummary,
-  TeamChatSummary,
   UnreadBadgeSummary,
 } from '@/app/(project)/project/[id]/chat/components/chat';
 import type { ChatSummaries, ChatInboxResponse, AuthUserSummary, ChatInboxActivity, ChatInboxProjectGroup } from './api-contract';

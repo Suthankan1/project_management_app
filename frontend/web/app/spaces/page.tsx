@@ -40,7 +40,7 @@ export default function SpacesPage() {
     const fetchProjects = async () => {
         try {
             const response = await projectsApi.list();
-            setProjects(response as any);
+            setProjects(response as SpaceProject[]);
         } catch (error) {
             console.error('Failed to fetch projects:', error);
         } finally {

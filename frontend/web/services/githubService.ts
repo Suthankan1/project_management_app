@@ -118,10 +118,6 @@ export interface GithubAutomationLog {
   executedAt: string;
 }
 
-interface TaskGithubIssueLink {
-  githubIssueNumber?: number | null;
-  githubRepoFullName?: string | null;
-}
 
 interface GitHubApiIssue {
   id: number;
@@ -350,9 +346,9 @@ export async function fetchImportedGitHubIssueNumbers(
   const normalizedRepoName = repoFullName.toLowerCase();
 
   return content
-    .filter((task: any) => task.githubRepoFullName?.toLowerCase() === normalizedRepoName)
-    .map((task: any) => task.githubIssueNumber)
-    .filter((issueNumber: any): issueNumber is number => typeof issueNumber === 'number');
+    .filter((task: Record<string, unknown> & { githubRepoFullName?: string }) => task.githubRepoFullName?.toLowerCase() === normalizedRepoName)
+    .map((task: Record<string, unknown> & { githubIssueNumber?: number }) => task.githubIssueNumber)
+    .filter((issueNumber: unknown): issueNumber is number => typeof issueNumber === 'number');
 }
 
 export async function createGitHubAutomationRule(
