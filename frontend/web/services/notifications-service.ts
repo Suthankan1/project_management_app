@@ -1,39 +1,22 @@
-import api from '@/lib/axios';
+import { notificationsApi } from './api-contract';
+import type { NotificationDto as Notification, NotificationFeedResponse } from './api-contract';
 
-// ── Types ──
-
-export interface Notification {
-  id: number;
-  message: string;
-  type?: string;
-  link?: string;
-  read: boolean;
-  createdAt: string;
-  [key: string]: unknown;
-}
-
-export interface NotificationFeedResponse {
-  notifications: Notification[];
-  unreadCount: number;
-}
-
-// ── API ──
+export type { Notification, NotificationFeedResponse };
 
 export async function fetchNotifications(): Promise<NotificationFeedResponse> {
-  const { data } = await api.get<NotificationFeedResponse>('/api/notifications');
-  return data;
+  return notificationsApi.list();
 }
 
 export async function markNotificationRead(id: number): Promise<void> {
-  await api.patch(`/api/notifications/${id}/read`);
+  return notificationsApi.markRead(id);
 }
 
 export async function markAllNotificationsRead(): Promise<void> {
-  await api.patch('/api/notifications/read-all');
+  return notificationsApi.markAllRead();
 }
 
 export async function deleteNotification(id: number): Promise<void> {
-  await api.delete(`/api/notifications/${id}`);
+  return notificationsApi.delete(id);
 }
 
 export async function deleteAllNotifications(ids: number[]): Promise<PromiseSettledResult<void>[]> {

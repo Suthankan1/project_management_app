@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -40,6 +41,9 @@ class MilestoneControllerTest {
 
     @MockBean
     private UserDetailsService userDetailsService;
+
+    @MockBean
+    private SimpMessagingTemplate messagingTemplate;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -69,6 +73,14 @@ class MilestoneControllerTest {
                         .content(objectMapper.writeValueAsString(milestoneRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("v1.0 Release"));
+
+        verify(messagingTemplate).convertAndSend(
+            eq("/topic/project/10/milestones"),
+            eq(Map.of(
+                "type", "MILESTONE_UPDATED",
+                "milestone", sampleMilestone,
+                "projectId", 10L
+            )));
     }
 
     @Test
@@ -99,6 +111,7 @@ class MilestoneControllerTest {
         MilestoneResponseDTO updated = new MilestoneResponseDTO();
         updated.setId(1L);
         updated.setName("v1.1 Release");
+        updated.setProjectId(10L);
         when(milestoneService.updateMilestone(eq(1L), any(), any())).thenReturn(updated);
 
         mockMvc.perform(put("/api/milestones/1")
@@ -107,6 +120,14 @@ class MilestoneControllerTest {
                         .content(objectMapper.writeValueAsString(milestoneRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("v1.1 Release"));
+
+        verify(messagingTemplate).convertAndSend(
+            eq("/topic/project/10/milestones"),
+            eq(Map.of(
+                "type", "MILESTONE_UPDATED",
+                "milestone", updated,
+                "projectId", 10L
+            )));
     }
 
     @Test

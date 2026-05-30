@@ -30,6 +30,11 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
 
     List<Document> findByFolderIdAndStatus(Long folderId, DocumentStatus status);
 
+    @Query("SELECT COALESCE(SUM(d.fileSize), 0) FROM Document d WHERE d.project.id = :projectId AND d.status = 'ACTIVE'")
+    long sumFileSizeByProjectId(@Param("projectId") Long projectId);
+
+    long countByProjectIdAndStatus(Long projectId, DocumentStatus status);
+
     @Query("SELECT d FROM Document d WHERE d.status = :status " +
             "AND d.deletedAt IS NOT NULL " +
             "AND d.deletedAt < :cutoff")

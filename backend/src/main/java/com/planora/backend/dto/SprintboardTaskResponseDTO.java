@@ -21,4 +21,5 @@ public class SprintboardTaskResponseDTO {
     private Integer commentCount;
     private String labelName;
     private String labelColor;
+    private boolean blocked;
 }

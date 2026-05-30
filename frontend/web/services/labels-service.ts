@@ -1,9 +1,8 @@
-import api from '@/lib/axios';
+import { labelsApi } from './api-contract';
 import type { Label } from '@/types';
 
 export async function getProjectLabels(projectId: number): Promise<Label[]> {
-  const res = await api.get<Label[]>(`/api/labels/project/${projectId}`);
-  return res.data;
+  return labelsApi.listByProject(projectId);
 }
 
 export async function createLabel(
@@ -11,8 +10,7 @@ export async function createLabel(
   name: string,
   color: string,
 ): Promise<Label> {
-  const res = await api.post<Label>('/api/labels', { projectId, name, color });
-  return res.data;
+  return labelsApi.create({ projectId, name, color });
 }
 
 export async function updateLabel(
@@ -20,10 +18,9 @@ export async function updateLabel(
   name: string,
   color: string,
 ): Promise<Label> {
-  const res = await api.put<Label>(`/api/labels/${id}`, { name, color });
-  return res.data;
+  return labelsApi.update(id, { name, color });
 }
 
 export async function deleteLabel(id: number): Promise<void> {
-  await api.delete(`/api/labels/${id}`);
+  return labelsApi.delete(id);
 }

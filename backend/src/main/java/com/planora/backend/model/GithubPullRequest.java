@@ -75,8 +75,8 @@ public class GithubPullRequest {
     @Column(name = "github_updated_at")
     private LocalDateTime githubUpdatedAt;
 
-    @Column(name = "merged_at", length = 30)
-    private String mergedAt;
+    @Column(name = "merged_at")
+    private LocalDateTime mergedAt;
 
     @Column(name = "github_merged_at")
     private LocalDateTime githubMergedAt;

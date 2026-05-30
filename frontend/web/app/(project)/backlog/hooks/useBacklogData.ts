@@ -74,7 +74,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         const pid = parseInt(projectId, 10);
         if (isNaN(pid)) return;
 
-        const cKey = buildSessionCacheKey('kanban-backlog', [projectId]);
+        const cKey = buildSessionCacheKey('kanban-backlog', [projectId, showArchived.toString()]);
         let hasCachedData = false;
         if (cKey && !forceNetwork) {
             const cached = getSessionCache<Task[]>(cKey, { allowStale: true });
@@ -88,7 +88,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         if (showSpinner && !hasCachedData) setLoading(true);
         setError(null);
         try {
-            const fetched = await fetchTasksByProject(pid);
+            const fetched = await fetchTasksByProject(pid, { archived: showArchived });
             setTasks(fetched);
             if (cKey) setSessionCache(cKey, fetched, 30 * 60_000);
         } catch (err) {
@@ -97,7 +97,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         } finally {
             if (showSpinner && !hasCachedData) setLoading(false);
         }
-    }, [projectId]);
+    }, [projectId, showArchived]);
 
     const fetchArchivedData = useCallback(async () => {
         if (!projectId || !showArchived) {

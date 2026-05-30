@@ -8,58 +8,57 @@ import {
   Platform,
   StyleSheet,
   TextInput,
-  Animated,
+  Animated as RNAnimated,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import api from '@/src/api/axios';
+import Animated, { FadeInUp } from 'react-native-reanimated';
+import api from '@/src/lib/axios';
 import BrandHeader from '@/src/components/ui/BrandHeader';
 import PrimaryButton from '@/src/components/ui/PrimaryButton';
-import ErrorBanner from '@/src/components/ui/ErrorBanner';
+import Toast from '@/src/components/ui/Toast';
 import { Colors } from '@/src/constants/colors';
 
 export default function VerifyEmailScreen() {
   const router = useRouter();
   const { email } = useLocalSearchParams<{ email: string }>();
+  const insets = useSafeAreaInsets();
 
   const [otp,             setOtp]            = useState('');
   const [isLoading,       setIsLoading]      = useState(false);
   const [isResending,     setIsResending]    = useState(false);
   const [error,           setError]          = useState('');
+  const [successMsg,      setSuccessMsg]     = useState('');
   const [resendCountdown, setResendCountdown] = useState(0);
   const [focusedIndex,    setFocusedIndex]   = useState<number | null>(null);
+
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastType, setToastType] = useState<'success' | 'error'>('error');
 
   const inputRefs   = useRef<TextInput[]>([]);
   const prevOtp     = useRef(otp);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const otpChars    = otp.padEnd(6, '').split('').slice(0, 6);
 
-  const cardAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnims = useRef([0, 1, 2, 3, 4, 5].map(() => new RNAnimated.Value(1))).current;
+  const shakeAnim  = useRef(new RNAnimated.Value(0)).current;
+
   useEffect(() => {
-    Animated.spring(cardAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      tension: 60,
-      friction: 10,
-      delay: 80,
-    }).start();
-  }, [cardAnim]);
+    if (error) {
+      setToastType('error');
+      setToastVisible(true);
+    }
+  }, [error]);
 
-  const cardStyle = {
-    opacity: cardAnim,
-    transform: [{
-      translateY: cardAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [24, 0],
-      }),
-    }],
-  };
-
-  const scaleAnims = useRef([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(1))).current;
-  const shakeAnim  = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (successMsg) {
+      setToastType('success');
+      setToastVisible(true);
+    }
+  }, [successMsg]);
 
   useEffect(() => {
     return () => {
@@ -68,17 +67,17 @@ export default function VerifyEmailScreen() {
   }, []);
 
   const triggerShake = useCallback(() =>
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 8,  duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 4,  duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0,  duration: 60, useNativeDriver: true }),
+    RNAnimated.sequence([
+      RNAnimated.timing(shakeAnim, { toValue: 8,  duration: 60, useNativeDriver: true }),
+      RNAnimated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
+      RNAnimated.timing(shakeAnim, { toValue: 4,  duration: 60, useNativeDriver: true }),
+      RNAnimated.timing(shakeAnim, { toValue: 0,  duration: 60, useNativeDriver: true }),
     ]).start(), [shakeAnim]);
 
   const triggerScale = (index: number) =>
-    Animated.sequence([
-      Animated.spring(scaleAnims[index], { toValue: 1.05, useNativeDriver: true, tension: 400, friction: 10 }),
-      Animated.spring(scaleAnims[index], { toValue: 1.0,  useNativeDriver: true, tension: 200, friction: 15 }),
+    RNAnimated.sequence([
+      RNAnimated.spring(scaleAnims[index], { toValue: 1.05, useNativeDriver: true, tension: 400, friction: 10 }),
+      RNAnimated.spring(scaleAnims[index], { toValue: 1.0,  useNativeDriver: true, tension: 200, friction: 15 }),
     ]).start();
 
   const startCountdown = () => {
@@ -125,9 +124,13 @@ export default function VerifyEmailScreen() {
     }
     setIsLoading(true);
     setError('');
+    setSuccessMsg('');
     try {
       await api.post('/api/auth/reg/verify', { email, otp });
-      router.replace('/(tabs)');
+      setSuccessMsg('Email verified successfully! Redirecting to login...');
+      setTimeout(() => {
+        router.replace('/(auth)/login');
+      }, 1500);
     } catch (err: unknown) {
       const e = err as { response?: { data?: unknown } };
       const errorData = e.response?.data;
@@ -153,8 +156,10 @@ export default function VerifyEmailScreen() {
     if (isResending || resendCountdown > 0) return;
     setIsResending(true);
     setError('');
+    setSuccessMsg('');
     try {
       await api.post('/api/auth/resend', { email });
+      setSuccessMsg('Verification code resent.');
       startCountdown();
     } catch (err: unknown) {
       const e = err as { response?: { data?: unknown } };
@@ -177,14 +182,21 @@ export default function VerifyEmailScreen() {
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
     >
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+        <Toast
+          message={toastType === 'error' ? error : successMsg}
+          visible={toastVisible}
+          onDismiss={() => setToastVisible(false)}
+          type={toastType}
+        />
+
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <ScrollView
             style={styles.flex}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -214,59 +226,58 @@ export default function VerifyEmailScreen() {
             </View>
 
             {/* Card */}
-            <Animated.View style={cardStyle}>
-            <BlurView intensity={20} tint="light" style={styles.card}>
-              {/* Email icon */}
-              <View style={styles.emailIconWrapper}>
-                <View style={styles.emailIconBox}>
-                  <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
-                    <Rect x={2} y={4} width={20} height={16} rx={2} stroke="white" strokeWidth={2} />
-                    <Path
-                      d="M2 7l10 7 10-7"
-                      stroke="white"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                    />
-                  </Svg>
+            <Animated.View entering={FadeInUp.duration(600).springify().damping(15)}>
+              <BlurView intensity={20} tint="light" style={styles.card}>
+                {/* Email icon */}
+                <View style={styles.emailIconWrapper}>
+                  <View style={styles.emailIconBox}>
+                    <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+                      <Rect x={2} y={4} width={20} height={16} rx={2} stroke="white" strokeWidth={2} />
+                      <Path
+                        d="M2 7l10 7 10-7"
+                        stroke="white"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                      />
+                    </Svg>
+                  </View>
+
+                  <Text style={styles.instructionText}>
+                    {'We sent a 6-digit verification code to\n'}
+                    <Text style={styles.emailBold}>{email}</Text>
+                  </Text>
                 </View>
 
-                <Text style={styles.instructionText}>
-                  {'We sent a 6-digit verification code to\n'}
-                  <Text style={styles.emailBold}>{email}</Text>
-                </Text>
-              </View>
+                <View style={styles.formGap}>
+                  {/* OTP Input */}
+                  <View>
+                    <Text style={styles.otpLabel}>Verification Code</Text>
+                    <RNAnimated.View style={[styles.otpRow, { transform: [{ translateX: shakeAnim }] }]}>
+                      {[0, 1, 2, 3, 4, 5].map(i => (
+                        <RNAnimated.View key={i} style={{ transform: [{ scale: scaleAnims[i] }] }}>
+                          <TextInput
+                            ref={ref => { if (ref) inputRefs.current[i] = ref; }}
+                            style={[
+                              styles.otpInput,
+                              otpChars[i] ? styles.otpInputFilled : null,
+                              focusedIndex === i && styles.otpInputFocused,
+                            ]}
+                            value={otpChars[i] || ''}
+                            onChangeText={text => handleOtpChange(text, i)}
+                            onFocus={() => setFocusedIndex(i)}
+                            onBlur={() => setFocusedIndex(null)}
+                            maxLength={i === 0 ? 6 : 1}
+                            keyboardType="number-pad"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            textAlign="center"
+                            selectTextOnFocus
+                          />
+                        </RNAnimated.View>
+                      ))}
+                    </RNAnimated.View>
+                  </View>
 
-              <View style={styles.formGap}>
-                {/* OTP Input */}
-                <View>
-                  <Text style={styles.otpLabel}>Verification Code</Text>
-                  <Animated.View style={[styles.otpRow, { transform: [{ translateX: shakeAnim }] }]}>
-                    {[0, 1, 2, 3, 4, 5].map(i => (
-                      <Animated.View key={i} style={{ transform: [{ scale: scaleAnims[i] }] }}>
-                        <TextInput
-                          ref={ref => { if (ref) inputRefs.current[i] = ref; }}
-                          style={[
-                            styles.otpInput,
-                            otpChars[i] ? styles.otpInputFilled : null,
-                            focusedIndex === i && styles.otpInputFocused,
-                          ]}
-                          value={otpChars[i] || ''}
-                          onChangeText={text => handleOtpChange(text, i)}
-                          onFocus={() => setFocusedIndex(i)}
-                          onBlur={() => setFocusedIndex(null)}
-                          maxLength={i === 0 ? 6 : 1}
-                          keyboardType="number-pad"
-                          inputMode="numeric"
-                          autoComplete="one-time-code"
-                          textAlign="center"
-                          selectTextOnFocus
-                        />
-                      </Animated.View>
-                    ))}
-                  </Animated.View>
-                </View>
-
-                <ErrorBanner message={error} visible={!!error} />
 
                 <PrimaryButton
                   label="Verify Email"

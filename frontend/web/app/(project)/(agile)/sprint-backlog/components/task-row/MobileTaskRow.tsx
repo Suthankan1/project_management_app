@@ -2,21 +2,24 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, GripVertical, Trash2, UserPlus } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, Pencil, Trash2, UserPlus, RefreshCw } from 'lucide-react';
 import AssigneeAvatar from '../AssigneeAvatar';
 import { STATUS_LABELS, type TaskStatus } from './TaskRowConstants';
 import type { TaskRowProps } from '../TaskRow';
 import { useTaskRowState } from './useTaskRowState';
 import { formatDate } from './TaskRowConstants';
+import { ArchiveBadge } from '@/components/ui';
 
-// ── Mobile Task Row ──────────────────────────────────────────────────────────
+function hexToLabelStyle(hex: string): React.CSSProperties {
+  return { backgroundColor: `${hex}20`, color: hex, border: `1px solid ${hex}40` };
+}
 
 export default function MobileTaskRow(props: TaskRowProps) {
   const {
     task, teamMembers = [], onStatusChange, onStoryPointsChange,
     onAssignTask, onDueDateChange, onDeleteTask,
     canDelete = true, projectLabels = [], onAddLabel, onRemoveLabel, onCreateLabel, extraStatuses = [],
-    hideStatus = false,
+    hideStatus = false, projectKey, onMoveUp, onMoveDown,
   } = props;
 
   const {
@@ -37,25 +40,28 @@ export default function MobileTaskRow(props: TaskRowProps) {
     onAddLabel, onRemoveLabel, onCreateLabel, extraStatuses, projectLabels,
   });
 
-  const amberStyle = dueClass === 'five_days' ? { backgroundColor: 'rgba(245, 158, 11, 0.15)' } : {};
+  const displayTaskKey = projectKey ? `#${projectKey}-${task.taskNo || task.id}` : `#${task.taskNo || task.id}`;
+
+  const rowBg =
+    dueClass === 'five_days' ? 'bg-amber-50 dark:bg-amber-900/15'
+    : dueClass === 'old' || dueClass === 'overdue' || dueClass === 'today' ? 'bg-cu-danger-light'
+    : 'bg-cu-bg';
 
   return (
     <div
-      className={`group relative flex flex-col rounded-xl border border-[#EAECF0] border-l-[4px] shadow-sm hover:shadow transition-shadow duration-150 mb-1.5 select-none overflow-hidden ${
-        dueClass === 'five_days' ? 'bg-amber-50/60' : 'bg-white'
-      }`}
-      style={{ borderLeftColor: statusBorderColor, ...amberStyle }}
+      className={`group relative flex flex-col rounded-2xl border-l-[6px] border border-cu-border shadow-cu-sm hover:shadow-cu-md transition-all duration-200 mb-3 select-none overflow-hidden ${rowBg} ${task.archived ? 'opacity-60' : ''}`}
+      style={{ borderLeftColor: statusBorderColor }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="flex items-center w-full min-h-[44px]">
-
-        {/* Drag Handle */}
-        <div className="flex flex-shrink-0 items-center justify-center w-5 self-stretch text-[#D0D5DD] hover:text-[#98A2B3] cursor-grab transition-colors">
-          <GripVertical size={13} />
-        </div>
-
-        {/* Title */}
-        <div className="flex flex-1 min-w-0 items-center py-2 pr-2 border-r border-[#F2F4F7]">
+      <div className="flex items-center w-full min-h-[72px]">
+        {/* Title Section */}
+        <div className="flex-1 min-w-0 p-4 border-r border-cu-border-light">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-bold text-cu-text-tertiary tracking-wider">{displayTaskKey}</span>
+            <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${priorityStyle}`}>
+              {priorityKey}
+            </span>
+          </div>
           {renaming ? (
             <div className="flex-1 min-w-0">
               <input
@@ -70,10 +76,10 @@ export default function MobileTaskRow(props: TaskRowProps) {
                 onBlur={() => void commitRename()}
                 autoFocus
                 onClick={(e) => e.stopPropagation()}
-                className="w-full border-b border-[#175CD3] bg-transparent text-[13px] font-semibold text-[#101828] outline-none"
+                className="w-full border-b-2 border-cu-primary bg-transparent text-[15px] font-bold text-cu-text-primary outline-none"
               />
               {renameValue.length > 200 && (
-                <p className="text-[10px] text-amber-500 mt-0.5">{255 - renameValue.length} chars left</p>
+                <p className="text-xs text-amber-500 mt-1">{255 - renameValue.length} characters remaining</p>
               )}
             </div>
           ) : (
@@ -88,21 +94,61 @@ export default function MobileTaskRow(props: TaskRowProps) {
               onTouchStart={onTouchStartInternal}
               onTouchEnd={onTouchEndInternal}
               onTouchMove={onTouchMoveInternal}
-              className={`flex-1 min-w-0 text-[13px] font-semibold leading-snug truncate cursor-text select-none ${
-                dueClass === 'five_days'
-                  ? 'text-amber-800'
-                  : task.status?.toUpperCase() === 'DONE'
-                  ? 'line-through text-[#B0B8C8]'
-                  : 'text-[#1A1F2E]'
+              className={`text-[15px] font-bold leading-tight truncate cursor-text select-none flex items-center gap-2 ${
+                dueClass === 'five_days' ? 'text-amber-800 dark:text-amber-300' :
+                task.status?.toUpperCase() === 'DONE' ? 'line-through text-cu-text-muted' : 'text-cu-text-primary'
               }`}
             >
-              {task.title}
+              <span className="truncate">{task.title}</span>
+              {task.recurrenceRule && (
+                <span
+                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold shrink-0 ${
+                    task.recurrenceActive === false
+                      ? 'bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/30'
+                      : 'bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/30'
+                  }`}
+                >
+                  <RefreshCw size={8} className="flex-shrink-0" />
+                  <span>Recur{task.recurrenceActive === false ? ' (P)' : ''}</span>
+                </span>
+              )}
+              {task.archived && <ArchiveBadge />}
             </h3>
           )}
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {task.labels?.slice(0, 1).map((label) => (
+              <span
+                key={label.id}
+                style={hexToLabelStyle(label.color ?? '#6366F1')}
+                className="px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap shadow-sm"
+              >
+                {label.name}
+              </span>
+            ))}
+          </div>
         </div>
 
         {/* Scrollable Metadata */}
-        <div className="flex items-center gap-1.5 px-2 overflow-x-auto no-scrollbar [scrollbar-width:none] [-webkit-overflow-scrolling:touch]">
+        <div className="flex-1 flex items-center gap-3 px-3 overflow-x-auto no-scrollbar bg-cu-bg-secondary/50 [scrollbar-width:none] [-webkit-overflow-scrolling:touch]">
+          {/* Actions */}
+          <div className="flex-shrink-0 flex items-center gap-1 border-r border-cu-border pr-2" onClick={(e) => e.stopPropagation()}>
+            {onMoveUp && (
+              <button type="button" onClick={onMoveUp} className="flex h-11 w-11 items-center justify-center rounded-lg text-cu-text-secondary hover:text-cu-primary hover:bg-cu-primary-light active:scale-90 transition-all">
+                <ArrowUp size={16} />
+              </button>
+            )}
+            {onMoveDown && (
+              <button type="button" onClick={onMoveDown} className="flex h-11 w-11 items-center justify-center rounded-lg text-cu-text-secondary hover:text-cu-primary hover:bg-cu-primary-light active:scale-90 transition-all">
+                <ArrowDown size={16} />
+              </button>
+            )}
+            <button type="button" onClick={startRename} className="flex h-11 w-11 items-center justify-center rounded-lg text-cu-text-secondary hover:text-cu-primary hover:bg-cu-primary-light active:scale-90 transition-all">
+              <Pencil size={16} />
+            </button>
+            <button type="button" onClick={() => canDelete && onDeleteTask(task.id)} className="flex h-11 w-11 items-center justify-center rounded-lg text-cu-text-secondary hover:text-cu-danger hover:bg-cu-danger-light active:scale-90 transition-all">
+              <Trash2 size={16} />
+            </button>
+          </div>
 
           {/* Priority → Status → Delete */}
           <div className="flex-shrink-0 flex items-center gap-1.5 border-r border-[#F2F4F7] pr-2" onClick={(e) => e.stopPropagation()}>
@@ -134,26 +180,24 @@ export default function MobileTaskRow(props: TaskRowProps) {
           </div>
 
           {/* Assignee */}
-          <div className="flex-shrink-0 flex items-center" ref={assignRef} onClick={(e) => e.stopPropagation()}>
+          <div className="flex-shrink-0 flex items-center relative" ref={assignRef} onClick={(e) => e.stopPropagation()}>
             <button type="button" onClick={() => openAssign()} className="flex items-center active:scale-90 transition-transform">
               {task.assigneeName && task.assigneeName !== 'Unassigned' ? (
                 <AssigneeAvatar name={task.assigneeName} profilePicUrl={task.assigneePhotoUrl} size={22} />
               ) : (
-                <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-dashed border-[#D0D5DD] text-[#C1C9D4]">
-                  <UserPlus size={11} />
+                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-dashed border-cu-border text-cu-text-tertiary">
+                  <UserPlus size={14} />
                 </div>
               )}
             </button>
           </div>
 
           {/* Points */}
-          <div className="flex-shrink-0 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-shrink-0 flex items-center justify-center min-w-[32px]" onClick={(e) => e.stopPropagation()}>
             <input
-              type="number"
-              value={task.storyPoints}
-              title="Story Points"
+              type="number" value={task.storyPoints} title="Points"
               onChange={(e) => onStoryPointsChange(task.id, Number(e.target.value))}
-              className="text-[11px] font-semibold text-[#344054] bg-[#F2F4F7] rounded-md px-1 outline-none w-8 text-center h-[26px] border-0"
+              className="text-[13px] font-bold text-cu-text-primary bg-cu-bg-tertiary rounded-lg px-2 py-2 outline-none w-11 text-center min-h-[44px]"
             />
           </div>
 
@@ -164,10 +208,10 @@ export default function MobileTaskRow(props: TaskRowProps) {
                 type="button"
                 onClick={openDatePicker}
                 title={formatDate(task.dueDate)}
-                className={`text-[10px] font-semibold whitespace-nowrap px-2 rounded-md h-[26px] transition-colors ${
+                className={`text-[12px] font-bold leading-none whitespace-nowrap px-2 py-2 rounded-lg min-h-[44px] ${
                   dueClass === 'overdue' || dueClass === 'old'
-                    ? 'text-[#F04438] bg-[#FEF3F2]'
-                    : 'text-[#667085] bg-[#F2F4F7]'
+                    ? 'text-cu-danger bg-cu-danger-light'
+                    : 'text-cu-text-secondary bg-cu-bg-tertiary'
                 }`}
               >
                 {dueClass === 'overdue' ? 'Overdue' : formatDate(task.dueDate)}
@@ -188,22 +232,14 @@ export default function MobileTaskRow(props: TaskRowProps) {
       {!hideStatus && statusOpen && typeof document !== 'undefined' && createPortal(
         <div
           ref={statusPortalRef}
-          style={{ position: 'fixed', top: `${statusPosition.top}px`, left: `${statusPosition.left}px`, width: '156px' }}
-          className="z-[9999] overflow-hidden rounded-xl border border-[#E4E7EC] bg-white shadow-lg animate-in fade-in zoom-in-95 duration-150"
+          style={{ position: 'fixed', top: `${statusPosition.top}px`, left: `${statusPosition.left}px`, width: '160px' }}
+          className="z-[9999] overflow-hidden rounded-xl border border-cu-border bg-cu-bg shadow-cu-xl animate-in fade-in zoom-in-95 duration-200"
         >
-          <div className="px-3 pt-2.5 pb-1.5 text-[10px] font-bold text-[#98A2B3] uppercase tracking-widest border-b border-[#F2F4F7]">
-            Change Status
-          </div>
-          <div className="max-h-[220px] overflow-y-auto p-1">
+          <div className="px-3 py-2 text-[11px] font-bold text-cu-text-secondary border-b border-cu-border uppercase tracking-wider">Move To</div>
+          <div className="p-1">
             {(Object.keys(STATUS_LABELS) as TaskStatus[]).map((s) => (
-              <button
-                key={s}
-                onClick={() => { onStatusChange(task.id, s); setStatusOpen(false); }}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium rounded-lg transition-colors ${
-                  task.status?.toUpperCase() === s
-                    ? 'bg-[#EFF8FF] text-[#175CD3] font-semibold'
-                    : 'text-[#344054] hover:bg-[#F9FAFB]'
-                }`}
+              <button key={s} onClick={() => { onStatusChange(task.id, s); setStatusOpen(false); }}
+                className={`w-full flex items-center px-3 py-2 text-[13px] font-medium rounded-lg transition-colors ${task.status?.toUpperCase() === s ? 'bg-cu-primary-light text-cu-primary' : 'text-cu-text-primary hover:bg-cu-hover'}`}
               >
                 <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{
                   background: task.status?.toUpperCase() === s ? '#175CD3' : '#D0D5DD'
@@ -220,18 +256,14 @@ export default function MobileTaskRow(props: TaskRowProps) {
       {assignOpen && typeof document !== 'undefined' && createPortal(
         <div
           ref={assignPortalRef}
-          style={{ position: 'fixed', top: `${assignPosition.top}px`, left: `${assignPosition.left}px`, width: 'max-content', minWidth: '196px' }}
-          className="z-[9999] overflow-hidden rounded-xl border border-[#E4E7EC] bg-white shadow-lg animate-in fade-in zoom-in-95 duration-150"
+          style={{ position: 'fixed', top: `${assignPosition.top}px`, left: `${assignPosition.left}px`, width: 'max-content', minWidth: '200px' }}
+          className="z-[9999] overflow-hidden rounded-xl border border-cu-border bg-cu-bg shadow-cu-xl animate-in fade-in zoom-in-95 duration-200"
         >
-          <div className="px-3 pt-2.5 pb-1.5 text-[10px] font-bold text-[#98A2B3] uppercase tracking-widest border-b border-[#F2F4F7]">
-            Assign To
-          </div>
+          <div className="px-4 py-2 text-[11px] font-bold text-cu-text-secondary border-b border-cu-border uppercase tracking-wider">Assign Member</div>
           <div className="max-h-[240px] overflow-y-auto p-1">
             {teamMembers.map((m) => (
-              <button
-                key={m.user.userId}
-                onClick={() => { void onAssignTask(task.id, m.user.userId); setAssignOpen(false); }}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-[12px] font-medium text-[#344054] hover:bg-[#F9FAFB] rounded-lg transition-colors"
+              <button key={m.user.userId} onClick={() => { void onAssignTask(task.id, m.user.userId); setAssignOpen(false); }}
+                className="flex w-full items-center gap-3 px-3 py-2 text-[13px] font-medium text-cu-text-primary hover:bg-cu-hover rounded-lg transition-colors"
               >
                 <AssigneeAvatar name={m.user.fullName || m.user.username} profilePicUrl={m.user.profilePicUrl} size={22} />
                 <span className="truncate">{m.user.fullName || m.user.username}</span>

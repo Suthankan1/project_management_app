@@ -4,6 +4,8 @@ import com.planora.backend.dto.*;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.service.DocumentService;
 import jakarta.validation.Valid;
+import org.springframework.validation.annotation.Validated;
+import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
@@ -18,6 +20,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/projects/{projectId}")
 @RequiredArgsConstructor
+@Validated
 public class DocumentController {
 
     private final DocumentService documentService;
@@ -176,7 +179,7 @@ public class DocumentController {
     public ResponseEntity<DocumentResponseDTO> updateMetadata(
             @PathVariable Long projectId,
             @PathVariable Long documentId,
-            @RequestBody DocumentMetadataUpdateRequestDTO request,
+            @Valid @RequestBody DocumentMetadataUpdateRequestDTO request,
             @AuthenticationPrincipal UserPrincipal principal) {
         return new ResponseEntity<>(
                 documentService.updateMetadata(projectId, documentId, principal.getUserId(), request),
@@ -263,10 +266,31 @@ public class DocumentController {
     public ResponseEntity<Map<String, String>> updateFolderPermissions(
             @PathVariable Long projectId,
             @PathVariable Long folderId,
-            @RequestBody List<FolderPermissionRequest> permissions,
+            @NotEmpty @RequestBody List<@Valid FolderPermissionRequest> permissions,
             @AuthenticationPrincipal UserPrincipal principal) {
         documentService.updateFolderPermissions(projectId, folderId, principal.getUserId(), permissions);
         return ResponseEntity.ok(Map.of("message", "Folder permissions updated"));
+    }
+
+    @GetMapping("/folders/{folderId}/permissions")
+    public ResponseEntity<List<FolderPermissionRequest>> getFolderPermissions(
+            @PathVariable Long projectId,
+            @PathVariable Long folderId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(
+                documentService.getFolderPermissions(projectId, folderId, principal.getUserId()),
+                HttpStatus.OK
+        );
+    }
+
+    @GetMapping("/storage-quota")
+    public ResponseEntity<ProjectStorageQuotaResponseDTO> getStorageQuota(
+            @PathVariable Long projectId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(
+                documentService.getStorageQuota(projectId, principal.getUserId()),
+                HttpStatus.OK
+        );
     }
 
     /*

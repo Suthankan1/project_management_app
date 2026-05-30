@@ -35,7 +35,7 @@ function applySummariesState(
   setPrivateLastMessages: React.Dispatch<React.SetStateAction<Record<string, ChatMessage | null>>>,
   setRoomLastMessages: React.Dispatch<React.SetStateAction<Record<number, ChatMessage | null>>>,
 ) {
-  const { directSummaries, roomSummaries, teamSummary } = summaries;
+  const { directSummaries = [], roomSummaries = [], teamSummary } = summaries || {};
 
   setTeamUnseenCount(Number(teamSummary?.unseenCount) || 0);
   setPrivateUnseenCounts(

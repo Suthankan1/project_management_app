@@ -243,10 +243,10 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-[#101828]">Calendar</h1>
-        <p className="text-sm text-[#667085]">Track sprints and work items in month, week, and agenda formats.</p>
+    <div className="min-h-full space-y-4 bg-[radial-gradient(circle_at_top_left,rgba(21,93,252,0.16),transparent_30%),radial-gradient(circle_at_top_right,rgba(236,72,153,0.11),transparent_26%),radial-gradient(circle_at_bottom_left,rgba(34,197,94,0.1),transparent_28%),linear-gradient(180deg,var(--cu-bg-secondary),var(--cu-bg-secondary))] px-4 py-4 md:px-6 md:py-5">
+      <div className="rounded-xl border border-cu-primary/15 bg-gradient-to-r from-cu-primary/10 via-violet-500/10 to-emerald-500/10 px-4 py-3 shadow-cu-sm">
+        <h1 className="text-xl font-semibold text-cu-text-primary">Calendar</h1>
+        <p className="text-sm text-cu-text-secondary">Track sprints and work items in month, week, and agenda formats.</p>
       </div>
 
       <CalendarToolbar
@@ -268,8 +268,8 @@ export default function CalendarPage() {
         onMoreFiltersChange={(values) => setFilters((prev) => ({ ...prev, moreFilters: values }))}
       />
 
-      {loading && <div className="rounded-lg border border-[#E4E7EC] bg-white p-6 text-sm text-[#667085]">Loading calendar events...</div>}
-      {!loading && error && <div className="rounded-lg border border-[#FECDCA] bg-[#FEF3F2] p-6 text-sm text-[#B42318]">{error}</div>}
+      {loading && <div className="rounded-lg border border-cu-primary/20 bg-gradient-to-r from-cu-primary/10 to-violet-500/10 p-6 text-sm text-cu-text-secondary">Loading calendar events...</div>}
+      {!loading && error && <div className="rounded-lg border border-red-500/25 bg-gradient-to-r from-red-500/10 to-orange-500/10 p-6 text-sm text-red-500">{error}</div>}
 
       {!loading && !error && (
         <motion.div onPanEnd={handlePanEnd} className="touch-pan-y">

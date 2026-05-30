@@ -6,11 +6,12 @@ import { Task, TeamMemberInfo } from '@/types';
 import MotionWrapper from '../MotionWrapper';
 import { Briefcase } from 'lucide-react';
 import useSWR from 'swr';
-import api from '@/lib/axios';
+import { projectsApi, authApi } from '@/services/api-contract';
 
 import { WorkloadEntry } from './types';
 import { WorkloadPieChart } from './WorkloadPieChart';
 import { WorkloadMembersList } from './WorkloadMembersList';
+import { getInitials, profileLookupKey, resolveSummaryAvatarUrl } from '../avatar-utils';
 
 const COLORS = [
   'var(--cu-primary)',
@@ -24,63 +25,74 @@ const COLORS = [
   'var(--cu-primary-light)',
   'var(--cu-warning)',
 ];
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-
 interface UserProfileItem {
   userId: number;
   email?: string;
   username?: string;
+  fullName?: string;
   profilePicUrl?: string;
 }
 
 export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: number | string; tasks: Task[] }) {
   const [activeIndex, setActiveIndex] = useState(-1);
-  const fetcher = (url: string) => api.get(url).then(res => res.data);
-
   // Fetch members
   const { data: members = [] } = useSWR<TeamMemberInfo[]>(
-    projectId ? `/api/projects/${projectId}/members` : null,
-    fetcher
+    projectId ? `project-members:${projectId}` : null,
+    () => projectsApi.getMembers(projectId) as unknown as Promise<TeamMemberInfo[]>
   );
 
   // Fetch user profiles globally to resolve mis-mapped avatars
   const { data: usersData = [] } = useSWR<UserProfileItem[]>(
-    members.length > 0 ? '/api/auth/users' : null,
-    fetcher
+    members.length > 0 ? 'auth-users' : null,
+    () => authApi.getAllUsers() as unknown as Promise<UserProfileItem[]>
   );
 
-  const userProfiles = useMemo(() => {
+  const userProfiles = useMemo<Record<string, string>>(() => {
     if (!usersData || usersData.length === 0) return {};
     const profilesMap: Record<string, string> = {};
     usersData.forEach((u) => {
-      if (u.profilePicUrl) {
-        const fullUrl = u.profilePicUrl.startsWith('http') ? u.profilePicUrl : `${API_BASE_URL}${u.profilePicUrl.startsWith('/') ? '' : '/'}${u.profilePicUrl}`;
-        profilesMap[`id:${u.userId}`] = fullUrl;
-        if (u.email) profilesMap[`email:${u.email}`] = fullUrl;
-        if (u.username) profilesMap[`username:${u.username}`] = fullUrl;
-      }
+      const fullUrl = resolveSummaryAvatarUrl(u.profilePicUrl);
+      if (!fullUrl) return;
+
+      profilesMap[`id:${profileLookupKey(u.userId)}`] = fullUrl;
+      if (u.email) profilesMap[`email:${profileLookupKey(u.email)}`] = fullUrl;
+      if (u.username) profilesMap[`username:${profileLookupKey(u.username)}`] = fullUrl;
+      if (u.fullName) profilesMap[`fullname:${profileLookupKey(u.fullName)}`] = fullUrl;
     });
     return profilesMap;
   }, [usersData]);
 
   const workloadData = useMemo(() => {
     const workloads: Record<string, Omit<WorkloadEntry, 'value' | 'color'>> = {};
+    const workloadByMemberId: Record<string, string> = {};
+    const workloadByUserId: Record<string, string> = {};
+    const workloadByName: Record<string, string> = {};
 
     members.forEach(m => {
-      let pathName = m.user.profilePicUrl;
-      if (!pathName) {
-        pathName = userProfiles[`id:${m.user.userId}`] || userProfiles[`email:${m.user.email}`] || userProfiles[`username:${m.user.username}`] || null;
-      } else if (!pathName.startsWith('http')) {
-        pathName = `${API_BASE_URL}${pathName.startsWith('/') ? '' : '/'}${pathName}`;
-      }
+      const memberName = m.user.fullName || m.user.username || 'Unknown member';
+      const workloadKey = `M_${m.id}`;
+      const profileUrl =
+        resolveSummaryAvatarUrl(m.user.profilePicUrl) ||
+        userProfiles[`id:${profileLookupKey(m.user.userId)}`] ||
+        userProfiles[`email:${profileLookupKey(m.user.email)}`] ||
+        userProfiles[`username:${profileLookupKey(m.user.username)}`] ||
+        userProfiles[`fullname:${profileLookupKey(memberName)}`] ||
+        null;
 
-      workloads[`M_${m.id}`] = {
+      workloadByMemberId[profileLookupKey(m.id)] = workloadKey;
+      workloadByUserId[profileLookupKey(m.user.userId)] = workloadKey;
+      [memberName, m.user.fullName, m.user.username, m.user.email].forEach((value) => {
+        const key = profileLookupKey(value);
+        if (key) workloadByName[key] = workloadKey;
+      });
+
+      workloads[workloadKey] = {
         isMember: true,
         id: m.id,
-        name: m.user.fullName || m.user.username,
+        name: memberName,
         role: m.role,
-        avatar: pathName,
-        initials: (m.user.fullName || m.user.username || 'U').substring(0, 2).toUpperCase(),
+        avatar: profileUrl,
+        initials: getInitials(memberName),
         tasks: 0,
         completed: 0,
         overdue: 0
@@ -92,16 +104,22 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
 
     tasks.forEach(t => {
       let key = "UNASSIGNED";
-      if (t.assigneeId && workloads[`M_${t.assigneeId}`]) {
-        key = `M_${t.assigneeId}`;
-      } else if (t.assigneeName) {
-        key = `O_${t.assigneeName}`;
+      const assigneeIdKey = profileLookupKey(t.assigneeId ?? t.assignee?.id);
+      const displayAssigneeName = t.assigneeName || t.assignee?.name;
+      const assigneeNameKey = profileLookupKey(displayAssigneeName);
+
+      if (assigneeIdKey && (workloadByMemberId[assigneeIdKey] || workloadByUserId[assigneeIdKey])) {
+        key = workloadByMemberId[assigneeIdKey] || workloadByUserId[assigneeIdKey];
+      } else if (assigneeNameKey && workloadByName[assigneeNameKey]) {
+        key = workloadByName[assigneeNameKey];
+      } else if (displayAssigneeName) {
+        key = `O_${displayAssigneeName}`;
         if (!workloads[key]) {
           workloads[key] = {
             isMember: false,
-            name: t.assigneeName,
-            avatar: t.assigneePhotoUrl,
-            initials: t.assigneeName.substring(0, 2).toUpperCase(),
+            name: displayAssigneeName,
+            avatar: resolveSummaryAvatarUrl(t.assigneePhotoUrl || t.assignee?.avatar || t.assignee?.profilePicUrl),
+            initials: getInitials(displayAssigneeName),
             tasks: 0, completed: 0, overdue: 0
           };
         }

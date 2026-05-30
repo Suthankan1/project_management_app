@@ -3,8 +3,6 @@
 import { useState } from 'react';
 import { CalendarDays, Clock, Rocket, X } from 'lucide-react';
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
 interface StartSprintModalProps {
   open: boolean;
   sprintName: string;
@@ -20,8 +18,6 @@ const DURATION_PRESETS = [
   { label: '3 Weeks', days: 21 },
   { label: '1 Month', days: 30 },
 ];
-
-// ── Component ────────────────────────────────────────────────────────────────
 
 export default function StartSprintModal({ open, sprintName, loading, error, onStart, onCancel }: StartSprintModalProps) {
   const [selectedDuration, setSelectedDuration] = useState<number>(14);
@@ -42,7 +38,6 @@ export default function StartSprintModal({ open, sprintName, loading, error, onS
   const getPreviewDates = () => {
     const duration = getEffectiveDuration();
     const startObj = new Date(startDate);
-    // Use UTC for date manipulation to avoid timezone issues when displaying
     const start = new Date(startObj.getTime() + startObj.getTimezoneOffset() * 60000);
     const end = new Date(start.getTime());
     end.setDate(start.getDate() + duration);
@@ -59,23 +54,23 @@ export default function StartSprintModal({ open, sprintName, loading, error, onS
       onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
       <div
-        className="relative w-full max-w-md mx-4 rounded-2xl border border-[#E4E7EC] bg-white shadow-2xl"
+        className="relative w-full max-w-md mx-4 rounded-2xl border border-cu-border bg-cu-bg shadow-2xl"
         style={{ animation: 'modalSlideIn 0.22s cubic-bezier(0.34,1.56,0.64,1) both' }}
       >
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-[#F2F4F7]">
+        <div className="flex items-start justify-between p-6 border-b border-cu-border-light">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#175CD3] to-[#2E90FA] shadow-md">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cu-primary shadow-md">
               <Rocket size={20} className="text-white" />
             </div>
             <div>
-              <h2 className="text-[16px] font-bold text-[#101828] leading-tight">Start Sprint</h2>
-              <p className="text-[13px] text-[#667085] mt-0.5">{sprintName}</p>
+              <h2 className="text-[16px] font-bold text-cu-text-primary leading-tight">Start Sprint</h2>
+              <p className="text-[13px] text-cu-text-secondary mt-0.5">{sprintName}</p>
             </div>
           </div>
           <button
             onClick={onCancel}
-            className="rounded-lg p-1.5 text-[#98A2B3] hover:text-[#344054] hover:bg-[#F2F4F7] transition-all duration-150"
+            className="rounded-lg p-1.5 text-cu-text-tertiary hover:text-cu-text-primary hover:bg-cu-hover transition-all duration-150"
           >
             <X size={18} />
           </button>
@@ -83,30 +78,29 @@ export default function StartSprintModal({ open, sprintName, loading, error, onS
 
         {/* Body */}
         <div className="p-6 space-y-5">
-          {/* Description */}
-          <p className="text-[13.5px] text-[#475467] leading-relaxed">
+          <p className="text-[13.5px] text-cu-text-secondary leading-relaxed">
             Set the sprint duration and start date.
           </p>
 
           {/* Start Date */}
           <div>
-            <label className="block text-[12px] font-semibold text-[#344054] uppercase tracking-wider mb-2">
+            <label className="block text-[12px] font-semibold text-cu-text-primary uppercase tracking-wider mb-2">
               Start Date
             </label>
             <div className="relative flex-1">
-              <CalendarDays size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#98A2B3] pointer-events-none" />
+              <CalendarDays size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-cu-text-tertiary pointer-events-none" />
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full rounded-lg border pl-9 pr-3 py-2.5 text-[14px] text-[#101828] outline-none transition-all duration-150 border-[#D0D5DD] hover:border-[#98A2B3] focus:border-[#175CD3] focus:ring-2 focus:ring-[#175CD3]/20"
+                className="w-full rounded-lg border border-cu-border bg-cu-bg text-cu-text-primary pl-9 pr-3 py-2.5 text-[14px] outline-none transition-all duration-150 hover:border-cu-text-muted focus:border-cu-primary focus:ring-2 focus:ring-cu-primary/20"
               />
             </div>
           </div>
 
           {/* Preset chips */}
           <div>
-            <label className="block text-[12px] font-semibold text-[#344054] uppercase tracking-wider mb-2.5">
+            <label className="block text-[12px] font-semibold text-cu-text-primary uppercase tracking-wider mb-2.5">
               Quick Select
             </label>
             <div className="grid grid-cols-4 gap-2">
@@ -117,8 +111,8 @@ export default function StartSprintModal({ open, sprintName, loading, error, onS
                   onClick={() => { setSelectedDuration(preset.days); setUseCustomDuration(false); }}
                   className={`rounded-lg border px-2 py-2.5 text-[12.5px] font-semibold transition-all duration-150 ${
                     !useCustomDuration && selectedDuration === preset.days
-                      ? 'border-[#175CD3] bg-[#EFF8FF] text-[#175CD3] shadow-sm ring-1 ring-[#175CD3]/30'
-                      : 'border-[#D0D5DD] bg-white text-[#344054] hover:border-[#98A2B3] hover:bg-[#F9FAFB]'
+                      ? 'border-cu-primary bg-cu-primary-light text-cu-primary shadow-sm ring-1 ring-cu-primary/30'
+                      : 'border-cu-border bg-cu-bg-secondary text-cu-text-primary hover:border-cu-text-muted hover:bg-cu-hover'
                   }`}
                 >
                   {preset.label}
@@ -129,12 +123,12 @@ export default function StartSprintModal({ open, sprintName, loading, error, onS
 
           {/* Custom duration */}
           <div>
-            <label className="block text-[12px] font-semibold text-[#344054] uppercase tracking-wider mb-2">
+            <label className="block text-[12px] font-semibold text-cu-text-primary uppercase tracking-wider mb-2">
               Custom Duration
             </label>
             <div className="relative flex items-center gap-2">
               <div className="relative flex-1">
-                <Clock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#98A2B3]" />
+                <Clock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-cu-text-tertiary" />
                 <input
                   type="number"
                   min="1"
@@ -146,13 +140,13 @@ export default function StartSprintModal({ open, sprintName, loading, error, onS
                     setUseCustomDuration(true);
                   }}
                   onFocus={() => setUseCustomDuration(true)}
-                  className={`w-full rounded-lg border pl-9 pr-14 py-2.5 text-[14px] text-[#101828] outline-none transition-all duration-150 ${
+                  className={`w-full rounded-lg border bg-cu-bg text-cu-text-primary pl-9 pr-14 py-2.5 text-[14px] outline-none transition-all duration-150 ${
                     useCustomDuration
-                      ? 'border-[#175CD3] ring-2 ring-[#175CD3]/20'
-                      : 'border-[#D0D5DD] hover:border-[#98A2B3]'
+                      ? 'border-cu-primary ring-2 ring-cu-primary/20'
+                      : 'border-cu-border hover:border-cu-text-muted'
                   }`}
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-[#98A2B3] font-medium">days</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-cu-text-tertiary font-medium">days</span>
               </div>
             </div>
           </div>
@@ -161,13 +155,13 @@ export default function StartSprintModal({ open, sprintName, loading, error, onS
           {duration > 0 && (() => {
             const { start, end } = getPreviewDates();
             return (
-              <div className="flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-[#F8F9FB] px-4 py-3">
-                <CalendarDays size={16} className="text-[#667085] flex-shrink-0" />
-                <div className="text-[13px] text-[#475467]">
-                  <span className="font-semibold text-[#101828]">{start}</span>
-                  <span className="mx-1.5 text-[#98A2B3]">→</span>
-                  <span className="font-semibold text-[#101828]">{end}</span>
-                  <span className="ml-2 text-[#667085]">({duration} {duration === 1 ? 'day' : 'days'})</span>
+              <div className="flex items-center gap-3 rounded-xl border border-cu-border bg-cu-bg-secondary px-4 py-3">
+                <CalendarDays size={16} className="text-cu-text-secondary flex-shrink-0" />
+                <div className="text-[13px] text-cu-text-secondary">
+                  <span className="font-semibold text-cu-text-primary">{start}</span>
+                  <span className="mx-1.5 text-cu-text-muted">→</span>
+                  <span className="font-semibold text-cu-text-primary">{end}</span>
+                  <span className="ml-2 text-cu-text-secondary">({duration} {duration === 1 ? 'day' : 'days'})</span>
                 </div>
               </div>
             );
@@ -175,20 +169,20 @@ export default function StartSprintModal({ open, sprintName, loading, error, onS
 
           {/* Error */}
           {error && (
-            <div className="flex items-start gap-2.5 rounded-lg border border-[#FDA29B] bg-[#FEF3F2] px-3.5 py-3">
-              <span className="mt-0.5 shrink-0 text-[#D92D20]">⚠</span>
-              <p className="text-[13px] text-[#B42318] leading-snug">{error}</p>
+            <div className="flex items-start gap-2.5 rounded-lg border border-cu-danger/30 bg-cu-danger-light px-3.5 py-3">
+              <span className="mt-0.5 shrink-0 text-cu-danger">⚠</span>
+              <p className="text-[13px] text-cu-danger leading-snug">{error}</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2.5 border-t border-[#F2F4F7] px-6 py-4">
+        <div className="flex items-center justify-end gap-2.5 border-t border-cu-border-light px-6 py-4">
           <button
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="rounded-lg border border-[#D0D5DD] bg-white px-4 py-2.5 text-[13.5px] font-semibold text-[#344054] hover:bg-[#F9FAFB] transition-all duration-150 disabled:opacity-50"
+            className="rounded-lg border border-cu-border bg-cu-bg px-4 py-2.5 text-[13.5px] font-semibold text-cu-text-primary hover:bg-cu-hover transition-all duration-150 disabled:opacity-50"
           >
             Cancel
           </button>
@@ -196,7 +190,7 @@ export default function StartSprintModal({ open, sprintName, loading, error, onS
             type="button"
             onClick={() => onStart(duration, startDate)}
             disabled={loading || duration <= 0}
-            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#175CD3] to-[#2E90FA] px-5 py-2.5 text-[13.5px] font-semibold text-white shadow-sm hover:from-[#1849A9] hover:to-[#1570EF] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 rounded-lg bg-cu-primary hover:bg-cu-primary-hover px-5 py-2.5 text-[13.5px] font-semibold text-white shadow-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>

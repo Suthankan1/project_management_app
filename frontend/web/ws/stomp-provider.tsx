@@ -9,6 +9,7 @@ import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
 interface StompContextValue {
   client: CompatClient | null;
   connected: boolean;
+  reconnectCount: number;
   subscribe: (
     destination: string,
     callback: (message: IMessage) => void,
@@ -26,6 +27,7 @@ interface StompProviderProps {
 const StompContext = createContext<StompContextValue>({
   client: null,
   connected: false,
+  reconnectCount: 0,
   subscribe: () => null,
   send: () => { },
 });
@@ -38,6 +40,7 @@ export function StompProvider({ token, children }: StompProviderProps) {
   const clientRef = useRef<CompatClient | null>(null);
   const [clientState, setClientState] = useState<CompatClient | null>(null);
   const [connected, setConnected] = useState(false);
+  const [reconnectCount, setReconnectCount] = useState(0);
 
   useEffect(() => {
     const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
@@ -52,6 +55,7 @@ export function StompProvider({ token, children }: StompProviderProps) {
         clientRef.current = stompClient;
         setClientState(stompClient);
         setConnected(true);
+        setReconnectCount((prev) => prev + 1);
       },
       (error: unknown) => {
         setConnected(false);
@@ -86,7 +90,7 @@ export function StompProvider({ token, children }: StompProviderProps) {
   );
 
   return (
-    <StompContext.Provider value={{ client: clientState, connected, subscribe, send }}>
+    <StompContext.Provider value={{ client: clientState, connected, subscribe, send, reconnectCount }}>
       {children}
     </StompContext.Provider>
   );

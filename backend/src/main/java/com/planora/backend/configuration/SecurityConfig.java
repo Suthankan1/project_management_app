@@ -24,13 +24,15 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
+
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Autowired
-    private JwtFilter jwtFilter;
+    private final JwtFilter jwtFilter;
 
     @Value("${cors.allowed-origins:http://localhost:3000}")
     private String corsAllowedOrigins;
@@ -73,7 +75,15 @@ public class SecurityConfig {
                         .authenticationEntryPoint((req, res, authException) -> {
                             res.setContentType("application/json");
                             res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            res.getWriter().write("{\"error\": \"Unauthorized\"}");
+                            com.planora.backend.dto.ApiErrorResponse errorResponse = new com.planora.backend.dto.ApiErrorResponse(
+                                java.time.LocalDateTime.now().toString(),
+                                HttpServletResponse.SC_UNAUTHORIZED,
+                                "UNAUTHORIZED",
+                                "Unauthorized",
+                                req.getRequestURI(),
+                                null
+                            );
+                            res.getWriter().write(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(errorResponse));
                         })
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

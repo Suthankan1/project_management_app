@@ -8,6 +8,8 @@ import java.util.Collection;
 import java.util.List;
 
 public interface DocumentFolderPermissionRepository extends JpaRepository<DocumentFolderPermission, Long> {
+    List<DocumentFolderPermission> findByFolderId(Long folderId);
+
     List<DocumentFolderPermission> findByFolderIdAndTeamRole(Long folderId, TeamRole role);
 
     List<DocumentFolderPermission> findByFolderIdInAndTeamRole(Collection<Long> folderIds, TeamRole role);

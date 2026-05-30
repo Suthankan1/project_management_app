@@ -112,7 +112,7 @@ The frontend proxies all `/api/*` calls to the backend (configured in `netlify.t
 
 - **Docker & Docker Compose** — for the quickstart path
 - **Java 21** (Temurin) — for running the backend manually
-- **Node.js 20 / npm** — for running the frontend manually
+- **Node.js 22 / npm** — for running the frontend manually (configured via `.nvmrc` in `frontend/web`)
 - **PostgreSQL** — local instance or a Supabase project
 - **AWS account** — S3 buckets for file storage (optional for local dev with stubs)
 - **Gmail account** — for SMTP email sending (optional for local dev)

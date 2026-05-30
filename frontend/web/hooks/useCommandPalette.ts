@@ -44,7 +44,7 @@ export default function useCommandPalette() {
         if (!q.trim() || !projectId || projectId === 'null') { setResults([]); return; }
         setIsSearching(true);
         try {
-            const res = await api.get<TaskResult[]>(`/api/tasks/project/${projectId}`);
+            const res = await api.get<TaskResult[]>(`/api/tasks/project/${projectId}/all`);
             const lower = q.toLowerCase();
             setResults((res.data || []).filter((t) => t.title.toLowerCase().includes(lower)).slice(0, 10));
         } catch { setResults([]); }

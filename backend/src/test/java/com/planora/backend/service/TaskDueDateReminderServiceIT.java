@@ -1,5 +1,6 @@
 package com.planora.backend.service;
 
+import com.planora.backend.BaseIntegrationIT;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.ProjectType;
 import com.planora.backend.model.Task;
@@ -15,9 +16,7 @@ import com.planora.backend.repository.TeamRepository;
 import com.planora.backend.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -26,11 +25,9 @@ import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@SpringBootTest
-@ActiveProfiles("test")
 @TestPropertySource(properties = "notifications.due-date-reminder.enabled=true")
 @Transactional
-class TaskDueDateReminderServiceIntegrationTest {
+class TaskDueDateReminderServiceIT extends BaseIntegrationIT {
 
     @Autowired
     private TaskDueDateReminderService reminderService;

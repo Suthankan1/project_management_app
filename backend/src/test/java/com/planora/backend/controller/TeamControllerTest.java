@@ -128,4 +128,20 @@ public class TeamControllerTest {
                 .with(csrf()))
                 .andExpect(status().isNoContent());
     }
+
+    @Test
+    void createTeam_invalidPayload_returns400() throws Exception {
+        TeamCreationDTO invalidDto = new TeamCreationDTO();
+        invalidDto.setName(""); // Blank name
+        invalidDto.setInviteEmails(List.of("not-an-email")); // Invalid email
+
+        mockMvc.perform(post("/api/teams")
+                        .with(user(principal))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidDto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
 }

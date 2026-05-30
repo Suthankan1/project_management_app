@@ -36,7 +36,7 @@ type ZoomLevel = 'Day' | 'Week' | 'Month';
 type GroupByType = 'none' | 'status' | 'assignee' | 'milestone';
 
 const statusColors = {
-  TODO: { badge: 'bg-slate-100 text-slate-700' },
+  TODO: { badge: 'bg-cu-bg-tertiary text-cu-text-secondary' },
   IN_PROGRESS: { badge: 'bg-blue-100 text-blue-700' },
   IN_REVIEW: { badge: 'bg-amber-100 text-amber-700' },
   DONE: { badge: 'bg-emerald-100 text-emerald-700' },
@@ -200,13 +200,13 @@ export default function TimelineView({ tasks, onOpenTask, onTaskUpdated, milesto
 
   if (timelineTasks.length === 0 && noDatesToShow.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-blue-50">
-          <h2 className="text-lg sm:text-xl font-semibold text-slate-800">Project Timeline</h2>
-          <p className="text-sm text-slate-500 mt-1">Tasks are mapped from start date to due date.</p>
+      <div className="rounded-2xl border border-cu-border bg-cu-bg shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-cu-border-light bg-cu-bg-secondary">
+          <h2 className="text-lg sm:text-xl font-semibold text-cu-text-primary">Project Timeline</h2>
+          <p className="text-sm text-cu-text-secondary mt-1">Tasks are mapped from start date to due date.</p>
         </div>
-        <div className="text-center py-16 text-slate-500 px-6">
-          <Calendar className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+        <div className="text-center py-16 text-cu-text-secondary px-6">
+          <Calendar className="w-12 h-12 mx-auto mb-4 text-cu-text-muted" />
           <p className="font-medium">No tasks with usable dates found</p>
           <p className="text-sm mt-2">Set due dates and optionally start dates.</p>
         </div>
@@ -215,7 +215,7 @@ export default function TimelineView({ tasks, onOpenTask, onTaskUpdated, milesto
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+    <div className="rounded-2xl border border-cu-border bg-cu-bg shadow-sm overflow-hidden">
       <TimelineControls
         zoom={zoom} setZoom={setZoom}
         groupBy={groupBy} setGroupBy={setGroupBy}
@@ -239,27 +239,27 @@ export default function TimelineView({ tasks, onOpenTask, onTaskUpdated, milesto
       <div ref={scrollContainerRef} className="overflow-x-auto overflow-y-hidden custom-scrollbar touch-pan-x" style={{ cursor: activeDrag ? 'grabbing' : undefined }}>
         <div className="min-w-max" style={{ width: `${300 + timelineWidthPx}px` }}>
           {/* Column headers */}
-          <div className="sticky top-0 z-20 bg-white/95 backdrop-blur">
-            <div className="flex border-b border-slate-200">
-              <div className="w-[300px] flex-shrink-0 px-4 py-3 bg-slate-50 border-r border-slate-200">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Task</p>
+          <div className="sticky top-0 z-20 bg-cu-bg/95 backdrop-blur">
+            <div className="flex border-b border-cu-border">
+              <div className="w-[300px] flex-shrink-0 px-4 py-3 bg-cu-bg-secondary border-r border-cu-border">
+                <p className="text-xs font-semibold uppercase tracking-wide text-cu-text-secondary">Task</p>
               </div>
               <div className="flex" style={{ width: `${timelineWidthPx}px` }}>
                 {monthGroups.map((group) => (
-                  <div key={`${group.label}-${group.span}`} className="px-2 py-3 border-r border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600" style={{ width: `${group.span * dayColumnWidth}px` }}>
+                  <div key={`${group.label}-${group.span}`} className="px-2 py-3 border-r border-cu-border bg-cu-bg-secondary text-xs font-semibold text-cu-text-secondary" style={{ width: `${group.span * dayColumnWidth}px` }}>
                     {group.label}
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="flex border-b border-slate-200">
-              <div className="w-[300px] flex-shrink-0 px-4 py-2 bg-slate-50 border-r border-slate-200" />
+            <div className="flex border-b border-cu-border">
+              <div className="w-[300px] flex-shrink-0 px-4 py-2 bg-cu-bg-secondary border-r border-cu-border" />
               <div className="flex" style={{ width: `${timelineWidthPx}px` }}>
                 {visibleDays.map((day) => (
                   <div
                     key={day.toISOString()}
-                    className={`h-10 border-r border-slate-100 text-[11px] flex flex-col items-center justify-center ${isWeekend(day) ? 'bg-slate-50/70 text-slate-500' : 'bg-white text-slate-600'}`}
+                    className={`h-10 border-r border-cu-border-light text-[11px] flex flex-col items-center justify-center ${isWeekend(day) ? 'bg-cu-primary/5 text-cu-text-tertiary' : 'bg-cu-bg text-cu-text-secondary'}`}
                     style={{ width: `${dayColumnWidth}px` }}
                   >
                     {zoom !== 'Month' && <span className="leading-none">{format(day, 'd')}</span>}
@@ -274,9 +274,9 @@ export default function TimelineView({ tasks, onOpenTask, onTaskUpdated, milesto
           {groupedTaskRows.map((group) => (
             <div key={group.label || 'all'}>
               {group.label && (
-                <div className="flex border-b border-slate-200 bg-slate-50/70">
+                <div className="flex border-b border-cu-border bg-cu-bg-secondary">
                   <div className="w-full px-4 py-1.5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{group.label}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-cu-text-secondary">{group.label}</p>
                   </div>
                 </div>
               )}
@@ -304,8 +304,8 @@ export default function TimelineView({ tasks, onOpenTask, onTaskUpdated, milesto
 
           {/* Tasks without dates section */}
           {noDatesToShow.length > 0 && (
-            <div className="border-t border-slate-200 mt-2">
-              <div className="flex border-b border-slate-200 bg-amber-50/60">
+            <div className="border-t border-cu-border mt-2">
+              <div className="flex border-b border-cu-border bg-amber-400/10">
                 <div className="w-full px-4 py-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">
                     Tasks without dates ({noDatesToShow.length})
@@ -317,15 +317,15 @@ export default function TimelineView({ tasks, onOpenTask, onTaskUpdated, milesto
                 return (
                   <div
                     key={task.id}
-                    className="flex border-b border-slate-100 hover:bg-slate-50/40 transition-colors cursor-pointer"
+                    className="flex border-b border-cu-border-light hover:bg-cu-hover transition-colors cursor-pointer"
                     onClick={() => onOpenTask?.(task.id)}
                   >
-                    <div className="w-[300px] flex-shrink-0 p-3 border-r border-slate-200">
-                      <p className="text-sm font-medium text-slate-700 truncate">{task.title}</p>
+                    <div className="w-[300px] flex-shrink-0 p-3 border-r border-cu-border">
+                      <p className="text-sm font-medium text-cu-text-primary truncate">{task.title}</p>
                       <div className="mt-1 flex items-center gap-2">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusTheme.badge}`}>{statusLabel(task.status)}</span>
                         {task.assigneeName && (
-                          <span className="text-[11px] text-slate-400 inline-flex items-center gap-1"><User className="w-3 h-3" />{task.assigneeName}</span>
+                          <span className="text-[11px] text-cu-text-muted inline-flex items-center gap-1"><User className="w-3 h-3" />{task.assigneeName}</span>
                         )}
                       </div>
                     </div>

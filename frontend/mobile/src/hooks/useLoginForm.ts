@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import api from '../api/axios';
-import { clearRefreshToken, getValidToken, saveRefreshToken, saveToken, setRememberMe } from '../auth/storage';
+import api from '../lib/axios';
+import { getValidToken, saveRefreshToken, saveToken, setRememberMe } from '../lib/auth';
 import { EMAIL_REGEX } from '../lib/validation';
+import { registerForPushNotifications } from '../lib/pushNotifications';
 
 export function useLoginForm() {
   const router = useRouter();
@@ -40,13 +42,26 @@ export function useLoginForm() {
       });
 
       if (response.data.success) {
-        await saveToken(response.data.token);
         await setRememberMe(remember);
-        if (remember && response.data.refreshToken) {
+        await saveToken(response.data.token);
+        if (response.data.refreshToken) {
           await saveRefreshToken(response.data.refreshToken);
-        } else {
-          await clearRefreshToken();
         }
+
+        if (Platform.OS === 'ios' || Platform.OS === 'android') {
+          const pushToken = await registerForPushNotifications();
+          if (pushToken) {
+            try {
+              await api.post('/api/user/me/push-token', {
+                pushToken,
+                platform: Platform.OS,
+              });
+            } catch {
+              // Push registration is best effort; login should still succeed.
+            }
+          }
+        }
+
         router.replace('/(tabs)');
       } else {
         setError(response.data.message || 'Login failed. Please try again.');
@@ -84,3 +99,4 @@ export function useLoginForm() {
     handleLogin,
   };
 }
+

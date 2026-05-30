@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -27,6 +29,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import lombok.RequiredArgsConstructor;
 
 /**
  * Aggregates all GitHub-related data for a Planora task.
@@ -45,6 +49,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class TaskGithubService {
 
     /** Maximum number of commits returned by the list endpoint to prevent large payloads. */
@@ -59,23 +64,17 @@ public class TaskGithubService {
     private static final Pattern TASK_KEY_PATTERN =
             Pattern.compile("(?:#|TASK-)([0-9]+)", Pattern.CASE_INSENSITIVE);
 
-    @Autowired
-    private GithubPullRequestRepository prRepository;
+    private final GithubPullRequestRepository prRepository;
 
-    @Autowired
-    private GithubCommitRepository commitRepository;
+    private final GithubCommitRepository commitRepository;
 
-    @Autowired
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
-    @Autowired
-    private GitHubIntegrationService gitHubIntegrationService;
+    private final GitHubIntegrationService gitHubIntegrationService;
 
-    @Autowired
-    private TaskActivityService taskActivityService;
+    private final TaskActivityService taskActivityService;
 
-    @Autowired
-    private CiStatusResolver ciStatusResolver;
+    private final CiStatusResolver ciStatusResolver;
 
     // ── 1. READ — DB-backed aggregation ──────────────────────────────────────────
 
@@ -329,7 +328,7 @@ public class TaskGithubService {
             entity.setAuthor(dto.getAuthor());
             entity.setCreatedAt(dto.getCreatedAt());
             entity.setUpdatedAt(dto.getUpdatedAt());
-            entity.setMergedAt(dto.getMergedAt());
+            entity.setMergedAt(parseIso(dto.getMergedAt()));
             entity.setHeadBranch(dto.getHeadBranch());
             entity.setBaseBranch(dto.getBaseBranch());
             entity.setHeadSha(dto.getHeadSha());
@@ -418,7 +417,7 @@ public class TaskGithubService {
                 .author(pr.getAuthor())
                 .createdAt(pr.getCreatedAt())
                 .updatedAt(pr.getUpdatedAt())
-                .mergedAt(pr.getMergedAt())
+                .mergedAt(formatIso(pr.getMergedAt()))
                 .headBranch(pr.getHeadBranch())
                 .baseBranch(pr.getBaseBranch())
                 .build();
@@ -447,7 +446,7 @@ public class TaskGithubService {
                 .author(pr.getAuthor())
                 .createdAt(pr.getCreatedAt())
                 .updatedAt(pr.getUpdatedAt())
-                .mergedAt(pr.getMergedAt())
+                .mergedAt(formatIso(pr.getMergedAt()))
                 .build();
     }
 
@@ -604,6 +603,29 @@ public class TaskGithubService {
 
     private boolean isBlank(String s) {
         return s == null || s.isBlank();
+    }
+
+    /**
+     * Parses an ISO-8601 timestamp string (with offset) from the GitHub API
+     * into a {@link LocalDateTime} for DB storage.
+     * Returns null when the input is null or blank.
+     */
+    private LocalDateTime parseIso(String iso) {
+        if (iso == null || iso.isBlank()) return null;
+        try {
+            return OffsetDateTime.parse(iso, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+                    .toLocalDateTime();
+        } catch (Exception e) {
+            return null;   // malformed value from GitHub — store as null rather than crash
+        }
+    }
+
+    /**
+     * Formats a {@link LocalDateTime} to an ISO-8601 string for response DTOs.
+     * Returns null when the input is null.
+     */
+    private String formatIso(LocalDateTime dt) {
+        return dt == null ? null : dt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
     }
 
     /**

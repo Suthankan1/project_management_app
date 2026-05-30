@@ -63,7 +63,7 @@ export const fetchCalendarEvents = async (projectId: string | number): Promise<C
     }));
   } catch {
     const [tasksRes, sprintsRes] = await Promise.allSettled([
-      api.get(`/api/tasks/project/${pid}`),
+      api.get(`/api/tasks/project/${pid}/all`),
       api.get(`/api/sprints/project/${pid}`),
     ]);
 

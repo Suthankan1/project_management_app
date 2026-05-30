@@ -1,20 +1,25 @@
 "use client";
+
 import React from "react";
+import { Search } from "lucide-react";
 
 export default function Header() {
   return (
-    <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-[10px] py-2">
+    <div className="sticky top-0 z-20 border-b border-cu-border bg-cu-bg px-[10px] py-2 shadow-cu-sm">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <div className="text-[16px] font-normal text-slate-800">Sprint Board</div>
+          <div className="text-[16px] font-semibold text-cu-text-primary">Sprint Board</div>
         </div>
 
         <div className="flex items-center gap-4">
           <div className="relative">
-            <input className="w-64 h-9 rounded-md border border-gray-300 pl-10 pr-3" placeholder="Search tasks..." />
-            <div className="absolute left-2 top-2 text-gray-400">🔍</div>
+            <input
+              className="h-9 w-64 rounded-lg border border-cu-border bg-cu-bg-secondary pl-9 pr-3 text-sm text-cu-text-primary placeholder:text-cu-text-muted focus:border-cu-primary focus:outline-none focus:ring-2 focus:ring-cu-primary/20"
+              placeholder="Search tasks..."
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-cu-text-muted" size={15} />
           </div>
-          <button className="w-[134px] h-[33.6px] bg-[#1D56D5] border border-[#1D56D5] rounded-[10px] text-white transition transform hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-[#1648B8] focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#1D56D5]">
+          <button className="h-[33.6px] w-[134px] rounded-[10px] border border-cu-primary bg-cu-primary text-white transition hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-cu-primary-hover focus:outline-none focus:ring-2 focus:ring-cu-primary/30">
             Complete Sprint
           </button>
         </div>

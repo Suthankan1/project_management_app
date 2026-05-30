@@ -14,12 +14,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
 public class ProjectPageController {
 
-    @Autowired
-    private ProjectPageService service;
+    private final ProjectPageService service;
 
     @PostMapping("/projects/{projectId}/pages")
     public ResponseEntity<PageDetailResponseDto> createPage(
