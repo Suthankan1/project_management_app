@@ -35,9 +35,10 @@ export function useTouchDragSort({
   // Row centers captured at drag-start so layout shifts (drop indicator) don't skew calculation
   const rowCentersRef = useRef<number[]>([]);
   const tasksRef = useRef(tasks);
-  tasksRef.current = tasks;
   const onDropRef = useRef(onDrop);
-  onDropRef.current = onDrop;
+
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+  useEffect(() => { onDropRef.current = onDrop; }, [onDrop]);
 
   // Per-element long-press tracking
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);

@@ -21,7 +21,7 @@ public class GithubTokenService {
     @Value("${github.default.token:}")
     private String defaultToken;
 
-    @Value("${github.token.encryption.key}")
+    @Value("${github.token.encryption.key:}")
     private String encryptionKey;
 
     public String resolveToken(GithubIntegration integration) {
@@ -46,6 +46,9 @@ public class GithubTokenService {
 
     @Transactional
     public void saveToken(Long userId, String token) {
+        if (!StringUtils.hasText(encryptionKey)) {
+            throw new IllegalStateException("GITHUB_TOKEN_ENCRYPTION_KEY is not configured");
+        }
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
         try {
@@ -59,6 +62,9 @@ public class GithubTokenService {
 
     @Transactional(readOnly = true)
     public String getToken(Long userId) {
+        if (!StringUtils.hasText(encryptionKey)) {
+            throw new IllegalStateException("GITHUB_TOKEN_ENCRYPTION_KEY is not configured");
+        }
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
         String stored = user.getGithubAccessToken();

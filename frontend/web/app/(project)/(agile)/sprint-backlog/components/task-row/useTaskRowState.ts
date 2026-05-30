@@ -5,9 +5,9 @@ import { classifyDue, STATUS_LABELS, STATUS_COLORS, STATUS_BORDER, PRIORITY_STYL
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useTaskRowState(task: TaskRowTask, props: Pick<TaskRowProps, 'canDelete' | 'onDeleteTask' | 'onRenameTask' | 'onAddLabel' | 'onRemoveLabel' | 'onCreateLabel' | 'extraStatuses' | 'projectLabels'>) {
-  const { 
-    canDelete, onDeleteTask, onRenameTask, onAddLabel, 
-    onRemoveLabel, onCreateLabel, extraStatuses, projectLabels: _projectLabels 
+  const {
+    canDelete: _canDelete, onDeleteTask: _onDeleteTask, onRenameTask, onAddLabel,
+    onRemoveLabel, onCreateLabel, extraStatuses, projectLabels: _projectLabels
   } = props;
 
   const [statusOpen, setStatusOpen] = useState(false);
