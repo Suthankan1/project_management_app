@@ -797,13 +797,10 @@ export default function SprintBacklogPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-slate-50 overflow-hidden">
-      <div className="sticky top-0 flex-shrink-0 z-40 w-full glass-panel border-b border-[#E4E7EC] px-4 py-4 sm:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Project Backlog</h1>
-            <p className="text-[13px] sm:text-[14px] text-slate-500 font-medium">Plan sprints and manage product tasks</p>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3">
+      <div className="sticky top-0 flex-shrink-0 z-40 w-full glass-panel border-b border-[#E4E7EC] px-4 py-3 sm:px-8">
+        <div className="flex items-start justify-between gap-4">
+          <FilterBar filters={filters} onChange={setFilters} assigneeNames={allAssigneeNames} />
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 pt-0.5">
             <button
               onClick={() => setShowArchived(!showArchived)}
               className={`flex h-11 items-center gap-2 rounded-xl px-4 text-[13px] font-bold shadow-sm transition-all active:scale-95 ${
@@ -833,9 +830,6 @@ export default function SprintBacklogPage() {
               </button>
             )}
           </div>
-        </div>
-        <div className="mt-5">
-          <FilterBar filters={filters} onChange={setFilters} assigneeNames={allAssigneeNames} />
         </div>
       </div>
 
@@ -871,6 +865,9 @@ export default function SprintBacklogPage() {
                           projectId={projectId!}
                           projectKey={projectKey}
                           currentUserRole={currentUserRole}
+                          availableSprintsForMove={sprints
+                            .filter((s) => s.id !== sprint.id && s.status === 'NOT_STARTED')
+                            .map((s) => ({ id: s.id, name: s.name }))}
                           onDropTask={moveTaskToSprint}
                           onCreateTask={createSprintTask}
                           onToggleTask={toggleTaskSelection}

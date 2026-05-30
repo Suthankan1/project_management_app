@@ -225,8 +225,8 @@ export const sprintsApi = {
   delete: async (sprintId: number | string): Promise<void> => {
     await api.delete(`/api/sprints/${sprintId}`);
   },
-  complete: async (sprintId: number | string): Promise<void> => {
-    await api.put(`/api/sprints/${sprintId}/complete`);
+  complete: async (sprintId: number | string, moveIncompleteTo: number | null = null): Promise<void> => {
+    await api.put(`/api/sprints/${sprintId}/complete`, { moveIncompleteTo });
   },
   getBurndown: async (sprintId: number | string): Promise<BurndownResponse> => {
     const { data } = await api.get(`/api/burndown/sprint/${sprintId}`);

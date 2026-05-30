@@ -18,7 +18,6 @@ import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.TaskRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -241,7 +240,7 @@ public class SprintService {
     }
 
     @Transactional
-    public SprintResponseDTO completeSprint(Long id, Long currentUserId) {
+    public SprintResponseDTO completeSprint(Long id, Long destinationSprintId, Long currentUserId) {
         Sprint sprint = sprintRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sprint not found"));
 
@@ -260,13 +259,12 @@ public class SprintService {
                 .collect(Collectors.toList());
 
         if (!incomplete.isEmpty()) {
-            // Find next available NOT_STARTED sprint in the same project
-            List<Sprint> nextSprints = sprintRepository.findNextAvailableSprint(
-                    sprint.getProId(), SprintStatus.NOT_STARTED, id, PageRequest.of(0, 1)
-            );
-
-            Sprint targetSprint = nextSprints.isEmpty() ? null : nextSprints.get(0);
-            incomplete.forEach(t -> t.setSprint(targetSprint));
+            Sprint targetSprint = null;
+            if (destinationSprintId != null) {
+                targetSprint = sprintRepository.findById(destinationSprintId).orElse(null);
+            }
+            final Sprint finalTarget = targetSprint;
+            incomplete.forEach(t -> t.setSprint(finalTarget));
             taskRepository.saveAll(incomplete);
         }
 
