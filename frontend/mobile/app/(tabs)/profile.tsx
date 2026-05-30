@@ -50,7 +50,7 @@ function Skeleton() {
         Animated.timing(anim, { toValue: 0.4, duration: 700, useNativeDriver: true }),
       ])
     ).start();
-  }, []);
+  }, [anim]);
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <Animated.View style={[sk.wrap, { opacity: anim }]}>
@@ -393,7 +393,7 @@ export default function ProfileScreen() {
           setProfile(res.data);
           setGithubUsername(res.data.githubUsername);
           setSuccessMsg('GitHub account unlinked successfully.');
-        } catch (err: any) {
+        } catch {
           setErrMsg('Failed to unlink GitHub account.');
         } finally {
           setGithubUnlinking(false);

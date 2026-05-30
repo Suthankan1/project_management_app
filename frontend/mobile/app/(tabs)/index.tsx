@@ -39,7 +39,7 @@ function FadeSlideIn({
         friction: 20,
       }),
     ]).start();
-  }, []);
+  }, [delay, opacity, translateY]);
 
   return (
     <Animated.View style={{ opacity, transform: [{ translateY }] }}>

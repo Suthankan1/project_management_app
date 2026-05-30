@@ -9,7 +9,7 @@ interface Props {
   isStale: boolean;
 }
 
-export function OfflineStaleBanner({ isOnline, isStale }: Props) {
+function OfflineStaleBanner({ isOnline, isStale }: Props) {
   const height = useSharedValue(0);
   const showBanner = !isOnline || isStale;
 
