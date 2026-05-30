@@ -1,4 +1,4 @@
-import axios from '@/lib/axios';
+import { tasksApi, sprintboardsApi, sprintsApi, projectsApi } from '@/services/api-contract';
 import { Sprintboard, SprintboardFullResponse } from './types';
 
 /**
@@ -6,35 +6,35 @@ import { Sprintboard, SprintboardFullResponse } from './types';
  * @param sprintId - The sprint ID to fetch board for
  */
 export async function fetchSprintboardBySprintId(sprintId: number): Promise<Sprintboard> {
-  const response = await axios.get(`/api/sprintboards/sprint/${sprintId}`);
-  const sprintboard = response.data;
+  const sprintboard = await sprintboardsApi.get(sprintId);
 
   const columnsWithTasks = await Promise.all(
     sprintboard.columns.map(async (col: { columnStatus: string }) => {
-      const tasksRes = await axios.get(`/api/sprintboards/${sprintboard.id}/columns/${col.columnStatus}/tasks`);
+      const tasks = await sprintboardsApi.getTasksInColumn(sprintboard.id, col.columnStatus)
+        .catch(() => []);
+
       return {
         ...col,
-        tasks: tasksRes.data || []
+        tasks
       };
     })
   );
 
   return {
     ...sprintboard,
-    columns: columnsWithTasks
+    columns: columnsWithTasks as any
   };
 }
 
 export async function fetchSprintboardBySprintIdFull(sprintId: number): Promise<SprintboardFullResponse> {
-  const response = await axios.get(`/api/sprintboards/sprint/${sprintId}/full`);
-  return response.data;
+  return await sprintboardsApi.getFull(sprintId);
 }
 
 /**
  * Move a task to a different column
  */
 export async function moveTaskToColumn(taskId: number, sprintboardId: number, newColumnStatus: string): Promise<void> {
-  await axios.put(`/api/sprintboards/tasks/${taskId}/move`, {
+  await sprintboardsApi.moveTask(taskId, {
     sprintboardId,
     newColumnStatus
   });
@@ -43,67 +43,63 @@ export async function moveTaskToColumn(taskId: number, sprintboardId: number, ne
 /**
  * Fetch all sprints for a project to find the active one
  */
-export async function fetchSprintsByProject(projectId: number): Promise<unknown[]> {
-  const response = await axios.get(`/api/sprints/project/${projectId}`);
-  return response.data || [];
+export async function fetchSprintsByProject(projectId: number): Promise<any[]> {
+  return await sprintsApi.listByProject(projectId);
 }
 
 /**
  * Complete a sprint — calls the dedicated complete endpoint
  */
 export async function completeSprint(sprintId: number): Promise<void> {
-  await axios.put(`/api/sprints/${sprintId}/complete`);
+  await sprintsApi.complete(sprintId);
 }
 
 /**
  * Create a new task within a sprint
  */
 export async function createTask(taskData: Record<string, unknown>): Promise<unknown> {
-  const response = await axios.post('/api/tasks', taskData);
-  return response.data;
+  return await tasksApi.create(taskData);
 }
 
 /**
  * Update an existing task
  */
 export async function updateTask(taskId: number, taskData: Record<string, unknown>): Promise<unknown> {
-  const response = await axios.put(`/api/tasks/${taskId}`, taskData);
-  return response.data;
+  return await tasksApi.update(taskId, taskData);
 }
 
 /**
  * Add a new column to the sprint board
  */
 export async function addColumn(sprintboardId: number, name: string, status: string) {
-  const response = await axios.post(`/api/sprintboards/${sprintboardId}/columns`, { name, status });
-  return response.data;
+  return await sprintboardsApi.addColumn(sprintboardId, { name, status });
 }
 
 export async function bulkUpdateTaskStatus(taskIds: number[], status: string): Promise<void> {
-  await axios.patch('/api/tasks/bulk/status', { taskIds, status });
+  await tasksApi.bulkUpdateStatus({ taskIds, status });
 }
 
 export async function bulkDeleteTasks(taskIds: number[]): Promise<void> {
-  await axios.delete('/api/tasks/bulk', { data: { taskIds } });
+  await tasksApi.bulkDelete({ taskIds });
 }
 
 export async function reorderSprintColumns(
   sprintboardId: number,
   reorderRequest: Array<{ id: number; position: number }>
 ): Promise<void> {
-  await axios.patch(`/api/sprintboards/${sprintboardId}/columns/reorder`, reorderRequest);
+  await sprintboardsApi.reorderColumns(sprintboardId, reorderRequest);
 }
 
 export async function patchTaskDueDate(taskId: number, dueDate: string | null): Promise<void> {
-  await axios.patch(`/api/tasks/${taskId}/dates`, { dueDate });
+  await tasksApi.updateDates(taskId, { dueDate });
 }
 
 export async function assignTaskSingle(taskId: number, userId: number): Promise<void> {
-  await axios.patch(`/api/tasks/${taskId}/assign/${userId}`);
+  await tasksApi.assignTaskSingle(taskId, userId);
 }
 
 export async function assignTaskMultiple(taskId: number, assigneeIds: number[]): Promise<void> {
-  await axios.patch(`/api/tasks/${taskId}/assignees`, { assigneeIds });
+  await tasksApi.assignTaskMultiple(taskId, { assigneeIds });
 }
 
 export interface SprintTeamMemberOption {
@@ -114,8 +110,7 @@ export interface SprintTeamMemberOption {
 }
 
 export async function fetchTeamMembers(teamId: number): Promise<SprintTeamMemberOption[]> {
-  const response = await axios.get(`/api/teams/${teamId}/members`);
-  const payload = response.data;
+  const payload = await projectsApi.getTeamMembers(teamId);
   const items = Array.isArray(payload) ? payload : payload?.members ?? payload?.data ?? payload?.content ?? [];
   return items
     .map((member: Record<string, unknown> & { user?: Record<string, unknown> }) => {
@@ -131,4 +126,3 @@ export async function fetchTeamMembers(teamId: number): Promise<SprintTeamMember
     })
     .filter((item: SprintTeamMemberOption | null): item is SprintTeamMemberOption => item !== null);
 }
-

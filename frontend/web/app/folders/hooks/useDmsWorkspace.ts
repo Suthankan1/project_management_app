@@ -285,6 +285,6 @@ export function useDmsWorkspace(mode: ViewMode) {
         onCreateFolder, onDeleteFolder, onUpload, onDrop,
         onDownload, onView, onRename, onConfirmRename, onCancelRename, onSoftDelete, onRestore,
         onPermanentDelete, onToggleFavorite, onToggleVersions, onOpenInfo,
-        isDragOver, setIsDragOver, isUploading, uploadProgress,
+        isDragOver, setIsDragOver, isUploading, uploadProgress, refresh,
     };
 }

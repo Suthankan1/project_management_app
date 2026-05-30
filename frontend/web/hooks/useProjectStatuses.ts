@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import api from '@/lib/axios';
+import { kanbanApi } from '@/services/api-contract';
 
 export interface ProjectStatus {
   name: string;
@@ -26,8 +26,8 @@ export function useProjectStatuses(projectId?: number) {
     const fetchStatuses = async () => {
       setLoading(true);
       try {
-        const response = await api.get(`/api/kanbans/project/${projectId}/board`);
-        const columns = response.data.columns || [];
+        const response = await kanbanApi.getBoard(projectId);
+        const columns = response.columns || [];
         
         if (columns.length > 0) {
           const dynamicStatuses = columns.map((col: { name: string; status: string; color?: string }) => ({

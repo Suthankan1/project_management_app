@@ -1,22 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import axiosInstance from '../../../../lib/axios';
+import { pagesApi } from '@/services/api-contract';
+import type { PageSummaryDto, PageDetailDto } from '@/services/api-contract';
 
 import { PageItem } from './types';
 export type { PageItem };
-
-interface PageSummaryDto {
-  id: number;
-  title: string;
-}
-
-interface PageDetailDto {
-  id: number;
-  title: string;
-  content?: string;
-  updatedAt?: string;
-}
 
 interface UsePagesReturn {
   pages: PageItem[];
@@ -60,8 +49,8 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
 
     setError(null);
     try {
-      const response = await axiosInstance.get<PageSummaryDto[]>(`/api/projects/${projectId}/pages`);
-      const pagesData = (response.data || []).map((page) => ({
+      const response = await pagesApi.listByProject(projectId);
+      const pagesData = (response || []).map((page) => ({
         id: page.id,
         title: page.title,
         isStarred: false, // TODO: sync with backend when implemented
@@ -106,12 +95,12 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
     if (!projectId) throw new Error('Project ID not found');
 
     try {
-      const response = await axiosInstance.post<PageDetailDto>(`/api/projects/${projectId}/pages`, { title, content });
+      const response = await pagesApi.create(projectId, { title, content });
       const newPage: PageItem = {
-        id: response.data.id,
-        title: response.data.title,
-        content: response.data.content,
-        updatedAt: response.data.updatedAt,
+        id: response.id,
+        title: response.title,
+        content: response.content,
+        updatedAt: response.updatedAt,
         isStarred: false,
       };
       setPages((prev) => [...prev, newPage]);
@@ -127,15 +116,15 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
   // Update an existing page
   const updatePage = async (pageId: string | number, title: string, content: string): Promise<PageItem> => {
     try {
-      const response = await axiosInstance.put<PageDetailDto>(`/api/pages/${pageId}`, {
+      const response = await pagesApi.update(pageId, {
         title,
         content,
       });
       const updatedPage: PageItem = {
-        id: response.data.id,
-        title: response.data.title,
-        content: response.data.content,
-        updatedAt: response.data.updatedAt,
+        id: response.id,
+        title: response.title,
+        content: response.content,
+        updatedAt: response.updatedAt,
         isStarred: pages.find((p) => p.id === pageId)?.isStarred || false,
       };
       setPages((prev) => prev.map((p) => (p.id === pageId ? updatedPage : p)));
@@ -151,7 +140,7 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
   // Delete a page
   const deletePage = async (pageId: string | number): Promise<void> => {
     try {
-      await axiosInstance.delete(`/api/pages/${pageId}`);
+      await pagesApi.delete(pageId);
       setPages((prev) => prev.filter((p) => p.id !== pageId));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
