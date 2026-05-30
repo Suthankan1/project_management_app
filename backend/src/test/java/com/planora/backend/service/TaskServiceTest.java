@@ -801,4 +801,32 @@ class TaskServiceTest {
         assertEquals("IN_REVIEW", task.getStatus());
         verify(taskRepository).save(task);
     }
+
+    @Test
+    void getAssignedTasks_withDuplicateDatabaseResults_deduplicatesAndDoesNotCrash() {
+        Long userId = 200L;
+        int limit = 20;
+
+        when(taskRepository.findAssignedTaskIdsByUser(eq(userId), any(Pageable.class)))
+                .thenReturn(List.of(71L, 71L));
+
+        Task task = buildTask(71L);
+
+        when(taskRepository.findByIdInWithScalars(List.of(71L, 71L)))
+                .thenReturn(List.of(task, task));
+
+        when(taskRepository.findByIdInWithCollections(List.of(71L, 71L)))
+                .thenReturn(List.of(task, task));
+
+        when(taskRepository.findDependencyRowsByTaskIds(List.of(71L, 71L)))
+                .thenReturn(java.util.Collections.emptyList());
+        when(taskRepository.findDependentRowsByTaskIds(List.of(71L, 71L)))
+                .thenReturn(java.util.Collections.emptyList());
+
+        List<TaskResponseDTO> result = taskService.getAssignedTasks(userId, limit);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(71L, result.getFirst().getId());
+    }
 }

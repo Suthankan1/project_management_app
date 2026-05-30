@@ -532,7 +532,7 @@ public class TaskService {
         List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
         java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(ids);
         java.util.Map<Long, Task> enrichedMap = enriched.stream()
-                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t));
+                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
 
         return taskPage.map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap));
     }
@@ -567,7 +567,7 @@ public class TaskService {
             List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
             java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(ids);
             java.util.Map<Long, Task> enrichedMap = enriched.stream()
-                    .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t));
+                    .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
             return filteredTasks.stream()
                     .map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap))
                     .collect(Collectors.toList());
@@ -580,7 +580,7 @@ public class TaskService {
         List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
         java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(ids);
         java.util.Map<Long, Task> enrichedMap = enriched.stream()
-                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t));
+                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
         return tasks.stream()
                 .map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap))
                 .collect(Collectors.toList());
@@ -1444,9 +1444,9 @@ public class TaskService {
         }
         List<Task> enrichedTasks = taskRepository.findByIdInWithCollections(taskIds);
         java.util.Map<Long, Task> scalarById = scalarTasks.stream()
-                .collect(Collectors.toMap(Task::getId, t -> t));
+                .collect(Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
         java.util.Map<Long, Task> enrichedById = enrichedTasks.stream()
-                .collect(Collectors.toMap(Task::getId, t -> t));
+                .collect(Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
         java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(taskIds);
 
         return taskIds.stream()
@@ -1494,7 +1494,7 @@ public class TaskService {
         }
         User actor = userRepository.findById(currentUserId).orElseThrow();
         java.util.Map<Long, Task> taskById = tasks.stream()
-                .collect(Collectors.toMap(Task::getId, task -> task));
+                .collect(Collectors.toMap(Task::getId, task -> task, (t1, t2) -> t1));
 
         // Iterate through the newly provided list and rewrite the position index integers
         for (int index = 0; index < orderedTaskIds.size(); index++) {

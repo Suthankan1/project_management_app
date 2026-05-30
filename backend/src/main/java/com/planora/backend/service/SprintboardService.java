@@ -161,7 +161,7 @@ public class SprintboardService {
         java.util.Map<Long, Task> enrichedMap = taskIds.isEmpty()
                 ? java.util.Map.of()
                 : taskRepository.findByIdInWithCollections(taskIds).stream()
-                        .collect(Collectors.toMap(Task::getId, t -> t));
+                        .collect(Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
 
         java.util.Map<String, List<SprintboardTaskResponseDTO>> tasksByStatus = new java.util.HashMap<>();
         for (Task scalarTask : scalarTasks) {
@@ -241,7 +241,7 @@ public class SprintboardService {
         List<Long> ids = scalarTasks.stream().map(Task::getId).collect(Collectors.toList());
         List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
         java.util.Map<Long, Task> enrichedMap = enriched.stream()
-                .collect(Collectors.toMap(Task::getId, t -> t));
+                .collect(Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
 
         return scalarTasks.stream()
                 .map(task -> mapTaskForBoard(enrichedMap.getOrDefault(task.getId(), task)))
