@@ -111,7 +111,23 @@ export function useDmsWorkspace(mode: ViewMode) {
 
     const refresh = async () => {
         if (!projectId) return;
-        setDocuments(await listDocuments(projectId, undefined, isTrashMode));
+        try {
+            setLoading(true);
+            setError(null);
+            const [folderData, documentData, allProjects] = await Promise.all([
+                listFolders(projectId),
+                listDocuments(projectId, undefined, isTrashMode),
+                listUserProjects(),
+            ]);
+            setFolders(folderData);
+            setDocuments(documentData);
+            const match = allProjects.find((p) => p.id === projectId);
+            setCurrentProjectName(match?.name ?? null);
+        } catch {
+            setError('Failed to load folder and document data.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const withProjectId = (basePath: string) =>

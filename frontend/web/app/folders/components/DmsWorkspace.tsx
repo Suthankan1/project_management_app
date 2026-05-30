@@ -1,13 +1,14 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Loader2, Search, X } from 'lucide-react';
+import { Loader2, RefreshCw, Search, X } from 'lucide-react';
 import DmsHeader from '@/app/folders/components/DmsHeader';
 import DmsSidebar from '@/app/folders/components/DmsSidebar';
 import DmsDocumentsTable from '@/app/folders/components/DmsDocumentsTable';
 import DmsModals from '@/app/folders/components/DmsModals';
 import { ViewMode } from '@/app/folders/components/types';
 import { useDmsWorkspace } from '@/app/folders/hooks/useDmsWorkspace';
+import EmptyState from '@/components/shared/EmptyState';
 
 interface DmsWorkspaceProps {
     mode: ViewMode;
@@ -28,6 +29,7 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
         onCreateFolder, onDeleteFolder, onUpload, onDrop,
         onToggleFavorite, onView, onDownload, onRename, onConfirmRename, onCancelRename,
         onSoftDelete, onToggleVersions, onOpenInfo, onRestore, onPermanentDelete,
+        refresh,
     } = useDmsWorkspace(mode);
 
     const dragCounter = useRef(0);
@@ -43,11 +45,19 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
 
     if (!projectId) {
         return (
-            <div className="flex flex-col items-center justify-center h-[60vh] gap-3 text-center">
-                <p className="text-sm font-medium text-cu-text-primary">No project selected</p>
-                <p className="text-xs text-cu-text-secondary max-w-xs">
-                    Open a project first, then navigate to Documents. Folders and files always belong to a specific project.
-                </p>
+            <div className="flex flex-col items-center justify-center h-[60vh] gap-3 text-center px-4">
+                <EmptyState
+                    title="No project selected"
+                    subtitle="Open a project first, then navigate to Documents. Folders and files always belong to a specific project."
+                    action={
+                        <a
+                            href="/dashboard"
+                            className="inline-flex items-center gap-2 rounded-xl bg-cu-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-cu-primary-hover transition-colors"
+                        >
+                            Open dashboard
+                        </a>
+                    }
+                />
             </div>
         );
     }
@@ -122,16 +132,45 @@ export default function DmsWorkspace({ mode }: DmsWorkspaceProps) {
                         </div>
 
                         {error && (
-                            <div className="mx-5 mt-4 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md">{error}</div>
+                            <div className="mx-5 mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center justify-between gap-3 flex-wrap">
+                                <span>{error}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => void refresh()}
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-red-700 border border-red-200 hover:bg-red-100 transition-colors"
+                                >
+                                    <RefreshCw size={13} />
+                                    Retry
+                                </button>
+                            </div>
                         )}
-                        <DmsDocumentsTable
-                            filteredDocuments={filteredDocuments} favoriteIds={favoriteIds}
-                            isTrashMode={isTrashMode} mode={mode}
-                            onToggleFavorite={onToggleFavorite} onView={onView} onDownload={onDownload}
-                            onRename={onRename} onSoftDelete={onSoftDelete}
-                            onToggleVersions={onToggleVersions} onOpenInfo={onOpenInfo}
-                            onRestore={onRestore} onPermanentDelete={onPermanentDelete}
-                        />
+                        {filteredDocuments.length === 0 ? (
+                            <div className="px-6 py-10">
+                                <EmptyState
+                                    title={searchQuery.trim() ? 'No documents match your search' : 'No documents yet'}
+                                    subtitle={searchQuery.trim() ? 'Clear the search to see all files.' : 'Upload a file or create a folder from the header to get started.'}
+                                    action={
+                                        <button
+                                            type="button"
+                                            onClick={() => void refresh()}
+                                            className="inline-flex items-center gap-2 rounded-xl bg-cu-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-cu-primary-hover transition-colors"
+                                        >
+                                            <RefreshCw size={14} />
+                                            Refresh
+                                        </button>
+                                    }
+                                />
+                            </div>
+                        ) : (
+                            <DmsDocumentsTable
+                                filteredDocuments={filteredDocuments} favoriteIds={favoriteIds}
+                                isTrashMode={isTrashMode} mode={mode}
+                                onToggleFavorite={onToggleFavorite} onView={onView} onDownload={onDownload}
+                                onRename={onRename} onSoftDelete={onSoftDelete}
+                                onToggleVersions={onToggleVersions} onOpenInfo={onOpenInfo}
+                                onRestore={onRestore} onPermanentDelete={onPermanentDelete}
+                            />
+                        )}
                     </section>
                 </div>
             </div>

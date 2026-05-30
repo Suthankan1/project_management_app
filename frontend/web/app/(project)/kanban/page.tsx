@@ -167,12 +167,21 @@ export default function KanbanPage() {
 
       {/* Error */}
       {error && (
-        <div className="mx-4 md:mx-6 mt-3 flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/25 rounded-lg text-red-500">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold text-sm">Error</p>
-            <p className="text-xs mt-0.5">{error}</p>
+        <div className="mx-4 md:mx-6 mt-3 flex items-start justify-between gap-3 p-4 bg-red-500/10 border border-red-500/25 rounded-lg text-red-500 flex-wrap">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-sm">Error</p>
+              <p className="text-xs mt-0.5">{error}</p>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={() => void forceRefresh()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/20 bg-white/80 px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-white transition-colors"
+          >
+            Retry
+          </button>
         </div>
       )}
 
