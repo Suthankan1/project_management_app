@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 
 export interface TouchDragGhost {
   x: number;
@@ -35,9 +35,12 @@ export function useTouchDragSort({
   // Row centers captured at drag-start so layout shifts (drop indicator) don't skew calculation
   const rowCentersRef = useRef<number[]>([]);
   const tasksRef = useRef(tasks);
-  tasksRef.current = tasks;
   const onDropRef = useRef(onDrop);
-  onDropRef.current = onDrop;
+
+  useLayoutEffect(() => {
+    tasksRef.current = tasks;
+    onDropRef.current = onDrop;
+  });
 
   // Per-element long-press tracking
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);

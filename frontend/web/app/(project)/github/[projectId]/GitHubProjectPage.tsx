@@ -114,37 +114,6 @@ function prStatus(pr: GitHubPullRequest): { label: string; color: string; dot: s
   return { label: 'Open', color: 'text-emerald-300 bg-emerald-400/12 border-emerald-400/25', dot: 'bg-emerald-400', glow: 'shadow-[0_0_10px_rgba(52,211,153,0.35)]' };
 }
 
-// ── Ambient background orbs ───────────────────────────────────────────────────
-function BackgroundOrbs() {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none" aria-hidden>
-      {/* Primary indigo orb */}
-      <div
-        className="absolute -top-40 left-1/3 w-[560px] h-[560px] rounded-full opacity-[0.18] blur-[120px]"
-        style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }}
-      />
-      {/* Purple orb bottom-right */}
-      <div
-        className="absolute bottom-10 right-10 w-[420px] h-[420px] rounded-full opacity-[0.13] blur-[100px]"
-        style={{ background: 'radial-gradient(circle, #a855f7 0%, transparent 70%)' }}
-      />
-      {/* Blue orb mid */}
-      <div
-        className="absolute top-1/2 left-[10%] w-[280px] h-[280px] rounded-full opacity-[0.09] blur-[80px]"
-        style={{ background: 'radial-gradient(circle, #3b82f6 0%, transparent 70%)' }}
-      />
-      {/* Subtle mesh grid */}
-      <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(255,255,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px)',
-          backgroundSize: '48px 48px',
-        }}
-      />
-    </div>
-  );
-}
 
 function isGitHubRepoNotification(notification: Notification, repoFullName: string): boolean {
   const normalizedRepo = repoFullName.trim().toLowerCase();
