@@ -229,9 +229,24 @@ export function useChat(projectId: string) {
     if (isConnectingRef.current) return;
     isConnectingRef.current = true;
 
+    const scheduleReconnect = (delayOverride?: number) => {
+      if (reconnectRef.current) return;
+      const delay = delayOverride ?? Math.min(30000, Math.pow(2, reconnectAttemptRef.current) * 1000);
+      reconnectAttemptRef.current += 1;
+      reconnectRef.current = setTimeout(() => {
+        reconnectRef.current = null;
+        connectWebSocket();
+      }, delay);
+    };
+
     try {
       const token = await ensureValidToken();
-      if (!token) { setError('Not authenticated'); isConnectingRef.current = false; return; }
+      if (!token) {
+        setError('Not authenticated');
+        isConnectingRef.current = false;
+        scheduleReconnect();
+        return;
+      }
 
       const base = API_BASE_URL.replace(/\/api$/, '');
       const wsUrl = base.replace(/^https?/, 'ws') + '/ws-native';
@@ -293,18 +308,18 @@ export function useChat(projectId: string) {
               || normalizedBody.includes('invalid');
 
             if (isAuthError) {
-              void ensureValidToken().then((refreshedToken) => {
-                if (!refreshedToken) {
-                  setError('Your session expired. Please sign in again.');
-                  return;
-                }
-                if (!reconnectRef.current) {
-                  reconnectRef.current = setTimeout(() => {
-                    reconnectRef.current = null;
-                    connectWebSocket();
-                  }, 500);
-                }
-              });
+              const refreshedToken = await ensureValidToken();
+              if (!refreshedToken) {
+                setError('Your session expired. Please sign in again.');
+              }
+              try {
+                ws.close(4001, 'jwt-expired');
+              } catch {
+                setIsSocketConnected(false);
+                socketRef.current = null;
+                isConnectingRef.current = false;
+                scheduleReconnect(500);
+              }
               return;
             }
 
@@ -330,14 +345,8 @@ export function useChat(projectId: string) {
           || closeReason.includes('invalid');
 
         if (!reconnectRef.current) {
-          const delay = isAuthClose
-            ? 500
-            : Math.min(30000, Math.pow(2, reconnectAttemptRef.current) * 1000);
-          reconnectAttemptRef.current += 1;
-          reconnectRef.current = setTimeout(() => {
-            reconnectRef.current = null;
-            connectWebSocket();
-          }, delay);
+          const delay = isAuthClose ? 500 : undefined;
+          scheduleReconnect(delay);
         }
       };
 
@@ -358,6 +367,7 @@ export function useChat(projectId: string) {
       console.error('[Chat] connect failed', err);
       setError('Failed to connect to chat server');
       isConnectingRef.current = false;
+      scheduleReconnect();
     }
   }, [projectId, handleMessage, subscribeRoom, roomsHook.rooms]);
 

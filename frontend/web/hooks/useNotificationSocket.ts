@@ -67,6 +67,8 @@ export default function useNotificationSocket({
         if (!refreshedToken) {
           connectingRef.current = false;
           clientRef.current = null;
+          reconnectAttemptRef.current += 1;
+          scheduleReconnect();
           return;
         }
 
@@ -91,7 +93,10 @@ export default function useNotificationSocket({
               if (nextToken) {
                 reconnectAttemptRef.current = 0;
                 scheduleReconnect(500);
+                return;
               }
+              reconnectAttemptRef.current += 1;
+              scheduleReconnect();
               return;
             }
 

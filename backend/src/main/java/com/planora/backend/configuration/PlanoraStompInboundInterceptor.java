@@ -33,6 +33,8 @@ public class PlanoraStompInboundInterceptor implements ChannelInterceptor {
     private static final Pattern PROJECT_TOPIC_PATTERN = Pattern.compile("^/topic/project/(\\d+)(?:/.*)?$");
     private static final Pattern PROJECTS_TOPIC_PATTERN = Pattern.compile("^/topic/projects/(\\d+)(?:/.*)?$");
     private static final Pattern USER_PROJECT_QUEUE_PATTERN = Pattern.compile("^/user/queue/project/(\\d+)(?:/.*)?$");
+        private static final Pattern USER_NOTIFICATION_DESTINATION_PATTERN =
+            Pattern.compile("^/user/([^/]+)/queue/notifications(?:-badge)?$");
 
     private final JWTService jwtService;
     private final UserCacheService userCacheService;
@@ -101,14 +103,15 @@ public class PlanoraStompInboundInterceptor implements ChannelInterceptor {
             return;
         }
 
+        Principal principal = requireAuthenticatedPrincipal(accessor);
+
+        if (isNotificationDestination(destination)) {
+            authorizeNotificationDestination(destination, principal.getName());
+        }
+
         Long projectId = extractProjectId(destination);
         if (projectId == null) {
             return;
-        }
-
-        Principal principal = accessor.getUser();
-        if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
-            throw new AccessDeniedException("Unauthenticated WebSocket subscription");
         }
 
         User user = userCacheService.resolveUserByEmailOrUsername(principal.getName());
@@ -121,6 +124,35 @@ public class PlanoraStompInboundInterceptor implements ChannelInterceptor {
             log.warn("[WebSocket] Blocked unauthorized subscription. user={} destination={}",
                     principal.getName(), destination);
             throw new AccessDeniedException("Forbidden project subscription");
+        }
+    }
+
+    private Principal requireAuthenticatedPrincipal(StompHeaderAccessor accessor) {
+        Principal principal = accessor.getUser();
+        if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
+            throw new AccessDeniedException("Unauthenticated WebSocket subscription");
+        }
+        return principal;
+    }
+
+    private boolean isNotificationDestination(String destination) {
+        return "/user/queue/notifications".equals(destination)
+                || "/user/queue/notifications-badge".equals(destination)
+                || USER_NOTIFICATION_DESTINATION_PATTERN.matcher(destination).matches();
+    }
+
+    private void authorizeNotificationDestination(String destination, String principalName) {
+        Matcher matcher = USER_NOTIFICATION_DESTINATION_PATTERN.matcher(destination);
+        if (!matcher.matches()) {
+            return;
+        }
+
+        String requestedUser = matcher.group(1).trim().toLowerCase();
+        String authenticatedUser = principalName.trim().toLowerCase();
+        if (!requestedUser.equals(authenticatedUser)) {
+            log.warn("[WebSocket] Blocked notification subscription mismatch. principal={} destination={}",
+                    principalName, destination);
+            throw new AccessDeniedException("Forbidden notification subscription");
         }
     }
 

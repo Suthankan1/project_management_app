@@ -109,4 +109,40 @@ class PlanoraStompInboundInterceptorTest {
 
         assertDoesNotThrow(() -> interceptor.preSend(message, messageChannel));
     }
+
+    @Test
+    void subscribeRejectsNotificationQueueWithoutPrincipal() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        accessor.setDestination("/user/queue/notifications");
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        AccessDeniedException ex =
+                assertThrows(AccessDeniedException.class, () -> interceptor.preSend(message, messageChannel));
+        assertNotNull(ex.getMessage());
+    }
+
+    @Test
+    void subscribeRejectsNotificationQueueWhenDestinationUserDoesNotMatchPrincipal() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        accessor.setDestination("/user/bob/queue/notifications");
+        accessor.setUser(new StompPrincipal("alice"));
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        AccessDeniedException ex =
+                assertThrows(AccessDeniedException.class, () -> interceptor.preSend(message, messageChannel));
+        assertNotNull(ex.getMessage());
+    }
+
+    @Test
+    void subscribeAllowsNotificationQueueWhenDestinationUserMatchesPrincipal() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        accessor.setDestination("/user/alice/queue/notifications-badge");
+        accessor.setUser(new StompPrincipal("alice"));
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        assertDoesNotThrow(() -> interceptor.preSend(message, messageChannel));
+    }
 }
