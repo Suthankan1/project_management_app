@@ -1813,6 +1813,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
       setIssueError(error instanceof Error ? error.message : 'Failed to load issues');
     }
   }, []);
+
   useEffect(() => {
     if (connection) void loadData(connection);
   }, [connection, loadData]);
@@ -2059,6 +2060,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
           <DisconnectedView key="disconnected" onConnect={handleInitiateConnect} onLogout={() => void handleLogout()} isPostLogout={isPostLogout} />
         )}
       </AnimatePresence>
+
 
         <AnimatePresence>
           {showModal && (
