@@ -10,7 +10,7 @@ import { useChatReactions } from './useChatReactions';
 import { useChatSearch } from './useChatSearch';
 import { useChatThreads } from './useChatThreads';
 import { useChatUnread } from './useChatUnread';
-import { ensureValidToken } from '@/src/auth/storage';
+import { ensureValidToken, refreshAccessToken } from '@/src/auth/storage';
 
 // ── Minimal inline STOMP builder/parser ──────────────────────────────────────
 
@@ -231,7 +231,9 @@ export function useChat(projectId: string) {
 
     const scheduleReconnect = (delayOverride?: number) => {
       if (reconnectRef.current) return;
-      const delay = delayOverride ?? Math.min(30000, Math.pow(2, reconnectAttemptRef.current) * 1000);
+      const baseDelay = Math.min(30000, Math.pow(2, reconnectAttemptRef.current) * 1000);
+      const jitter = delayOverride == null ? Math.floor(Math.random() * 250) : 0;
+      const delay = (delayOverride ?? baseDelay) + jitter;
       reconnectAttemptRef.current += 1;
       reconnectRef.current = setTimeout(() => {
         reconnectRef.current = null;
@@ -308,7 +310,7 @@ export function useChat(projectId: string) {
               || normalizedBody.includes('invalid');
 
             if (isAuthError) {
-              const refreshedToken = await ensureValidToken();
+              const refreshedToken = await refreshAccessToken().catch(() => null);
               if (!refreshedToken) {
                 setError('Your session expired. Please sign in again.');
               }
@@ -345,8 +347,18 @@ export function useChat(projectId: string) {
           || closeReason.includes('invalid');
 
         if (!reconnectRef.current) {
-          const delay = isAuthClose ? 500 : undefined;
-          scheduleReconnect(delay);
+          if (isAuthClose) {
+            refreshAccessToken()
+              .then(() => {
+                reconnectAttemptRef.current = 0;
+                scheduleReconnect(500);
+              })
+              .catch(() => {
+                setError('Your session expired. Please sign in again.');
+              });
+            return;
+          }
+          scheduleReconnect();
         }
       };
 

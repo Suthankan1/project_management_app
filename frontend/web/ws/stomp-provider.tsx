@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { CompatClient, Stomp, IMessage } from '@stomp/stompjs';
-import { AUTH_TOKEN_CHANGED_EVENT, ensureValidToken } from '@/lib/auth';
+import { AUTH_TOKEN_CHANGED_EVENT, ensureValidToken, refreshAccessToken } from '@/lib/auth';
 import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
 
 // ── Types ──
@@ -74,7 +74,8 @@ export function StompProvider({ token, children }: StompProviderProps) {
       if (disposed) return;
       clearReconnectTimer();
       const baseDelay = Math.min(30000, Math.pow(2, reconnectAttemptRef.current) * 1000);
-      const delay = delayOverride ?? baseDelay;
+      const jitter = delayOverride == null ? Math.floor(Math.random() * 250) : 0;
+      const delay = (delayOverride ?? baseDelay) + jitter;
       reconnectTimerRef.current = setTimeout(() => {
         reconnectTimerRef.current = null;
         connectClient();
@@ -125,11 +126,14 @@ export function StompProvider({ token, children }: StompProviderProps) {
             connectingRef.current = false;
 
             if (isAuthError(error)) {
-              const refreshedToken = await ensureValidToken();
+              const refreshedToken = await refreshAccessToken().catch(() => null);
               if (refreshedToken) {
                 reconnectAttemptRef.current = 0;
                 scheduleReconnect(500);
+                return;
               }
+              reconnectAttemptRef.current += 1;
+              scheduleReconnect();
               return;
             }
 

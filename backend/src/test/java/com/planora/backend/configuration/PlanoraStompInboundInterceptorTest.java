@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import static org.mockito.Mockito.when;
@@ -92,6 +94,43 @@ class PlanoraStompInboundInterceptorTest {
         Message<byte[]> message = buildMutableMessage(accessor);
 
         AccessDeniedException ex = assertThrows(AccessDeniedException.class, () -> interceptor.preSend(message, messageChannel));
+        assertNotNull(ex.getMessage());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "/topic/projects/77/github/issues",
+            "/topic/projects/77/github/prs",
+            "/topic/projects/77/github/ci",
+            "/topic/projects/77/github/task-badges"
+    })
+    void subscribeRejectsGithubTopicWhenUserIsNotProjectMember(String destination) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        accessor.setDestination(destination);
+        accessor.setUser(new StompPrincipal("alice"));
+
+        User user = new User();
+        user.setUserId(23L);
+
+        when(userCacheService.resolveUserByEmailOrUsername("alice")).thenReturn(user);
+        when(projectMembershipService.isProjectMember(77L, 23L)).thenReturn(false);
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        AccessDeniedException ex =
+                assertThrows(AccessDeniedException.class, () -> interceptor.preSend(message, messageChannel));
+        assertNotNull(ex.getMessage());
+    }
+
+    @Test
+    void subscribeRejectsGithubTopicWithoutPrincipal() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        accessor.setDestination("/topic/projects/77/github/issues");
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        AccessDeniedException ex =
+                assertThrows(AccessDeniedException.class, () -> interceptor.preSend(message, messageChannel));
         assertNotNull(ex.getMessage());
     }
 
