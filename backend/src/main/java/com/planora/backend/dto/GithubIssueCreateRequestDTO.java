@@ -3,6 +3,7 @@ package com.planora.backend.dto;
 import java.util.List;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 @Data
@@ -19,4 +20,7 @@ public class GithubIssueCreateRequestDTO {
     private List<String> labels;
 
     private List<String> assignees;
+
+    @Positive
+    private Long taskId;
 }

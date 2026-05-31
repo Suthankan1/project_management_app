@@ -10,6 +10,7 @@ import type { GitHubIssue } from '@/services/githubService';
 
 interface CreateIssueFromTaskModalProps {
   open: boolean;
+  taskId?: number;
   taskTitle: string;
   taskDescription?: string;
   taskLabels: string[];
@@ -24,6 +25,7 @@ function normalizeLabel(label: string): string {
 
 export default function CreateIssueFromTaskModal({
   open,
+  taskId,
   taskTitle,
   taskDescription,
   taskLabels,
@@ -88,6 +90,7 @@ export default function CreateIssueFromTaskModal({
         body: body.trim() || undefined,
         labels,
         assignees: [],
+        taskId,
       });
 
       onCreated(data);

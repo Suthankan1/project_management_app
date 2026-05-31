@@ -377,6 +377,8 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
                 <TaskSidebar
                   taskId={taskData.id}
                   projectId={taskData.projectId}
+                  taskTitle={taskData.title}
+                  taskDescription={taskData.description}
                   status={taskData.status}
                   assignee={taskData.assigneeName}
                   reporter={taskData.reporterName}
@@ -435,6 +437,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
             {showGitHubIssueModal && projectGitHubRepo && (
               <CreateIssueFromTaskModal
                 open={showGitHubIssueModal}
+                taskId={taskData.id}
                 taskTitle={taskData.title}
                 taskDescription={taskData.description}
                 taskLabels={taskData.labels?.map((label) => label.name) || []}

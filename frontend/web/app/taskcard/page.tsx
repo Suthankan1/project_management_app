@@ -249,7 +249,10 @@ function TaskPageContent() {
 
           {/* 3. Sidebar Component (Right Side) — full width on mobile, fixed on lg+ */}
           <TaskSidebar 
+              taskId={taskData.id}
               projectId={taskData.projectId}
+              taskTitle={taskData.title}
+              taskDescription={taskData.description}
               status={taskData.status}
               assignee={taskData.assigneeName}
               reporter={taskData.reporterName}
@@ -274,6 +277,7 @@ function TaskPageContent() {
           {showGitHubIssueModal && projectGitHubRepo && (
             <CreateIssueFromTaskModal
               open={showGitHubIssueModal}
+              taskId={taskData.id}
               taskTitle={taskData.title}
               taskDescription={taskData.description}
               taskLabels={taskData.labels?.map((label) => label.name) || []}

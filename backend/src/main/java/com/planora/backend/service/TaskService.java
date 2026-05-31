@@ -12,7 +12,6 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -1092,6 +1091,17 @@ public class TaskService {
         String actorName = actor != null ? actor.getUsername() : "Unknown";
         taskActivityService.logActivity(task.getId(), TaskActivityType.ASSIGNEE_CHANGED,
                 actorName, actorName + " unassigned the task");
+    }
+
+    @Transactional
+    public void linkGithubIssue(Long taskId, Long githubIssueNumber, String githubRepoFullName, Long currentUserId) {
+        Task task = findTaskWithProjectTeam(taskId);
+        requireMinimumRole(task.getProject().getTeam().getId(), currentUserId, TeamRole.MEMBER);
+
+        task.setGithubIssueNumber(githubIssueNumber);
+        task.setGithubRepoFullName(githubRepoFullName);
+        task.setLastModifiedBy(userRepository.findById(currentUserId).orElseThrow());
+        taskRepository.save(task);
     }
 
     //19. BULK UPDATE STATUS
