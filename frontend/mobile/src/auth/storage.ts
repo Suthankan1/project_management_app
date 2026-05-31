@@ -4,6 +4,8 @@ import {
   saveRefreshToken,
   clearTokens,
   getRefreshToken,
+  ensureValidToken,
+  refreshAccessToken,
   setRememberMe,
   getRememberMe,
   getUserIdFromToken
@@ -15,6 +17,8 @@ export {
   saveRefreshToken,
   clearTokens,
   getRefreshToken,
+  ensureValidToken,
+  refreshAccessToken,
   setRememberMe,
   getRememberMe
 };

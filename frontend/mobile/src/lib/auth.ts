@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { DeviceEventEmitter, Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 
@@ -11,6 +11,13 @@ export interface User {
 }
 
 export const AUTH_TOKEN_CHANGED_EVENT = 'planora-auth-token-changed';
+
+export type AuthTokenChangedReason = 'save' | 'refresh' | 'clear';
+
+export interface AuthTokenChangedPayload {
+  token: string | null;
+  reason: AuthTokenChangedReason;
+}
 
 const TOKEN_KEY = 'planora_access_token';
 const REFRESH_TOKEN_KEY = 'planora_refresh_token';
@@ -38,6 +45,15 @@ const store = {
     await SecureStore.deleteItemAsync(key);
   },
 };
+
+function emitAuthTokenChanged(payload: AuthTokenChangedPayload): void {
+  if (Platform.OS === 'web') {
+    globalThis.window?.dispatchEvent(new CustomEvent(AUTH_TOKEN_CHANGED_EVENT, { detail: payload }));
+    return;
+  }
+
+  DeviceEventEmitter.emit(AUTH_TOKEN_CHANGED_EVENT, payload);
+}
 
 export async function setRememberMe(remember: boolean): Promise<void> {
   if (remember) {
@@ -123,6 +139,7 @@ export async function getUserIdFromToken(): Promise<number | null> {
 
 export async function saveToken(token: string): Promise<void> {
   await store.set(TOKEN_KEY, token);
+  emitAuthTokenChanged({ token, reason: 'save' });
 }
 
 export async function saveRefreshToken(token: string): Promise<void> {
@@ -138,6 +155,7 @@ export async function clearTokens(): Promise<void> {
   await store.delete(REFRESH_TOKEN_KEY);
   await store.delete(REMEMBER_KEY);
   await store.delete('planora_user_profile');
+  emitAuthTokenChanged({ token: null, reason: 'clear' });
 }
 
 export async function getValidToken(): Promise<string | null> {
@@ -191,10 +209,11 @@ async function requestRefreshAccessToken(): Promise<string> {
   }
 
   const data = await res.json();
-  await saveToken(data.token);
+  await store.set(TOKEN_KEY, data.token);
   if (data.refreshToken) {
     await saveRefreshToken(data.refreshToken);
   }
+  emitAuthTokenChanged({ token: data.token, reason: 'refresh' });
   return data.token;
 }
 
