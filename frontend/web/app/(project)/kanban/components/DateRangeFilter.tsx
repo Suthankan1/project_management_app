@@ -43,11 +43,11 @@ export default function DateRangeFilter({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`
-          flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors
+          flex items-center gap-2 px-4 py-2 rounded-xl border transition-colors
           ${
             hasActiveFilter
-              ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium'
-              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+              ? 'bg-cu-primary/10 border-cu-primary/30 text-cu-primary font-medium'
+              : 'bg-cu-bg-secondary border-cu-border text-cu-text-secondary hover:bg-cu-hover hover:text-cu-text-primary'
           }
         `}
       >
@@ -61,11 +61,11 @@ export default function DateRangeFilter({
 
       {/* Filter Dropdown */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50 min-w-96">
+        <div className="absolute top-full left-0 mt-2 bg-cu-bg border border-cu-border rounded-xl shadow-cu-xl p-4 z-50 min-w-[min(24rem,calc(100vw-2rem))]">
           <div className="space-y-4">
             {/* Start Date */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-cu-text-primary mb-2">
                 Start Date
               </label>
               <DatePicker
@@ -76,13 +76,13 @@ export default function DateRangeFilter({
                 maxDate={endDate || new Date()}
                 placeholderText="Select start date"
                 wrapperClassName="w-full"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full px-3 py-2 border border-cu-border bg-cu-bg-secondary text-cu-text-primary rounded-lg focus:outline-none focus:border-cu-primary focus:ring-2 focus:ring-cu-primary/30"
               />
             </div>
 
             {/* End Date */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-cu-text-primary mb-2">
                 End Date
               </label>
               <DatePicker
@@ -93,7 +93,7 @@ export default function DateRangeFilter({
                 maxDate={new Date()}
                 placeholderText="Select end date"
                 wrapperClassName="w-full"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full px-3 py-2 border border-cu-border bg-cu-bg-secondary text-cu-text-primary rounded-lg focus:outline-none focus:border-cu-primary focus:ring-2 focus:ring-cu-primary/30"
               />
             </div>
 
@@ -101,13 +101,13 @@ export default function DateRangeFilter({
             <div className="flex gap-2 pt-2">
               <button
                 onClick={handleApply}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                className="flex-1 px-4 py-2 bg-cu-primary text-white rounded-lg font-medium hover:bg-cu-primary-hover transition-colors"
               >
                 Apply Filter
               </button>
               <button
                 onClick={handleReset}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2 border border-cu-border text-cu-text-secondary rounded-lg font-medium hover:bg-cu-hover transition-colors"
               >
                 Reset
               </button>
@@ -116,7 +116,7 @@ export default function DateRangeFilter({
             {/* Close button */}
             <button
               onClick={() => setIsOpen(false)}
-              className="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600"
+              className="absolute top-2 right-2 p-1 text-cu-text-muted hover:text-cu-text-secondary"
             >
               <X size={18} />
             </button>

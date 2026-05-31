@@ -16,7 +16,7 @@ export function useGithubPRSocket(
   onUpdate: (update: GithubPRUpdate) => void,
   onError?: (message: string) => void,
 ): void {
-  const { connected, subscribe } = useStomp();
+  const { connected, subscribe, reconnectCount } = useStomp();
   const onUpdateRef = useRef(onUpdate);
   const onErrorRef = useRef(onError);
 
@@ -49,5 +49,5 @@ export function useGithubPRSocket(
     return () => {
       subscription?.unsubscribe();
     };
-  }, [connected, projectId, subscribe]);
+  }, [connected, projectId, reconnectCount, subscribe]);
 }

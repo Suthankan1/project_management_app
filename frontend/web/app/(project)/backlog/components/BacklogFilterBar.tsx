@@ -64,7 +64,7 @@ export default function BacklogFilterBar({
     const activeCount = (filterPriority.length > 0 ? 1 : 0) + (filterStatus.length > 0 ? 1 : 0) + (filterAssignee ? 1 : 0) + (filterLabel !== null ? 1 : 0) + (filterDateRange.startDate || filterDateRange.endDate ? 1 : 0);
 
     return (
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 rounded-2xl border border-cu-border bg-cu-bg p-3 sm:p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 rounded-2xl border border-cu-border bg-cu-bg/95 p-3 sm:p-4 shadow-cu-sm">
             {/* Search - always visible */}
             <div className="relative flex-1 min-w-[220px]">
                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-cu-text-muted" />
@@ -73,7 +73,7 @@ export default function BacklogFilterBar({
                     placeholder="Search tasks..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full pl-8 pr-3 h-10 text-[13px] border border-cu-border rounded-xl focus:outline-none focus:ring-2 focus:ring-cu-primary/40 bg-cu-bg text-cu-text-primary placeholder:text-cu-text-muted"
+                    className="w-full pl-8 pr-3 h-10 text-[13px] border border-cu-border rounded-xl focus:outline-none focus:border-cu-primary focus:ring-2 focus:ring-cu-primary/30 bg-cu-bg-secondary text-cu-text-primary placeholder:text-cu-text-muted"
                 />
                 {searchTerm && (
                     <button onClick={() => setSearchTerm('')} className="absolute right-2 top-1/2 -translate-y-1/2">
@@ -89,20 +89,20 @@ export default function BacklogFilterBar({
                     className={`flex items-center gap-1.5 px-3 h-10 text-[12px] border rounded-xl transition-colors ${
                         filterOpen || hasActiveFilters
                             ? 'bg-cu-primary/10 border-cu-primary text-cu-primary'
-                            : 'bg-cu-bg border-cu-border text-cu-text-primary hover:border-cu-primary'
+                            : 'bg-cu-bg-secondary border-cu-border text-cu-text-primary hover:border-cu-primary/70 hover:bg-cu-hover'
                     }`}
                 >
                     <Filter size={13} />
                     <span className="hidden sm:inline">Filters</span>
                     {activeCount > 0 && (
-                        <span className="bg-[#155DFC] text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                        <span className="bg-cu-primary text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
                             {activeCount}
                         </span>
                     )}
                 </button>
 
                 {filterOpen && (
-                    <div className="absolute right-0 top-full mt-2 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-xl p-4 min-w-[300px] sm:min-w-[360px] space-y-3">
+                    <div className="absolute right-0 top-full mt-2 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-cu-xl p-4 min-w-[300px] sm:min-w-[360px] space-y-3">
                         <div className="flex items-center justify-between">
                             <span className="text-[13px] font-semibold text-cu-text-primary">Filters</span>
                             {hasActiveFilters && (
@@ -128,7 +128,7 @@ export default function BacklogFilterBar({
                                         className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
                                             filterPriority.includes(p)
                                                 ? 'bg-cu-primary text-white border-cu-primary'
-                                                : 'bg-cu-bg text-cu-text-secondary border-cu-border hover:border-cu-primary'
+                                                : 'bg-cu-bg-secondary text-cu-text-secondary border-cu-border hover:border-cu-primary/70 hover:bg-cu-hover'
                                         }`}
                                     >{p}</button>
                                 ))}
@@ -142,13 +142,13 @@ export default function BacklogFilterBar({
                                 <button
                                     type="button"
                                     onClick={() => setStatusFilterOpen(o => !o)}
-                                    className="flex items-center justify-between w-full gap-1.5 px-2.5 py-1.5 text-[12px] border border-cu-border rounded-lg bg-cu-bg text-cu-text-primary hover:bg-cu-hover transition-colors"
+                                    className="flex items-center justify-between w-full gap-1.5 px-2.5 py-1.5 text-[12px] border border-cu-border rounded-lg bg-cu-bg-secondary text-cu-text-primary hover:bg-cu-hover transition-colors"
                                 >
                                     <span>{filterStatus[0] ? filterStatus[0].replace(/_/g, ' ') : 'All Status'}</span>
                                     <ChevronDown size={12} className="text-cu-text-muted" />
                                 </button>
                                 {statusFilterOpen && (
-                                    <div className="absolute top-full left-0 mt-1 bg-cu-bg border border-cu-border rounded-xl shadow-lg z-50 min-w-full py-1">
+                                    <div className="absolute top-full left-0 mt-1 bg-cu-bg border border-cu-border rounded-xl shadow-cu-lg z-50 min-w-full py-1">
                                         <button
                                             type="button"
                                             onClick={() => { setFilterStatus([]); setStatusFilterOpen(false); }}
@@ -175,7 +175,7 @@ export default function BacklogFilterBar({
                                     <button
                                         type="button"
                                         onClick={() => setAssigneeFilterOpen(o => !o)}
-                                        className="flex items-center justify-between w-full gap-1.5 px-2.5 py-1.5 text-[12px] border border-cu-border rounded-lg bg-cu-bg text-cu-text-primary hover:bg-cu-hover transition-colors"
+                                        className="flex items-center justify-between w-full gap-1.5 px-2.5 py-1.5 text-[12px] border border-cu-border rounded-lg bg-cu-bg-secondary text-cu-text-primary hover:bg-cu-hover transition-colors"
                                     >
                                         <span className="flex items-center gap-1.5">
                                             <User size={12} className="text-cu-text-muted" />
@@ -184,7 +184,7 @@ export default function BacklogFilterBar({
                                         <ChevronDown size={12} className="text-cu-text-muted" />
                                     </button>
                                     {assigneeFilterOpen && (
-                                        <div className="absolute top-full left-0 mt-1 bg-cu-bg border border-cu-border rounded-xl shadow-lg z-50 min-w-full max-h-48 overflow-y-auto py-1">
+                                        <div className="absolute top-full left-0 mt-1 bg-cu-bg border border-cu-border rounded-xl shadow-cu-lg z-50 min-w-full max-h-48 overflow-y-auto py-1">
                                             <button
                                                 type="button"
                                                 onClick={() => { setFilterAssignee(''); setAssigneeFilterOpen(false); }}
@@ -212,7 +212,7 @@ export default function BacklogFilterBar({
                                     <button
                                         type="button"
                                         onClick={() => setLabelFilterOpen(o => !o)}
-                                        className="flex items-center justify-between w-full gap-1.5 px-2.5 py-1.5 text-[12px] border border-cu-border rounded-lg bg-cu-bg text-cu-text-primary hover:bg-cu-hover transition-colors"
+                                        className="flex items-center justify-between w-full gap-1.5 px-2.5 py-1.5 text-[12px] border border-cu-border rounded-lg bg-cu-bg-secondary text-cu-text-primary hover:bg-cu-hover transition-colors"
                                     >
                                         <span className="flex items-center gap-1.5">
                                             <Tag size={12} className="text-cu-text-muted" />
@@ -221,7 +221,7 @@ export default function BacklogFilterBar({
                                         <ChevronDown size={12} className="text-cu-text-muted" />
                                     </button>
                                     {labelFilterOpen && (
-                                        <div className="absolute top-full left-0 mt-1 bg-cu-bg border border-cu-border rounded-xl shadow-lg z-50 min-w-full max-h-48 overflow-y-auto py-1">
+                                        <div className="absolute top-full left-0 mt-1 bg-cu-bg border border-cu-border rounded-xl shadow-cu-lg z-50 min-w-full max-h-48 overflow-y-auto py-1">
                                             <button
                                                 type="button"
                                                 onClick={() => { setFilterLabel(null); setLabelFilterOpen(false); }}
@@ -253,7 +253,7 @@ export default function BacklogFilterBar({
             {/* Group by - always visible */}
             <button
                 onClick={() => setGroupBy(g => g === 'none' ? 'status' : g === 'status' ? 'priority' : g === 'priority' ? 'assignee' : 'none')}
-                className="flex items-center gap-1.5 px-3 h-10 text-[12px] border border-cu-border rounded-xl bg-cu-bg text-cu-text-primary hover:border-cu-primary transition-colors"
+                className="flex items-center gap-1.5 px-3 h-10 text-[12px] border border-cu-border rounded-xl bg-cu-bg-secondary text-cu-text-primary hover:border-cu-primary/70 hover:bg-cu-hover transition-colors"
                 title="Toggle group by"
             >
                 <Layers size={13} />
@@ -262,10 +262,10 @@ export default function BacklogFilterBar({
 
             <button
                 onClick={() => setShowArchived(v => !v)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                className={`flex items-center gap-1.5 px-3 h-10 text-[12px] rounded-xl border transition-colors ${
                     showArchived
                         ? 'bg-amber-400/10 border-amber-400/30 text-amber-500'
-                        : 'border-cu-border text-cu-text-secondary hover:border-cu-border'
+                        : 'bg-cu-bg-secondary border-cu-border text-cu-text-secondary hover:bg-cu-hover hover:border-cu-primary/50 hover:text-cu-text-primary'
                 }`}
             >
                 <Archive className="w-3.5 h-3.5" />

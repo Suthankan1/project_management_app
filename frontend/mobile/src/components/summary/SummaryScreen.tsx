@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useProjectSummary } from '../../hooks/useProjectSummary';
+import OfflineStaleBanner from '../ui/OfflineStaleBanner';
 import { DonutPriorityChart } from './charts/DonutPriorityChart';
 import { BurndownLineChart } from './charts/BurndownLineChart';
 import { VelocityBarChart } from './charts/VelocityBarChart';
@@ -363,7 +364,7 @@ export default function SummaryScreen({
   topOffset?: number;
 }) {
   const router = useRouter();
-  const { data, milestones, loading, error, refresh } = useProjectSummary(projectId);
+  const { data, milestones, loading, error, refresh, isOnline, isStale } = useProjectSummary(projectId);
   // Defer SVG chart rendering until the navigation slide animation is done
   const [chartsReady, setChartsReady] = useState(false);
   useEffect(() => {
@@ -404,6 +405,7 @@ export default function SummaryScreen({
     <SpinProvider>
       <SafeAreaView style={s.safe} edges={hideHeader ? [] : ['top', 'left', 'right']}>
         <StatusBar style="dark" />
+        <OfflineStaleBanner isOnline={isOnline} isStale={isStale} />
 
         {/* Built-in Header — hidden when ProjectTopNav is the host */}
         {!hideHeader && (

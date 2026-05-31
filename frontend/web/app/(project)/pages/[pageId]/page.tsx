@@ -86,7 +86,7 @@ export default function PageDetailPage() {
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full text-xl font-bold text-gray-900 bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-200 rounded px-1 truncate"
+                    className="w-full text-xl font-bold text-gray-900 bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-200 dark:focus:ring-cu-primary/30 rounded px-1 truncate"
                     placeholder="Document Title..."
                     title="Click to rename"
                   />
@@ -118,12 +118,12 @@ export default function PageDetailPage() {
                         </span>
                       )}
                       {saveStatus === 'saved' && (
-                        <span className="flex items-center gap-1 text-green-600 text-xs">
+                        <span className="flex items-center gap-1 text-green-600 dark:text-cu-success text-xs">
                           <CheckCircle2 size={12} /> Saved
                         </span>
                       )}
                       {saveStatus === 'error' && (
-                        <span className="text-red-500 text-xs">Save failed</span>
+                        <span className="text-red-500 dark:text-cu-danger text-xs">Save failed</span>
                       )}
                     </span>
                   )}
@@ -157,7 +157,7 @@ export default function PageDetailPage() {
                     onClick={() => setShowHistory(!showHistory)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                       showHistory
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                        ? 'bg-blue-100 dark:bg-cu-primary-light text-blue-700 dark:text-cu-primary border border-blue-200 dark:border-cu-primary/30'
                         : 'text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100'
                     }`}
                     title="Version History"
@@ -169,7 +169,7 @@ export default function PageDetailPage() {
                 <div className="h-5 w-px bg-gray-200 mx-1" />
                 <button
                   onClick={handleDeletePage}
-                  className="p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
+                  className="p-1.5 text-red-400 dark:text-cu-danger/70 hover:bg-red-50 dark:hover:bg-cu-danger-light hover:text-red-600 dark:hover:text-cu-danger rounded-lg transition-colors"
                   title={isDraft ? 'Discard Draft' : 'Delete Document'}
                 >
                   <Trash2 size={16} />
@@ -192,7 +192,7 @@ export default function PageDetailPage() {
                 {showMobileActions && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowMobileActions(false)} />
-                    <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1 overflow-hidden">
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)] z-20 py-1 overflow-hidden">
                       <button
                         onClick={() => { fileInputRef.current?.click(); setShowMobileActions(false); }}
                         className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
@@ -216,7 +216,7 @@ export default function PageDetailPage() {
                       <div className="h-px bg-gray-100 my-1" />
                       <button
                         onClick={() => { handleDeletePage(); setShowMobileActions(false); }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 dark:text-cu-danger hover:bg-red-50 dark:hover:bg-cu-danger-light transition-colors"
                       >
                         <Trash2 size={16} /> {isDraft ? 'Discard Draft' : 'Delete Document'}
                       </button>
@@ -238,10 +238,10 @@ export default function PageDetailPage() {
 
               {/* Version History Drawer */}
               {showHistory && (
-                <div className="absolute right-0 top-0 w-[300px] h-full border-l border-gray-200 bg-gray-50 flex flex-col z-20 shadow-[-4px_0_15px_rgba(0,0,0,0.04)]">
+                <div className="absolute right-0 top-0 w-[300px] h-full border-l border-gray-200 bg-gray-50 flex flex-col z-20 shadow-[-4px_0_15px_rgba(0,0,0,0.06)] dark:shadow-[-4px_0_15px_rgba(0,0,0,0.4)]">
                   <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-white">
                     <h3 className="font-semibold text-gray-800 flex items-center gap-2 text-sm">
-                      <History size={16} className="text-blue-500" /> Version History
+                      <History size={16} className="text-blue-500 dark:text-cu-primary" /> Version History
                     </h3>
                     <button onClick={() => setShowHistory(false)} className="text-gray-400 hover:text-gray-700 p-1 rounded">
                       <X size={16} />
@@ -251,7 +251,7 @@ export default function PageDetailPage() {
                     <div className="space-y-5">
                       {historyMock.map((history) => (
                         <div key={history.id} className="relative pl-5 border-l-2 border-gray-200 py-0.5">
-                          <div className="absolute -left-[7px] top-1.5 h-3 w-3 rounded-full bg-white border-2 border-blue-500" />
+                          <div className="absolute -left-[7px] top-1.5 h-3 w-3 rounded-full bg-white dark:bg-cu-bg border-2 border-blue-500 dark:border-cu-primary" />
                           <p className="text-sm font-medium text-gray-900 mb-0.5 flex items-center gap-1.5 flex-wrap">
                             {history.editedBy}
                             <span className="text-xs font-normal px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">
@@ -282,8 +282,8 @@ export default function PageDetailPage() {
       </div>
 
       {error && (
-        <div className="fixed bottom-4 right-4 p-4 bg-red-50 border border-red-200 rounded-lg shadow-md z-50">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="fixed bottom-4 right-4 p-4 bg-red-50 dark:bg-cu-danger-light border border-red-200 dark:border-cu-danger/30 rounded-lg shadow-md z-50">
+          <p className="text-sm text-red-600 dark:text-cu-danger">{error}</p>
         </div>
       )}
 
@@ -292,8 +292,8 @@ export default function PageDetailPage() {
           <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowDeleteConfirm(false)} />
           <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[340px] bg-white rounded-2xl shadow-xl p-6 flex flex-col gap-4">
             <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-9 h-9 rounded-full bg-red-100 flex items-center justify-center">
-                <Trash2 size={18} className="text-red-600" />
+              <div className="flex-shrink-0 w-9 h-9 rounded-full bg-red-100 dark:bg-cu-danger-light flex items-center justify-center">
+                <Trash2 size={18} className="text-red-600 dark:text-cu-danger" />
               </div>
               <div>
                 <p className="font-semibold text-gray-900 text-sm">Delete document?</p>

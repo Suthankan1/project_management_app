@@ -902,7 +902,8 @@ function IssueFilterDropdown({
       </div>
     </Popover>
   );
-}function IssuesPanel({
+}
+function IssuesPanel({
   projectId,
   repoFullName,
   issues,
@@ -973,13 +974,15 @@ function IssueFilterDropdown({
           {!loading && !error && (
             <span className="text-sm text-slate-400 font-outfit">
               ({filtersActive ? `${filteredIssues.length} of ` : ''}{issues.length})
-            </span>          )}
+            </span>
+          )}
         </div>
         <button
           type="button"
           onClick={onRefresh}
           disabled={loading}
-          className="inline-flex items-center justify-center self-start rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:opacity-40 sm:self-auto"          title="Refresh issues"
+          className="inline-flex items-center justify-center self-start rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:opacity-40 sm:self-auto"
+          title="Refresh issues"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
@@ -1039,7 +1042,8 @@ function IssueFilterDropdown({
               </button>
             ) : null}
           </div>
-        </div>      </div>
+        </div>
+      </div>
 
       {loading && <SkeletonList />}
 
@@ -1308,7 +1312,8 @@ function ConnectedDashboard({
             {connection.repoFullName}
           </span>
           <span className={`flex items-center gap-1 text-[10px] font-outfit px-1.5 py-0.5 rounded-full ${connection.private ? 'bg-slate-700 text-slate-300' : 'bg-blue-500/20 text-blue-300'
-            }`}>            {connection.private ? <Lock size={8} /> : <Globe size={8} />}
+            }`}>
+            {connection.private ? <Lock size={8} /> : <Globe size={8} />}
             {connection.private ? 'Private' : 'Public'}
           </span>
           <span className="hidden sm:flex items-center gap-1 text-[10px] font-outfit text-slate-600">
@@ -1522,7 +1527,8 @@ function ConnectedDashboard({
         ))}
       </AnimatePresence>
 
-      <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">        {([
+      <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+        {([
           { id: 'pullRequests', label: 'Pull Requests', short: 'PRs', icon: <GitPullRequest size={13} /> },
           { id: 'commits', label: 'Commits', short: 'Commits', icon: <GitCommit size={13} /> },
           {
@@ -1550,7 +1556,8 @@ function ConnectedDashboard({
                 </span>
               )}
             </span>
-          </button>        ))}
+          </button>
+        ))}
       </div>
 
       {/* ── Content grid ─────────────────────────────────────────────────── */}
@@ -1564,13 +1571,15 @@ function ConnectedDashboard({
               <h2 className="text-sm font-outfit font-bold text-slate-700">
                 Pull Requests
                 {!loading && !prError && (
-                  <span className="ml-1.5 text-slate-400 font-normal">({prs.length})</span>                )}
+                  <span className="ml-1.5 text-slate-400 font-normal">({prs.length})</span>
+                )}
               </h2>
               <a
                 href={`https://github.com/${connection.repoFullName}/pulls`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline shrink-0"              >
+                className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline shrink-0"
+              >
                 GitHub <ExternalLink size={10} />
               </a>
             </div>
@@ -1583,13 +1592,15 @@ function ConnectedDashboard({
                   <AlertCircle size={16} className="text-red-500" />
                 </div>
                 <p className="text-xs text-slate-500 font-outfit">{prError}</p>
-                <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>              </div>
+                <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
+              </div>
             )}
 
             {!loading && !prError && prs.length === 0 && (
               <div className="flex flex-col items-center gap-2 py-10">
                 <GitPullRequest size={20} className="text-slate-300" />
-                <p className="text-xs text-slate-400 font-outfit">No pull requests found</p>              </div>
+                <p className="text-xs text-slate-400 font-outfit">No pull requests found</p>
+              </div>
             )}
 
             {!loading && !prError && prs.length > 0 && (() => {
@@ -1622,13 +1633,15 @@ function ConnectedDashboard({
               <h2 className="text-sm font-outfit font-bold text-slate-700">
                 Commits
                 {!loading && !commitError && (
-                  <span className="ml-1.5 text-slate-400 font-normal">({commits.length})</span>                )}
+                  <span className="ml-1.5 text-slate-400 font-normal">({commits.length})</span>
+                )}
               </h2>
               <a
                 href={`https://github.com/${connection.repoFullName}/commits`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline shrink-0"              >
+                className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline shrink-0"
+              >
                 GitHub <ExternalLink size={10} />
               </a>
             </div>
@@ -1641,13 +1654,15 @@ function ConnectedDashboard({
                   <AlertCircle size={16} className="text-red-500" />
                 </div>
                 <p className="text-xs text-slate-500 font-outfit">{commitError}</p>
-                <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>              </div>
+                <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
+              </div>
             )}
 
             {!loading && !commitError && commits.length === 0 && (
               <div className="flex flex-col items-center gap-2 py-10">
                 <GitCommit size={20} className="text-slate-300" />
-                <p className="text-xs text-slate-400 font-outfit">No commits found</p>              </div>
+                <p className="text-xs text-slate-400 font-outfit">No commits found</p>
+              </div>
             )}
 
             {!loading && !commitError && commits.length > 0 && (() => {
@@ -2045,6 +2060,8 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
           <DisconnectedView key="disconnected" onConnect={handleInitiateConnect} onLogout={() => void handleLogout()} isPostLogout={isPostLogout} />
         )}
       </AnimatePresence>
+
+
         <AnimatePresence>
           {showModal && (
             <RepoModal
@@ -2079,6 +2096,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
             onClose={() => setShowAccountPicker(false)}
           />
         )}
-      </AnimatePresence>    </div>
+      </AnimatePresence>
+    </div>
   );
 }

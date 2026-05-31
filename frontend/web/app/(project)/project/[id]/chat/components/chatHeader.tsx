@@ -30,21 +30,21 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   const headerIcon = selectedRoom
     ? (
-      <div className={`w-8 h-8 rounded-full flex-shrink-0 bg-gradient-to-br ${avatarColor(selectedRoom?.name || 'G')} flex items-center justify-center text-white text-[13px] font-bold shadow-sm ring-2 ring-white`}>
+      <div className={`w-8 h-8 rounded-full flex-shrink-0 bg-gradient-to-br ${avatarColor(selectedRoom?.name || 'G')} flex items-center justify-center text-white text-[13px] font-bold shadow-cu-sm ring-2 ring-cu-bg`}>
         {(selectedRoom?.name || 'G').charAt(0).toUpperCase()}
       </div>
     )
     : selectedUser && userProfilePics[selectedUser]
       // eslint-disable-next-line @next/next/no-img-element
-      ? <img src={userProfilePics[selectedUser]} alt={selectedUser} className="w-8 h-8 rounded-full flex-shrink-0 object-cover shadow-sm ring-2 ring-white" />
+      ? <img src={userProfilePics[selectedUser]} alt={selectedUser} className="w-8 h-8 rounded-full flex-shrink-0 object-cover shadow-cu-sm ring-2 ring-cu-bg" />
       : selectedUser
         ? (
-          <div className={`w-8 h-8 rounded-full flex-shrink-0 bg-gradient-to-br ${avatarColor(selectedUser)} flex items-center justify-center text-white text-[13px] font-bold shadow-sm ring-2 ring-white`}>
+          <div className={`w-8 h-8 rounded-full flex-shrink-0 bg-gradient-to-br ${avatarColor(selectedUser)} flex items-center justify-center text-white text-[13px] font-bold shadow-cu-sm ring-2 ring-cu-bg`}>
             {(selectedUser || '?').charAt(0).toUpperCase()}
           </div>
         )
         : (
-          <div className="w-8 h-8 rounded-full flex-shrink-0 bg-blue-100 flex items-center justify-center text-blue-600 shadow-sm ring-2 ring-white">
+          <div className="w-8 h-8 rounded-full flex-shrink-0 bg-cu-primary/10 flex items-center justify-center text-cu-primary shadow-cu-sm ring-2 ring-cu-bg">
             <Users size={16} strokeWidth={2.5} />
           </div>
         );
@@ -62,33 +62,33 @@ export function ChatHeader({
         : 'Team workspace';
 
   return (
-    <div className="h-12 sm:h-14 md:h-16 px-2.5 sm:px-5 flex items-center justify-between border-b border-gray-100 flex-shrink-0 sticky top-0 z-30 bg-white/95 supports-[backdrop-filter]:backdrop-blur backdrop-blur">
+    <div className="sticky top-0 z-30 flex h-12 flex-shrink-0 items-center justify-between border-b border-cu-border bg-cu-bg/95 px-2.5 backdrop-blur supports-[backdrop-filter]:backdrop-blur sm:h-14 sm:px-5 md:h-16">
       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
         <button
-          className="lg:hidden h-11 w-11 -ml-1 rounded-full hover:bg-gray-100 text-gray-600 flex items-center justify-center flex-shrink-0"
+          className="-ml-1 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-cu-text-secondary transition-colors hover:bg-cu-hover hover:text-cu-text-primary lg:hidden"
           onClick={onShowSidebar}
           aria-label="Back to conversations"
         >
           <ArrowLeft size={18} />
         </button>
-        <div className="w-9 h-9 sm:w-9 sm:h-9 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+        <div className="w-9 h-9 sm:w-9 sm:h-9 rounded-xl bg-cu-primary/10 flex items-center justify-center flex-shrink-0">
           {headerIcon}
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-[14px] sm:text-[15px] font-semibold text-gray-900 truncate">{headerTitle}</h2>
+            <h2 className="truncate text-[14px] font-semibold text-cu-text-primary sm:text-[15px]">{headerTitle}</h2>
             <span
               className={`w-2 h-2 rounded-full flex-shrink-0 transition-colors ${isConnected ? 'bg-emerald-400' : 'bg-amber-400'}`}
               title={isConnected ? 'Connected' : 'Disconnected'}
             />
           </div>
-          <p className="text-[11px] sm:text-[12px] text-gray-400 truncate">{headerSub}</p>
+          <p className="truncate text-[11px] text-cu-text-muted sm:text-[12px]">{headerSub}</p>
         </div>
       </div>
 
       <div className="flex items-center gap-1 flex-shrink-0">
         {onlineUsers.length > 0 && (
-          <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-[11.5px] font-semibold rounded-xl px-3 py-1.5 border border-emerald-100">
+          <div className="hidden items-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-[11.5px] font-semibold text-emerald-500 sm:flex">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             {onlineUsers.length} online
           </div>
@@ -97,7 +97,7 @@ export function ChatHeader({
         {phaseDEnabled && (
           <button
             onClick={onToggleSearch}
-            className="w-11 h-11 sm:w-10 sm:h-10 md:w-9 md:h-9 rounded-xl hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-cu-text-muted transition-colors hover:bg-cu-hover hover:text-cu-text-primary sm:h-10 sm:w-10 md:h-9 md:w-9"
             title="Search messages"
             aria-label="Toggle message search"
           >

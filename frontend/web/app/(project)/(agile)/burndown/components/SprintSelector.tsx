@@ -29,9 +29,9 @@ interface SprintSelectorProps {
 // ─── Status helpers ──────────────────────────────────────────────────────────
 
 const STATUS_STYLE: Record<Sprint['status'], string> = {
-  NOT_STARTED: 'bg-[#F2F4F7] text-[#344054]',
-  ACTIVE:      'bg-[#ECFDF3] text-[#027A48]',
-  COMPLETED:   'bg-[#EFF8FF] text-[#175CD3]',
+  NOT_STARTED: 'bg-cu-bg-tertiary text-cu-text-secondary',
+  ACTIVE:      'bg-emerald-500/10 text-emerald-500',
+  COMPLETED:   'bg-cu-primary/10 text-cu-primary',
 };
 const STATUS_LABEL: Record<Sprint['status'], string> = {
   NOT_STARTED: 'Not Started',
@@ -63,7 +63,7 @@ export default function SprintSelector({
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={onToggleDropdown}
-          className="flex items-center gap-2 rounded-lg border border-[#D0D5DD] bg-white px-4 py-2 text-[14px] font-medium text-[#344054] shadow-sm hover:border-[#98A2B3] transition-colors"
+          className="flex items-center gap-2 rounded-lg border border-cu-border bg-cu-bg px-4 py-2 text-[14px] font-medium text-cu-text-primary shadow-cu-sm transition-colors hover:border-cu-primary/40 hover:bg-cu-hover"
         >
           <span>
             {selectedSprint ? selectedSprint.name : 'Select Sprint'}
@@ -73,16 +73,16 @@ export default function SprintSelector({
               {STATUS_LABEL[selectedSprint.status]}
             </span>
           )}
-          <ChevronDown size={16} className="text-[#98A2B3]" />
+          <ChevronDown size={16} className="text-cu-text-muted" />
         </button>
 
         {sprintDropOpen && (
-          <div className="absolute left-0 top-11 z-50 min-w-[220px] rounded-xl border border-[#E4E7EC] bg-white shadow-xl overflow-hidden">
+          <div className="absolute left-0 top-11 z-50 min-w-[220px] overflow-hidden rounded-xl border border-cu-border bg-cu-bg shadow-cu-xl">
             {sprints.map((s) => (
               <button
                 key={s.id}
                 onClick={() => onSelectSprint(s)}
-                className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[13px] hover:bg-[#F9FAFB] transition-colors ${s.id === selectedSprintId ? 'bg-[#EFF8FF] font-semibold text-[#175CD3]' : 'text-[#344054]'}`}
+                className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[13px] transition-colors hover:bg-cu-hover ${s.id === selectedSprintId ? 'bg-cu-primary/10 font-semibold text-cu-primary' : 'text-cu-text-primary'}`}
               >
                 <span>{s.name}</span>
                 <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[s.status]}`}>
@@ -95,21 +95,21 @@ export default function SprintSelector({
       </div>
 
       {/* Date range filter */}
-      <div className="flex items-center gap-2 rounded-lg border border-[#D0D5DD] bg-white px-3 py-2 shadow-sm">
+      <div className="flex items-center gap-2 rounded-lg border border-cu-border bg-cu-bg px-3 py-2 shadow-cu-sm">
         <input
           type="date"
           value={filterFrom}
           max={filterTo || undefined}
           onChange={(e) => onFilterFromChange(e.target.value)}
-          className="border-none bg-transparent text-[13px] text-[#344054] outline-none"
+          className="border-none bg-transparent text-[13px] text-cu-text-primary outline-none"
         />
-        <span className="text-[#98A2B3] text-[12px]">→</span>
+        <span className="text-[12px] text-cu-text-muted">-</span>
         <input
           type="date"
           value={filterTo}
           min={filterFrom || undefined}
           onChange={(e) => onFilterToChange(e.target.value)}
-          className="border-none bg-transparent text-[13px] text-[#344054] outline-none"
+          className="border-none bg-transparent text-[13px] text-cu-text-primary outline-none"
         />
       </div>
     </div>

@@ -39,10 +39,10 @@ export default function CompleteSprintModal({
   const hasIncomplete = incompleteCount > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-[#EAECF0] p-6 max-w-md w-full">
-        <h3 className="text-lg font-bold text-[#101828] mb-1">Complete Sprint</h3>
-        <p className="text-sm text-[#667085] mb-4">Select the sprint to complete</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-cu-border bg-cu-bg p-6 shadow-cu-xl">
+        <h3 className="mb-1 text-lg font-bold text-cu-text-primary">Complete Sprint</h3>
+        <p className="mb-4 text-sm text-cu-text-secondary">Select the sprint to complete</p>
 
         {/* Sprint selector — only shown when multiple active sprints */}
         {allActiveSprints.length > 1 && (
@@ -53,8 +53,8 @@ export default function CompleteSprintModal({
                 onClick={() => onSelectSprint(s.id)}
                 className={`w-full text-left p-3 rounded-xl border text-sm font-medium transition-colors ${
                   sprintIdToComplete === s.id
-                    ? 'border-[#155DFC] bg-blue-50 text-[#155DFC]'
-                    : 'border-[#EAECF0] text-[#344054] hover:bg-gray-50'
+                    ? 'border-cu-primary bg-cu-primary/10 text-cu-primary'
+                    : 'border-cu-border bg-cu-bg-secondary text-cu-text-primary hover:bg-cu-hover'
                 }`}
               >
                 {s.sprintName || `Sprint #${s.id}`}
@@ -74,12 +74,11 @@ export default function CompleteSprintModal({
             </div>
 
             <div>
-              <p className="text-sm font-semibold text-[#344054] mb-2">Move incomplete tasks to:</p>
+              <p className="text-sm font-semibold text-cu-text-primary mb-2">Move incomplete tasks to:</p>
               <div className="space-y-2">
-                {/* Backlog option */}
                 <label
                   className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                    destination === null ? 'border-[#155DFC] bg-blue-50' : 'border-[#EAECF0] hover:bg-gray-50'
+                    destination === null ? 'border-cu-primary bg-cu-primary/10' : 'border-cu-border hover:bg-cu-hover'
                   }`}
                 >
                   <input
@@ -87,18 +86,17 @@ export default function CompleteSprintModal({
                     name="dest"
                     checked={destination === null}
                     onChange={() => onSelectDestination(null)}
-                    className="accent-[#155DFC]"
+                    className="accent-cu-primary"
                   />
-                  <Archive size={15} className="text-[#667085] flex-shrink-0" />
-                  <span className="text-sm font-medium text-[#101828]">Backlog</span>
+                  <Archive size={15} className="text-cu-text-secondary flex-shrink-0" />
+                  <span className="text-sm font-medium text-cu-text-primary">Backlog</span>
                 </label>
 
-                {/* Other sprints */}
                 {availableDestSprints.map((s) => (
                   <label
                     key={s.id}
                     className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                      destination === s.id ? 'border-[#155DFC] bg-blue-50' : 'border-[#EAECF0] hover:bg-gray-50'
+                      destination === s.id ? 'border-cu-primary bg-cu-primary/10' : 'border-cu-border hover:bg-cu-hover'
                     }`}
                   >
                     <input
@@ -106,33 +104,33 @@ export default function CompleteSprintModal({
                       name="dest"
                       checked={destination === s.id}
                       onChange={() => onSelectDestination(s.id)}
-                      className="accent-[#155DFC]"
+                      className="accent-cu-primary"
                     />
-                    <ArrowRight size={15} className="text-[#667085] flex-shrink-0" />
-                    <span className="text-sm font-medium text-[#101828]">{s.name}</span>
+                    <ArrowRight size={15} className="text-cu-text-secondary flex-shrink-0" />
+                    <span className="text-sm font-medium text-cu-text-primary">{s.name}</span>
                   </label>
                 ))}
               </div>
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 p-3">
-            <CheckCircle2 size={16} className="text-green-500 flex-shrink-0" />
-            <span className="text-sm text-green-700 font-medium">All tasks are done!</span>
+          <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3">
+            <CheckCircle2 size={16} className="text-emerald-500 flex-shrink-0" />
+            <span className="text-sm text-emerald-500 font-medium">All tasks are done!</span>
           </div>
         )}
 
         <div className="mt-5 flex gap-2">
           <button
             onClick={onCancel}
-            className="flex-1 rounded-xl border border-[#D0D5DD] px-3 py-2.5 text-sm font-semibold text-[#344054] hover:bg-gray-50 transition-colors"
+            className="flex-1 rounded-xl border border-cu-border px-3 py-2.5 text-sm font-semibold text-cu-text-secondary hover:bg-cu-hover transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onComplete}
             disabled={isLoading || !sprintIdToComplete}
-            className="flex-1 rounded-xl bg-[#D92D20] px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-50 hover:bg-[#B42318] transition-colors"
+            className="flex-1 rounded-xl bg-red-600 px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-50 hover:bg-red-700 transition-colors"
           >
             {isLoading ? 'Completing...' : 'Complete Sprint'}
           </button>

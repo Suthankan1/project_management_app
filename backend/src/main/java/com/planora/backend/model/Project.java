@@ -42,7 +42,12 @@ public class Project {
     @Column(nullable = false) // JPA: project type is required.
     private ProjectType type;
 
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @org.hibernate.annotations.CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @org.hibernate.annotations.UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
     @ManyToOne(fetch = FetchType.LAZY) // JPA: many projects can belong to one team.
@@ -54,11 +59,6 @@ public class Project {
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true) // JPA: one project has many tasks; cascade and orphan cleanup are enabled.
     private List<Task> tasks = new ArrayList<>();
-
-    @PreUpdate // JPA lifecycle hook: updates timestamp before every entity update.
-    public void setLastUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
 
     @Override // Java override: custom equality based on entity id.
     public boolean equals(Object o) {

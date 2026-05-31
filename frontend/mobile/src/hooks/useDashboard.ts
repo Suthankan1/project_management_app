@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/axios';
 import { getValidToken } from '../auth/storage';
+import { offlineSyncManager } from '../services/offlineSyncManager';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -143,6 +145,8 @@ interface UseDashboardReturn {
   refreshTab: () => void;
   toggleFavorite: (id: number) => Promise<void>;
   recordAccess: (id: number) => Promise<void>;
+  isOnline: boolean;
+  isStale: boolean;
 }
 
 export function useDashboard(): UseDashboardReturn {
@@ -155,6 +159,33 @@ export function useDashboard(): UseDashboardReturn {
   const [tabItemsByTab, setTabItemsByTab]     = useState<TabItemsByKey>(EMPTY_TAB_ITEMS);
   const [loadingTabs, setLoadingTabs]         = useState<TabLoadingByKey>(EMPTY_TAB_LOADING);
   const [assignedCount, setAssignedCount]     = useState(0);
+
+  const [isOnline, setIsOnline]               = useState(offlineSyncManager.getOnlineStatus());
+  const [isStale, setIsStale]                 = useState(true);
+
+  // ── Load cached data from AsyncStorage ──────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const [cachedProj, cachedTabs, cachedCount] = await Promise.all([
+          AsyncStorage.getItem('dashboard_projects'),
+          AsyncStorage.getItem('dashboard_tabs'),
+          AsyncStorage.getItem('dashboard_assigned_count'),
+        ]);
+        if (cachedProj) {
+          setProjects(JSON.parse(cachedProj));
+        }
+        if (cachedTabs) {
+          setTabItemsByTab(JSON.parse(cachedTabs));
+        }
+        if (cachedCount) {
+          setAssignedCount(Number(cachedCount));
+        }
+      } catch (e) {
+        console.error('Failed to load dashboard cache', e);
+      }
+    })();
+  }, []);
 
   // ── Check auth ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -183,7 +214,10 @@ export function useDashboard(): UseDashboardReturn {
         api.get('/api/projects/recent'),
         api.get('/api/projects/favorites'),
       ]);
-      setProjects({ recent: recentRes.data || [], favorites: favRes.data || [] });
+      const data = { recent: recentRes.data || [], favorites: favRes.data || [] };
+      setProjects(data);
+      await AsyncStorage.setItem('dashboard_projects', JSON.stringify(data));
+      setIsStale(false);
     } catch (e) {
       console.error('Dashboard fetchProjects error', e);
     } finally {
@@ -194,25 +228,33 @@ export function useDashboard(): UseDashboardReturn {
   useEffect(() => { void fetchProjects(); }, [fetchProjects]);
 
   // ── Fetch assigned count (always) ───────────────────────────────────────────
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await api.get('/api/tasks/assigned?limit=100');
-        const pending = res.data.filter((t: { status?: string }) => t.status !== 'DONE').length;
-        setAssignedCount(pending);
-      } catch { /* silent */ }
-    })();
+  const fetchAssignedCount = useCallback(async () => {
+    try {
+      const res = await api.get('/api/tasks/assigned?limit=100');
+      const pending = res.data.filter((t: { status?: string }) => t.status !== 'DONE').length;
+      setAssignedCount(pending);
+      await AsyncStorage.setItem('dashboard_assigned_count', String(pending));
+    } catch { /* silent */ }
   }, []);
+
+  useEffect(() => {
+    void fetchAssignedCount();
+  }, [fetchAssignedCount]);
 
   // ── Fetch tab data ───────────────────────────────────────────────────────────
   const fetchTab = useCallback(async (tab: TabKey) => {
     setLoadingTabs(prev => ({ ...prev, [tab]: true }));
     try {
       const items = await fetchTabData(tab);
-      setTabItemsByTab(prev => ({ ...prev, [tab]: items }));
+      setTabItemsByTab(prev => {
+        const next = { ...prev, [tab]: items };
+        AsyncStorage.setItem('dashboard_tabs', JSON.stringify(next)).catch(console.error);
+        return next;
+      });
+      setIsStale(false);
     } catch (e) {
       console.error('Dashboard fetchTab error', e);
-      setTabItemsByTab(prev => ({ ...prev, [tab]: [] }));
+      // In case of error (e.g. offline), we keep using cache if present
     } finally {
       setLoadingTabs(prev => ({ ...prev, [tab]: false }));
     }
@@ -220,11 +262,25 @@ export function useDashboard(): UseDashboardReturn {
 
   useEffect(() => { void fetchTab(activeTab); }, [activeTab, fetchTab]);
 
-  // Preload the default visible dashboard cards so each table owns its data.
+  // Preload other tabs
   useEffect(() => {
     void fetchTab('worked-on');
     void fetchTab('favorites');
   }, [fetchTab]);
+
+  // ── Listen to Sync Manager connection & sync events ────────────────────────
+  useEffect(() => {
+    const removeListener = offlineSyncManager.addListener((event) => {
+      if (event.type === 'CONNECTION_CHANGED') {
+        setIsOnline(event.isOnline);
+      } else if (event.type === 'SYNC_COMPLETED') {
+        void fetchProjects();
+        void fetchAssignedCount();
+        void fetchTab(activeTab);
+      }
+    });
+    return removeListener;
+  }, [fetchProjects, fetchAssignedCount, fetchTab, activeTab]);
 
   // ── Toggle favorite ──────────────────────────────────────────────────────────
   const toggleFavorite = useCallback(async (id: number) => {
@@ -259,5 +315,7 @@ export function useDashboard(): UseDashboardReturn {
     },
     toggleFavorite,
     recordAccess,
+    isOnline,
+    isStale,
   };
 }

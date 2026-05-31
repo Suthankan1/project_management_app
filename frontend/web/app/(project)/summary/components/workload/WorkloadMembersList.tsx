@@ -1,7 +1,7 @@
 'use client';
 
 // Displays the detailed, scrollable list of team members with their task progress bars.
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import { WorkloadEntry, formatRole } from './types';
 
@@ -10,6 +10,31 @@ interface WorkloadMembersListProps {
   activeWorkloadData: WorkloadEntry[];
   activeIndex: number;
   setActiveIndex: (index: number) => void;
+}
+
+function WorkloadAvatar({ member }: { member: WorkloadEntry }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  return (
+    <div
+      className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center shadow-cu-sm text-white font-arimo text-[13px] font-bold ring-2 ring-cu-bg backdrop-blur-sm overflow-hidden"
+      style={{ backgroundColor: member.color }}
+    >
+      {member.avatar && !imageFailed ? (
+        <Image
+          src={member.avatar}
+          alt={`${member.name} avatar`}
+          width={40}
+          height={40}
+          className="h-10 w-10 rounded-full object-cover"
+          unoptimized
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <span>{member.initials || 'U'}</span>
+      )}
+    </div>
+  );
 }
 
 export function WorkloadMembersList({ 
@@ -34,16 +59,7 @@ export function WorkloadMembersList({
             >
               {/* Member Profile Block */}
               <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center shadow-cu-sm text-white font-arimo text-[13px] font-bold ring-2 ring-cu-bg backdrop-blur-sm"
-                  style={{ backgroundColor: member.color }}
-                >
-                  {member.avatar ? (
-                    <Image src={member.avatar} alt={member.name} width={40} height={40} className="w-10 h-10 rounded-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                  ) : (
-                    <span>{member.initials || 'U'}</span>
-                  )}
-                </div>
+                <WorkloadAvatar member={member} />
                 <div>
                   <h4 className="font-arimo text-[14px] font-bold text-cu-text-primary leading-none mb-1.5">{member.name}</h4>
                   <p className="font-arimo text-[11px] text-cu-text-muted font-semibold tracking-wide uppercase">{formatRole(member.role)}</p>

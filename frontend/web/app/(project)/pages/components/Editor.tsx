@@ -52,7 +52,7 @@ function ToolbarButton({
       type="button"
       className={`flex items-center justify-center w-8 h-8 min-w-[36px] min-h-[36px] rounded-md text-sm font-medium transition-all duration-150 ${
         isActive
-          ? 'bg-blue-600 text-white shadow-sm'
+          ? 'bg-cu-primary text-white shadow-sm'
           : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
       }`}
     >
@@ -118,7 +118,7 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-gray prose-base focus:outline-none max-w-none min-h-[400px] leading-relaxed',
+        class: 'prose prose-gray dark:prose-invert prose-base focus:outline-none max-w-none min-h-[400px] leading-relaxed',
       },
     },
   });

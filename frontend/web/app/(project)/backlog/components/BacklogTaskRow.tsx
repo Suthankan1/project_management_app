@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Task } from '../../kanban/types';
 import {
     ChevronDown, ArrowUp, ArrowRight, ArrowDown, Minus,
-    Archive, ArchiveRestore, MoreHorizontal
+    Archive, ArchiveRestore, MoreHorizontal, RefreshCw
 } from 'lucide-react';
 import { hexToLabelStyle } from '@/components/shared/LabelPicker';
 import AssigneeAvatar from '../../(agile)/sprint-backlog/components/AssigneeAvatar';
@@ -12,6 +12,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { DayPicker } from 'react-day-picker';
 import { format, parseISO } from 'date-fns';
 import api from '@/lib/axios';
+import { ArchiveBadge } from '@/components/ui';
 import 'react-day-picker/dist/style.css';
 
 const PRIORITY_CONFIG: Record<string, { color: string; icon: React.ElementType; label: string }> = {
@@ -46,13 +47,13 @@ interface BacklogTaskRowProps {
 
 export default function BacklogTaskRow({
     task, onDelete, onClick, onStatusChange, onOpenModal,
-    onArchive, onUnarchive, selected, onToggleSelect, onDateChange,
+    onArchive, onUnarchive, selected, onToggleSelect, onDateChange, isArchived = false,
 }: BacklogTaskRowProps) {
     const PriorityIcon = task.priority ? (PRIORITY_CONFIG[task.priority]?.icon ?? Minus) : Minus;
     const priorityColor = task.priority ? (PRIORITY_CONFIG[task.priority]?.color ?? '#9CA3AF') : '#9CA3AF';
     const priorityLabel = task.priority ? (PRIORITY_CONFIG[task.priority]?.label ?? task.priority) : '—';
     const normalizedStatus = (task.status ?? '').toUpperCase();
-    const statusClass = STATUS_COLOR[normalizedStatus] ?? 'bg-[#F3F4F6] text-[#6A7282]';
+    const statusClass = STATUS_COLOR[normalizedStatus] ?? 'bg-cu-bg-tertiary text-cu-text-secondary';
     const [statusOpen, setStatusOpen] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const statusRef = useRef<HTMLDivElement>(null);
@@ -85,8 +86,8 @@ export default function BacklogTaskRow({
     return (
         <div
             className={`grid grid-cols-[auto_1fr_120px_100px_120px_100px_100px_32px] sm:grid-cols-[auto_1.5fr_140px_110px_130px_110px_120px_32px] items-center gap-x-2 px-3 sm:px-4 min-h-[52px] rounded-lg border cursor-pointer select-none transition-colors ${
-                selected ? 'bg-cu-primary/5 border-cu-primary/30' : isOverdue ? 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10' : 'bg-cu-bg border-cu-border hover:bg-cu-hover'
-            }`}
+                selected ? 'bg-cu-primary/10 border-cu-primary/40 shadow-[inset_2px_0_0_var(--cu-primary)]' : isOverdue ? 'bg-red-500/10 border-red-500/25 hover:bg-red-500/15' : 'bg-cu-bg-secondary/70 border-cu-border hover:bg-cu-hover'
+            } ${task.archived || isArchived ? 'opacity-60' : ''}`}
             onClick={() => {
                 if (statusOpen || menuOpen) return;
                 if (window.innerWidth >= 768) onOpenModal(task.id);
@@ -99,7 +100,7 @@ export default function BacklogTaskRow({
                 checked={selected ?? false}
                 onChange={e => { e.stopPropagation(); onToggleSelect?.(task.id); }}
                 onClick={e => e.stopPropagation()}
-                className="shrink-0 w-3.5 h-3.5 accent-[#155DFC] cursor-pointer"
+                className="shrink-0 w-3.5 h-3.5 accent-cu-primary cursor-pointer"
             />
 
             {/* Title + ID */}
@@ -108,6 +109,20 @@ export default function BacklogTaskRow({
                 <p className={`text-[14px] font-medium truncate ${normalizedStatus === 'DONE' ? 'line-through text-cu-text-muted' : 'text-cu-text-primary'}`}>
                     {task.title}
                 </p>
+                {task.recurrenceRule && (
+                    <span
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                            task.recurrenceActive === false
+                                ? 'bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/30'
+                                : 'bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/30'
+                        }`}
+                        title={task.recurrenceActive === false ? 'Recurring (Paused)' : `Recurring (${task.recurrenceRule})`}
+                    >
+                        <RefreshCw size={9} className="flex-shrink-0" />
+                        <span>Recurring{task.recurrenceActive === false ? ' (Paused)' : ''}</span>
+                    </span>
+                )}
+                {(task.archived || isArchived) && <ArchiveBadge />}
             </div>
 
             {/* Label */}
@@ -131,13 +146,13 @@ export default function BacklogTaskRow({
             <div className="relative" ref={statusRef}>
                 <button
                     onClick={(e) => { e.stopPropagation(); setStatusOpen(s => !s); }}
-                    className={`text-[10px] sm:text-[11px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${statusClass} whitespace-nowrap`}
+                    className={`text-[10px] sm:text-[11px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${statusClass} whitespace-nowrap ring-1 ring-inset ring-current/10`}
                 >
                     <span className="max-w-[70px] truncate">{normalizedStatus.replace(/_/g, ' ')}</span>
                     <ChevronDown size={10} className="shrink-0" />
                 </button>
                 {statusOpen && (
-                    <div className="absolute right-0 top-full mt-1 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-lg py-1 min-w-[130px]">
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-cu-lg py-1 min-w-[130px]">
                         {STATUS_OPTIONS.map((s) => (
                             <button
                                 key={s}
@@ -164,12 +179,12 @@ export default function BacklogTaskRow({
             <div className="min-w-0 flex items-center" onClick={(e) => e.stopPropagation()}>
                 <Popover.Root>
                     <Popover.Trigger asChild>
-                        <button className="text-[11px] text-cu-text-muted hover:text-cu-primary bg-transparent border border-transparent hover:border-cu-primary/20 hover:bg-cu-primary/5 px-2 py-1 rounded transition-colors truncate">
+                        <button className="text-[11px] text-cu-text-muted hover:text-cu-primary bg-transparent border border-transparent hover:border-cu-primary/30 hover:bg-cu-primary/10 px-2 py-1 rounded transition-colors truncate">
                             {task.dueDate ? format(parseISO(task.dueDate), 'MMM d, yyyy') : 'No date'}
                         </button>
                     </Popover.Trigger>
                     <Popover.Portal>
-                        <Popover.Content className="z-[10000] p-3 bg-cu-bg rounded-xl shadow-xl border border-cu-border" sideOffset={5}>
+                        <Popover.Content className="z-[10000] p-3 bg-cu-bg rounded-xl shadow-cu-xl border border-cu-border" sideOffset={5}>
                             <DayPicker
                                 mode="single"
                                 selected={task.dueDate ? parseISO(task.dueDate) : undefined}
@@ -190,7 +205,7 @@ export default function BacklogTaskRow({
                     <MoreHorizontal size={14} />
                 </button>
                 {menuOpen && (
-                    <div className="absolute right-0 top-full mt-1 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-lg py-1 min-w-[120px]">
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-cu-lg py-1 min-w-[120px]">
                         <button
                             onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onOpenModal(task.id); }}
                             className="w-full text-left px-3 py-1.5 text-[12px] text-cu-text-primary hover:bg-cu-hover transition-colors"

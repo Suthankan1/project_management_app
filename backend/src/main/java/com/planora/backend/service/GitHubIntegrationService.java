@@ -22,6 +22,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import lombok.RequiredArgsConstructor;
+
 /**
  * Fetches live GitHub data (pull requests, commits, CI status) for a single task.
  *
@@ -34,6 +36,7 @@ import java.util.Map;
  *    this service is stateless and token-agnostic.
  */
 @Service
+@RequiredArgsConstructor
 public class GitHubIntegrationService {
 
     private static final String GITHUB_API = "https://api.github.com";
@@ -41,8 +44,7 @@ public class GitHubIntegrationService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @Autowired
-    private CiStatusResolver ciStatusResolver;
+    private final CiStatusResolver ciStatusResolver;
 
     /**
      * Fetches the authenticated user's repositories from GitHub.

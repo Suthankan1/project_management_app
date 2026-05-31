@@ -198,4 +198,36 @@ class ProjectControllerTest {
 
         verify(projectService).deleteProject(88L, 55L, 7L);
     }
+
+    @Test
+    void createProject_invalidPayload_returns400() throws Exception {
+        ProjectDTO invalidDto = ProjectDTO.builder()
+                .name("") // Blank name
+                .projectKey("INVALIDKEY") // Invalid project key (too long/lowercase/contains invalid chars)
+                .teamOption("INVALID") // Invalid teamOption
+                .build();
+
+        mockMvc.perform(post("/api/projects")
+                        .with(SecurityMockMvcRequestPostProcessors.user(principal))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidDto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
+
+    @Test
+    void updateProject_invalidPayload_returns400() throws Exception {
+        UpdateProjectDTO invalidDto = new UpdateProjectDTO();
+        invalidDto.setType("INVALID"); // Invalid type pattern
+
+        mockMvc.perform(put("/api/projects/12")
+                        .with(SecurityMockMvcRequestPostProcessors.user(principal))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidDto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
 }

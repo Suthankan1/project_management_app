@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 
 export interface TouchDragGhost {
   x: number;
@@ -37,8 +37,10 @@ export function useTouchDragSort({
   const tasksRef = useRef(tasks);
   const onDropRef = useRef(onDrop);
 
-  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
-  useEffect(() => { onDropRef.current = onDrop; }, [onDrop]);
+  useLayoutEffect(() => {
+    tasksRef.current = tasks;
+    onDropRef.current = onDrop;
+  });
 
   // Per-element long-press tracking
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);

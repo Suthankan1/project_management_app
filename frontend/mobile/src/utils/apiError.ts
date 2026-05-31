@@ -9,19 +9,24 @@ export function apiErrorMessage(error: unknown, fallback: string) {
   if (typeof data === 'string' && data.trim()) return data;
 
   if (data && typeof data === 'object') {
-    const body = data as { message?: unknown; error?: unknown; details?: unknown };
-    if (Array.isArray(body.details)) {
-      const messages = body.details
-        .map((detail) => {
-          if (!detail || typeof detail !== 'object') return null;
-          const message = (detail as { message?: unknown }).message;
-          return typeof message === 'string' && message.trim() ? message : null;
+    const body = data as {
+      message?: string;
+      fieldErrors?: Array<{ field?: string; message?: string }>;
+    };
+
+    if (Array.isArray(body.fieldErrors)) {
+      const messages = body.fieldErrors
+        .map((err) => {
+          if (!err || typeof err !== 'object') return null;
+          return typeof err.message === 'string' && err.message.trim() ? err.message : null;
         })
         .filter(Boolean);
       if (messages.length) return messages.join('\n');
     }
-    if (typeof body.message === 'string' && body.message.trim()) return body.message;
-    if (typeof body.error === 'string' && body.error.trim()) return body.error;
+
+    if (typeof body.message === 'string' && body.message.trim()) {
+      return body.message;
+    }
   }
 
   return fallback;

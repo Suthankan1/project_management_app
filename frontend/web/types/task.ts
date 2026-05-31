@@ -38,6 +38,7 @@ export interface Dependency {
   id: number;
   title: string;
   relation: string;
+  status?: string;
 }
 
 export interface TaskAttachmentSummary {
@@ -61,6 +62,8 @@ export interface Task {
   createdAt?: string;
   completedAt?: string;
   updatedAt?: string;
+  archived?: boolean;
+  archivedAt?: string;
   assignee?: Assignee;
   assigneeId?: number;
   assigneeName?: string;
@@ -84,6 +87,10 @@ export interface Task {
   recurrenceEnd?: string;
   recurrenceParentId?: number;
   nextOccurrence?: string;
+  recurrenceActive?: boolean;
+  customInterval?: number;
+  recurrenceLimit?: number;
+  recurrenceCount?: number;
 }
 
 export interface TaskActivity {
@@ -104,6 +111,8 @@ export interface TaskData {
   priority: string;
   storyPoint: number;
   reporterName: string;
+  archived?: boolean;
+  archivedAt?: string;
   reporterId?: number;
   assigneeName: string;
   assigneeId?: number;
@@ -137,6 +146,9 @@ export interface TaskItem {
   dueDate?: string;
   priority?: string;
   labels?: Label[];
+  archived?: boolean;
+  recurrenceRule?: string | null;
+  recurrenceActive?: boolean;
 }
 
 export interface CustomField {

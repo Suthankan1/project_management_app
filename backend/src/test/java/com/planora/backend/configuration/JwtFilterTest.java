@@ -94,6 +94,10 @@ class JwtFilterTest {
         jwtFilter.doFilterInternal(request, response, chain);
 
         assertEquals(HttpServletResponse.SC_UNAUTHORIZED, response.getStatus());
+        String content = response.getContentAsString();
+        assertTrue(content.contains("\"status\":401"));
+        assertTrue(content.contains("\"errorCode\":\"UNAUTHORIZED\""));
+        assertTrue(content.contains("\"message\":\"Token has expired\""));
         verify(chain, never()).doFilter(any(), any());
     }
 
@@ -110,6 +114,10 @@ class JwtFilterTest {
         jwtFilter.doFilterInternal(request, response, chain);
 
         assertEquals(HttpServletResponse.SC_UNAUTHORIZED, response.getStatus());
+        String content = response.getContentAsString();
+        assertTrue(content.contains("\"status\":401"));
+        assertTrue(content.contains("\"errorCode\":\"UNAUTHORIZED\""));
+        assertTrue(content.contains("\"message\":\"Invalid token format\""));
     }
 
     @Test

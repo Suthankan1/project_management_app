@@ -54,7 +54,7 @@ export default function SprintBoardHeader({
   const progressPercent = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
   return (
-    <div className="flex flex-col bg-cu-bg border-b border-cu-border">
+    <div className="flex flex-col bg-cu-bg border-b border-cu-border shadow-cu-sm">
       <div className="flex items-center justify-between gap-4 py-3 px-4 md:px-6">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
@@ -64,19 +64,19 @@ export default function SprintBoardHeader({
             <h1 className="text-base md:text-lg font-bold text-cu-text-primary tracking-tight">Sprint Board</h1>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-[11px] text-cu-text-muted truncate">{sprintName}</span>
-              <span className="text-cu-text-muted/40">·</span>
+              <span className="text-cu-text-muted/40">&middot;</span>
               <span className="text-[11px] text-cu-text-muted">{totalTasks} tasks</span>
-              <span className="text-cu-text-muted/40">·</span>
+              <span className="text-cu-text-muted/40">&middot;</span>
               <span className="text-[11px] text-cu-text-muted">{doneStoryPoints}/{totalStoryPoints} pts</span>
               {overdueTasks > 0 && (
                 <>
-                  <span className="text-cu-text-muted/40">·</span>
+                  <span className="text-cu-text-muted/40">&middot;</span>
                   <span className="text-[11px] font-semibold text-red-500">{overdueTasks} overdue</span>
                 </>
               )}
               {totalTasks > 0 && (
                 <>
-                  <span className="text-cu-text-muted/40">·</span>
+                  <span className="text-cu-text-muted/40">&middot;</span>
                   <div className="flex items-center gap-1.5">
                     <div className="w-16 h-1 rounded-full bg-cu-bg-tertiary overflow-hidden">
                       <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
@@ -94,7 +94,7 @@ export default function SprintBoardHeader({
             <button
               type="button"
               onClick={() => setIsFilterOpen(!isFilterOpen)}
-              className="flex items-center gap-1.5 rounded-lg border border-cu-border bg-cu-bg px-3 py-1.5 text-xs font-medium text-cu-text-secondary hover:bg-cu-hover transition-colors w-fit"
+              className="flex items-center gap-1.5 rounded-lg border border-cu-border bg-cu-bg-secondary px-3 py-1.5 text-xs font-medium text-cu-text-secondary hover:bg-cu-hover hover:text-cu-text-primary transition-colors w-fit"
               aria-label="Filters"
             >
               <SlidersHorizontal size={13} />
@@ -108,11 +108,11 @@ export default function SprintBoardHeader({
                   className="fixed inset-0 z-10" 
                   onClick={() => setIsFilterOpen(false)}
                 />
-                <div className="absolute right-0 mt-2 w-72 bg-cu-bg rounded-xl shadow-xl border border-cu-border z-20 p-4 space-y-4 animate-in fade-in zoom-in duration-200">
+                <div className="absolute right-0 mt-2 w-72 bg-cu-bg rounded-xl shadow-cu-xl border border-cu-border z-20 p-4 space-y-4 animate-in fade-in zoom-in duration-200">
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-cu-text-muted uppercase tracking-wider">Priority</label>
                     <select
-                      className="w-full rounded-lg border border-cu-border bg-cu-bg px-3 py-2 text-sm text-cu-text-primary outline-none focus:border-cu-primary"
+                      className="w-full rounded-lg border border-cu-border bg-cu-bg-secondary px-3 py-2 text-sm text-cu-text-primary outline-none focus:border-cu-primary focus:ring-2 focus:ring-cu-primary/20"
                       value={filters.priority}
                       onChange={(e) => onFilterChange({ priority: e.target.value })}
                     >
@@ -127,7 +127,7 @@ export default function SprintBoardHeader({
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-cu-text-muted uppercase tracking-wider">Status</label>
                     <select
-                      className="w-full rounded-lg border border-cu-border bg-cu-bg px-3 py-2 text-sm text-cu-text-primary outline-none focus:border-cu-primary"
+                      className="w-full rounded-lg border border-cu-border bg-cu-bg-secondary px-3 py-2 text-sm text-cu-text-primary outline-none focus:border-cu-primary focus:ring-2 focus:ring-cu-primary/20"
                       value={filters.status}
                       onChange={(e) => onFilterChange({ status: e.target.value })}
                     >
@@ -142,7 +142,7 @@ export default function SprintBoardHeader({
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-cu-text-muted uppercase tracking-wider">Assignee</label>
                     <select
-                      className="w-full rounded-lg border border-cu-border bg-cu-bg px-3 py-2 text-sm text-cu-text-primary outline-none focus:border-cu-primary"
+                      className="w-full rounded-lg border border-cu-border bg-cu-bg-secondary px-3 py-2 text-sm text-cu-text-primary outline-none focus:border-cu-primary focus:ring-2 focus:ring-cu-primary/20"
                       value={filters.assignee}
                       onChange={(e) => onFilterChange({ assignee: e.target.value })}
                     >
@@ -159,7 +159,7 @@ export default function SprintBoardHeader({
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-cu-text-muted uppercase tracking-wider">Swimlane</label>
                     <select
-                      className="w-full rounded-lg border border-cu-border bg-cu-bg px-3 py-2 text-sm text-cu-text-primary outline-none focus:border-cu-primary"
+                      className="w-full rounded-lg border border-cu-border bg-cu-bg-secondary px-3 py-2 text-sm text-cu-text-primary outline-none focus:border-cu-primary focus:ring-2 focus:ring-cu-primary/20"
                       value={filters.swimlane}
                       onChange={(e) => onFilterChange({ swimlane: e.target.value as SprintBoardFilters['swimlane'] })}
                     >
@@ -176,7 +176,7 @@ export default function SprintBoardHeader({
                       className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
                         filters.showOnlyMine
                           ? 'border-cu-primary/20 bg-cu-primary/10 text-cu-primary'
-                          : 'border-cu-border bg-cu-bg text-cu-text-secondary hover:bg-cu-hover'
+                          : 'border-cu-border bg-cu-bg-secondary text-cu-text-secondary hover:bg-cu-hover hover:text-cu-text-primary'
                       }`}
                     >
                       <Users size={12} className="inline mr-1.5 mb-0.5" />
@@ -212,7 +212,7 @@ export default function SprintBoardHeader({
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-lg text-xs font-medium hover:bg-emerald-500/20 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
           >
             {isLoading ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-500/20 border-t-emerald-500" />
             ) : (
               <CheckCircle2 size={14} />
             )}
@@ -228,7 +228,7 @@ export default function SprintBoardHeader({
       <div className="sm:hidden px-4 pb-3 flex items-center gap-2">
         <div className="relative flex-1">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-            <Search size={14} className="text-[#98A2B3]" />
+            <Search size={14} className="text-cu-text-muted" />
           </div>
           <input
             type="text"

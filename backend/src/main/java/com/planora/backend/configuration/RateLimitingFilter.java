@@ -6,17 +6,17 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,9 +25,8 @@ import java.util.regex.Pattern;
  * Allows at most 5 requests per minute per IP on the configured paths.
  */
 @Component
+@Slf4j
 public class RateLimitingFilter extends OncePerRequestFilter {
-
-    private static final Logger logger = LoggerFactory.getLogger(RateLimitingFilter.class);
 
     private static final int MAX_REQUESTS_PER_MINUTE = 5;
     private static final int MAX_INVITATIONS_PER_HOUR = 10;
@@ -41,8 +40,15 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             "/api/auth/resend-otp"
     );
 
-    /** One bucket per (IP + path) key. */
-    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+    private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
+            .expireAfterAccess(2, TimeUnit.MINUTES)
+            .maximumSize(50_000)
+            .recordStats()
+            .build();
+
+    public RateLimitingFilter() {
+        log.warn("Eviction count at startup: {}", buckets.stats().evictionCount());
+    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -64,24 +70,31 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         if (isProjectInviteRequest(request)) {
             Matcher matcher = PROJECT_INVITE_PATH.matcher(request.getServletPath());
             String projectId = matcher.find() ? matcher.group(1) : "unknown";
-            key = "invite-project:" + projectId;
-            bucket = buckets.computeIfAbsent(key, k -> newInvitationBucket());
+            key = "invite-project:" + projectId + ":" + resolveClientIp(request);
+            bucket = buckets.get(key, k -> newInvitationBucket());
         } else {
             key = resolveClientIp(request) + ":" + request.getServletPath();
-            bucket = buckets.computeIfAbsent(key, k -> newBucket());
+            bucket = buckets.get(key, k -> newBucket());
         }
 
         if (bucket.tryConsume(1)) {
             filterChain.doFilter(request, response);
         } else {
-            logger.warn("Rate limit exceeded for key={}", key);
+            log.warn("Rate limit exceeded for key={}", key);
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType("application/json");
-            if (isProjectInviteRequest(request)) {
-                response.getWriter().write("{\"message\":\"Too many invitations sent, try again in 1 hour\"}");
-            } else {
-                response.getWriter().write("{\"error\":\"Too many requests. Please try again later.\"}");
-            }
+            String message = isProjectInviteRequest(request)
+                ? "Too many invitations sent, try again in 1 hour"
+                : "Too many requests. Please try again later.";
+            com.planora.backend.dto.ApiErrorResponse errorResponse = new com.planora.backend.dto.ApiErrorResponse(
+                java.time.LocalDateTime.now().toString(),
+                HttpStatus.TOO_MANY_REQUESTS.value(),
+                "RATE_LIMIT",
+                message,
+                request.getRequestURI(),
+                null
+            );
+            response.getWriter().write(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(errorResponse));
         }
     }
 
