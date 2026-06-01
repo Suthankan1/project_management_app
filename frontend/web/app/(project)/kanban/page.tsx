@@ -202,6 +202,7 @@ export default function KanbanPage() {
                         columnId={cfg?.id}
                         color={cfg?.color}
                         wipLimit={cfg?.wipLimit}
+                        updatingTaskId={updatingTaskId}
                         onDeleteTask={handleDeleteTask}
                         onCreateTask={handleAddTask}
                         onEditTask={handleEditTask}

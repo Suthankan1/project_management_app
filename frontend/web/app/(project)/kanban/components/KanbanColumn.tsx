@@ -49,6 +49,7 @@ interface KanbanColumnProps {
   onColumnRenamed?: (columnId: number, name: string) => void;
   onColumnSettingsChanged?: (columnId: number, settings: { color?: string; wipLimit?: number }) => void;
   onDeleteColumn?: (columnId: number) => void;
+  updatingTaskId?: number | null;
 }
 
 type MenuMode = 'main' | 'rename' | 'wip' | 'color' | 'confirmDelete';
@@ -309,7 +310,7 @@ export default function KanbanColumn({
         style={{ maxHeight: 'calc(100vh - 260px)', scrollbarWidth: 'thin' }}
       >
         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
-          {column.tasks.length === 0 ? (
+              {column.tasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <div className="w-12 h-12 rounded-full bg-cu-bg-tertiary flex items-center justify-center mb-3">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
@@ -329,6 +330,7 @@ export default function KanbanColumn({
                 usersMap={usersMap}
                 labels={allLabels}
                 onCreateLabel={onCreateLabel}
+                isSyncing={updatingTaskId === task.id}
               />
             ))
           )}

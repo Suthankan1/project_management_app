@@ -17,6 +17,7 @@ interface KanbanCardProps {
   usersMap?: Record<string, string | null>;
   labels?: Label[];
   onCreateLabel?: (name: string, color: string) => Promise<Label | null>;
+  isSyncing?: boolean;
 }
 
 const PRIORITY_COLORS: Record<string, { border: string; bg: string; text: string; dot: string }> = {
@@ -30,7 +31,7 @@ const PRIORITY_LIST = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
 
 const LABEL_COLORS = ['#6366F1', '#EF4444', '#F59E0B', '#22C55E', '#3B82F6', '#EC4899', '#8B5CF6', '#14B8A6'];
 
-export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask, onInlineUpdate, usersMap, labels: allLabels, onCreateLabel }: KanbanCardProps) {
+export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask, onInlineUpdate, usersMap, labels: allLabels, onCreateLabel, isSyncing }: KanbanCardProps) {
   const avatarUrl =
     (task.assigneePhotoUrl && task.assigneePhotoUrl.startsWith('http') ? task.assigneePhotoUrl : null) ??
     (task.assigneeName && usersMap?.[task.assigneeName]?.startsWith('http') ? usersMap[task.assigneeName] : null);
@@ -205,7 +206,17 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
       )}
 
       <div className="p-3">
+        {/* Subtle syncing indicator when a background mutation is in-flight for this task */}
+        {/** Position absolute to not affect layout */}
+        {/** Renders a small spinner badge in the top-left */}
+        {/* actual indicator (no-op placeholder removed) */}
         {/* Top row: labels + task ID */}
+        {isSyncing && (
+          <div className="absolute top-2 left-2 z-20 flex items-center gap-2 text-[11px] text-cu-text-muted">
+            <div className="w-3 h-3 border border-cu-border border-t-transparent rounded-full animate-spin" />
+            <span className="hidden sm:inline">Syncing</span>
+          </div>
+        )}
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <div className="flex flex-wrap gap-1 min-w-0">
             {/* Show task labels — resolve from allLabels if task.labels not populated */}

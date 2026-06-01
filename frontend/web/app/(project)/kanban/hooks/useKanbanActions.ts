@@ -11,6 +11,27 @@ import {
   updateTask,
   reorderKanbanColumns,
 } from '../api';
+import { toast } from '@/components/ui';
+
+// Helper exported for unit testing: performs optimistic update and reverts on failure
+export async function optimisticUpdateTaskStatusHelper(
+  tasks: any[],
+  setTasks: (updater: any) => void,
+  taskId: number,
+  newStatus: string,
+  updateFn: (taskId: number, status: string, title?: string) => Promise<any>,
+  title?: string,
+) {
+  const previous = tasks;
+  setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+  try {
+    await updateFn(taskId, newStatus, title);
+    return { success: true };
+  } catch (err) {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: previous.find(p => p.id === taskId)?.status } : t));
+    throw err;
+  }
+}
 import { type CreateTaskData } from '@/components/shared/CreateTaskModal';
 import { buildSessionCacheKey, removeSessionCache } from '@/lib/session-cache';
 
@@ -58,20 +79,44 @@ export function useKanbanActions(
 
     if (task.status === newStatus) return;
 
+    // Optimistic update + retryable toast
+    const previousTasks = tasks;
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
     setUpdatingTaskId(taskId);
 
-    try {
-      await updateTaskStatus(taskId, newStatus, task.title);
-      const key = buildSessionCacheKey('kanban-board', [projectId]);
-      if (key) removeSessionCache(key);
-      forceRefresh();
-    } catch (err) {
-      console.error('Error updating task status:', err);
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: task.status } : t));
-    } finally {
-      setUpdatingTaskId(null);
-    }
+    const attempt = async () => {
+      try {
+        await updateTaskStatus(taskId, newStatus, task.title);
+        const key = buildSessionCacheKey('kanban-board', [projectId]);
+        if (key) removeSessionCache(key);
+        forceRefresh();
+      } catch (err) {
+        // Revert immediately to avoid false UI state
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: task.status } : t));
+        // Show toast with retry option
+        toast('Failed to move task. Retry?', 'error', 8000, 'Retry', async () => {
+          // Show syncing indicator again
+          setUpdatingTaskId(taskId);
+          try {
+            await updateTaskStatus(taskId, newStatus, task.title);
+            const key = buildSessionCacheKey('kanban-board', [projectId]);
+            if (key) removeSessionCache(key);
+            forceRefresh();
+          } catch (e) {
+            // Final failure — leave UI reverted
+            console.error('Retry failed:', e);
+            toast('Retry failed. Please try again later.', 'error');
+          } finally {
+            setUpdatingTaskId(null);
+          }
+        });
+        console.error('Error updating task status:', err);
+      } finally {
+        setUpdatingTaskId(null);
+      }
+    };
+
+    void attempt();
   }, [tasks, columnConfigs, setTasks, projectId, forceRefresh]);
 
   // Column reorder
