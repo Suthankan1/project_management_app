@@ -16,6 +16,9 @@ export interface ChatMessage {
   deleted?: boolean;
   deletedAt?: string | null;
   editedAt?: string | null;
+  syncStatus?: 'pending' | 'syncing' | 'sent' | 'failed';
+  offlineQueued?: boolean;
+  failureReason?: string;
 }
 
 export interface ChatReactionSummary {

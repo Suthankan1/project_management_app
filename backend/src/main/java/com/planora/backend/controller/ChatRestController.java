@@ -173,6 +173,12 @@ public class ChatRestController {
 
     public static record EditMessageRequest(String content, ChatMessage.FormatType formatType) {}
 
+    public static record SendMessageRequest(String content,
+                                            String recipient,
+                                            Long roomId,
+                                            String localId,
+                                            ChatMessage.FormatType formatType) {}
+
     public static record ThreadReplyRequest(String content, ChatMessage.FormatType formatType) {}
 
     public static record ReactionToggleRequest(String emoji) {}
@@ -220,6 +226,54 @@ public class ChatRestController {
         String username = authentication.getName();
         resolveValidatedTeamId(projectId, username);
         return new ResponseEntity<>(chatService.getThreadMessages(projectId, messageId), HttpStatus.OK);
+    }
+
+    @PostMapping("/messages")
+    public ResponseEntity<ChatMessageDTO> createMessage(@PathVariable Long projectId,
+                                                        @RequestBody SendMessageRequest request,
+                                                        Authentication authentication) {
+        String username = authentication.getName();
+        Long teamId = resolveValidatedTeamId(projectId, username);
+
+        if (request.content() == null || request.content().trim().isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+
+        var message = new ChatMessage();
+        message.setSender(resolveCanonicalChatIdentifier(username));
+        message.setContent(request.content().trim());
+        message.setType(ChatMessage.MessageType.CHAT);
+        message.setFormatType(request.formatType() != null ? request.formatType() : ChatMessage.FormatType.PLAIN);
+        message.setProjectId(projectId);
+
+        if (request.roomId() != null) {
+            validateRoomMembership(request.roomId(), username);
+            var room = chatService.getChatRoomByIdAndProjectId(request.roomId(), projectId);
+            if (Boolean.TRUE.equals(room.getArchived())) {
+                return new ResponseEntity<>(HttpStatus.CONFLICT);
+            }
+            message.setRoomId(request.roomId());
+            message.setChatType(ChatMessage.ChatType.GROUP);
+        } else if (request.recipient() != null && !request.recipient().isBlank()) {
+            validateTeamMembership(teamId, request.recipient());
+            message.setRecipient(resolveCanonicalChatIdentifier(request.recipient()));
+            message.setChatType(ChatMessage.ChatType.PRIVATE);
+        } else {
+            message.setChatType(ChatMessage.ChatType.GROUP);
+        }
+
+        var saved = chatService.saveMessage(message);
+        saved.setLocalId(request.localId());
+
+        if (request.roomId() != null) {
+            simpMessagingTemplate.convertAndSend("/topic/project/" + projectId + "/room/" + request.roomId(), saved);
+        } else if (saved.getRecipient() != null && !saved.getRecipient().isBlank()) {
+            sendPrivateMessageToConversationParticipants(projectId, saved);
+        } else {
+            simpMessagingTemplate.convertAndSend("/topic/project/" + projectId + "/public", saved);
+        }
+
+        return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
 
     @PostMapping("/messages/{messageId}/thread/replies")
@@ -756,6 +810,32 @@ public class ChatRestController {
 
     private void validateRoomMembership(Long roomId, String usernameOrEmail) {
         chatService.ensureRoomMembership(roomId, usernameOrEmail);
+    }
+
+    private void sendPrivateMessageToConversationParticipants(Long projectId, ChatMessageDTO savedMessage) {
+        var destination = "/queue/project/" + projectId + "/messages";
+        var aliases = List.of(savedMessage.getSender(), savedMessage.getRecipient());
+
+        aliases.stream()
+                .filter(alias -> alias != null && !alias.isBlank())
+                .map(userCacheService::resolveUserByEmailOrUsername)
+                .filter(Objects::nonNull)
+                .forEach(user -> sendToUserDestinations(user, destination, savedMessage));
+    }
+
+    private void sendToUserDestinations(com.planora.backend.model.User user, String destination, Object payload) {
+        if (user == null || destination == null || destination.isBlank() || payload == null) {
+            return;
+        }
+
+        var identities = new java.util.LinkedHashSet<String>();
+        if (user.getUsername() != null && !user.getUsername().isBlank()) {
+            identities.add(user.getUsername().toLowerCase());
+        }
+        if (user.getEmail() != null && !user.getEmail().isBlank()) {
+            identities.add(user.getEmail().toLowerCase());
+        }
+        identities.forEach(identity -> simpMessagingTemplate.convertAndSendToUser(identity, destination, payload));
     }
 
     private String resolveCanonicalChatIdentifier(String usernameOrEmail) {

@@ -51,7 +51,8 @@ export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenConten
     teamTypingUsers, roomTypingUsers, privateTypingUsers,
     featureFlags, searchResults, isSearchLoading,
     messageReactions, activeThreadRoot, threadMessages,
-    onlineUsers, isLoading, isSocketConnected, error,
+    onlineUsers, isLoading, isSocketConnected, isNetworkOnline, error,
+    hasStaleCachedMessages, queuedChatCount, failedChatCount, serverChangedWhileOffline,
     roomMentionCounts, teamMentionCount,
     selectPrivateUser, selectRoom,
     sendMessage, sendRoomMessage, sendThreadReply,
@@ -181,6 +182,11 @@ export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenConten
             shouldShowErrorBanner={shouldShowErrorBanner}
             error={error}
             onRetry={retryConnection}
+            isOffline={!isNetworkOnline}
+            isShowingStaleCache={hasStaleCachedMessages}
+            queuedCount={queuedChatCount}
+            failedCount={failedChatCount}
+            serverChangedWhileOffline={serverChangedWhileOffline}
           />
 
           <ChatHeader
@@ -245,7 +251,7 @@ export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenConten
           <ChatInput
             onSendMessage={handleSendMessage}
             onTypingChange={sendTyping}
-            disabled={isLoading || !isConnected || shouldShowErrorBanner}
+            disabled={isLoading || shouldShowErrorBanner}
             placeholder={
               hasSelectedRoom
                 ? `Message #${selectedRoom?.name ?? 'channel'}…`

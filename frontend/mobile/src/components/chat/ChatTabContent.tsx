@@ -50,7 +50,8 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
     teamTypingUsers, roomTypingUsers, privateTypingUsers,
     featureFlags, searchResults, isSearchLoading,
     messageReactions, activeThreadRoot, threadMessages,
-    onlineUsers, isLoading, isSocketConnected, error,
+    onlineUsers, isLoading, isSocketConnected, isNetworkOnline, error,
+    hasStaleCachedMessages, queuedChatCount, failedChatCount, serverChangedWhileOffline,
     roomMentionCounts, teamMentionCount,
     selectPrivateUser, selectRoom,
     sendMessage, sendRoomMessage, sendThreadReply,
@@ -167,6 +168,11 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
             shouldShowErrorBanner={shouldShowErrorBanner}
             error={error}
             onRetry={retryConnection}
+            isOffline={!isNetworkOnline}
+            isShowingStaleCache={hasStaleCachedMessages}
+            queuedCount={queuedChatCount}
+            failedCount={failedChatCount}
+            serverChangedWhileOffline={serverChangedWhileOffline}
           />
           <ChatHeader
             selectedRoom={selectedRoom}
@@ -230,7 +236,7 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
           <ChatInput
             onSendMessage={handleSendMessage}
             onTypingChange={sendTyping}
-            disabled={isLoading || !isConnected || shouldShowErrorBanner}
+            disabled={isLoading || shouldShowErrorBanner}
             placeholder={
               hasSelectedRoom
                 ? `Message #${selectedRoom?.name ?? 'channel'}…`
