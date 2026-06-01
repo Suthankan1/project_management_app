@@ -20,6 +20,7 @@ const SUPPORTED_NOTIFICATION_PREFIXES = [
   '/github/',
   '/create-project/',
   '/portfolios/',
+  '/dashboard/notifications',
   '/(tabs)',
   '/modal',
 ];
@@ -215,6 +216,7 @@ export default function RootLayout() {
           <Stack.Screen name="create-project/index"   options={{ headerShown: false, animation: 'slide_from_bottom' }} />
           <Stack.Screen name="create-project/setup"   options={{ headerShown: false, animation: 'slide_from_right' }} />
           <Stack.Screen name="create-project/invite"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+          <Stack.Screen name="dashboard/notifications" options={{ headerShown: false, animation: 'slide_from_right' }} />
           <Stack.Screen name="portfolios/index"                options={{ headerShown: false, animation: 'slide_from_right' }} />
           <Stack.Screen name="portfolios/[id]"                 options={{ headerShown: false, animation: 'slide_from_right' }} />
           <Stack.Screen name="project/[projectId]/settings"    options={{ headerShown: false, animation: 'slide_from_right' }} />
