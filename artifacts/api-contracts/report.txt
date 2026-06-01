@@ -1,11 +1,11 @@
 Planora API Contract Check
-Frontend call sites scanned: 416
+Frontend call sites scanned: 422
 Backend routes scanned: 39
 
 Suspicious mappings missing leading slash: 1
 - backend/src/main/java/com/planora/backend/controller/TeamController.java:21 [class-level mapping] api/teams
 
-Frontend calls with no backend match: 365
+Frontend calls with no backend match: 368
 - frontend/web/app/(project)/(agile)/burndown/page.tsx:68 GET /api/sprints/project/:projectId (fetchSprints)
 - frontend/web/app/(project)/(agile)/burndown/page.tsx:102 GET /api/burndown/sprint/:selectedSprintId
 - frontend/web/app/(project)/(agile)/burndown/page.tsx:133 PUT /api/sprints/:id (handleDateSaving)
@@ -19,9 +19,9 @@ Frontend calls with no backend match: 365
 - frontend/web/app/(project)/(agile)/sprint-backlog/components/backlog-card/useBacklogCardHandlers.ts:203 POST /api/tasks/:taskId/label/:labelId (handleAddLabel)
 - frontend/web/app/(project)/(agile)/sprint-backlog/components/backlog-card/useBacklogCardHandlers.ts:217 DELETE /api/tasks/:taskId/label/:labelId (handleRemoveLabel)
 - frontend/web/app/(project)/(agile)/sprint-backlog/components/backlog-card/useBacklogCardHandlers.ts:229 PUT /api/sprints/:id (handleNameSave)
-- frontend/web/app/(project)/(agile)/sprint-backlog/components/backlog-card/useBacklogCardHandlers.ts:255 PUT /api/sprints/:id (confirmEditSprint)
+- frontend/web/app/(project)/(agile)/sprint-backlog/components/backlog-card/useBacklogCardHandlers.ts:255 PUT /api/sprints/:id
 - frontend/web/app/(project)/(agile)/sprint-backlog/components/backlog-card/useBacklogCardHandlers.ts:270 PUT /api/sprints/:id (saveGoal)
-- frontend/web/app/(project)/(agile)/sprint-backlog/components/backlog-card/useBacklogCardHandlers.ts:294 PUT /api/sprints/:id/start (confirmStartSprint)
+- frontend/web/app/(project)/(agile)/sprint-backlog/components/backlog-card/useBacklogCardHandlers.ts:294 PUT /api/sprints/:id/start
 - frontend/web/app/(project)/(agile)/sprint-backlog/components/backlog-card/useBacklogCardHandlers.ts:314 PUT /api/sprints/:id/complete (doCompleteSprint)
 - frontend/web/app/(project)/(agile)/sprint-backlog/components/backlog-card/useBacklogCardHandlers.ts:331 DELETE /api/sprints/:id (doDeleteSprint)
 - frontend/web/app/(project)/(agile)/sprint-backlog/components/CreateTaskModal.tsx:55 GET /api/projects/:projectId (loadMembers)
@@ -36,7 +36,7 @@ Frontend calls with no backend match: 365
 - frontend/web/app/(project)/(agile)/sprint-backlog/page.tsx:309 PUT /api/tasks/:id
 - frontend/web/app/(project)/(agile)/sprint-backlog/page.tsx:582 PUT /api/tasks/:id
 - frontend/web/app/(project)/(agile)/sprint-backlog/page.tsx:613 PUT /api/tasks/:id
-- frontend/web/app/(project)/(agile)/sprint-backlog/page.tsx:784 GET /api/burndown/project/:projectId/velocity (handleKeyDown)
+- frontend/web/app/(project)/(agile)/sprint-backlog/page.tsx:784 GET /api/burndown/project/:projectId/velocity
 - frontend/web/app/(project)/(agile)/sprint-backlog/page.tsx:888 PUT /api/tasks/:taskId
 - frontend/web/app/(project)/(agile)/sprint-backlog/page.tsx:938 PUT /api/tasks/:taskId
 - frontend/web/app/(project)/(agile)/sprint-board/components/CreateTaskModal.tsx:85 GET /api/projects/:projectId (loadMembers)
@@ -49,17 +49,17 @@ Frontend calls with no backend match: 365
 - frontend/web/app/(project)/calendar/api.ts:66 GET /api/tasks/project/:pid/all
 - frontend/web/app/(project)/calendar/api.ts:67 GET /api/sprints/project/:pid
 - frontend/web/app/(project)/github/[projectId]/GitHubProjectPage.tsx:1758 POST /api/github/revoke (handleLogout)
-- frontend/web/app/(project)/layout.tsx:63 GET /api/projects/:projectId (syncProjectContext)
+- frontend/web/app/(project)/layout.tsx:63 GET /api/projects/:projectId
 - frontend/web/app/(project)/layout.tsx:78 POST /api/projects/:projectId/access
 - frontend/web/app/(project)/list/components/TaskRow.tsx:115 PATCH /api/tasks/:id/priority (handlePriorityChange)
 - frontend/web/app/(project)/list/hooks/useListTasks.ts:251 PUT /api/tasks/:taskId
 - frontend/web/app/(project)/list/hooks/useListTasks.ts:265 DELETE /api/tasks/:taskId
-- frontend/web/app/(project)/project/[id]/chat/components/chatMessage.tsx:260 GET /api/projects/:projectId/chat/messages/refresh-document (handleDocumentClick)
-- frontend/web/app/(project)/project/[id]/chat/components/uploadChatDocument.ts:6 POST /api/projects/:projectId/chat/messages/upload-document (uploadChatDocument)
-- frontend/web/app/(project)/project/[id]/settings/RecurringSchedulesManager.tsx:33 GET /api/tasks/project/:projectId/all (RecurringSchedulesManager)
+- frontend/web/app/(project)/project/[id]/chat/components/chatMessage.tsx:260 GET /api/projects/:projectId/chat/messages/refresh-document
+- frontend/web/app/(project)/project/[id]/chat/components/uploadChatDocument.ts:6 POST /api/projects/:projectId/chat/messages/upload-document
+- frontend/web/app/(project)/project/[id]/settings/RecurringSchedulesManager.tsx:33 GET /api/tasks/project/:projectId/all
 - frontend/web/app/(project)/project/[id]/settings/RecurringSchedulesManager.tsx:54 PUT /api/tasks/:id (handleToggleActive)
 - frontend/web/app/(project)/project/[id]/settings/RecurringSchedulesManager.tsx:80 PUT /api/tasks/:id (handleRemoveRecurrence)
-- frontend/web/app/(project)/workload/page.tsx:83 GET /api/projects/:pid (WorkloadPage)
+- frontend/web/app/(project)/workload/page.tsx:83 GET /api/projects/:pid
 - frontend/web/app/(project)/workload/page.tsx:86 GET /api/teams/:teamId/members
 - frontend/web/app/createProject/inviteMembers/page.tsx:133 POST /api/projects/:projectId/invitations
 - frontend/web/app/dashboard/components/recentspaces/RecentProjectCard.tsx:51 POST /api/projects/:id/favorite (handleFavoriteClick)
@@ -70,15 +70,15 @@ Frontend calls with no backend match: 365
 - frontend/web/app/profile/hooks/useProfile.ts:122 PUT /api/user/profile/update (onSaveProfile)
 - frontend/web/app/profile/hooks/useProfile.ts:160 POST /api/user/profile/photo (onUploadPhoto)
 - frontend/web/app/taskcard/ActivityFeed.tsx:59 GET /api/tasks/:taskId/activities (load)
-- frontend/web/app/taskcard/components/DependencyPicker.tsx:32 GET /api/tasks/project/:projectId/all (onCancel)
+- frontend/web/app/taskcard/components/DependencyPicker.tsx:32 GET /api/tasks/project/:projectId/all
 - frontend/web/app/taskcard/components/DependencyPicker.tsx:49 POST /api/tasks/:taskId/dependencies/:id (handleSelect)
 - frontend/web/app/taskcard/page.tsx:85 GET /api/tasks/:taskId
-- frontend/web/app/taskcard/page.tsx:158 PUT /api/tasks/:taskId (updateTask)
+- frontend/web/app/taskcard/page.tsx:158 PUT /api/tasks/:taskId
 - frontend/web/app/taskcard/sidebar/CreateIssueModal.tsx:171 POST /api/tasks/:taskId/github-issue (handleSubmit)
 - frontend/web/app/taskcard/sidebar/CustomFieldsSection.tsx:30 GET /api/tasks/:taskId/custom-fields (fetchFields)
 - frontend/web/app/taskcard/sidebar/CustomFieldsSection.tsx:50 PATCH /api/tasks/:taskId/custom-fields (handleUpdate)
-- frontend/web/app/taskcard/sidebar/CustomFieldsSection.tsx:61 GET /api/tasks/:taskId/custom-fields (handleUpdate)
-- frontend/web/app/taskcard/sidebar/MultiAssigneeSection.tsx:37 GET /api/projects/:projectId/members (onChanged)
+- frontend/web/app/taskcard/sidebar/CustomFieldsSection.tsx:61 GET /api/tasks/:taskId/custom-fields
+- frontend/web/app/taskcard/sidebar/MultiAssigneeSection.tsx:37 GET /api/projects/:projectId/members
 - frontend/web/app/taskcard/sidebar/MultiAssigneeSection.tsx:64 PATCH /api/tasks/:taskId/assignees (addAssignee)
 - frontend/web/app/taskcard/sidebar/MultiAssigneeSection.tsx:72 PATCH /api/tasks/:taskId/assignees (removeAssignee)
 - frontend/web/app/taskcard/sidebar/TaskGitHubSection.tsx:304 GET /api/tasks/:taskId/github
@@ -92,23 +92,23 @@ Frontend calls with no backend match: 365
 - frontend/web/app/taskcard/TaskHeader.tsx:58 POST /api/tasks/:numericTaskId/save-as-template (handleSaveTemplate)
 - frontend/web/app/taskcard/TaskMainContent.tsx:192 DELETE /api/tasks/:taskId/dependencies/:id
 - frontend/web/app/taskcard/TaskMainContent.tsx:249 DELETE /api/tasks/:id/dependencies/:taskId
-- frontend/web/app/taskcard/TemplatePicker.tsx:18 GET /api/projects/:projectId/templates (onClose)
-- frontend/web/components/github/CreateIssueFromTaskModal.tsx:87 POST /api/github/issues/create (handleSubmit)
+- frontend/web/app/taskcard/TemplatePicker.tsx:18 GET /api/projects/:projectId/templates
+- frontend/web/components/github/CreateIssueFromTaskModal.tsx:87 POST /api/github/issues/create
 - frontend/web/components/github/ImportIssueModal.tsx:52 POST /api/github/issues/import (handleImport)
 - frontend/web/components/layout/topbar/GlobalSearch.tsx:128 GET /api/search
 - frontend/web/components/shared/CreateTaskModal.tsx:75 GET /api/projects/:projectId (loadMembers)
 - frontend/web/components/shared/CreateTaskModal.tsx:79 GET /api/teams/:teamId/members (loadMembers)
 - frontend/web/hooks/useCommandPalette.ts:47 GET /api/tasks/project/:projectId/all
-- frontend/web/lib/dms.ts:126 GET /api/projects/:projectId/folders/:folderId/permissions (getFolderPermissions)
-- frontend/web/lib/dms.ts:131 PUT /api/projects/:projectId/folders/:folderId/permissions (updateFolderPermissions)
-- frontend/web/lib/dms.ts:135 GET /api/projects/:projectId/storage-quota (getProjectStorageQuota)
-- frontend/web/lib/dms.ts:140 GET /api/projects/:projectId/folders (listFolders)
-- frontend/web/lib/dms.ts:145 POST /api/projects/:projectId/folders (createFolder)
-- frontend/web/lib/dms.ts:153 DELETE /api/projects/:projectId/folders/:folderId (deleteFolder)
-- frontend/web/lib/dms.ts:161 GET /api/projects/:projectId/documents (listDocuments)
-- ... 265 more
+- frontend/web/lib/dms.ts:126 GET /api/projects/:projectId/folders/:folderId/permissions
+- frontend/web/lib/dms.ts:131 PUT /api/projects/:projectId/folders/:folderId/permissions
+- frontend/web/lib/dms.ts:135 GET /api/projects/:projectId/storage-quota
+- frontend/web/lib/dms.ts:140 GET /api/projects/:projectId/folders
+- frontend/web/lib/dms.ts:145 POST /api/projects/:projectId/folders
+- frontend/web/lib/dms.ts:153 DELETE /api/projects/:projectId/folders/:folderId
+- frontend/web/lib/dms.ts:161 GET /api/projects/:projectId/documents
+- ... 268 more
 
-Critical frontend contract misses: 262
+Critical frontend contract misses: 263
 - frontend/web/app/(project)/(agile)/sprint-board/hooks/useSprintBoardActions.ts:116 POST /api/tasks
 - frontend/web/app/(project)/calendar/api.ts:7 PATCH /api/tasks/:taskId/dates
 - frontend/web/app/(project)/calendar/api.ts:46 GET /api/calendar/events
@@ -159,7 +159,7 @@ Critical frontend contract misses: 262
 - frontend/web/services/collaboration-contract.ts:147 GET /api/projects/:projectId/chat/messages
 - frontend/web/services/collaboration-contract.ts:153 GET /api/projects/:projectId/chat/messages
 - frontend/web/services/collaboration-contract.ts:159 PATCH /api/projects/:projectId/chat/messages/:messageId
-- ... 212 more
+- ... 213 more
 
 Duplicate frontend endpoint payloads: 16
 - POST /api/tasks
@@ -192,13 +192,10 @@ Duplicate frontend endpoint payloads: 16
   - object:newPassword: frontend/mobile/src/hooks/useResetPassword.ts:35
 - POST /api/projects/:projectId/chat/telemetry
   - expr:payload: frontend/web/services/collaboration-contract.ts:118
-  - object:target: frontend/mobile/src/services/chatService.ts:223
+  - object:target: frontend/mobile/src/services/chatService.ts:244
 - POST /api/projects/:projectId/chat/rooms
   - expr:payload: frontend/web/services/collaboration-contract.ts:195
-  - object:members: frontend/mobile/src/services/chatService.ts:147
-- PATCH /api/projects/:projectId/chat/rooms/:roomId/meta
-  - expr:updates: frontend/web/services/collaboration-contract.ts:202
-  - type:{ name?: string; topic?: string; description?: string }: frontend/mobile/src/services/chatService.ts:163
+  - object:members: frontend/mobile/src/services/chatService.ts:168
 - POST /api/projects
   - expr:payload: frontend/web/services/projects-contract.ts:157
   - object:projectKey,teamOption,type: frontend/mobile/src/hooks/useCreateProject.ts:130
@@ -214,20 +211,22 @@ Duplicate frontend endpoint payloads: 16
 - POST /api/kanban-columns
   - expr:payload: frontend/web/services/tasks-contract.ts:339
   - object:kanbanId,position: frontend/mobile/src/hooks/useProjectBoard.ts:485
+- POST /api/projects/:projectId/chat/messages
+  - object:formatType,recipient: frontend/mobile/src/services/chatService.ts:109
+  - object:formatType,roomId: frontend/mobile/src/services/chatService.ts:124
 
-Backend endpoints with no frontend/mobile usage: 11
+Backend endpoints with no frontend/mobile usage: 10
 - backend/src/main/java/com/planora/backend/controller/KanbanColumnController.java:32 ANY /api/kanban-columns/kanban/:kanbanId
 - backend/src/main/java/com/planora/backend/controller/KanbanController.java:35 ANY /api/kanbans/:id
 - backend/src/main/java/com/planora/backend/controller/KanbanController.java:42 ANY /api/kanbans/:id
 - backend/src/main/java/com/planora/backend/controller/KanbanController.java:47 ANY /api/kanbans/:id
 - backend/src/main/java/com/planora/backend/controller/KanbanController.java:53 ANY /api/kanbans/project/:projectId
 - backend/src/main/java/com/planora/backend/controller/KanbanController.java:65 ANY /api/kanbans/project/:projectId/auto-create
-- backend/src/main/java/com/planora/backend/controller/NotificationController.java:38 ANY /api/notifications/unread-count
 - backend/src/main/java/com/planora/backend/controller/UserController.java:73 ANY /api/auth/resend-otp
 - backend/src/main/java/com/planora/backend/controller/UserController.java:128 ANY /api/auth/users/:userId/photo
 - backend/src/main/java/com/planora/backend/controller/UserController.java:143 ANY /api/auth/try
 - backend/src/main/java/com/planora/backend/controller/UserController.java:148 ANY /api/auth/me
 
 Summary
-- Critical issues: 382
-- Informational backend-only routes: 11
+- Critical issues: 385
+- Informational backend-only routes: 10
