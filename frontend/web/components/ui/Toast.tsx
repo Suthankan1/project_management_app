@@ -117,7 +117,7 @@ function ToastItem({
         <div className="flex items-center gap-2 ml-2">
           <button
             onClick={() => {
-              t.onAction && t.onAction();
+              t.onAction?.();
               onDismiss(t.id);
             }}
             className="text-sm font-semibold text-cu-primary hover:underline"

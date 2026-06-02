@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CheckSquare, Square, Plus, Loader2 } from 'lucide-react';
 import api from '@/lib/axios';
+import { toast } from '@/components/ui';
 
 interface Subtask {
   id: number;
@@ -80,7 +81,19 @@ const SubtaskList: React.FC<SubtaskListProps> = ({ subtasks: initialSubtasks, ta
     try {
       await api.patch(`/api/tasks/${st.id}/status`, { status: newStatus });
     } catch {
+      // revert
       setSubtasks(prev => prev.map(s => s.id === st.id ? { ...s, status: st.status } : s));
+      // offer retry
+      toast('Failed to update subtask status', 'error', 8000, 'Retry', async () => {
+        setToggleLoading(st.id);
+        try {
+          await api.patch(`/api/tasks/${st.id}/status`, { status: newStatus });
+        } catch {
+          toast('Retry failed', 'error');
+        } finally {
+          setToggleLoading(null);
+        }
+      });
     } finally {
       setToggleLoading(null);
     }

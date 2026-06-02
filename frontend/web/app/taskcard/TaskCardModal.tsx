@@ -128,6 +128,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [canEdit, setCanEdit] = useState(true);
   const [canChangeReporter, setCanChangeReporter] = useState(false);
+  const [, setIsSyncing] = useState(false);
   const [projectMembers, setProjectMembers] = useState<ProjectMemberOption[]>([]);
   const [projectLabels, setProjectLabels] = useState<LabelOption[]>([]);
   const [projectSprints, setProjectSprints] = useState<SprintOption[]>([]);
@@ -294,6 +295,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
     if (!taskData) return;
     // Optimistic: apply locally before the API call so the UI reflects the change without latency
     setTaskData((prev) => prev ? { ...prev, ...updates } : prev);
+    setIsSyncing(true);
     try {
       await api.put(`/api/tasks/${taskId}`, updates);
       wasModified.current = true;
@@ -306,6 +308,8 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
       await fetchTaskData();
       const axiosErr = err as { response?: { data?: { message?: string } } };
       toast('Failed to update task: ' + (axiosErr?.response?.data?.message || 'Unknown error'), 'error');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
