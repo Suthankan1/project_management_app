@@ -11,6 +11,8 @@ interface ToastItem {
   message: string;
   type: ToastType;
   duration?: number;
+  actionLabel?: string;
+  onAction?: (() => void) | null;
 }
 
 const iconMap: Record<ToastType, React.ReactNode> = {
@@ -31,15 +33,21 @@ const bgMap: Record<ToastType, string> = {
 let addToastFn: ((toast: Omit<ToastItem, 'id'>) => void) | null = null;
 
 export type ToastFunction = {
-  (message: string, type?: ToastType, duration?: number): void;
+  (message: string, type?: ToastType, duration?: number, actionLabel?: string, onAction?: (() => void) | null): void;
   info: (message: string, duration?: number) => void;
   success: (message: string, duration?: number) => void;
   error: (message: string, duration?: number) => void;
   warning: (message: string, duration?: number) => void;
 };
 
-const toastBase = (message: string, type: ToastType = 'info', duration?: number) => {
-  addToastFn?.({ message, type, duration });
+const toastBase = (
+  message: string,
+  type: ToastType = 'info',
+  duration?: number,
+  actionLabel?: string,
+  onAction?: (() => void) | null,
+) => {
+  addToastFn?.({ message, type, duration, actionLabel, onAction });
 };
 
 export const toast: ToastFunction = Object.assign(toastBase, {
@@ -105,12 +113,32 @@ function ToastItem({
     >
       <span className="mt-0.5 shrink-0">{iconMap[t.type]}</span>
       <p className="text-sm text-cu-text-primary flex-1">{t.message}</p>
-      <button
-        onClick={() => onDismiss(t.id)}
-        className="shrink-0 text-cu-text-tertiary hover:text-cu-text-primary transition-colors"
-      >
-        <X size={14} />
-      </button>
+      {t.actionLabel && t.onAction ? (
+        <div className="flex items-center gap-2 ml-2">
+          <button
+            onClick={() => {
+              t.onAction && t.onAction();
+              onDismiss(t.id);
+            }}
+            className="text-sm font-semibold text-cu-primary hover:underline"
+          >
+            {t.actionLabel}
+          </button>
+          <button
+            onClick={() => onDismiss(t.id)}
+            className="shrink-0 text-cu-text-tertiary hover:text-cu-text-primary transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => onDismiss(t.id)}
+          className="shrink-0 text-cu-text-tertiary hover:text-cu-text-primary transition-colors"
+        >
+          <X size={14} />
+        </button>
+      )}
     </motion.div>
   );
 }
