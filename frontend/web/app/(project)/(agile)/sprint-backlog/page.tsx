@@ -11,6 +11,7 @@ import { useSearchParams } from 'next/navigation';
 const VelocityChart = dynamic(() => import('./components/VelocityChart'), { ssr: false });
 import type { SprintVelocityPoint } from './components/VelocityChart';
 import { getUserFromToken } from '@/lib/auth';
+import api from '@/lib/axios';
 import { toast } from '@/components/ui';
 import { getProjectLabels, createLabel } from '@/services/labels-service';
 import type { TaskItem, SprintItem, Label } from '@/types';
@@ -158,6 +159,7 @@ export default function SprintBacklogPage() {
 
   const fetchData = useCallback(async (options: { showSpinner?: boolean; forceNetwork?: boolean } = {}) => {
     const { showSpinner = true, forceNetwork = false } = options;
+    if (!projectId) return;
     
     const cKey = buildSessionCacheKey('sprint-backlog', [projectId, showArchived.toString()]);
     let hasCachedData = false;
@@ -181,12 +183,10 @@ export default function SprintBacklogPage() {
         tasksPromises.push(tasksApi.listAllByProject(projectId, { archived: true }));
       }
 
-      const [sprintsRes, ...tasksResList] = await Promise.all([
+      const [rawSprints, ...tasksResList] = await Promise.all([
         sprintsApi.listByProject(projectId),
         ...tasksPromises,
       ]);
-
-      const rawSprints = sprintsRes as any[];
       const rawTasks: RawTask[] = [];
       tasksResList.forEach((res) => {
         rawTasks.push(...(res as RawTask[]));
@@ -195,8 +195,7 @@ export default function SprintBacklogPage() {
       const mappedTasks = uniqueRaw.map((t) => mapRawTask(t));
 
       if (projectIdNum) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setTasksForProject(projectIdNum, rawTasks as any);
+        setTasksForProject(projectIdNum, mappedTasks);
       }
 
       const backlogTasks = mappedTasks.filter((t) => !t.sprintId);
@@ -207,9 +206,13 @@ export default function SprintBacklogPage() {
         sprintTaskMap.get(sid)!.push(t);
       });
 
-      const newSprints = rawSprints.map((s) => ({
-        ...s,
-        goal: s.goal ?? '',
+      const newSprints: SprintItem[] = rawSprints.map((s) => ({
+        id: s.id,
+        name: s.name,
+        status: s.status,
+        startDate: s.startDate ?? undefined,
+        endDate: s.endDate ?? undefined,
+        goal: (s as SprintItem & { goal?: string }).goal ?? '',
         tasks: sprintTaskMap.get(s.id) ?? []
       }));
 
