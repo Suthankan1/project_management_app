@@ -12,10 +12,10 @@ import RecurrenceSection from './sidebar/RecurrenceSection';
 import TaskGitHubSection from './sidebar/TaskGitHubSection';
 import SidebarField from './sidebar/SidebarField';
 import CustomFieldsSection from './sidebar/CustomFieldsSection';
-import api from '@/lib/axios';
 import { Check, ChevronDown, Link2, Plus } from 'lucide-react';
 import GitHubIssueBadge from '@/components/github/GitHubIssueBadge';
 import GitHubMark from '@/components/github/GitHubMark';
+import { projectsApi } from '@/services/projects-contract';
 import type { ProjectGitHubConnection } from '@/services/githubService';
 
 interface MultiAssignee {
@@ -35,6 +35,8 @@ interface ProjectCustomField {
 interface TaskSidebarProps {
   taskId?: number;
   projectId?: number;
+  taskTitle?: string;
+  taskDescription?: string;
   status: string;
   assignee: string | null;
   reporter: string | null;
@@ -82,7 +84,7 @@ interface TaskSidebarProps {
 }
 
 const TaskSidebar: React.FC<TaskSidebarProps> = ({
-  taskId, projectId, status, assignee, reporter, labels, labelIds = [], priority, sprint, storyPoint,
+  taskId, projectId, taskTitle, taskDescription, status, assignee, reporter, labels, labelIds = [], priority, sprint, storyPoint,
   milestoneId, milestoneName, githubIssueNumber = null, githubRepoFullName = null, projectGitHubRepo = null, assignees,
   recurrenceRule, recurrenceEnd, customInterval, recurrenceLimit, dates, reporterId, sprintId,
   onUpdateStatus, onUpdatePriority, onUpdateStoryPoint, onUpdateDueDate, onUpdateMilestone,
@@ -102,10 +104,10 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
   React.useEffect(() => {
     if (projectId == null) return;
     let active = true;
-    api.get(`/api/projects/${projectId}/custom-fields`)
+    projectsApi.getCustomFields(projectId)
       .then((res) => {
         if (active) {
-          setProjectCustomFields(res.data || []);
+          setProjectCustomFields(res || []);
         }
       })
       .catch(() => {});
@@ -311,7 +313,13 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
         {sections.dates && <DateSection dates={dates} onUpdateDueDate={canEdit ? onUpdateDueDate : undefined} onUpdateStartDate={canEdit ? onUpdateStartDate : undefined} />}
       </div>
       {taskId != null && (
-        <TaskGitHubSection taskId={taskId} projectId={projectId} />
+        <TaskGitHubSection
+          taskId={taskId}
+          projectId={projectId}
+          taskTitle={taskTitle || `Task #${taskId}`}
+          taskDescription={taskDescription}
+          taskLabels={labels}
+        />
       )}
       <div className="border border-cu-border rounded-xl bg-cu-bg shadow-cu-sm overflow-hidden">
         <button onClick={() => toggleSection('github')} className="w-full px-4 py-2.5 border-b border-cu-border text-[10px] font-bold text-cu-text-muted uppercase tracking-wider flex items-center justify-between">

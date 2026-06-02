@@ -42,6 +42,7 @@ import com.planora.backend.service.GithubIssueImportService;
 import com.planora.backend.service.GithubIssuesSyncService;
 import com.planora.backend.service.GithubNotificationService;
 import com.planora.backend.service.JWTService;
+import com.planora.backend.service.TaskService;
 
 @WebMvcTest(GithubIssuesController.class)
 @SuppressWarnings("unused")
@@ -73,6 +74,9 @@ class GithubIssuesControllerTest {
 
     @MockitoBean
     private UserDetailsService userDetailsService;
+
+        @MockitoBean
+        private TaskService taskService;
 
     private User userEntity;
     private UserPrincipal principal;
@@ -242,6 +246,29 @@ class GithubIssuesControllerTest {
                 "octocat",
                 null,
                 List.of());
+        verify(taskService, never()).linkGithubIssue(any(), any(), any(), any());
+    }
+
+    @Test
+    void createIssue_linksTaskWhenTaskIdIsProvided() throws Exception {
+        GithubIssueDTO createdIssue = new GithubIssueDTO();
+        createdIssue.setNumber(34);
+        createdIssue.setTitle("Fix login");
+        when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
+        when(githubIssuesSyncService.createIssue(any(GithubIssueCreateRequestDTO.class), org.mockito.ArgumentMatchers.eq("github-token")))
+                .thenReturn(createdIssue);
+
+        mockMvc.perform(post("/api/github/issues/create")
+                        .with(user(principal))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"repoFullName":"planora/app","title":"Fix login","taskId":123}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.number").value(34));
+
+        verify(taskService).linkGithubIssue(123L, 34L, "planora/app", 7L);
     }
 
     @Test

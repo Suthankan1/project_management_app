@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import api from '@/lib/axios';
 import { ensureValidToken, saveToken, saveRefreshToken, setRememberMe } from '@/lib/auth';
+import { authApi } from '@/services/api-contract';
 
 /*
  * Headless Business Logic Hook for Login.
@@ -66,28 +66,28 @@ export function useLoginForm() {
 
     try {
       // API CONTRACT: Send credentials to Spring Boot.
-      const response = await api.post('/api/auth/login', {
+      const response = await authApi.login({
         email: email.toLowerCase(),
         password,
       });
 
-      if (response.data.success) {
+      if ((response as { success?: boolean }).success) {
         // Step 1: Tell our local auth utility how long to keep these tokens alive based on user preference.
         setRememberMe(remember);
 
         // Step 2: Persist the Access JWT.
-        saveToken(response.data.token);
+        saveToken((response as { token?: string }).token || (response as { accessToken?: string }).accessToken || '');
 
         // Step 3: Persist the Refresh Token (if the backend issues them).
-        if (response.data.refreshToken) {
-          saveRefreshToken(response.data.refreshToken);
+        if ((response as { refreshToken?: string }).refreshToken) {
+          saveRefreshToken((response as { refreshToken?: string }).refreshToken!);
         }
 
         // Step 4: Route to the authenticated app (or back to the deep link they came from).
         const redirectTo = searchParams.get('redirect') || '/dashboard';
         router.push(redirectTo);
       } else {
-        setError(response.data.message || 'Login failed. Please try again.');
+        setError((response as { message?: string }).message || 'Login failed. Please try again.');
       }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {

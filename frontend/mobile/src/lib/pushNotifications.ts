@@ -1,11 +1,16 @@
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
 
 export async function registerForPushNotifications(): Promise<string | null> {
+  if (Constants.appOwnership === 'expo') {
+    return null;
+  }
+
   if (!Device.isDevice) {
     return null;
   }
+
+  const Notifications = await import('expo-notifications');
 
   const { status } = await Notifications.requestPermissionsAsync();
   if (status !== 'granted') {

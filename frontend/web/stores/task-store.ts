@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import type { Task } from '@/types';
+import type { TaskItem } from '@/types';
 
 interface TaskStoreState {
   // Active task for detail panel
@@ -20,8 +20,8 @@ interface TaskStoreState {
   setEditingTaskId: (id: number | null) => void;
 
   // Per-project task cache (stale-while-revalidate)
-  tasksByProject: Record<number, Task[]>;
-  setTasksForProject: (projectId: number, tasks: Task[]) => void;
+  tasksByProject: Record<number, TaskItem[]>;
+  setTasksForProject: (projectId: number, tasks: TaskItem[]) => void;
 }
 
 export const useTaskStore = create<TaskStoreState>()((set, get) => ({

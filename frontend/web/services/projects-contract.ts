@@ -1,6 +1,14 @@
 import api from '@/lib/axios';
 import type { ProjectMetrics } from '@/types';
 
+export interface ProjectCustomFieldDto {
+  id: number;
+  name: string;
+  fieldType: string;
+  options?: string[];
+  position?: number;
+}
+
 export interface ProjectSummary {
   id: number;
   name: string;
@@ -19,11 +27,17 @@ export interface ProjectSummary {
 
 export interface Member {
   id: number;
-  userId: number;
-  username: string;
-  email: string;
-  role: string;
-  joinedAt: string;
+  role?: string;
+  joinedAt?: string;
+  userId?: number;
+  username?: string;
+  email?: string;
+  user?: {
+    userId: number;
+    username: string;
+    email?: string;
+    profilePicUrl?: string | null;
+  };
 }
 
 export interface PendingInvite {
@@ -143,13 +157,16 @@ export const projectsApi = {
     const { data } = await api.post('/api/projects', payload);
     return data;
   },
-  getCustomFields: async (projectId: number | string): Promise<unknown[]> => {
+  getCustomFields: async (projectId: number | string): Promise<ProjectCustomFieldDto[]> => {
     const { data } = await api.get(`/api/projects/${projectId}/custom-fields`);
     return data;
   },
-  createCustomField: async (projectId: number | string, payload: Record<string, unknown>): Promise<unknown> => {
+  createCustomField: async (projectId: number | string, payload: Record<string, unknown>): Promise<ProjectCustomFieldDto> => {
     const { data } = await api.post(`/api/projects/${projectId}/custom-fields`, payload);
     return data;
+  },
+  deleteCustomField: async (projectId: number | string, fieldId: number | string): Promise<void> => {
+    await api.delete(`/api/projects/${projectId}/custom-fields/${fieldId}`);
   },
   getTeamMembers: async (teamId: number | string): Promise<unknown> => {
     const { data } = await api.get(`/api/teams/${teamId}/members`);

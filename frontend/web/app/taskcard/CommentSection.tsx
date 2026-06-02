@@ -1,10 +1,10 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import api from '@/lib/axios';
 import { getUserFromToken } from '@/lib/auth';
 import ActivityFeed from './ActivityFeed';
 import CommentItem from './components/CommentItem';
+import { authApi, tasksApi } from '@/services/api-contract';
 
 interface Comment {
   id: number;
@@ -37,10 +37,10 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
       // Fetch users to populate profile pictures and map them by username
       const fetchUsers = async () => {
         try {
-          const response = await api.get('/api/auth/users');
+          const response = await authApi.getAllUsers();
           const uidMap: Record<string, string | null> = {};
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          response.data.forEach((u: any) => {
+          response.forEach((u: any) => {
              if (u.username) {
                uidMap[u.username] = u.profilePicUrl || null;
              }
@@ -66,8 +66,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
   const fetchComments = async () => {
     if (!taskId) return;
     try {
-      const response = await api.get(`/api/tasks/${taskId}/comments`);
-      setComments(response.data);
+      const response = await tasksApi.getComments(taskId);
+      setComments(response);
     } catch (error) {
       console.error('Failed to fetch comments:', error);
     }
@@ -90,7 +90,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
 
     try {
       setIsSubmitting(true);
-      await api.post(`/api/tasks/${taskId}/comments`, {
+      await tasksApi.postComment(taskId, {
         content: newComment
       });
       setNewComment('');

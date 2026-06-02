@@ -1,4 +1,5 @@
 import api from '@/lib/axios';
+import { formatLocalDate } from './contract-common';
 import type { PageResponse } from './contract-common';
 import type {
   Sprint,
@@ -9,6 +10,17 @@ import type {
   Subtask,
   Label,
 } from '@/types';
+
+export interface TaskCommentDto {
+  id: number;
+  text: string;
+  authorName: string;
+  createdAt: string;
+}
+
+export interface AssignedTaskQueryParams {
+  limit?: number;
+}
 
 export interface TaskAttachment {
   id: number;
@@ -150,7 +162,10 @@ export const tasksApi = {
     return data;
   },
   updateDates: async (taskId: number | string, payload: { startDate?: string | null; dueDate?: string | null }): Promise<void> => {
-    await api.patch(`/api/tasks/${taskId}/dates`, payload);
+    await api.patch(`/api/tasks/${taskId}/dates`, {
+      startDate: payload.startDate == null ? payload.startDate : formatLocalDate(payload.startDate),
+      dueDate: payload.dueDate == null ? payload.dueDate : formatLocalDate(payload.dueDate),
+    });
   },
   saveAsTemplate: async (taskId: number | string, payload: { templateName: string }): Promise<void> => {
     await api.post(`/api/tasks/${taskId}/save-as-template`, payload);
@@ -159,11 +174,11 @@ export const tasksApi = {
     const { data } = await api.post(`/api/tasks/${taskId}/subtasks`, payload);
     return data;
   },
-  getComments: async (taskId: number | string): Promise<Comment[]> => {
+  getComments: async (taskId: number | string): Promise<TaskCommentDto[]> => {
     const { data } = await api.get(`/api/tasks/${taskId}/comments`);
     return data;
   },
-  postComment: async (taskId: number | string, payload: { content: string }): Promise<Comment> => {
+  postComment: async (taskId: number | string, payload: { content: string }): Promise<TaskCommentDto> => {
     const { data } = await api.post(`/api/tasks/${taskId}/comments`, payload);
     return data;
   },
@@ -197,6 +212,9 @@ export const tasksApi = {
   bulkDelete: async (payload: { taskIds: number[] }): Promise<void> => {
     await api.delete('/api/tasks/bulk', { data: payload });
   },
+  reorderTasks: async (payload: Record<string, unknown>): Promise<void> => {
+    await api.patch('/api/tasks/reorder', payload);
+  },
   assignTaskSingle: async (taskId: number | string, userId: number): Promise<void> => {
     await api.patch(`/api/tasks/${taskId}/assign/${userId}`);
   },
@@ -206,6 +224,30 @@ export const tasksApi = {
   getCalendarEvents: async (projectId: number | string): Promise<Record<string, unknown>[]> => {
     const { data } = await api.get(`/api/calendar/events?projectId=${projectId}`);
     return data;
+  },
+  getAssigned: async (params?: AssignedTaskQueryParams): Promise<Task[]> => {
+    const { data } = await api.get('/api/tasks/assigned', {
+      params,
+    });
+    return data;
+  },
+  getWorkedOn: async (params?: AssignedTaskQueryParams): Promise<Task[]> => {
+    const { data } = await api.get('/api/tasks/worked-on', {
+      params,
+    });
+    return data;
+  },
+  getRecent: async (params?: AssignedTaskQueryParams): Promise<Task[]> => {
+    const { data } = await api.get('/api/tasks/recent', {
+      params,
+    });
+    return data;
+  },
+  addLabel: async (taskId: number | string, labelId: number | string): Promise<void> => {
+    await api.post(`/api/tasks/${taskId}/label/${labelId}`);
+  },
+  removeLabel: async (taskId: number | string, labelId: number | string): Promise<void> => {
+    await api.delete(`/api/tasks/${taskId}/label/${labelId}`);
   },
 };
 

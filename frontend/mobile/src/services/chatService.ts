@@ -100,10 +100,31 @@ export async function searchMessages(projectId: string, query: string): Promise<
   return data.messages || [];
 }
 
-export async function sendRestMessage(projectId: string, content: string, recipient?: string): Promise<ChatMessage> {
+export async function sendRestMessage(
+  projectId: string,
+  content: string,
+  recipient?: string,
+  localId?: string,
+): Promise<ChatMessage> {
   const { data } = await api.post(`/api/projects/${projectId}/chat/messages`, {
     content,
     recipient,
+    localId,
+    formatType: 'PLAIN',
+  });
+  return data;
+}
+
+export async function sendRoomRestMessage(
+  projectId: string,
+  roomId: number,
+  content: string,
+  localId?: string,
+): Promise<ChatMessage> {
+  const { data } = await api.post(`/api/projects/${projectId}/chat/messages`, {
+    content,
+    roomId,
+    localId,
     formatType: 'PLAIN',
   });
   return data;

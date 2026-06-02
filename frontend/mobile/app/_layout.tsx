@@ -1,4 +1,3 @@
-import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -6,6 +5,7 @@ import 'react-native-reanimated';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Platform, View, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
+import Constants from 'expo-constants';
 import SplashAnimation from '@/src/components/SplashAnimation';
 import { getValidToken } from '@/src/auth/storage';
 import { offlineSyncManager } from '@/src/services/offlineSyncManager';
@@ -20,6 +20,7 @@ const SUPPORTED_NOTIFICATION_PREFIXES = [
   '/github/',
   '/create-project/',
   '/portfolios/',
+  '/dashboard/notifications',
   '/(tabs)',
   '/modal',
 ];
@@ -67,21 +68,52 @@ function resolveNotificationRoute(data: Record<string, unknown> | undefined): st
 function NativeNotificationBridge({
   onNotificationResponse,
 }: {
-  onNotificationResponse: (response: Notifications.NotificationResponse | null) => void;
+  onNotificationResponse: (response: NotificationResponseLike | null) => void;
 }) {
-  const lastNotificationResponse = Notifications.useLastNotificationResponse();
-
   useEffect(() => {
-    onNotificationResponse(lastNotificationResponse ?? null);
-  }, [lastNotificationResponse, onNotificationResponse]);
+    if (Constants.appOwnership === 'expo') {
+      return;
+    }
 
-  useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(onNotificationResponse);
-    return () => subscription.remove();
+    let removeListener: (() => void) | null = null;
+    let cancelled = false;
+
+    (async () => {
+      const Notifications = await import('expo-notifications');
+      if (cancelled) {
+        return;
+      }
+
+      const lastResponse = await Notifications.getLastNotificationResponseAsync();
+      if (!cancelled) {
+        onNotificationResponse(lastResponse ?? null);
+      }
+
+      const subscription = Notifications.addNotificationResponseReceivedListener(onNotificationResponse);
+      removeListener = () => subscription.remove();
+    })().catch(() => {
+      // Notification navigation is best effort and must not block app startup.
+    });
+
+    return () => {
+      cancelled = true;
+      removeListener?.();
+    };
   }, [onNotificationResponse]);
 
   return null;
 }
+
+type NotificationResponseLike = {
+  notification: {
+    request: {
+      identifier: string;
+      content: {
+        data?: Record<string, unknown>;
+      };
+    };
+  };
+};
 
 /**
  * Root layout — declares all route groups.
@@ -118,7 +150,7 @@ export default function RootLayout() {
     return (pendingRoute ?? '/(tabs)') as Parameters<typeof router.replace>[0];
   }, [isAuthed, pendingRoute, router]);
 
-  const handleNotificationResponse = useCallback((response: Notifications.NotificationResponse | null) => {
+  const handleNotificationResponse = useCallback((response: NotificationResponseLike | null) => {
     if (!response) {
       return;
     }
@@ -184,6 +216,7 @@ export default function RootLayout() {
           <Stack.Screen name="create-project/index"   options={{ headerShown: false, animation: 'slide_from_bottom' }} />
           <Stack.Screen name="create-project/setup"   options={{ headerShown: false, animation: 'slide_from_right' }} />
           <Stack.Screen name="create-project/invite"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+          <Stack.Screen name="dashboard/notifications" options={{ headerShown: false, animation: 'slide_from_right' }} />
           <Stack.Screen name="portfolios/index"                options={{ headerShown: false, animation: 'slide_from_right' }} />
           <Stack.Screen name="portfolios/[id]"                 options={{ headerShown: false, animation: 'slide_from_right' }} />
           <Stack.Screen name="project/[projectId]/settings"    options={{ headerShown: false, animation: 'slide_from_right' }} />
