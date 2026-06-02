@@ -17,6 +17,7 @@ import {
 } from '../api';
 import type { SprintboardTask, SprintboardFullResponse, Sprintboard } from '../types';
 import type { SprintTeamMemberOption } from '../api';
+import type { AvailableDestSprint } from '../components/CompleteSprintModal';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,7 @@ type SprintSummary = { id: number; status: string; sprintName?: string };
 interface UseSprintBoardActionsArgs {
   projectIdStr: string | null;
   allBoards: SprintboardFullResponse[];
+  allActiveSprints: SprintSummary[];
   setAllBoards: React.Dispatch<React.SetStateAction<SprintboardFullResponse[]>>;
   selectedIdx: number;
   activeSprint: SprintSummary | null;
@@ -42,6 +44,8 @@ interface UseSprintBoardActionsArgs {
 
 export function useSprintBoardActions({
   projectIdStr,
+  allBoards,
+  allActiveSprints,
   setAllBoards,
   selectedIdx,
   activeSprint,
@@ -58,10 +62,42 @@ export function useSprintBoardActions({
   const [successMsg, setSuccessMsg] = useState('');
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [sprintIdToComplete, setSprintIdToComplete] = useState<number | null>(null);
+  const [completeDestination, setCompleteDestination] = useState<number | null>(null);
+  const [availableDestSprints, setAvailableDestSprints] = useState<AvailableDestSprint[]>([]);
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
   const [isCreatingColumn, setIsCreatingColumn] = useState(false);
   const [isBulkApplying, setIsBulkApplying] = useState(false);
+
+  // Compute incomplete task count for a given sprint from the boards already loaded
+  const getIncompleteCount = useCallback((sprintId: number): number => {
+    const idx = allActiveSprints.findIndex((s) => s.id === sprintId);
+    const b = allBoards[idx];
+    if (!b) return 0;
+    return b.columns
+      .filter((col) => col.columnStatus !== 'DONE')
+      .reduce((sum, col) => sum + col.tasks.length, 0);
+  }, [allBoards, allActiveSprints]);
+
+  const incompleteCount = sprintIdToComplete != null ? getIncompleteCount(sprintIdToComplete) : 0;
+
+  // Open the complete-sprint modal: pre-select the sprint, default destination to backlog,
+  // and fetch NOT_STARTED sprints for the destination dropdown.
+  const openCompleteModal = useCallback(async (sprintId: number) => {
+    setSprintIdToComplete(sprintId);
+    setCompleteDestination(null); // default: backlog
+    setShowCompleteConfirm(true);
+    if (!projectIdStr) return;
+    try {
+      const res = await axios.get(`/api/sprints/project/${projectIdStr}`);
+      const notStarted = (res.data as Array<{ id: number; name?: string; sprintName?: string; status: string }>)
+        .filter((s) => s.status === 'NOT_STARTED' && s.id !== sprintId)
+        .map((s) => ({ id: s.id, name: s.sprintName || s.name || `Sprint #${s.id}` }));
+      setAvailableDestSprints(notStarted);
+    } catch {
+      setAvailableDestSprints([]);
+    }
+  }, [projectIdStr]);
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -176,7 +212,7 @@ export function useSprintBoardActions({
     if (!sprintIdToComplete) return;
     setIsUpdating(true);
     try {
-      await completeSprint(sprintIdToComplete);
+      await completeSprint(sprintIdToComplete, completeDestination);
       setShowCompleteConfirm(false);
       setSuccessMsg('Sprint completed successfully!');
       setTimeout(() => setSuccessMsg(''), 1800);
@@ -231,6 +267,10 @@ export function useSprintBoardActions({
     isUpdating, successMsg,
     showCompleteConfirm, setShowCompleteConfirm,
     sprintIdToComplete, setSprintIdToComplete,
+    completeDestination, setCompleteDestination,
+    availableDestSprints,
+    incompleteCount,
+    openCompleteModal,
     isAddingColumn, setIsAddingColumn,
     newColumnName, setNewColumnName,
     isCreatingColumn, isBulkApplying,

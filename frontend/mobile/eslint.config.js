@@ -5,6 +5,9 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
   expoConfig,
   {
+    settings: {
+      'import/core-modules': ['expo-device', 'expo-notifications'],
+    },
     ignores: ['dist/*'],
   },
 ]);

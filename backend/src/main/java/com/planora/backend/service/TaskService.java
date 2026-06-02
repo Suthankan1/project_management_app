@@ -131,10 +131,12 @@ public class TaskService {
                     .orElseThrow(()-> new ResourceNotFoundException("Sprint not found"));
             task.setSprint(sprint);
             // Append to the bottom of the Sprint board.
+            projectRepository.findByIdWithLock(project.getId()); // serialise concurrent position assignments
             task.setSprintPosition(taskRepository.findMaxSprintPositionBySprintId(sprint.getId()) + 1);
             task.setBacklogPosition(null);
         } else {
             // Append to the bottom of the Backlog.
+            projectRepository.findByIdWithLock(project.getId()); // serialise concurrent position assignments
             task.setBacklogPosition(taskRepository.findMaxBacklogPositionByProjectId(project.getId()) + 1);
             task.setSprintPosition(null);
         }
@@ -317,6 +319,7 @@ public class TaskService {
                 // Sent to Backlog
                 task.setSprint(null);
                 task.setSprintPosition(null);
+                projectRepository.findByIdWithLock(task.getProject().getId()); // serialise concurrent position assignments
                 task.setBacklogPosition(taskRepository.findMaxBacklogPositionByProjectId(task.getProject().getId()) + 1);
             } else {
                 // Sent to a new Sprint
@@ -324,6 +327,7 @@ public class TaskService {
                         .orElseThrow(()->new ResourceNotFoundException("Sprint not found"));
                 task.setSprint(sprint);
                 task.setBacklogPosition(null);
+                projectRepository.findByIdWithLock(task.getProject().getId()); // serialise concurrent position assignments
                 task.setSprintPosition(taskRepository.findMaxSprintPositionBySprintId(sprint.getId()) + 1);
             }
         }
@@ -1486,7 +1490,7 @@ public class TaskService {
     // Handles the complex math of rearranging rows when a user drags and drops a task in the UI.
     @Transactional
     public void reorderTasks(Long projectId, Long sprintId, List<Long> orderedTaskIds, Long currentUserId) {
-        Project project = projectRepository.findById(projectId)
+        Project project = projectRepository.findByIdWithLock(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
         requireMinimumRole(project.getTeam().getId(), currentUserId, TeamRole.MEMBER);
         if (orderedTaskIds == null || orderedTaskIds.isEmpty()) {

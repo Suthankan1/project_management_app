@@ -23,25 +23,18 @@ interface IssueCardProps {
   isImported?: boolean;
 }
 
-function stateStyles(state: GitHubIssue['state']): { badge: string; icon: string } {
+function stateStyles(state: GitHubIssue['state']): { badge: string; icon: string; glow: string } {
   if (state === 'open') {
     return {
-      badge: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-      icon: 'text-emerald-500',
+      badge: 'text-emerald-300 bg-emerald-400/10 border-emerald-400/25',
+      icon: 'text-emerald-400',
+      glow: 'shadow-[0_0_8px_rgba(52,211,153,0.3)]',
     };
   }
-
   return {
-    badge: 'bg-violet-50 text-violet-700 border-violet-100',
-    icon: 'text-violet-500',
-  };
-}
-
-function labelStyles(color: string): { backgroundColor: string; color: string; border: string } {
-  return {
-    backgroundColor: `#${color}22`,
-    color: `#${color}`,
-    border: `1px solid #${color}44`,
+    badge: 'text-purple-300 bg-purple-400/10 border-purple-400/25',
+    icon: 'text-purple-400',
+    glow: '',
   };
 }
 
@@ -53,12 +46,27 @@ export function IssueCard({ issue, onImport, isImported = false }: IssueCardProp
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2, boxShadow: '0 8px 28px rgba(0,0,0,0.10)' }}
+      whileHover={{
+        y: -3,
+        boxShadow: '0 12px 40px rgba(99,102,241,0.18), inset 0 1px 0 rgba(255,255,255,0.1)',
+      }}
       transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-      className="group relative flex flex-col gap-3 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-slate-300 transition-colors"
+      className="group relative flex flex-col gap-3 p-4 rounded-2xl transition-all"
+      style={{
+        background: 'rgba(255,255,255,0.04)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        border: '1px solid rgba(255,255,255,0.09)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07)',
+      }}
     >
       {isImported && (
-        <span className="absolute top-4 right-4 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-outfit font-semibold text-emerald-700">
+        <span
+          className="absolute top-3.5 right-3.5 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-outfit font-semibold text-emerald-300"
+          style={{
+            background: 'rgba(52,211,153,0.12)',
+            border: '1px solid rgba(52,211,153,0.25)',
+          }}
+        >
           Imported
         </span>
       )}
@@ -68,12 +76,12 @@ export function IssueCard({ issue, onImport, isImported = false }: IssueCardProp
           href={issue.htmlUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-outfit font-bold transition-colors ${stateStyle.badge} hover:border-slate-300`}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-outfit font-bold transition-all ${stateStyle.badge} ${stateStyle.glow}`}
         >
-          <Circle size={11} className={stateStyle.icon} fill="currentColor" strokeWidth={2} />
+          <Circle size={10} className={stateStyle.icon} fill="currentColor" strokeWidth={0} />
           #{issue.number}
         </a>
-        <span className="ml-auto text-[11px] text-slate-400 font-outfit shrink-0">
+        <span className="ml-auto text-[11px] text-slate-600 font-outfit shrink-0">
           {timeAgo(issue.updatedAt)}
         </span>
       </div>
@@ -82,7 +90,7 @@ export function IssueCard({ issue, onImport, isImported = false }: IssueCardProp
         href={issue.htmlUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-sm font-outfit font-semibold text-slate-800 leading-snug line-clamp-2 hover:text-blue-600 transition-colors"
+        className="text-sm font-outfit font-semibold text-slate-100 leading-snug line-clamp-2 hover:text-indigo-300 transition-colors"
       >
         {issue.title}
       </a>
@@ -93,7 +101,11 @@ export function IssueCard({ issue, onImport, isImported = false }: IssueCardProp
             <span
               key={`${label.name}-${label.color}`}
               className="px-1.5 py-0.5 rounded-full text-[10px] font-outfit font-semibold"
-              style={labelStyles(label.color)}
+              style={{
+                backgroundColor: `#${label.color}1a`,
+                color: `#${label.color}`,
+                border: `1px solid #${label.color}30`,
+              }}
             >
               {label.name}
             </span>
@@ -121,39 +133,50 @@ export function IssueCard({ issue, onImport, isImported = false }: IssueCardProp
                       alt={login}
                       width={20}
                       height={20}
-                      className="rounded-full ring-2 ring-white"
+                      className="rounded-full ring-2 ring-[rgba(10,15,35,0.9)]"
                       unoptimized
                     />
                   ) : (
-                    <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center ring-2 ring-white">
-                      <User size={11} className="text-slate-400" />
+                    <div
+                      className="w-5 h-5 rounded-full flex items-center justify-center ring-2 ring-[rgba(10,15,35,0.9)]"
+                      style={{ background: 'rgba(255,255,255,0.08)' }}
+                    >
+                      <User size={10} className="text-slate-400" />
                     </div>
                   )}
                 </div>
               );
             })
           ) : (
-            <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center ring-2 ring-white">
-              <User size={11} className="text-slate-400" />
+            <div
+              className="w-5 h-5 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
+            >
+              <User size={10} className="text-slate-500" />
             </div>
           )}
         </div>
 
-        <span className="flex items-center gap-1.5">
-          <MessageSquare size={11} className="text-slate-400" />
+        <span className="flex items-center gap-1.5 text-slate-600">
+          <MessageSquare size={11} />
           {issue.comments}
         </span>
 
-        <span className="text-slate-400">{timeAgo(issue.updatedAt)}</span>
-
         {onImport && !isImported && (
-          <button
+          <motion.button
             type="button"
             onClick={() => onImport(issue)}
-            className="ml-auto inline-flex items-center rounded-xl bg-slate-900 px-3 py-1.5 text-[11px] font-outfit font-semibold text-white shadow-sm transition-all duration-200 opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto hover:bg-slate-800"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="ml-auto inline-flex items-center rounded-xl px-3 py-1.5 text-[11px] font-outfit font-semibold text-white opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200"
+            style={{
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.7), rgba(168,85,247,0.6))',
+              border: '1px solid rgba(255,255,255,0.15)',
+              boxShadow: '0 2px 12px rgba(99,102,241,0.35)',
+            }}
           >
             Import as Task
-          </button>
+          </motion.button>
         )}
       </div>
     </motion.div>

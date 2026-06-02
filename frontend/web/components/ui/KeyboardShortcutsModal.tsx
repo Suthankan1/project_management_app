@@ -18,9 +18,18 @@ const SHORTCUTS: ShortcutGroup[] = [
   {
     group: 'Global',
     shortcuts: [
+      { keys: ['Ctrl', 'K'], description: 'Open command palette' },
       { keys: ['?'], description: 'Show keyboard shortcuts' },
       { keys: ['Esc'], description: 'Close modal / dismiss' },
       { keys: ['/'], description: 'Focus search' },
+    ],
+  },
+  {
+    group: 'Command Palette',
+    shortcuts: [
+      { keys: ['↑↓'], description: 'Navigate results' },
+      { keys: ['↵'], description: 'Select item / open task' },
+      { keys: ['Esc'], description: 'Close palette' },
     ],
   },
   {

@@ -72,7 +72,7 @@ export default function FilterBar({ filters, onChange, assigneeNames }: FilterBa
   };
 
   return (
-    <div className="flex flex-col gap-3 mb-4">
+    <div className="flex flex-col gap-3">
       {/* Search + Filter toggle row */}
       <div className="flex items-center gap-2">
         {/* Search */}

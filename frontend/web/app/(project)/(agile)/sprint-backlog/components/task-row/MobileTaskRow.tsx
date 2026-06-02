@@ -4,19 +4,22 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowDown, ArrowUp, ChevronDown, Pencil, Trash2, UserPlus, RefreshCw } from 'lucide-react';
 import AssigneeAvatar from '../AssigneeAvatar';
-import { hexToLabelStyle } from '@/components/shared/LabelPicker';
 import { STATUS_LABELS, type TaskStatus } from './TaskRowConstants';
 import type { TaskRowProps } from '../TaskRow';
 import { useTaskRowState } from './useTaskRowState';
 import { formatDate } from './TaskRowConstants';
 import { ArchiveBadge } from '@/components/ui';
 
+function hexToLabelStyle(hex: string): React.CSSProperties {
+  return { backgroundColor: `${hex}20`, color: hex, border: `1px solid ${hex}40` };
+}
+
 export default function MobileTaskRow(props: TaskRowProps) {
   const {
     task, teamMembers = [], onStatusChange, onStoryPointsChange,
-    onAssignTask, onDueDateChange, onDeleteTask, onMoveUp, onMoveDown, projectKey,
+    onAssignTask, onDueDateChange, onDeleteTask,
     canDelete = true, projectLabels = [], onAddLabel, onRemoveLabel, onCreateLabel, extraStatuses = [],
-    hideStatus = false,
+    hideStatus = false, projectKey, onMoveUp, onMoveDown,
   } = props;
 
   const {
@@ -60,7 +63,7 @@ export default function MobileTaskRow(props: TaskRowProps) {
             </span>
           </div>
           {renaming ? (
-            <div>
+            <div className="flex-1 min-w-0">
               <input
                 type="text"
                 maxLength={255}
@@ -147,15 +150,32 @@ export default function MobileTaskRow(props: TaskRowProps) {
             </button>
           </div>
 
-          {/* Status */}
-          <div className="flex-shrink-0" ref={statusRef} onClick={(e) => e.stopPropagation()}>
+          {/* Priority → Status → Delete */}
+          <div className="flex-shrink-0 flex items-center gap-1.5 border-r border-[#F2F4F7] pr-2" onClick={(e) => e.stopPropagation()}>
+            {/* Priority pill */}
+            <span className={`flex-shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${priorityStyle}`}>
+              {priorityKey}
+            </span>
+            {/* Status */}
+            {!hideStatus && (
+              <div ref={statusRef}>
+                <button
+                  type="button"
+                  onClick={() => openStatus()}
+                  className={`flex h-[26px] min-w-[78px] items-center justify-center gap-1 rounded-md px-2 text-[10px] font-semibold uppercase tracking-wide transition-all active:scale-95 ${displayStyle}`}
+                >
+                  <span className="truncate">{displayLabel}</span>
+                  <ChevronDown size={8} className="opacity-50 flex-shrink-0" />
+                </button>
+              </div>
+            )}
+            {/* Delete */}
             <button
               type="button"
-              onClick={() => openStatus()}
-              className={`flex h-11 min-w-[108px] items-center justify-center gap-1.5 rounded-lg px-2 text-[11px] font-bold uppercase tracking-wider shadow-sm transition-all active:scale-95 ${displayStyle}`}
+              onClick={() => canDelete && onDeleteTask(task.id)}
+              className="flex h-[26px] w-[26px] items-center justify-center rounded-md text-[#C1C9D4] hover:text-[#F04438] hover:bg-[#FEF3F2] active:scale-90 transition-all"
             >
-              <span className="truncate">{displayLabel}</span>
-              <ChevronDown size={10} className="opacity-60 flex-shrink-0" />
+              <Trash2 size={12} />
             </button>
           </div>
 
@@ -163,7 +183,7 @@ export default function MobileTaskRow(props: TaskRowProps) {
           <div className="flex-shrink-0 flex items-center relative" ref={assignRef} onClick={(e) => e.stopPropagation()}>
             <button type="button" onClick={() => openAssign()} className="flex items-center active:scale-90 transition-transform">
               {task.assigneeName && task.assigneeName !== 'Unassigned' ? (
-                <AssigneeAvatar name={task.assigneeName} profilePicUrl={task.assigneePhotoUrl} size={28} />
+                <AssigneeAvatar name={task.assigneeName} profilePicUrl={task.assigneePhotoUrl} size={22} />
               ) : (
                 <div className="flex h-11 w-11 items-center justify-center rounded-full border border-dashed border-cu-border text-cu-text-tertiary">
                   <UserPlus size={14} />
@@ -183,9 +203,10 @@ export default function MobileTaskRow(props: TaskRowProps) {
 
           {/* Due Date */}
           {onDueDateChange && (
-            <div className="flex-shrink-0 flex items-center relative" onClick={(e) => e.stopPropagation()}>
+            <div className="flex-shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
               <button
-                type="button" onClick={openDatePicker}
+                type="button"
+                onClick={openDatePicker}
                 title={formatDate(task.dueDate)}
                 className={`text-[12px] font-bold leading-none whitespace-nowrap px-2 py-2 rounded-lg min-h-[44px] ${
                   dueClass === 'overdue' || dueClass === 'old'
@@ -195,7 +216,13 @@ export default function MobileTaskRow(props: TaskRowProps) {
               >
                 {dueClass === 'overdue' ? 'Overdue' : formatDate(task.dueDate)}
               </button>
-              <input ref={dateRef} type="date" value={task.dueDate || ''} onChange={(e) => onDueDateChange(task.id, e.target.value)} className="sr-only" />
+              <input
+                ref={dateRef}
+                type="date"
+                value={task.dueDate || ''}
+                onChange={(e) => onDueDateChange(task.id, e.target.value)}
+                className="sr-only"
+              />
             </div>
           )}
         </div>
@@ -214,6 +241,9 @@ export default function MobileTaskRow(props: TaskRowProps) {
               <button key={s} onClick={() => { onStatusChange(task.id, s); setStatusOpen(false); }}
                 className={`w-full flex items-center px-3 py-2 text-[13px] font-medium rounded-lg transition-colors ${task.status?.toUpperCase() === s ? 'bg-cu-primary-light text-cu-primary' : 'text-cu-text-primary hover:bg-cu-hover'}`}
               >
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{
+                  background: task.status?.toUpperCase() === s ? '#175CD3' : '#D0D5DD'
+                }} />
                 {STATUS_LABELS[s]}
               </button>
             ))}
@@ -235,7 +265,7 @@ export default function MobileTaskRow(props: TaskRowProps) {
               <button key={m.user.userId} onClick={() => { void onAssignTask(task.id, m.user.userId); setAssignOpen(false); }}
                 className="flex w-full items-center gap-3 px-3 py-2 text-[13px] font-medium text-cu-text-primary hover:bg-cu-hover rounded-lg transition-colors"
               >
-                <AssigneeAvatar name={m.user.fullName || m.user.username} profilePicUrl={m.user.profilePicUrl} size={24} />
+                <AssigneeAvatar name={m.user.fullName || m.user.username} profilePicUrl={m.user.profilePicUrl} size={22} />
                 <span className="truncate">{m.user.fullName || m.user.username}</span>
               </button>
             ))}
