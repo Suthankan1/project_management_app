@@ -15,11 +15,11 @@ import { toast } from '@/components/ui';
 
 // Helper exported for unit testing: performs optimistic update and reverts on failure
 export async function optimisticUpdateTaskStatusHelper(
-  tasks: any[],
-  setTasks: (updater: any) => void,
+  tasks: Task[],
+  setTasks: React.Dispatch<React.SetStateAction<Task[]>>,
   taskId: number,
   newStatus: string,
-  updateFn: (taskId: number, status: string, title?: string) => Promise<any>,
+  updateFn: (taskId: number, status: string, title?: string) => Promise<unknown>,
   title?: string,
 ) {
   const previous = tasks;
@@ -28,7 +28,7 @@ export async function optimisticUpdateTaskStatusHelper(
     await updateFn(taskId, newStatus, title);
     return { success: true };
   } catch (err) {
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: previous.find(p => p.id === taskId)?.status } : t));
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: previous.find(p => p.id === taskId)?.status ?? t.status } : t));
     throw err;
   }
 }

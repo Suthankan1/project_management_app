@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -75,25 +75,25 @@ export default function ResetPasswordScreen() {
         useNativeDriver: shouldUseNativeDriver,
       }).start();
     }
-  }, [submitted]);
+  }, [submitted, scaleAnim]);
 
   useEffect(() => {
     if (otp.length !== 6) return;
     const timer = setTimeout(handleSubmit, 150);
     return () => clearTimeout(timer);
-  }, [otp]);
+  }, [otp, handleSubmit]);
 
-  useEffect(() => {
-    if (error) triggerShake();
-  }, [error]);
-
-  const triggerShake = () =>
+  const triggerShake = useCallback(() =>
     Animated.sequence([
       Animated.timing(shakeAnim, { toValue: 8,  duration: 60, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: 4,  duration: 60, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: 0,  duration: 60, useNativeDriver: true }),
-    ]).start();
+    ]).start(), [shakeAnim]);
+
+  useEffect(() => {
+    if (error) triggerShake();
+  }, [error, triggerShake]);
 
   const triggerScale = (index: number) =>
     Animated.sequence([

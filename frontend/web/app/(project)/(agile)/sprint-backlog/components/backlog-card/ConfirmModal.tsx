@@ -3,8 +3,6 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle2, Trash2, X } from 'lucide-react';
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
 export interface ConfirmModalProps {
   open: boolean;
   variant: 'danger' | 'warning' | 'success';
@@ -16,8 +14,6 @@ export interface ConfirmModalProps {
   onConfirm: () => void;
   onCancel: () => void;
 }
-
-// ── Component ────────────────────────────────────────────────────────────────
 
 export default function ConfirmModal({
   open,
@@ -34,25 +30,25 @@ export default function ConfirmModal({
 
   const variantConfig = {
     danger: {
-      iconBg: 'bg-[#FEF3F2]',
-      iconColor: 'text-[#D92D20]',
+      iconBg: 'bg-cu-danger-light',
+      iconColor: 'text-cu-danger',
       icon: <Trash2 size={22} />,
-      btnClass: 'bg-[#D92D20] hover:bg-[#B42318] text-white',
-      borderColor: 'border-[#FDA29B]',
+      btnClass: 'bg-cu-danger hover:bg-cu-danger/85 text-white',
+      borderColor: 'border-cu-danger/30',
     },
     warning: {
-      iconBg: 'bg-[#FFFAEB]',
-      iconColor: 'text-[#B54708]',
+      iconBg: 'bg-amber-50 dark:bg-amber-900/20',
+      iconColor: 'text-amber-600 dark:text-amber-400',
       icon: <AlertTriangle size={22} />,
-      btnClass: 'bg-[#DC6803] hover:bg-[#B54708] text-white',
-      borderColor: 'border-[#FEDF89]',
+      btnClass: 'bg-amber-600 hover:bg-amber-700 text-white',
+      borderColor: 'border-amber-300 dark:border-amber-500/30',
     },
     success: {
-      iconBg: 'bg-[#ECFDF3]',
-      iconColor: 'text-[#027A48]',
+      iconBg: 'bg-cu-success-light',
+      iconColor: 'text-cu-success',
       icon: <CheckCircle2 size={22} />,
-      btnClass: 'bg-[#039855] hover:bg-[#027A48] text-white',
-      borderColor: 'border-[#A6F4C5]',
+      btnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+      borderColor: 'border-cu-success/30',
     },
   };
 
@@ -65,13 +61,13 @@ export default function ConfirmModal({
       onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
       <div
-        className="relative w-full max-w-sm mx-4 rounded-2xl border border-[#E4E7EC] bg-white shadow-2xl"
+        className="relative w-full max-w-sm mx-4 rounded-2xl border border-cu-border bg-cu-bg shadow-2xl"
         style={{ animation: 'confirmSlideIn 0.2s cubic-bezier(0.34,1.56,0.64,1) both' }}
       >
         {/* Close */}
         <button
           onClick={onCancel}
-          className="absolute right-4 top-4 rounded-lg p-1 text-[#98A2B3] hover:text-[#344054] hover:bg-[#F2F4F7] transition-all duration-150"
+          className="absolute right-4 top-4 rounded-lg p-1 text-cu-text-tertiary hover:text-cu-text-primary hover:bg-cu-hover transition-all duration-150"
         >
           <X size={16} />
         </button>
@@ -83,16 +79,16 @@ export default function ConfirmModal({
           </div>
 
           {/* Title & Message */}
-          <h3 className="text-[16px] font-bold text-[#101828] mb-1">{title}</h3>
-          <p className="text-[13.5px] text-[#475467] leading-relaxed">{message}</p>
+          <h3 className="text-[16px] font-bold text-cu-text-primary mb-1">{title}</h3>
+          <p className="text-[13.5px] text-cu-text-secondary leading-relaxed">{message}</p>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2.5 border-t border-[#F2F4F7] px-6 py-4">
+        <div className="flex items-center justify-end gap-2.5 border-t border-cu-border-light px-6 py-4">
           <button
             onClick={onCancel}
             disabled={loading}
-            className="rounded-lg border border-[#D0D5DD] bg-white px-4 py-2.5 text-[13.5px] font-semibold text-[#344054] hover:bg-[#F9FAFB] transition-all duration-150 disabled:opacity-50"
+            className="rounded-lg border border-cu-border bg-cu-bg px-4 py-2.5 text-[13.5px] font-semibold text-cu-text-primary hover:bg-cu-hover transition-all duration-150 disabled:opacity-50"
           >
             {cancelLabel}
           </button>

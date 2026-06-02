@@ -134,11 +134,11 @@ export default function MonthCalendarView({
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
 
   return (
-    <div className="rounded-xl border border-cu-border bg-cu-bg overflow-hidden">
+    <div className="rounded-xl border border-cu-primary/15 bg-cu-bg overflow-hidden shadow-cu-sm">
       {/* Day-name header */}
-      <div className="grid grid-cols-7 border-b border-cu-border">
+      <div className="grid grid-cols-7 border-b border-cu-primary/15 bg-gradient-to-r from-cu-primary/10 via-violet-500/10 to-emerald-500/10">
         {DAY_NAMES.map(name => (
-          <div key={name} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-cu-text-muted">
+          <div key={name} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-cu-text-secondary">
             {name}
           </div>
         ))}
@@ -164,7 +164,7 @@ export default function MonthCalendarView({
         const eventsAreaH = visibleLaneCount * (LANE_H + LANE_GAP) + (overflow.length ? 18 : 4);
 
         return (
-          <div key={weekIdx} className="border-b border-cu-border last:border-b-0">
+          <div key={weekIdx} className="border-b border-cu-border last:border-b-0 odd:bg-cu-bg even:bg-cu-primary/5">
 
             {/* Day-number strip — also the drop targets */}
             <div className="grid grid-cols-7">

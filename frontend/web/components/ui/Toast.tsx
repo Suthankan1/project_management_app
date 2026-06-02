@@ -32,15 +32,30 @@ const bgMap: Record<ToastType, string> = {
 // Global toast state
 let addToastFn: ((toast: Omit<ToastItem, 'id'>) => void) | null = null;
 
-export function toast(
+export type ToastFunction = {
+  (message: string, type?: ToastType, duration?: number, actionLabel?: string, onAction?: (() => void) | null): void;
+  info: (message: string, duration?: number) => void;
+  success: (message: string, duration?: number) => void;
+  error: (message: string, duration?: number) => void;
+  warning: (message: string, duration?: number) => void;
+};
+
+const toastBase = (
   message: string,
   type: ToastType = 'info',
   duration?: number,
   actionLabel?: string,
   onAction?: (() => void) | null,
-) {
+) => {
   addToastFn?.({ message, type, duration, actionLabel, onAction });
-}
+};
+
+export const toast: ToastFunction = Object.assign(toastBase, {
+  info: (message: string, duration?: number) => toastBase(message, 'info', duration),
+  success: (message: string, duration?: number) => toastBase(message, 'success', duration),
+  error: (message: string, duration?: number) => toastBase(message, 'error', duration),
+  warning: (message: string, duration?: number) => toastBase(message, 'warning', duration),
+});
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -101,7 +116,10 @@ function ToastItem({
       {t.actionLabel && t.onAction ? (
         <div className="flex items-center gap-2 ml-2">
           <button
-            onClick={() => { t.onAction && t.onAction(); onDismiss(t.id); }}
+            onClick={() => {
+              t.onAction && t.onAction();
+              onDismiss(t.id);
+            }}
             className="text-sm font-semibold text-cu-primary hover:underline"
           >
             {t.actionLabel}

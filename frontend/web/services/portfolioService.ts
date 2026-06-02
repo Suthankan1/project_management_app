@@ -1,77 +1,34 @@
-import api from '@/lib/axios';
+import { portfoliosApi } from './api-contract';
+import type { Portfolio, PortfolioProject, CreatePortfolioPayload } from './api-contract';
 
-export interface PortfolioProject {
-  id: number;
-  name: string;
-  projectKey: string;
-  description?: string;
-  type: 'AGILE' | 'KANBAN';
-  ownerId: number;
-  ownerName: string;
-  teamId: number;
-  teamName: string;
-  createdAt: string;
-  updatedAt?: string;
-}
-
-export interface Portfolio {
-  id: number;
-  name: string;
-  description?: string;
-  color: string;
-  emoji?: string;
-  ownerId: number;
-  ownerName: string;
-  projectCount: number;
-  projects?: PortfolioProject[];
-  totalTasks?: number;
-  completedTasks?: number;
-  overdueTasks?: number;
-  totalMembers?: number;
-  healthScore?: number;
-  createdAt: string;
-  updatedAt?: string;
-}
-
-export interface CreatePortfolioPayload {
-  name: string;
-  description?: string;
-  color?: string;
-  emoji?: string;
-  projectIds?: number[];
-}
+export type { Portfolio, PortfolioProject, CreatePortfolioPayload };
 
 export const portfolioService = {
   list: async (): Promise<Portfolio[]> => {
-    const { data } = await api.get<Portfolio[]>('/api/portfolios');
-    return data;
+    return portfoliosApi.list();
   },
 
   get: async (id: number): Promise<Portfolio> => {
-    const { data } = await api.get<Portfolio>(`/api/portfolios/${id}`);
-    return data;
+    return portfoliosApi.get(id);
   },
 
   create: async (payload: CreatePortfolioPayload): Promise<Portfolio> => {
-    const { data } = await api.post<Portfolio>('/api/portfolios', payload);
-    return data;
+    return portfoliosApi.create(payload);
   },
 
   update: async (id: number, payload: Partial<CreatePortfolioPayload>): Promise<Portfolio> => {
-    const { data } = await api.put<Portfolio>(`/api/portfolios/${id}`, payload);
-    return data;
+    return portfoliosApi.update(id, payload);
   },
 
   remove: async (id: number): Promise<void> => {
-    await api.delete(`/api/portfolios/${id}`);
+    return portfoliosApi.remove(id);
   },
 
   addProject: async (portfolioId: number, projectId: number): Promise<Portfolio> => {
-    const { data } = await api.post<Portfolio>(`/api/portfolios/${portfolioId}/projects/${projectId}`);
-    return data;
+    return portfoliosApi.addProject(portfolioId, projectId);
   },
 
   removeProject: async (portfolioId: number, projectId: number): Promise<void> => {
-    await api.delete(`/api/portfolios/${portfolioId}/projects/${projectId}`);
+    return portfoliosApi.removeProject(portfolioId, projectId);
   },
 };

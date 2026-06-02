@@ -5,6 +5,9 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/axios';
+import { getUserFromToken } from '@/lib/auth';
+
+const RECENT_SEARCH_LIMIT = 6;
 
 type SearchResultType = 'TASK' | 'DOCUMENT' | 'MEMBER' | 'PROJECT';
 
@@ -66,9 +69,30 @@ export default function GlobalSearch({ projectId }: GlobalSearchProps = {}) {
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const router = useRouter();
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const recentSearchStorageKey = useMemo(() => {
+    const user = getUserFromToken();
+    const identity = user?.userId ?? user?.email ?? 'anonymous';
+    return `planora:global-search:recent:${identity}`;
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(recentSearchStorageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setRecentSearches(parsed.filter((item): item is string => typeof item === 'string').slice(0, RECENT_SEARCH_LIMIT));
+        }
+      }
+    } catch {
+      localStorage.removeItem(recentSearchStorageKey);
+    }
+  }, [recentSearchStorageKey]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -129,27 +153,68 @@ export default function GlobalSearch({ projectId }: GlobalSearchProps = {}) {
     ...(results?.members?.map(item => ({ ...item, section: 'members' as const, key: `member-${item.id}` })) || []),
   ], [results]);
 
+  const saveRecentSearch = useCallback((term: string) => {
+    const normalized = term.trim();
+    if (normalized.length < 2) return;
+
+    setRecentSearches(prev => {
+      const next = [
+        normalized,
+        ...prev.filter(item => item.toLowerCase() !== normalized.toLowerCase()),
+      ].slice(0, RECENT_SEARCH_LIMIT);
+
+      try {
+        localStorage.setItem(recentSearchStorageKey, JSON.stringify(next));
+      } catch {
+        // Recent searches are a convenience; search should still work if storage is unavailable.
+      }
+      return next;
+    });
+  }, [recentSearchStorageKey]);
+
   const handleResultSelect = useCallback((result: FlattenedResult) => {
+    saveRecentSearch(query);
     setIsOpen(false);
     setQuery('');
     router.push(result.url);
-  }, [router]);
+  }, [query, router, saveRecentSearch]);
+
+  const handleRecentSearchSelect = useCallback((term: string) => {
+    saveRecentSearch(term);
+    setQuery(term);
+    setResults(null);
+    setIsOpen(true);
+    setSelectedIndex(-1);
+  }, [saveRecentSearch]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!isOpen || flatResults.length === 0) return;
+    const normalizedQuery = query.trim();
+    const showingRecentSearches = normalizedQuery.length === 0 && recentSearches.length > 0;
+    const navigableCount = showingRecentSearches ? recentSearches.length : flatResults.length;
+
+    if (!isOpen || navigableCount === 0) {
+      if (e.key === 'ArrowDown' && recentSearches.length > 0 && normalizedQuery.length === 0) {
+        e.preventDefault();
+        setIsOpen(true);
+        setSelectedIndex(0);
+      }
+      return;
+    }
 
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(prev => (prev + 1) % flatResults.length);
+        setSelectedIndex(prev => (prev + 1) % navigableCount);
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setSelectedIndex(prev => (prev - 1 + flatResults.length) % flatResults.length);
+        setSelectedIndex(prev => (prev === -1 ? navigableCount - 1 : (prev - 1 + navigableCount) % navigableCount));
         break;
       case 'Enter':
         e.preventDefault();
-        if (selectedIndex >= 0 && selectedIndex < flatResults.length) {
+        if (showingRecentSearches && selectedIndex >= 0 && selectedIndex < recentSearches.length) {
+          handleRecentSearchSelect(recentSearches[selectedIndex]);
+        } else if (selectedIndex >= 0 && selectedIndex < flatResults.length) {
           handleResultSelect(flatResults[selectedIndex]);
         }
         break;
@@ -160,9 +225,10 @@ export default function GlobalSearch({ projectId }: GlobalSearchProps = {}) {
       default:
         break;
     }
-  }, [isOpen, flatResults, selectedIndex, handleResultSelect]);
+  }, [flatResults, handleRecentSearchSelect, handleResultSelect, isOpen, query, recentSearches, selectedIndex]);
 
   const isEmpty = !loading && query.trim().length >= 2 && flatResults.length === 0;
+  const shouldShowRecentSearches = query.trim().length === 0 && recentSearches.length > 0;
 
   const renderIcon = (type: SearchResultType) => {
     if (type === 'TASK') {
@@ -233,11 +299,18 @@ export default function GlobalSearch({ projectId }: GlobalSearchProps = {}) {
           value={query}
           onChange={(e) => {
             const value = e.target.value;
+            const normalizedValue = value.trim();
             setQuery(value);
-            setIsOpen(value.trim().length > 0);
+            setIsOpen(normalizedValue.length >= 2 || (normalizedValue.length === 0 && recentSearches.length > 0));
+            setSelectedIndex(-1);
           }}
           onKeyDown={handleKeyDown}
-          onFocus={() => query.trim().length >= 2 && setIsOpen(true)}
+          onFocus={() => {
+            const normalizedQuery = query.trim();
+            if (normalizedQuery.length >= 2 || (normalizedQuery.length === 0 && recentSearches.length > 0)) {
+              setIsOpen(true);
+            }
+          }}
           placeholder="Search projects, tasks, docs..."
           className="w-full bg-cu-bg-tertiary border border-transparent rounded-[10px] h-9 pl-10 pr-4 text-[13px] text-cu-text-primary outline-none focus:bg-cu-bg focus:border-cu-primary focus:ring-4 focus:ring-cu-primary/10 transition-all placeholder:text-cu-text-muted font-outfit"
         />
@@ -252,7 +325,7 @@ export default function GlobalSearch({ projectId }: GlobalSearchProps = {}) {
       </div>
 
       <AnimatePresence>
-        {isOpen && query.trim().length >= 2 && (
+        {isOpen && (query.trim().length >= 2 || shouldShowRecentSearches) && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -286,7 +359,38 @@ export default function GlobalSearch({ projectId }: GlobalSearchProps = {}) {
             )}
 
             <div className="max-h-[400px] overflow-y-auto py-2">
-              {loading ? (
+              {shouldShowRecentSearches ? (
+                <div>
+                  <div className="px-4 py-1.5 text-[10px] font-bold text-cu-text-muted uppercase tracking-widest">Recent Searches</div>
+                  {recentSearches.map((term, idx) => {
+                    const isSelected = selectedIndex === idx;
+
+                    return (
+                      <button
+                        key={term}
+                        onClick={() => handleRecentSearchSelect(term)}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 transition-colors group text-left ${
+                          isSelected ? 'bg-cu-primary/10 border-l-2 border-l-cu-primary' : 'hover:bg-cu-hover'
+                        }`}
+                        type="button"
+                      >
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-cu-bg-tertiary text-cu-text-muted">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="9" />
+                            <path d="M12 7v5l3 2" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] font-semibold text-cu-text-primary truncate group-hover:text-cu-primary transition-colors">
+                            {term}
+                          </div>
+                          <div className="text-[11px] text-cu-text-secondary truncate">Search again</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : loading ? (
                 <div className="px-4 py-8 flex items-center justify-center gap-2 text-cu-text-secondary">
                   <span className="w-4 h-4 rounded-full border-2 border-cu-border border-t-cu-primary animate-spin" />
                   <span className="text-sm">Searching...</span>
@@ -305,10 +409,10 @@ export default function GlobalSearch({ projectId }: GlobalSearchProps = {}) {
               ) : null}
             </div>
 
-            {flatResults.length > 0 && (
+            {(flatResults.length > 0 || shouldShowRecentSearches) && (
               <div className="bg-cu-bg-secondary px-4 py-2 border-t border-cu-border flex items-center justify-between">
                 <span className="text-[10px] text-cu-text-muted font-bold uppercase tracking-widest">
-                  {flatResults.length} results
+                  {shouldShowRecentSearches ? `${recentSearches.length} recent` : `${flatResults.length} results`}
                 </span>
                 <span className="text-[10px] text-cu-text-muted font-medium">
                   ↑↓ navigate • ↵ select • ⎋ close

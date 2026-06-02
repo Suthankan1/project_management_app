@@ -34,6 +34,7 @@ export interface Dependency {
   id: number;
   title: string;
   relation: string; // BLOCKED_BY | BLOCKS | RELATES_TO
+  status?: string;
 }
 
 // Task interface matching backend response
@@ -73,6 +74,14 @@ export interface Task {
   attachmentCount?: number;  // number of attachments on this task
   ciStatus?: string | null;  // CI/CD pipeline status from GitHub (PASSING | FAILED | RUNNING | null)
   openPrCount?: number;      // number of open pull requests linked to this task
+  recurrenceRule?: string;
+  recurrenceEnd?: string;
+  recurrenceParentId?: number;
+  nextOccurrence?: string;
+  recurrenceActive?: boolean;
+  customInterval?: number;
+  recurrenceLimit?: number;
+  recurrenceCount?: number;
 }
 
 // Subtask interface

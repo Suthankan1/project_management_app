@@ -12,7 +12,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -52,60 +52,47 @@ import com.planora.backend.repository.TaskAccessRepository;
 import com.planora.backend.repository.TaskRepository;
 import com.planora.backend.repository.UserRepository;
 
+import lombok.RequiredArgsConstructor;
+
 /*
  * Handles the complete lifecycle of tasks, including Agile metrics (sprints, story points),
  * complex relationships (dependencies, subtasks), and strict Role-Based Access Control.
  */
 @Service
+@RequiredArgsConstructor
 public class TaskService {
 
-    @Autowired
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
-    @Autowired
-    private KanbanColumnRepository kanbanColumnRepository;
+    private final KanbanColumnRepository kanbanColumnRepository;
 
-    @Autowired
-    private KanbanRepository kanbanRepository;
+    private final KanbanRepository kanbanRepository;
 
-    @Autowired
-    private ProjectRepository projectRepository;
+    private final ProjectRepository projectRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private LabelRepository labelRepository;
+    private final LabelRepository labelRepository;
 
-    @Autowired
-    private CommentRepository commentRepository;
+    private final CommentRepository commentRepository;
 
-    @Autowired
-    private SprintRepository sprintRepository;
+    private final SprintRepository sprintRepository;
 
-    @Autowired
-    private NotificationService notificationService;
+    private final NotificationService notificationService;
 
-    @Autowired
-    private TaskAccessRepository taskAccessRepository;
+    private final TaskAccessRepository taskAccessRepository;
 
-    @Autowired
-    private TaskActivityService taskActivityService;
+    private final TaskActivityService taskActivityService;
 
-    @Autowired
-    private MilestoneRepository milestoneRepository;
+    private final MilestoneRepository milestoneRepository;
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
 
-    @Autowired
-    private TeamMembershipLookupService teamMembershipLookupService;
+    private final TeamMembershipLookupService teamMembershipLookupService;
 
-    @Autowired
-    private TaskGithubService taskGithubService;
+    private final TaskGithubService taskGithubService;
 
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
 
     // ── 1. CREATE TASK ──────────────────────────────────────────────────────────
 
@@ -195,7 +182,10 @@ public class TaskService {
         if (request.getRecurrenceRule() != null) {
             task.setRecurrenceRule(request.getRecurrenceRule());
             task.setRecurrenceEnd(request.getRecurrenceEnd());
-            task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule()));
+            task.setRecurrenceActive(request.getRecurrenceActive() != null ? request.getRecurrenceActive() : true);
+            task.setCustomInterval(request.getCustomInterval());
+            task.setRecurrenceLimit(request.getRecurrenceLimit());
+            task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule(), request.getCustomInterval()));
         }
 
         Task savedTask = taskRepository.save(task);
@@ -369,9 +359,49 @@ public class TaskService {
 
         // update recurrence (V7)
         if (request.getRecurrenceRule() != null) {
-            task.setRecurrenceRule(request.getRecurrenceRule());
-            task.setRecurrenceEnd(request.getRecurrenceEnd());
-            task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule()));
+            if (request.getRecurrenceRule().trim().isEmpty() || "NONE".equalsIgnoreCase(request.getRecurrenceRule())) {
+                task.setRecurrenceRule(null);
+                task.setRecurrenceEnd(null);
+                task.setNextOccurrence(null);
+                task.setCustomInterval(null);
+                task.setRecurrenceLimit(null);
+                task.setRecurrenceActive(false);
+            } else {
+                task.setRecurrenceRule(request.getRecurrenceRule());
+                task.setRecurrenceEnd(request.getRecurrenceEnd());
+                if (request.getRecurrenceActive() != null) {
+                    task.setRecurrenceActive(request.getRecurrenceActive());
+                }
+                task.setCustomInterval(request.getCustomInterval());
+                task.setRecurrenceLimit(request.getRecurrenceLimit());
+                task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule(), request.getCustomInterval()));
+            }
+        } else if (request.getRecurrenceActive() != null) {
+            task.setRecurrenceActive(request.getRecurrenceActive());
+        }
+
+        // Handle archiving/unarchiving
+        if (request.getArchived() != null) {
+            if (request.getArchived() != task.isArchived()) {
+                task.setArchived(request.getArchived());
+                User actor = userRepository.findById(currentUserId).orElseThrow();
+                task.setLastModifiedBy(actor);
+                if (request.getArchived()) {
+                    task.setArchivedAt(LocalDateTime.now());
+                    taskActivityService.logActivity(
+                            taskId,
+                            TaskActivityType.UPDATED,
+                            actor.getUsername(),
+                            "Task archived");
+                } else {
+                    task.setArchivedAt(null);
+                    taskActivityService.logActivity(
+                            taskId,
+                            TaskActivityType.UPDATED,
+                            actor.getUsername(),
+                            "Task unarchived");
+                }
+            }
         }
 
         task.setLastModifiedBy(userRepository.findById(currentUserId).orElseThrow());
@@ -429,7 +459,7 @@ public class TaskService {
 
     // ── 4. DELETE TASK ──────────────────────────────────────────────────────────
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long deleteTask(Long taskId, Long currentUserId) {
         Task task = taskRepository.findByIdWithDetails(taskId)
                 .orElseThrow(()-> new ResourceNotFoundException("Task not found"));
@@ -491,24 +521,45 @@ public class TaskService {
 
     // ── 5. GET TASKS BY PROJECT (Highly Optimized Fetch) ────────────────────────
     @Transactional(readOnly = true)
-    public List<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId,
-                                                   String status, Long assigneeId,
-                                                   String priority, Long sprintId, Long milestoneId) {
+    public Page<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId, Pageable pageable) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
         requireMinimumRole(project.getTeam().getId(), currentUserId, null);
 
-        /*
-         * PERFORMANCE OPTIMIZATION (The "Two-Phase Fetch"):
-         * Fetching a Task + Labels + Subtasks + Attachments + Assignees all in one SQL query
-         * creates a massive "Cartesian Product" (multiplying rows), which crashes the database memory.
-         * * Solution:
-         * 1. Query just the IDs of the tasks we need.
-         * 2. Use those IDs to execute a secondary, batched fetch that safely loads collections.
-         */
+        Page<Task> taskPage = taskRepository.findByProjectIdAndArchivedFalse(projectId, pageable);
+        if (taskPage.isEmpty()) {
+            return taskPage.map(t -> mapToDTO(t, java.util.Map.of()));
+        }
+
+        List<Long> ids = taskPage.getContent().stream().map(Task::getId).toList();
+        List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
+        java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(ids);
+        java.util.Map<Long, Task> enrichedMap = enriched.stream()
+                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
+
+        return taskPage.map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap));
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId,
+                                                   String status, Long assigneeId,
+                                                   String priority, Long sprintId, Long milestoneId) {
+        return getTasksByProject(projectId, currentUserId, status, assigneeId, priority, sprintId, milestoneId, false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId,
+                                                   String status, Long assigneeId,
+                                                   String priority, Long sprintId, Long milestoneId,
+                                                   Boolean archived) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+        requireMinimumRole(project.getTeam().getId(), currentUserId, null);
+
+        boolean isArchived = archived != null && archived;
         boolean hasFilters = status != null || assigneeId != null || priority != null || sprintId != null || milestoneId != null;
         if (hasFilters) {
-            List<Task> filteredTasks = taskRepository.findByProjectIdFiltered(projectId, status, assigneeId, priority, sprintId, milestoneId)
+            List<Task> filteredTasks = taskRepository.findByProjectIdFilteredAndArchived(projectId, status, assigneeId, priority, sprintId, milestoneId, isArchived)
                     .stream()
                     .distinct()
                     .toList();
@@ -519,20 +570,20 @@ public class TaskService {
             List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
             java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(ids);
             java.util.Map<Long, Task> enrichedMap = enriched.stream()
-                    .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t));
+                    .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
             return filteredTasks.stream()
                     .map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap))
                     .collect(Collectors.toList());
         }
 
-        // Standard unfiltered fetch
-        List<Task> tasks = taskRepository.findByProjectIdWithScalars(projectId);
+        // Standard fetch
+        List<Task> tasks = taskRepository.findByProjectIdWithScalarsAndArchived(projectId, isArchived);
         if (tasks.isEmpty()) return List.of();
         List<Long> ids = tasks.stream().map(Task::getId).collect(Collectors.toList());
         List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
         java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(ids);
         java.util.Map<Long, Task> enrichedMap = enriched.stream()
-                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t));
+                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
         return tasks.stream()
                 .map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap))
                 .collect(Collectors.toList());
@@ -628,6 +679,11 @@ public class TaskService {
             throw new IllegalArgumentException("A task cannot depend on itself");
         }
 
+        Task blocker = findTaskWithProjectTeam(blockerId);
+
+        // Prevent dependency across inaccessible projects
+        requireMinimumRole(blocker.getProject().getTeam().getId(), currentUserId, null);
+
         // Check: would adding (taskId -> blockerId) create a cycle?
         // i.e., is taskId already reachable from blockerId through existing dependencies?
         if (wouldCreateCycle(blockerId, taskId)) {
@@ -636,7 +692,6 @@ public class TaskService {
             );
         }
 
-        Task blocker = findTaskWithProjectTeam(blockerId);
         task.getDependencies().add(blocker);
         task.setLastModifiedBy(userRepository.findById(currentUserId).orElseThrow());
         taskRepository.save(task);
@@ -783,8 +838,8 @@ public class TaskService {
     // ── 12. ASSIGNEE MANAGEMENT ─────────────────────────────────────────────────
 
     @Transactional
-    public void assignUser(Long taskID, Long userId, Long currentUserId) {
-        Task task = findTaskWithProjectTeam(taskID);
+    public void assignUser(Long taskId, Long userId, Long currentUserId) {
+        Task task = findTaskWithProjectTeam(taskId);
 
         //permission check
         requireMinimumRole(task.getProject().getTeam().getId(), currentUserId, TeamRole.MEMBER);
@@ -1042,6 +1097,17 @@ public class TaskService {
                 actorName, actorName + " unassigned the task");
     }
 
+    @Transactional
+    public void linkGithubIssue(Long taskId, Long githubIssueNumber, String githubRepoFullName, Long currentUserId) {
+        Task task = findTaskWithProjectTeam(taskId);
+        requireMinimumRole(task.getProject().getTeam().getId(), currentUserId, TeamRole.MEMBER);
+
+        task.setGithubIssueNumber(githubIssueNumber);
+        task.setGithubRepoFullName(githubRepoFullName);
+        task.setLastModifiedBy(userRepository.findById(currentUserId).orElseThrow());
+        taskRepository.save(task);
+    }
+
     //19. BULK UPDATE STATUS
     @Transactional
     public void bulkUpdateStatus(List<Long> taskIds, String status, Long currentUserId) {
@@ -1287,10 +1353,8 @@ public class TaskService {
         // Map dependencies
         if (dependencyMap != null) {
             dto.setDependencies(dependencyMap.getOrDefault(task.getId(), List.of()));
-        } else if(task.getDependencies() != null){
-            dto.setDependencies(new ArrayList<>(task.getDependencies()).stream()
-                .map(d -> new DependencyDTO(d.getId(), d.getTitle(), "BLOCKED_BY"))
-                .collect(Collectors.toList()));
+        } else {
+            dto.setDependencies(buildDependencyMap(List.of(task.getId())).getOrDefault(task.getId(), List.of()));
         }
 
         // Map attachments
@@ -1306,6 +1370,10 @@ public class TaskService {
         dto.setRecurrenceRule(task.getRecurrenceRule());
         dto.setRecurrenceEnd(task.getRecurrenceEnd());
         dto.setNextOccurrence(task.getNextOccurrence());
+        dto.setRecurrenceActive(task.isRecurrenceActive());
+        dto.setCustomInterval(task.getCustomInterval());
+        dto.setRecurrenceLimit(task.getRecurrenceLimit());
+        dto.setRecurrenceCount(task.getRecurrenceCount());
         if (task.getRecurrenceParent() != null) {
             dto.setRecurrenceParentId(task.getRecurrenceParent().getId());
         }
@@ -1347,18 +1415,33 @@ public class TaskService {
         }
         java.util.Map<Long, List<DependencyDTO>> map = new java.util.HashMap<>();
         List<Object[]> rows = taskRepository.findDependencyRowsByTaskIds(taskIds);
-        if (rows == null) {
-            return map;
-        }
-        for (Object[] row : rows) {
-            Long blockedTaskId = (Long) row[0];
-            Long blockerTaskId = (Long) row[1];
-            String blockerTitle = (String) row[2];
-            if (blockedTaskId == null || blockerTaskId == null) {
-                continue;
+        if (rows != null) {
+            for (Object[] row : rows) {
+                Long blockedTaskId = (Long) row[0];
+                Long blockerTaskId = (Long) row[1];
+                String blockerTitle = (String) row[2];
+                String blockerStatus = (String) row[3];
+                if (blockedTaskId == null || blockerTaskId == null) {
+                    continue;
+                }
+                map.computeIfAbsent(blockedTaskId, ignored -> new ArrayList<>())
+                        .add(new DependencyDTO(blockerTaskId, blockerTitle, "BLOCKED_BY", blockerStatus));
             }
-            map.computeIfAbsent(blockedTaskId, ignored -> new ArrayList<>())
-                    .add(new DependencyDTO(blockerTaskId, blockerTitle, "BLOCKED_BY"));
+        }
+
+        List<Object[]> depRows = taskRepository.findDependentRowsByTaskIds(taskIds);
+        if (depRows != null) {
+            for (Object[] row : depRows) {
+                Long blockerTaskId = (Long) row[0];
+                Long blockedTaskId = (Long) row[1];
+                String blockedTitle = (String) row[2];
+                String blockedStatus = (String) row[3];
+                if (blockerTaskId == null || blockedTaskId == null) {
+                    continue;
+                }
+                map.computeIfAbsent(blockerTaskId, ignored -> new ArrayList<>())
+                        .add(new DependencyDTO(blockedTaskId, blockedTitle, "BLOCKS", blockedStatus));
+            }
         }
         return map;
     }
@@ -1375,9 +1458,9 @@ public class TaskService {
         }
         List<Task> enrichedTasks = taskRepository.findByIdInWithCollections(taskIds);
         java.util.Map<Long, Task> scalarById = scalarTasks.stream()
-                .collect(Collectors.toMap(Task::getId, t -> t));
+                .collect(Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
         java.util.Map<Long, Task> enrichedById = enrichedTasks.stream()
-                .collect(Collectors.toMap(Task::getId, t -> t));
+                .collect(Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
         java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(taskIds);
 
         return taskIds.stream()
@@ -1425,7 +1508,7 @@ public class TaskService {
         }
         User actor = userRepository.findById(currentUserId).orElseThrow();
         java.util.Map<Long, Task> taskById = tasks.stream()
-                .collect(Collectors.toMap(Task::getId, task -> task));
+                .collect(Collectors.toMap(Task::getId, task -> task, (t1, t2) -> t1));
 
         // Iterate through the newly provided list and rewrite the position index integers
         for (int index = 0; index < orderedTaskIds.size(); index++) {
@@ -1449,15 +1532,16 @@ public class TaskService {
     }
 
     // Computes the next occurrence date after today based on recurrence rule.
-    private LocalDate computeNextOccurrence(LocalDate base, String rule) {
+    private LocalDate computeNextOccurrence(LocalDate base, String rule, Integer customInterval) {
         LocalDate from = (base != null && base.isAfter(LocalDate.now())) ? base : LocalDate.now();
         if (rule == null) return null;
+        int delta = (customInterval != null && customInterval > 0) ? customInterval : 1;
         return switch (rule.toUpperCase()) {
-            case "DAILY"   -> from.plusDays(1);
-            case "WEEKLY"  -> from.plusWeeks(1);
-            case "MONTHLY" -> from.plusMonths(1);
-            case "YEARLY"  -> from.plusYears(1);
-            default        -> null;
+            case "DAILY", "CUSTOM_DAYS"     -> from.plusDays(delta);
+            case "WEEKLY", "CUSTOM_WEEKS"   -> from.plusWeeks(delta);
+            case "MONTHLY", "CUSTOM_MONTHS" -> from.plusMonths(delta);
+            case "YEARLY", "CUSTOM_YEARS"   -> from.plusYears(delta);
+            default                         -> null;
         };
     }
 }

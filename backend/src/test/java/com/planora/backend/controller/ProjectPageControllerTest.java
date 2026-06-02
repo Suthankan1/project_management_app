@@ -122,4 +122,18 @@ class ProjectPageControllerTest {
 
         verify(service).deletePage(eq(1L), any());
     }
+
+    @Test
+    @WithMockUserPrincipal
+    void createPage_invalidPayload_returns400() throws Exception {
+        PageRequestDto invalidReq = new PageRequestDto();
+        invalidReq.setTitle(""); // Blank title (fails @NotBlank)
+
+        mockMvc.perform(post("/api/projects/10/pages")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
 }

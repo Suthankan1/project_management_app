@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import api from '@/lib/axios';
 import { validatePassword } from '@/lib/passwordValidation';
 import BrandLogo from '../components/UI/BrandLogo';
 import ResetPasswordForm from './components/ResetPasswordForm';
 import SuccessMessage from './components/SuccessMessage';
+import { authApi } from '@/services/api-contract';
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
@@ -41,7 +41,7 @@ export default function ResetPasswordPage() {
     setIsLoading(true);
 
     try {
-      await api.post('/api/auth/reset', {
+      await authApi.resetPassword({
         token: otp.trim(),
         newPassword,
       });

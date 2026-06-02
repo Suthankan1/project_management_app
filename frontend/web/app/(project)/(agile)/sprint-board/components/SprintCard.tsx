@@ -4,7 +4,7 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { SprintboardTask } from '../types';
-import { Calendar, GripVertical } from 'lucide-react';
+import { Calendar, GripVertical, Lock } from 'lucide-react';
 import AssigneeAvatar from '../../sprint-backlog/components/AssigneeAvatar';
 import { hexToLabelStyle } from '@/components/shared/LabelPicker';
 import { SprintTeamMemberOption } from '../api';
@@ -116,8 +116,8 @@ export default function SprintCard({
       {...attributes}
       {...listeners}
       className={`
-        rounded-xl border bg-cu-bg shadow-sm
-        hover:shadow-md hover:border-cu-primary/30 transition-all duration-200 cursor-grab active:cursor-grabbing
+        rounded-xl border bg-cu-bg shadow-cu-sm
+        hover:shadow-cu-md hover:border-cu-primary/30 transition-all duration-200 cursor-grab active:cursor-grabbing
         focus-within:ring-2 focus-within:ring-cu-primary/20
         ${dense ? 'p-2.5' : 'p-3'}
         ${selected ? 'border-cu-primary ring-2 ring-cu-primary/20' : 'border-cu-border'}
@@ -133,7 +133,7 @@ export default function SprintCard({
             type="checkbox"
             checked={selected}
             onChange={(e) => onToggleSelect?.(task.taskId, e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-[#D0D5DD] text-[#155DFC] focus:ring-[#155DFC]"
+            className="h-3.5 w-3.5 rounded border-cu-border text-cu-primary focus:ring-cu-primary"
           />
         </label>
         <div className="flex items-center gap-1 text-[10px] text-cu-text-muted">
@@ -182,12 +182,12 @@ export default function SprintCard({
           className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-cu-primary/10"
           aria-label="Edit due date"
         >
-          <Calendar size={14} className={isOverdue ? 'text-[#F04438]' : 'text-[#98A2B3]'} />
-          <span className={isOverdue ? 'text-[#F04438]' : ''}>{dueDateFormatted ?? 'Set due date'}</span>
+          <Calendar size={14} className={isOverdue ? 'text-red-500' : 'text-cu-text-muted'} />
+          <span className={isOverdue ? 'text-red-500' : ''}>{dueDateFormatted ?? 'Set due date'}</span>
         </button>
         {dateOpen && (
           <div
-            className="absolute top-6 left-0 z-20 rounded-lg border border-cu-border bg-cu-bg p-2 shadow-xl"
+            className="absolute top-6 left-0 z-20 rounded-lg border border-cu-border bg-cu-bg p-2 shadow-cu-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <input
@@ -205,7 +205,12 @@ export default function SprintCard({
 
       {/* Bottom row: Priority badge, Story points & Assignee */}
       <div className={`flex items-center justify-between mt-auto ${dense ? 'pt-1' : 'pt-1.5'}`}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {task.blocked && (
+            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-500">
+              <Lock size={10} className="flex-shrink-0" /> Blocked
+            </span>
+          )}
           {priorityStyle && (
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${priorityStyle.bg} ${priorityStyle.text}`}>
               {priorityStyle.label}
@@ -216,7 +221,7 @@ export default function SprintCard({
         <div className="relative">
           <button
             type="button"
-            className="rounded-full focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
+            className="rounded-full focus:outline-none focus:ring-2 focus:ring-cu-primary/20"
             onClick={(e) => {
               e.stopPropagation();
               setAssigneeOpen((prev) => !prev);
@@ -236,7 +241,7 @@ export default function SprintCard({
           </button>
           {assigneeOpen && (
             <div
-              className="absolute right-0 top-7 z-20 w-64 rounded-xl border border-cu-border bg-cu-bg p-2 shadow-xl"
+              className="absolute right-0 top-7 z-20 w-64 rounded-xl border border-cu-border bg-cu-bg p-2 shadow-cu-xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-2 flex items-center justify-between">

@@ -1,5 +1,5 @@
--- GitHub timestamps are retained as ISO-8601 text in GithubPullRequest and its DTOs.
--- Repair databases where merged_at was previously created as a timestamp column.
+-- Align merged_at to TIMESTAMP to match the GithubPullRequest entity (LocalDateTime).
+-- V22 originally created this column as VARCHAR(30); this migration promotes it to TIMESTAMP.
 ALTER TABLE github_pull_requests
-    ALTER COLUMN merged_at TYPE VARCHAR(30)
-    USING merged_at::VARCHAR(30);
+    ALTER COLUMN merged_at TYPE TIMESTAMP
+    USING NULLIF(merged_at::text, '')::timestamp;

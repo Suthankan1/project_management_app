@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -33,29 +32,30 @@ import com.planora.backend.service.GithubIssueCommentSyncService;
 import com.planora.backend.service.GithubIssueImportService;
 import com.planora.backend.service.GithubIssuesSyncService;
 import com.planora.backend.service.GithubNotificationService;
+import com.planora.backend.service.TaskService;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 
+import lombok.RequiredArgsConstructor;
+
 @Validated
 @RestController
 @RequestMapping("/api/github")
+@RequiredArgsConstructor
 public class GithubIssuesController {
 
-    @Autowired
-    private GithubIssuesSyncService githubIssuesSyncService;
+    private final GithubIssuesSyncService githubIssuesSyncService;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private GithubIssueImportService githubIssueImportService;
+    private final GithubIssueImportService githubIssueImportService;
 
-    @Autowired
-    private GithubIssueCommentSyncService githubIssueCommentSyncService;
+    private final GithubIssueCommentSyncService githubIssueCommentSyncService;
 
-    @Autowired
-    private GithubNotificationService githubNotificationService;
+    private final GithubNotificationService githubNotificationService;
+
+    private final TaskService taskService;
 
     @GetMapping("/issues")
     public ResponseEntity<List<GithubIssueDTO>> getIssues(
@@ -109,6 +109,13 @@ public class GithubIssuesController {
         }
         GithubIssueDTO createdIssue = githubIssuesSyncService.createIssue(request, accessToken);
         Integer issueNumber = createdIssue.getNumber();
+        if (request.getTaskId() != null && issueNumber != null) {
+            taskService.linkGithubIssue(
+                    request.getTaskId(),
+                    issueNumber.longValue(),
+                    request.getRepoFullName(),
+                    currentUser.getUserId());
+        }
         githubNotificationService.notifyIssueEvent(
             request.getRepoFullName(),
             issueNumber == null ? 0 : issueNumber,

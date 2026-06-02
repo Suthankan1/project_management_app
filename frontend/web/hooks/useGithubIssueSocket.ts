@@ -15,7 +15,7 @@ export function useGithubIssueSocket(
   onUpdate: (update: GithubIssueUpdate) => void,
   onError?: (message: string) => void,
 ): void {
-  const { connected, subscribe } = useStomp();
+  const { connected, subscribe, reconnectCount } = useStomp();
   const onUpdateRef = useRef(onUpdate);
   const onErrorRef = useRef(onError);
 
@@ -47,5 +47,5 @@ export function useGithubIssueSocket(
     return () => {
       subscription?.unsubscribe();
     };
-  }, [connected, projectId, subscribe]);
+  }, [connected, projectId, reconnectCount, subscribe]);
 }

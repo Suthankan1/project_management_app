@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Task, Label } from '../types';
-import { Calendar, GitBranch, GitPullRequest, MessageSquare, Paperclip, Check, X, Tag, Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Calendar, GitBranch, GitPullRequest, MessageSquare, Paperclip, Check, X, Tag, Plus, ChevronDown, ChevronRight, Lock, RefreshCw } from 'lucide-react';
 import { CIStatusBadge } from '@/components/ui';
 
 interface KanbanCardProps {
@@ -41,6 +41,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
 
   const pStyle = task.priority ? PRIORITY_COLORS[task.priority] : null;
   const priorityBorder = pStyle ? pStyle.border : 'border-l-transparent';
+  const isBlocked = task.dependencies?.some(d => d.relation === 'BLOCKED_BY' && d.status !== 'DONE') ?? false;
 
   // Inline editing state
   const [isEditing, setIsEditing] = useState(false);
@@ -163,7 +164,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
         <div className="flex justify-end gap-1.5 pt-1 border-t border-cu-border">
           <button onClick={handleCancelEdit} disabled={saving} className="px-2 py-1 text-xs text-cu-text-secondary hover:text-cu-text-primary rounded transition-colors flex items-center gap-1"><X size={12} /> Cancel</button>
           <button onClick={() => void handleSaveInline()} disabled={saving || !editTitle.trim()}
-            className="px-2.5 py-1 text-xs font-medium text-white bg-cu-primary rounded hover:bg-cu-primary-dark disabled:opacity-40 transition-colors flex items-center gap-1">
+            className="px-2.5 py-1 text-xs font-medium text-white bg-cu-primary rounded hover:bg-cu-primary-hover disabled:opacity-40 transition-colors flex items-center gap-1">
             {saving ? <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /> : <Check size={12} />} Save
           </button>
         </div>
@@ -171,7 +172,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
     );
   }
 
-  // ── NORMAL DISPLAY MODE ───────────────────────────────────
+  // Normal display mode
   return (
     <div
       ref={setNodeRef} style={style} {...attributes} {...listeners}
@@ -219,7 +220,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
         )}
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <div className="flex flex-wrap gap-1 min-w-0">
-            {/* Show task labels — resolve from allLabels if task.labels not populated */}
+            {/* Show task labels: resolve from allLabels if task.labels not populated */}
             {(() => {
               const displayLabels = (task.labels && task.labels.length > 0)
                 ? task.labels
@@ -241,14 +242,34 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
         {/* Title */}
         <p className="text-[13px] font-medium text-cu-text-primary leading-snug line-clamp-2 mb-2">{task.title}</p>
 
-        {/* Priority badge */}
-        {pStyle && task.priority && (
-          <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold mb-2 ${pStyle.text} ${pStyle.bg}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${pStyle.dot}`} /> {task.priority}
-          </div>
-        )}
+        {/* Priority and Blocked badges */}
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {isBlocked && (
+            <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-500">
+              <Lock size={10} className="flex-shrink-0" /> Blocked
+            </div>
+          )}
+          {pStyle && task.priority && (
+            <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${pStyle.text} ${pStyle.bg}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${pStyle.dot}`} /> {task.priority}
+            </div>
+          )}
+          {task.recurrenceRule && (
+            <div
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                task.recurrenceActive === false
+                  ? 'bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/30'
+                  : 'bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/30'
+              }`}
+              title={task.recurrenceActive === false ? 'Recurring (Paused)' : `Recurring (${task.recurrenceRule})`}
+            >
+              <RefreshCw size={10} className="flex-shrink-0" />
+              <span>Recurring{task.recurrenceActive === false ? ' (Paused)' : ''}</span>
+            </div>
+          )}
+        </div>
 
-        {/* Subtask checklist — ClickUp style */}
+        {/* Subtask checklist: ClickUp style */}
         {totalSubtasks > 0 && (
           <div className="mb-2">
             {/* Progress bar and Toggle */}
@@ -289,7 +310,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
         {/* Bottom meta row: due date (clickable), label (clickable), story points, assignee */}
         <div className="flex items-center justify-between gap-2 mt-1">
           <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            {/* Due date — inline pickable */}
+            {/* Due date: inline pickable */}
             <div className="relative" ref={datePickerRef}>
               <button
                 data-action="date"
@@ -307,7 +328,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
               </button>
 
               {showDatePicker && (
-                <div className="absolute bottom-full left-0 mb-1 bg-cu-bg border border-cu-border rounded-xl shadow-xl z-50 p-2 w-48" onClick={e => e.stopPropagation()}>
+                <div className="absolute bottom-full left-0 mb-1 bg-cu-bg border border-cu-border rounded-xl shadow-cu-xl z-50 p-2 w-48" onClick={e => e.stopPropagation()}>
                   <p className="text-[10px] font-medium text-cu-text-muted mb-1.5">Due date</p>
                   <input
                     type="date"
@@ -323,7 +344,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
               )}
             </div>
 
-            {/* Label — inline pickable */}
+            {/* Label: inline pickable */}
             <div className="relative" ref={labelPickerRef}>
               <button
                 data-action="label"
@@ -345,7 +366,7 @@ export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask
               </button>
 
               {showLabelPicker && (
-                <div className="absolute bottom-full left-0 mb-1 bg-cu-bg border border-cu-border rounded-xl shadow-xl z-50 p-2 w-52" onClick={e => e.stopPropagation()}>
+                <div className="absolute bottom-full left-0 mb-1 bg-cu-bg border border-cu-border rounded-xl shadow-cu-xl z-50 p-2 w-52" onClick={e => e.stopPropagation()}>
                   <p className="text-[10px] font-medium text-cu-text-muted mb-1.5">Labels</p>
                   <div className="max-h-32 overflow-y-auto space-y-0.5 mb-1.5">
                     {/* No label option */}

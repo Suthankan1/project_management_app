@@ -21,6 +21,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import com.planora.backend.annotation.WithMockUserPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Map;
@@ -84,11 +86,22 @@ class TaskControllerTest {
 
     @Test
     @WithMockUserPrincipal
-    void getTasksByProject_returnsListOfTasks() throws Exception {
-        when(service.getTasksByProject(eq(10L), any(), any(), any(), any(), any(), any()))
-                .thenReturn(List.of(sampleTask));
+    void getTasksByProject_returnsPageOfTasks() throws Exception {
+        when(service.getTasksByProject(eq(10L), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(sampleTask)));
 
         mockMvc.perform(get("/api/tasks/project/10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].title").value("Implement login"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void getAllTasksByProject_returnsListOfTasks() throws Exception {
+        when(service.getTasksByProject(eq(10L), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(sampleTask));
+
+        mockMvc.perform(get("/api/tasks/project/10/all"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("Implement login"));
     }
@@ -287,5 +300,55 @@ class TaskControllerTest {
                 eq("/topic/project/10/tasks"),
                 eq(Map.of("type", "TASK_UPDATED", "task", sampleTask))
         );
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void assignUser_returns200() throws Exception {
+        doNothing().when(service).assignUser(anyLong(), anyLong(), anyLong());
+
+        mockMvc.perform(patch("/api/tasks/1/assign/5").with(csrf()))
+                .andExpect(status().isOk());
+
+        verify(service).assignUser(eq(1L), eq(5L), anyLong());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void assignUser_negativeTest_withoutSlash_returns404() throws Exception {
+        mockMvc.perform(patch("/api/tasks1/assign/5").with(csrf()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void createTask_invalidPayload_returns400() throws Exception {
+        TaskRequestDTO invalidReq = new TaskRequestDTO();
+        invalidReq.setTitle(""); // Blank title (fails @NotBlank on OnCreate)
+        invalidReq.setProjectId(-5L); // Negative project ID
+        invalidReq.setStoryPoint(2000); // Exceeds max 999
+        invalidReq.setRecurrenceRule("INVALID_RULE"); // Invalid recurrence rule pattern
+
+        mockMvc.perform(post("/api/tasks")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void updateTask_invalidPayload_returns400() throws Exception {
+        TaskRequestDTO invalidReq = new TaskRequestDTO();
+        invalidReq.setStoryPoint(-10); // fails @Min(0)
+
+        mockMvc.perform(put("/api/tasks/1")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"));
     }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, FlatList, TextInput, Modal, Animated, SectionList,
@@ -579,20 +579,20 @@ function MobileGitHubGlassShell({
   const displayIssues = useMemo(() => (issues.length > 0 ? issues : MOCK_ISSUES), [issues]);
   const filteredIssues = useMemo(() => {
     if (issueFilter === 'all') return displayIssues;
-    return displayIssues.filter(issue => issue.state === issueFilter);
+    return displayIssues.filter((issue: GitHubIssue) => issue.state === issueFilter);
   }, [displayIssues, issueFilter]);
 
-  const openIssueCount = useMemo(() => displayIssues.filter(issue => issue.state === 'open').length, [displayIssues]);
+  const openIssueCount = useMemo(() => displayIssues.filter((issue: GitHubIssue) => issue.state === 'open').length, [displayIssues]);
   const notificationGroups = useMemo(() => buildNotificationGroups(connection.repoFullName), [connection.repoFullName]);
   const unreadCount = useMemo(
-    () => notificationGroups.reduce((sum, group) => sum + group.unreadCount, 0),
+    () => notificationGroups.reduce((sum: number, group: GitHubNotificationGroup) => sum + group.unreadCount, 0),
     [notificationGroups],
   );
 
   const sections = useMemo(() => {
     const notificationSections = [
       { key: 'notifications-intro', kind: 'notifications-intro' as const, data: [] as never[] },
-      ...notificationGroups.map(group => ({
+      ...notificationGroups.map((group: GitHubNotificationGroup) => ({
         key: group.repoFullName,
         kind: 'notifications' as const,
         repoFullName: group.repoFullName,

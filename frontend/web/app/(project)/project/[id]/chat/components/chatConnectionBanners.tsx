@@ -62,14 +62,14 @@ export function ChatConnectionBanners({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="bg-red-50 border-b border-red-100 px-4 py-2.5 flex items-center justify-between gap-3" role="alert">
+            <div className="bg-red-500/10 border-b border-red-500/20 px-4 py-2.5 flex items-center justify-between gap-3" role="alert">
               <div className="flex-1">
-                <p className="text-[12.5px] font-semibold text-red-700">{error}</p>
+                <p className="text-[12.5px] font-semibold text-red-500">{error}</p>
                 <p className="text-[11px] text-red-500 mt-0.5">Retry the connection to continue chatting.</p>
               </div>
               <button
                 onClick={onRetry}
-                className="flex items-center gap-1.5 text-[12px] font-semibold text-red-700 hover:text-red-800 bg-red-100 hover:bg-red-200 rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap"
+                className="flex items-center gap-1.5 text-[12px] font-semibold text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/15 rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap"
               >
                 <RefreshCw size={12} strokeWidth={2.5} />
                 Retry

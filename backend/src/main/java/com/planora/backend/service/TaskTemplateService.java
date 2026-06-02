@@ -20,13 +20,16 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class TaskTemplateService {
 
-    @Autowired private TaskTemplateRepository templateRepository;
-    @Autowired private ProjectRepository projectRepository;
-    @Autowired private TaskRepository taskRepository;
-    @Autowired private UserRepository userRepository;
+    private final TaskTemplateRepository templateRepository;
+    private final ProjectRepository projectRepository;
+    private final TaskRepository taskRepository;
+    private final UserRepository userRepository;
 
     // Jackson ObjectMapper used for serializing Java Lists into JSON strings for database storage.
     private final ObjectMapper objectMapper = new ObjectMapper();

@@ -15,7 +15,7 @@ import {
   updateKanbanColumnSettings,
 } from '../api';
 
-/** Status → accent color for the top indicator bar */
+/** Status to accent color for the top indicator bar */
 const STATUS_ACCENT: Record<string, string> = {
   TODO:        '#94A3B8',
   IN_PROGRESS: '#3B82F6',
@@ -24,7 +24,7 @@ const STATUS_ACCENT: Record<string, string> = {
   BLOCKED:     '#EF4444',
 };
 
-/** Convert status like IN_PROGRESS → "In Progress" */
+/** Convert status like IN_PROGRESS to "In Progress" */
 function humanizeStatus(status: string | null | undefined): string {
   if (!status) return 'Untitled';
   return status
@@ -70,6 +70,7 @@ export default function KanbanColumn({
   onColumnRenamed,
   onColumnSettingsChanged,
   onDeleteColumn,
+  updatingTaskId,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.status,
@@ -174,7 +175,7 @@ export default function KanbanColumn({
         style={{ backgroundColor: accentColor }}
       />
 
-      {/* Column Header — always visible, prominent title */}
+      {/* Column Header: always visible, prominent title */}
       <div className="px-3.5 py-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
           {/* Status dot */}
@@ -227,7 +228,7 @@ export default function KanbanColumn({
               </button>
 
               {menuOpen && (
-                <div className="absolute right-0 top-full mt-1 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-xl w-52 py-1">
+                <div className="absolute right-0 top-full mt-1 z-50 bg-cu-bg border border-cu-border rounded-xl shadow-cu-xl w-52 py-1">
                   {menuMode === 'main' && (
                     <>
                       <button onClick={() => setMenuMode('rename')} className="w-full text-left px-3 py-2 text-sm text-cu-text-primary hover:bg-cu-hover transition-colors">Rename column</button>
@@ -250,7 +251,7 @@ export default function KanbanColumn({
                         onKeyDown={e => { if (e.key === 'Enter') void handleRenameSubmit(); if (e.key === 'Escape') { setMenuMode('main'); setRenameValue(column.title); } }}
                         className="w-full px-2.5 py-1.5 border border-cu-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cu-primary/40 bg-cu-bg text-cu-text-primary" />
                       <div className="flex gap-2 mt-2">
-                        <button onClick={() => void handleRenameSubmit()} className="flex-1 py-1.5 bg-cu-primary text-white rounded-lg text-xs font-medium hover:bg-cu-primary-dark transition-colors">Save</button>
+                        <button onClick={() => void handleRenameSubmit()} className="flex-1 py-1.5 bg-cu-primary text-white rounded-lg text-xs font-medium hover:bg-cu-primary-hover transition-colors">Save</button>
                         <button onClick={() => { setMenuMode('main'); setRenameValue(column.title); }} className="flex-1 py-1.5 border border-cu-border text-cu-text-secondary rounded-lg text-xs hover:bg-cu-hover transition-colors">Cancel</button>
                       </div>
                     </div>
@@ -262,7 +263,7 @@ export default function KanbanColumn({
                         onKeyDown={e => { if (e.key === 'Enter') void handleWipSubmit(); }}
                         className="w-full px-2.5 py-1.5 border border-cu-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cu-primary/40 bg-cu-bg text-cu-text-primary" />
                       <div className="flex gap-2 mt-2">
-                        <button onClick={() => void handleWipSubmit()} className="flex-1 py-1.5 bg-cu-primary text-white rounded-lg text-xs font-medium hover:bg-cu-primary-dark transition-colors">Save</button>
+                        <button onClick={() => void handleWipSubmit()} className="flex-1 py-1.5 bg-cu-primary text-white rounded-lg text-xs font-medium hover:bg-cu-primary-hover transition-colors">Save</button>
                         <button onClick={() => setMenuMode('main')} className="flex-1 py-1.5 border border-cu-border text-cu-text-secondary rounded-lg text-xs hover:bg-cu-hover transition-colors">Cancel</button>
                       </div>
                     </div>
@@ -301,7 +302,7 @@ export default function KanbanColumn({
         </div>
       </div>
 
-      {/* Column Content — droppable zone */}
+      {/* Column Content: droppable zone */}
       <div
         ref={setNodeRef}
         className={`flex-1 overflow-y-auto px-2 pb-2 space-y-2 transition-colors duration-200 ${
@@ -313,7 +314,7 @@ export default function KanbanColumn({
               {column.tasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <div className="w-12 h-12 rounded-full bg-cu-bg-tertiary flex items-center justify-center mb-3">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                <svg className="text-cu-text-muted" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
               </div>
               <p className="text-sm text-cu-text-muted font-medium">No tasks yet</p>
               <p className="text-xs text-cu-text-muted/60 mt-0.5">Drag cards here or create a new task</p>
@@ -341,7 +342,7 @@ export default function KanbanColumn({
       {onCreateTask && (
         <div className="px-2 pb-2">
           {showInlineCreate ? (
-            <div className="bg-cu-bg rounded-lg border border-cu-primary/30 shadow-sm p-2">
+            <div className="bg-cu-bg rounded-lg border border-cu-primary/30 shadow-cu-sm p-2">
               <input
                 ref={inlineInputRef} type="text" value={inlineTitle}
                 maxLength={255}
@@ -365,7 +366,7 @@ export default function KanbanColumn({
                 <button onClick={() => { setInlineTitle(''); setInlineTitleLength(0); setShowInlineCreate(false); }}
                   className="px-2.5 py-1 text-xs text-cu-text-secondary hover:text-cu-text-primary rounded transition-colors">Cancel</button>
                 <button onClick={handleInlineCreate} disabled={!inlineTitle.trim()}
-                  className="px-3 py-1 text-xs font-medium text-white bg-cu-primary rounded hover:bg-cu-primary-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Add</button>
+                  className="px-3 py-1 text-xs font-medium text-white bg-cu-primary rounded hover:bg-cu-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Add</button>
               </div>
             </div>
           ) : (

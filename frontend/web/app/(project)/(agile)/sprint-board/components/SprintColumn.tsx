@@ -58,30 +58,30 @@ export default function SprintColumn({
   const getColumnBgColor = (status: string) => {
     switch (status.toUpperCase()) {
       case 'TODO':
-        return 'bg-[#F8FAFC]';
+        return 'bg-cu-bg-secondary';
       case 'IN_PROGRESS':
-        return 'bg-[#FFF8F1]';
+        return 'bg-cu-primary/5';
       case 'IN_REVIEW':
-        return 'bg-[#FAF5FF]';
+        return 'bg-amber-400/5';
       case 'DONE':
-        return 'bg-[#F0FDF4]';
+        return 'bg-emerald-500/5';
       default:
-        return 'bg-gray-50';
+        return 'bg-cu-bg-secondary';
     }
   };
 
   const getTitleColor = (status: string) => {
     switch (status.toUpperCase()) {
       case 'TODO':
-        return 'text-[#175CD3]';
+        return 'text-cu-primary';
       case 'IN_PROGRESS':
-        return 'text-[#B54708]';
+        return 'text-cu-primary';
       case 'IN_REVIEW':
-        return 'text-[#6941C6]';
+        return 'text-amber-500';
       case 'DONE':
-        return 'text-[#027A48]';
+        return 'text-emerald-500';
       default:
-        return 'text-gray-700';
+        return 'text-cu-text-primary';
     }
   };
 
@@ -98,19 +98,19 @@ export default function SprintColumn({
 
   return (
     <motion.div 
-      whileHover={{ scale: 1.005, boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05)' }}
+      whileHover={{ scale: 1.005 }}
       transition={{ duration: 0.2 }}
       animate={{ width: columnWidth }}
       style={sortableStyle}
-      className={`flex flex-col h-full min-w-0 rounded-xl border border-gray-200/80 ${getColumnBgColor(column.columnStatus)} p-2 snap-center snap-always shadow-sm transition-all duration-200`}
+      className={`flex flex-col h-full min-w-0 rounded-xl border border-cu-border ${getColumnBgColor(column.columnStatus)} p-2 snap-center snap-always shadow-cu-sm transition-all duration-200`}
     >
       {/* Column Header */}
-      <div className="sticky top-0 z-10 rounded-lg border border-gray-100/80 bg-white/90 backdrop-blur px-2.5 py-2 flex items-center justify-between mb-2">
+      <div className="sticky top-0 z-10 rounded-lg border border-cu-border bg-cu-bg/95 backdrop-blur px-2.5 py-2 flex items-center justify-between mb-2">
         <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
             onClick={() => onToggleCollapsed?.(column.columnStatus)}
-            className="rounded-md p-0.5 text-gray-500 hover:bg-gray-100"
+            className="rounded-md p-0.5 text-cu-text-muted hover:bg-cu-hover hover:text-cu-text-primary"
             title={collapsed ? 'Expand column' : 'Collapse column'}
           >
             {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
@@ -119,10 +119,10 @@ export default function SprintColumn({
             type="button"
             {...sortable.attributes}
             {...sortable.listeners}
-            className="rounded-md p-0.5 text-gray-400 hover:bg-gray-100"
+            className="rounded-md p-0.5 text-cu-text-muted hover:bg-cu-hover hover:text-cu-text-primary"
             title="Drag to reorder column"
           >
-            <GripVertical size={13} className="text-gray-300" />
+            <GripVertical size={13} className="text-cu-text-muted" />
           </button>
           {!collapsed && (
           <h3 className={`font-semibold text-[12px] uppercase tracking-wider truncate ${getTitleColor(column.columnStatus)}`}>
@@ -134,26 +134,26 @@ export default function SprintColumn({
           <div className="flex items-center gap-1.5 ml-auto">
             <button
               onClick={() => setInlineOpen(true)}
-              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+              className="p-1 text-cu-text-muted hover:text-cu-primary hover:bg-cu-primary/10 rounded-md transition-colors"
               title="Add task"
             >
               <Plus size={14} />
             </button>
             <div className="relative group/menu">
               <button
-                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                className="p-1 text-cu-text-muted hover:text-cu-text-primary hover:bg-cu-hover rounded-md transition-colors"
                 title="Column options"
               >
                 <MoreHorizontal size={14} />
               </button>
-              <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20 invisible group-hover/menu:visible opacity-0 group-hover/menu:opacity-100 transition-all">
-                <button className="w-full px-3 py-1.5 text-left text-xs text-gray-600 hover:bg-gray-50">Rename column</button>
-                <button className="w-full px-3 py-1.5 text-left text-xs text-gray-600 hover:bg-gray-50">Change color</button>
-                <button className="w-full px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50">Delete column</button>
+              <div className="absolute right-0 top-full mt-1 w-36 bg-cu-bg rounded-lg shadow-cu-lg border border-cu-border py-1 z-20 invisible group-hover/menu:visible opacity-0 group-hover/menu:opacity-100 transition-all">
+                <button className="w-full px-3 py-1.5 text-left text-xs text-cu-text-secondary hover:bg-cu-hover hover:text-cu-text-primary">Rename column</button>
+                <button className="w-full px-3 py-1.5 text-left text-xs text-cu-text-secondary hover:bg-cu-hover hover:text-cu-text-primary">Change color</button>
+                <button className="w-full px-3 py-1.5 text-left text-xs text-red-500 hover:bg-red-500/10">Delete column</button>
               </div>
             </div>
-            <div className="flex items-center gap-1 text-[10px] text-[#667085] ml-1">
-              {overdue > 0 && <span className="rounded bg-[#FEF3F2] px-1.5 py-0.5 text-[#B42318]">{overdue} overdue</span>}
+            <div className="flex items-center gap-1 text-[10px] text-cu-text-muted ml-1">
+              {overdue > 0 && <span className="rounded bg-red-500/10 px-1.5 py-0.5 text-red-500">{overdue} overdue</span>}
             </div>
           </div>
         )}
@@ -187,7 +187,7 @@ export default function SprintColumn({
               />
             ))
           ) : (
-            <div className="flex flex-col items-center justify-center h-20 text-gray-400 border-2 border-dashed border-[#EAECF0] rounded-xl bg-white/50">
+            <div className="flex flex-col items-center justify-center h-20 text-cu-text-muted border-2 border-dashed border-cu-border rounded-xl bg-cu-bg/50">
               <p className="text-[11px] font-medium">Drop tasks here</p>
             </div>
           )}
@@ -227,7 +227,7 @@ export default function SprintColumn({
                 setInlineTitle('');
                 setInlineTitleLength(0);
               }}
-              className="w-full px-3 py-2 text-sm border border-[#155DFC] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white shadow-sm"
+              className="w-full px-3 py-2 text-sm border border-cu-primary rounded-xl focus:outline-none focus:ring-2 focus:ring-cu-primary/20 bg-cu-bg text-cu-text-primary shadow-cu-sm placeholder:text-cu-text-muted"
               placeholder="Task name… (Enter to save)"
             />
             {inlineTitleLength > 200 && (
@@ -239,10 +239,10 @@ export default function SprintColumn({
         ) : (
           <button
             onClick={() => setInlineOpen(true)}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-white hover:bg-gray-50 border border-[#EAECF0] rounded-xl text-[13px] font-semibold text-[#344054] shadow-sm transition-all duration-200 group focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-cu-bg hover:bg-cu-hover border border-cu-border rounded-xl text-[13px] font-semibold text-cu-text-secondary hover:text-cu-text-primary shadow-cu-sm transition-all duration-200 group focus:outline-none focus:ring-2 focus:ring-cu-primary/20"
             aria-label={`Add task in ${column.columnName}`}
           >
-            <Plus size={18} className="text-[#98A2B3] group-hover:text-[#101828]" />
+            <Plus size={18} className="text-cu-text-muted group-hover:text-cu-primary" />
             <span>Add task</span>
           </button>
         )}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Platform } from 'react-native';
+import { DeviceEventEmitter, Platform } from 'react-native';
 import * as chatService from '../../services/chatService';
 import { API_BASE_URL } from '../../api/axios';
 import { ChatMessage, ChatFeatureFlags } from '../../types/chat';
@@ -10,7 +10,17 @@ import { useChatReactions } from './useChatReactions';
 import { useChatSearch } from './useChatSearch';
 import { useChatThreads } from './useChatThreads';
 import { useChatUnread } from './useChatUnread';
-import { getValidToken } from '@/src/auth/storage';
+import { ensureValidToken, refreshAccessToken } from '@/src/auth/storage';
+import { AUTH_TOKEN_CHANGED_EVENT, type AuthTokenChangedPayload, decodeJwtPayload } from '@/src/lib/auth';
+import { offlineSyncManager } from '../../services/offlineSyncManager';
+import {
+  addChatOfflineListener,
+  cacheChatSnapshot,
+  enqueueChatMessage,
+  loadCachedChat,
+  syncQueuedChatMessages,
+  type QueuedChatMessage,
+} from '../../services/chatOfflineService';
 
 // ── Minimal inline STOMP builder/parser ──────────────────────────────────────
 
@@ -67,6 +77,19 @@ function uniqueUsersByKey(usernames: string[]) {
   return usernames.reduce<string[]>((acc, username) => addUniqueUserByKey(acc, username), []);
 }
 
+const TOKEN_REFRESH_SKEW_MS = 60_000;
+const MIN_TOKEN_REFRESH_DELAY_MS = 5_000;
+const MAX_RECONNECT_DELAY_MS = 30_000;
+
+function isUsablePlanoraAccessToken(token: string | null): token is string {
+  if (!token) return false;
+  const payload = decodeJwtPayload(token);
+  if (!payload?.sub) return false;
+  if (payload.tokenType && String(payload.tokenType).toUpperCase() !== 'ACCESS') return false;
+  if (payload.exp && payload.exp * 1000 <= Date.now()) return false;
+  return true;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function useChat(projectId: string) {
@@ -82,6 +105,10 @@ export function useChat(projectId: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [error, setError] = useState('');
+  const [isNetworkOnline, setIsNetworkOnline] = useState(offlineSyncManager.getOnlineStatus());
+  const [queuedChatCount, setQueuedChatCount] = useState(0);
+  const [failedChatCount, setFailedChatCount] = useState(0);
+  const [serverChangedWhileOffline, setServerChangedWhileOffline] = useState(false);
 
   // Refs so socket handlers always read fresh values without stale closures
   const currentUserRef = useRef('');
@@ -90,7 +117,12 @@ export function useChat(projectId: string) {
   const selectedRoomIdRef = useRef<number | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tokenRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptRef = useRef(0);
   const isConnectingRef = useRef(false);
+  const shouldReconnectRef = useRef(true);
+  const stompConnectedRef = useRef(false);
+  const authenticatedProjectRef = useRef(false);
   // Track which rooms we've subscribed to already
   const subscribedRoomsRef = useRef<Set<number>>(new Set());
 
@@ -109,13 +141,178 @@ export function useChat(projectId: string) {
   useEffect(() => { usersRef.current = users; }, [users]);
   useEffect(() => { selectedRoomIdRef.current = selectedRoomId; }, [selectedRoomId]);
 
+  const getActiveLastMessageId = useCallback((roomId?: number, recipient?: string | null) => {
+    const source = roomId != null
+      ? (messagesHook.roomMessages[roomId] || [])
+      : recipient
+        ? (messagesHook.privateMessages[dmKey(recipient)] || [])
+        : messagesHook.messages;
+    return source.find(message => !!message.id)?.id ?? null;
+  }, [messagesHook.messages, messagesHook.privateMessages, messagesHook.roomMessages]);
+
+  const loadLatestForQueuedMessage = useCallback((item: QueuedChatMessage) => {
+    if (item.scope.type === 'ROOM') {
+      return chatService.fetchRoomHistory(projectId, item.scope.roomId);
+    }
+    if (item.scope.type === 'PRIVATE') {
+      return chatService.fetchPrivateHistory(projectId, item.scope.recipient);
+    }
+    return chatService.fetchTeamMessages(projectId);
+  }, [projectId]);
+
+  useEffect(() => {
+    const unsubscribeNetwork = offlineSyncManager.addListener((event) => {
+      if (event.type === 'CONNECTION_CHANGED') {
+        setIsNetworkOnline(event.isOnline);
+        if (event.isOnline) {
+          void syncQueuedChatMessages(projectId, loadLatestForQueuedMessage);
+        }
+      }
+    });
+
+    const unsubscribeChat = addChatOfflineListener((event) => {
+      if (event.projectId !== projectId) return;
+      if (event.type === 'QUEUE_CHANGED') {
+        setQueuedChatCount(event.queue.filter(item => item.status === 'pending' || item.status === 'syncing').length);
+        setFailedChatCount(event.queue.filter(item => item.status === 'failed').length);
+        return;
+      }
+      if (event.type === 'MESSAGE_SYNCED') {
+        setServerChangedWhileOffline(prev => prev || event.serverChangedWhileOffline);
+        if (event.serverChangedWhileOffline) {
+          const scope = event.queueItem.scope;
+          if (scope.type === 'ROOM') {
+            event.latestMessages.forEach(message => messagesHook.addRoomMessage(scope.roomId, message));
+          } else if (scope.type === 'PRIVATE') {
+            event.latestMessages.forEach(message => messagesHook.addPrivateMessage(scope.recipient, message));
+          } else {
+            event.latestMessages.forEach(message => messagesHook.addTeamMessage(message));
+          }
+        }
+        messagesHook.setMessages(prev => prev.map(message =>
+          message.localId === event.localId ? { ...message, ...event.message } : message
+        ));
+        messagesHook.setRoomMessages(prev => {
+          const next = { ...prev };
+          Object.keys(next).forEach((roomId) => {
+            next[+roomId] = next[+roomId].map(message =>
+              message.localId === event.localId ? { ...message, ...event.message } : message
+            );
+          });
+          return next;
+        });
+        messagesHook.setPrivateMessages(prev => {
+          const next = { ...prev };
+          Object.keys(next).forEach((partner) => {
+            next[partner] = next[partner].map(message =>
+              message.localId === event.localId ? { ...message, ...event.message } : message
+            );
+          });
+          return next;
+        });
+        return;
+      }
+      if (event.type === 'MESSAGE_FAILED') {
+        const markFailed = (message: ChatMessage) => (
+          message.localId === event.localId
+            ? { ...message, syncStatus: 'failed' as const, failureReason: event.error }
+            : message
+        );
+        messagesHook.setMessages(prev => prev.map(markFailed));
+        messagesHook.setRoomMessages(prev => {
+          const next = { ...prev };
+          Object.keys(next).forEach((roomId) => { next[+roomId] = next[+roomId].map(markFailed); });
+          return next;
+        });
+        messagesHook.setPrivateMessages(prev => {
+          const next = { ...prev };
+          Object.keys(next).forEach((partner) => { next[partner] = next[partner].map(markFailed); });
+          return next;
+        });
+      }
+    });
+
+    void syncQueuedChatMessages(projectId, loadLatestForQueuedMessage);
+
+    return () => {
+      unsubscribeNetwork();
+      unsubscribeChat();
+    };
+  // Listener callbacks only use React state setters from messagesHook, which are stable.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadLatestForQueuedMessage, projectId]);
+
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectRef.current) {
+      clearTimeout(reconnectRef.current);
+      reconnectRef.current = null;
+    }
+  }, []);
+
+  const clearTokenRefreshTimer = useCallback(() => {
+    if (tokenRefreshRef.current) {
+      clearTimeout(tokenRefreshRef.current);
+      tokenRefreshRef.current = null;
+    }
+  }, []);
+
+  const clearSubscribedRooms = useCallback(() => {
+    subscribedRoomsRef.current.clear();
+  }, []);
+
+  const closeSocketForReconnect = useCallback((reason = 'credential-rotated') => {
+    const ws = socketRef.current;
+    stompConnectedRef.current = false;
+    setIsSocketConnected(false);
+    clearSubscribedRooms();
+    if (!ws) return;
+    try {
+      ws.close(4001, reason);
+    } catch {
+      socketRef.current = null;
+      isConnectingRef.current = false;
+    }
+  }, [clearSubscribedRooms]);
+
+  const scheduleTokenRefreshReconnect = useCallback((token: string) => {
+    clearTokenRefreshTimer();
+    const payload = decodeJwtPayload(token);
+    if (!payload?.exp) return;
+
+    const refreshIn = Math.max(
+      MIN_TOKEN_REFRESH_DELAY_MS,
+      payload.exp * 1000 - Date.now() - TOKEN_REFRESH_SKEW_MS,
+    );
+
+    tokenRefreshRef.current = setTimeout(() => {
+      tokenRefreshRef.current = null;
+      refreshAccessToken()
+        .then(() => {
+          reconnectAttemptRef.current = 0;
+          closeSocketForReconnect('credential-refresh');
+        })
+        .catch(() => {
+          setError('Your session expired. Please sign in again.');
+          shouldReconnectRef.current = false;
+          closeSocketForReconnect('jwt-expired');
+        });
+    }, refreshIn);
+  }, [clearTokenRefreshTimer, closeSocketForReconnect]);
+
   // ── Subscribe to a single room's message + typing channels ──────────────────
   const subscribeRoom = useCallback((ws: WebSocket, roomId: number) => {
+    const visibleRoom = roomsHook.rooms.some(room =>
+      room.id === roomId && (room.projectId == null || String(room.projectId) === String(projectId))
+    );
+    if (!visibleRoom) {
+      console.warn(`[Chat] Refusing to subscribe to room ${roomId}; not visible for project ${projectId}`);
+      return;
+    }
     if (subscribedRoomsRef.current.has(roomId)) return;
     subscribedRoomsRef.current.add(roomId);
     sendStompFrame(ws, buildSubscribe(`sub-room-${roomId}`, `/topic/project/${projectId}/room/${roomId}`));
     sendStompFrame(ws, buildSubscribe(`sub-room-typing-${roomId}`, `/topic/project/${projectId}/typing/room/${roomId}`));
-  }, [projectId]);
+  }, [projectId, roomsHook.rooms]);
 
   // ── Handle incoming STOMP MESSAGE frames ─────────────────────────────────────
   const handleMessage = useCallback((frame: ReturnType<typeof parseFrame>) => {
@@ -224,13 +421,36 @@ export function useChat(projectId: string) {
 
   // ── Connect WebSocket ─────────────────────────────────────────────────────
   const connectWebSocket = useCallback(async () => {
+    shouldReconnectRef.current = true;
     if (socketRef.current?.readyState === WebSocket.OPEN) return;
     if (isConnectingRef.current) return;
+    if (!authenticatedProjectRef.current) {
+      setError('Chat is not available for this project.');
+      return;
+    }
     isConnectingRef.current = true;
 
+    const scheduleReconnect = (delayOverride?: number) => {
+      if (!shouldReconnectRef.current || !authenticatedProjectRef.current) return;
+      if (reconnectRef.current) return;
+      const baseDelay = Math.min(MAX_RECONNECT_DELAY_MS, Math.pow(2, reconnectAttemptRef.current) * 1000);
+      const jitter = delayOverride == null ? Math.floor(Math.random() * 250) : 0;
+      const delay = (delayOverride ?? baseDelay) + jitter;
+      reconnectAttemptRef.current += 1;
+      reconnectRef.current = setTimeout(() => {
+        reconnectRef.current = null;
+        connectWebSocket();
+      }, delay);
+    };
+
     try {
-      const token = await getValidToken();
-      if (!token) { setError('Not authenticated'); isConnectingRef.current = false; return; }
+      const token = await ensureValidToken();
+      if (!isUsablePlanoraAccessToken(token)) {
+        setError('Not authenticated');
+        isConnectingRef.current = false;
+        scheduleReconnect();
+        return;
+      }
 
       const base = API_BASE_URL.replace(/\/api$/, '');
       const wsUrl = base.replace(/^https?/, 'ws') + '/ws-native';
@@ -260,9 +480,14 @@ export function useChat(projectId: string) {
           const frame = parseFrame(raw);
           if (frame.command === 'CONNECTED') {
             console.info('[Chat] STOMP CONNECTED');
+            reconnectAttemptRef.current = 0;
+            stompConnectedRef.current = true;
             setIsSocketConnected(true);
+            setIsNetworkOnline(true);
             setError('');
-            subscribedRoomsRef.current.clear();
+            clearSubscribedRooms();
+            scheduleTokenRefreshReconnect(token);
+            void syncQueuedChatMessages(projectId, loadLatestForQueuedMessage);
 
             // Core subscriptions
             sendStompFrame(ws, buildSubscribe('sub-public', `/topic/project/${projectId}/public`));
@@ -283,6 +508,32 @@ export function useChat(projectId: string) {
             handleMessage(frame);
           } else if (frame.command === 'ERROR') {
             console.error('[Chat] STOMP ERROR', frame.body);
+            const normalizedBody = (frame.body || '').toLowerCase();
+            const isAuthError = normalizedBody.includes('jwt')
+              || normalizedBody.includes('auth')
+              || normalizedBody.includes('token')
+              || normalizedBody.includes('expired')
+              || normalizedBody.includes('invalid');
+
+            if (isAuthError) {
+              const refreshedToken = await refreshAccessToken().catch(() => null);
+              if (!refreshedToken) {
+                setError('Your session expired. Please sign in again.');
+                shouldReconnectRef.current = false;
+              } else {
+                reconnectAttemptRef.current = 0;
+              }
+              try {
+                ws.close(4001, refreshedToken ? 'credential-refresh' : 'jwt-expired');
+              } catch {
+                setIsSocketConnected(false);
+                socketRef.current = null;
+                isConnectingRef.current = false;
+                scheduleReconnect(500);
+              }
+              return;
+            }
+
             setError('Chat server error. Please reconnect.');
           }
         } catch (err) {
@@ -294,13 +545,33 @@ export function useChat(projectId: string) {
         if (socketRef.current !== ws) return;
         console.warn(`[Chat] WS closed — code: ${event.code}, reason: "${event.reason || '(none)'}"`);
         setIsSocketConnected(false);
+        stompConnectedRef.current = false;
         socketRef.current = null;
         isConnectingRef.current = false;
-        if (!reconnectRef.current) {
-          reconnectRef.current = setTimeout(() => {
-            reconnectRef.current = null;
-            connectWebSocket();
-          }, 5000);
+        clearTokenRefreshTimer();
+        clearSubscribedRooms();
+
+        const closeReason = `${event.reason || ''}`.toLowerCase();
+        const isAuthClose = closeReason.includes('jwt')
+          || closeReason.includes('auth')
+          || closeReason.includes('token')
+          || closeReason.includes('expired')
+          || closeReason.includes('invalid');
+
+        if (shouldReconnectRef.current && !reconnectRef.current) {
+          if (isAuthClose) {
+            refreshAccessToken()
+              .then(() => {
+                reconnectAttemptRef.current = 0;
+                scheduleReconnect(500);
+              })
+              .catch(() => {
+                setError('Your session expired. Please sign in again.');
+                shouldReconnectRef.current = false;
+              });
+            return;
+          }
+          scheduleReconnect();
         }
       };
 
@@ -310,6 +581,7 @@ export function useChat(projectId: string) {
           console.info('[Chat] WS connection error; reconnect will be attempted');
         }
         setError('Connection error. Retrying...');
+        stompConnectedRef.current = false;
         isConnectingRef.current = false;
         try {
           ws.close();
@@ -321,8 +593,9 @@ export function useChat(projectId: string) {
       console.error('[Chat] connect failed', err);
       setError('Failed to connect to chat server');
       isConnectingRef.current = false;
+      scheduleReconnect();
     }
-  }, [projectId, handleMessage, subscribeRoom, roomsHook.rooms]);
+  }, [projectId, handleMessage, subscribeRoom, roomsHook.rooms, clearTokenRefreshTimer, scheduleTokenRefreshReconnect, clearSubscribedRooms, loadLatestForQueuedMessage]);
 
   // ── Subscribe to new rooms when they are loaded/created ───────────────────
   useEffect(() => {
@@ -331,11 +604,53 @@ export function useChat(projectId: string) {
     rooms.forEach(r => subscribeRoom(ws, r.id));
   }, [rooms, subscribeRoom]);
 
+  useEffect(() => {
+    const handleTokenChanged = (payload: AuthTokenChangedPayload) => {
+      if (payload.reason === 'clear' || !isUsablePlanoraAccessToken(payload.token)) {
+        shouldReconnectRef.current = false;
+        clearReconnectTimer();
+        clearTokenRefreshTimer();
+        closeSocketForReconnect('signed-out');
+        setError('Your session expired. Please sign in again.');
+        return;
+      }
+
+      shouldReconnectRef.current = true;
+      reconnectAttemptRef.current = 0;
+      clearReconnectTimer();
+
+      const ws = socketRef.current;
+      if (stompConnectedRef.current || ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) {
+        closeSocketForReconnect('credential-rotated');
+        return;
+      }
+
+      if (authenticatedProjectRef.current) {
+        connectWebSocket();
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const listener = (event: Event) => {
+        handleTokenChanged((event as CustomEvent<AuthTokenChangedPayload>).detail);
+      };
+      globalThis.window?.addEventListener(AUTH_TOKEN_CHANGED_EVENT, listener);
+      return () => globalThis.window?.removeEventListener(AUTH_TOKEN_CHANGED_EVENT, listener);
+    }
+
+    const subscription = DeviceEventEmitter.addListener(AUTH_TOKEN_CHANGED_EVENT, handleTokenChanged);
+    return () => subscription.remove();
+  }, [clearReconnectTimer, clearTokenRefreshTimer, closeSocketForReconnect, connectWebSocket]);
+
   // ── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
+    authenticatedProjectRef.current = false;
+    shouldReconnectRef.current = true;
     const init = async () => {
       setIsLoading(true);
+      let initialized = false;
+      const hadCachedMessages = await messagesHook.hydrateCachedMessages();
       try {
         const [user, members, roomsData, flags] = await Promise.all([
           chatService.fetchCurrentUser(),
@@ -351,6 +666,21 @@ export function useChat(projectId: string) {
         setUsers(uniqueUsersByKey(members));
         setFeatureFlags(flags);
         roomsHook.setRooms(roomsData);
+        authenticatedProjectRef.current = true;
+        initialized = true;
+
+        await cacheChatSnapshot({
+          projectId,
+          cachedAt: Date.now(),
+          currentUser: user.username,
+          currentUserAliases: user.aliases || [],
+          users: uniqueUsersByKey(members),
+          rooms: roomsData,
+          featureFlags: flags,
+          teamMessages: messagesHook.messages,
+          roomMessages: messagesHook.roomMessages,
+          privateMessages: messagesHook.privateMessages,
+        });
 
         await Promise.all([
           messagesHook.loadTeamHistory(),
@@ -359,12 +689,28 @@ export function useChat(projectId: string) {
         ]);
       } catch (err) {
         console.error('[Chat] init failed', err);
-        if (!cancelled) setError('Failed to initialize chat');
+        authenticatedProjectRef.current = false;
+        if (!cancelled && hadCachedMessages) {
+          const cached = await loadCachedChat(projectId);
+          currentUserRef.current = (cached?.currentUser || '').toLowerCase();
+          setCurrentUser(cached?.currentUser || '');
+          setCurrentUserAliases(cached?.currentUserAliases || []);
+          setUsers(uniqueUsersByKey(cached?.users || []));
+          setFeatureFlags(cached?.featureFlags || featureFlags);
+          roomsHook.setRooms(cached?.rooms || []);
+          authenticatedProjectRef.current = true;
+          initialized = false;
+          setError('Offline. Showing cached chat messages.');
+        } else if (!cancelled) {
+          setError('You do not have access to this project chat.');
+        }
       } finally {
         if (!cancelled) {
           setIsLoading(false);
           // Connect after HTTP init so any token refresh has already completed.
-          connectWebSocket();
+          if (initialized) {
+            connectWebSocket();
+          }
         }
       }
     };
@@ -373,11 +719,17 @@ export function useChat(projectId: string) {
 
     return () => {
       cancelled = true;
+      authenticatedProjectRef.current = false;
+      shouldReconnectRef.current = false;
+      stompConnectedRef.current = false;
       isConnectingRef.current = false;
+      reconnectAttemptRef.current = 0;
       const dying = socketRef.current;
       socketRef.current = null;
       dying?.close();
-      if (reconnectRef.current) { clearTimeout(reconnectRef.current); reconnectRef.current = null; }
+      clearSubscribedRooms();
+      clearReconnectTimer();
+      clearTokenRefreshTimer();
     };
   // The initialization lifecycle is intentionally keyed to project changes only.
   // The hook modules expose stable operational callbacks for this flow.
@@ -388,10 +740,11 @@ export function useChat(projectId: string) {
   const stompSend = useCallback((dest: string, body: string) => {
     const ws = socketRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      setError('Not connected. Please wait…');
-      return;
+      setError('Not connected. Message will be queued.');
+      return false;
     }
     sendStompFrame(ws, buildSend(dest, body));
+    return true;
   }, []);
 
   const sendMessage = useCallback((content: string, recipient?: string | null) => {
@@ -403,21 +756,47 @@ export function useChat(projectId: string) {
         localId, sender: currentUserRef.current, content: trimmed,
         recipient, type: 'CHAT', formatType: 'PLAIN',
         timestamp: new Date().toISOString(),
+        syncStatus: isSocketConnected ? 'sent' : 'pending',
+        offlineQueued: !isSocketConnected,
       };
-      stompSend(`/app/project/${projectId}/chat.sendPrivateMessage`, JSON.stringify(msg));
+      const sent = isSocketConnected && stompSend(`/app/project/${projectId}/chat.sendPrivateMessage`, JSON.stringify(msg));
       // Optimistic update
       messagesHook.addPrivateMessage(recipient, msg);
       unreadHook.setPrivateLastMessages(prev => ({ ...prev, [dmKey(recipient)]: msg }));
+      if (!sent) {
+        void enqueueChatMessage({
+          projectId,
+          localId,
+          scope: { type: 'PRIVATE', recipient },
+          content: trimmed,
+          sender: currentUserRef.current,
+          createdAt: msg.timestamp!,
+          baseLastMessageId: getActiveLastMessageId(undefined, recipient),
+        });
+      }
     } else {
       const msg: ChatMessage = {
         localId, sender: currentUserRef.current, content: trimmed,
         type: 'CHAT', formatType: 'PLAIN',
         timestamp: new Date().toISOString(),
+        syncStatus: isSocketConnected ? 'sent' : 'pending',
+        offlineQueued: !isSocketConnected,
       };
-      stompSend(`/app/project/${projectId}/chat.sendMessage`, JSON.stringify(msg));
+      const sent = isSocketConnected && stompSend(`/app/project/${projectId}/chat.sendMessage`, JSON.stringify(msg));
       messagesHook.addTeamMessage(msg);
+      if (!sent) {
+        void enqueueChatMessage({
+          projectId,
+          localId,
+          scope: { type: 'TEAM' },
+          content: trimmed,
+          sender: currentUserRef.current,
+          createdAt: msg.timestamp!,
+          baseLastMessageId: getActiveLastMessageId(),
+        });
+      }
     }
-  }, [projectId, stompSend, messagesHook, unreadHook]);
+  }, [getActiveLastMessageId, isSocketConnected, projectId, stompSend, messagesHook, unreadHook]);
 
   const sendRoomMessage = useCallback((content: string, roomId: number) => {
     const trimmed = content.trim();
@@ -427,10 +806,23 @@ export function useChat(projectId: string) {
       localId, sender: currentUserRef.current, content: trimmed,
       roomId, type: 'CHAT', formatType: 'PLAIN',
       timestamp: new Date().toISOString(),
+      syncStatus: isSocketConnected ? 'sent' : 'pending',
+      offlineQueued: !isSocketConnected,
     };
-    stompSend(`/app/project/${projectId}/room/${roomId}/send`, JSON.stringify(msg));
+    const sent = isSocketConnected && stompSend(`/app/project/${projectId}/room/${roomId}/send`, JSON.stringify(msg));
     messagesHook.addRoomMessage(roomId, msg);
-  }, [projectId, stompSend, messagesHook]);
+    if (!sent) {
+      void enqueueChatMessage({
+        projectId,
+        localId,
+        scope: { type: 'ROOM', roomId },
+        content: trimmed,
+        sender: currentUserRef.current,
+        createdAt: msg.timestamp!,
+        baseLastMessageId: getActiveLastMessageId(roomId),
+      });
+    }
+  }, [getActiveLastMessageId, isSocketConnected, projectId, stompSend, messagesHook]);
 
   const sendTyping = useCallback((isTyping: boolean) => {
     const body = JSON.stringify({
@@ -499,7 +891,9 @@ export function useChat(projectId: string) {
     messageReactions: reactionsHook.messageReactions,
     activeThreadRoot: threadsHook.activeThreadRoot,
     threadMessages: threadsHook.threadMessages,
-    isLoading, isSocketConnected, error,
+    isLoading, isSocketConnected, isNetworkOnline, error,
+    hasStaleCachedMessages: messagesHook.hasStaleCache,
+    queuedChatCount, failedChatCount, serverChangedWhileOffline,
     selectPrivateUser,
     selectRoom: handleSelectRoom,
     sendMessage, sendRoomMessage,

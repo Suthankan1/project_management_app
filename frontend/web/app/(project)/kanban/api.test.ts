@@ -2,6 +2,7 @@ import {
   createTask,
   deleteTask,
   fetchTasksByProject,
+  fetchAllTasksByProject,
   fetchTeamMembers,
   updateTask,
   updateTaskStatus,
@@ -27,11 +28,20 @@ describe('kanban api', () => {
   });
 
   it('fetchTasksByProject returns task list', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: [{ id: 1, title: 'Task 1' }] });
+    mockedAxios.get.mockResolvedValueOnce({ data: { content: [{ id: 1, title: 'Task 1' }] } });
 
     const result = await fetchTasksByProject(12);
 
-    expect(mockedAxios.get).toHaveBeenCalledWith('/api/tasks/project/12', { params: {} });
+    expect(mockedAxios.get).toHaveBeenCalledWith('/api/tasks/project/12', { params: { page: 0, size: 500 } });
+    expect(result).toEqual([{ id: 1, title: 'Task 1' }]);
+  });
+
+  it('fetchAllTasksByProject returns task list', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: [{ id: 1, title: 'Task 1' }] });
+
+    const result = await fetchAllTasksByProject(12);
+
+    expect(mockedAxios.get).toHaveBeenCalledWith('/api/tasks/project/12/all', { params: {} });
     expect(result).toEqual([{ id: 1, title: 'Task 1' }]);
   });
 

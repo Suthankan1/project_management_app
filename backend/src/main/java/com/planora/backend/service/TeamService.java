@@ -17,17 +17,17 @@ import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.TeamRepository;
 import com.planora.backend.repository.UserRepository;
 
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class TeamService {
 
-    @Autowired
-    private TeamRepository teamRepository;
+    private final TeamRepository teamRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private TeamMemberRepository teamMemberRepository;
+    private final TeamMemberRepository teamMemberRepository;
 
     // Checks if team name is already taken and if the user is already a member
     @Transactional(readOnly = true)

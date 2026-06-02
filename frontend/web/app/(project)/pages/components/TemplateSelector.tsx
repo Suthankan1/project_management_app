@@ -28,7 +28,7 @@ export default function TemplateSelector({ onSelect }: TemplateSelectorProps) {
             <button
               key={template.id}
               onClick={() => onSelect(template)}
-              className="group flex flex-col items-start p-6 bg-white border border-gray-200 rounded-xl hover:border-cu-primary hover:shadow-md transition-all text-left bg-gradient-to-br hover:from-white hover:to-blue-50/30"
+              className="group flex flex-col items-start p-6 bg-white border border-gray-200 rounded-xl hover:border-cu-primary hover:shadow-md dark:hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)] transition-all text-left bg-gradient-to-br hover:from-white hover:to-blue-50/30 dark:hover:from-cu-bg dark:hover:to-cu-primary-light/20"
             >
               <div className="flex-shrink-0 mb-4 p-3 bg-gray-50 rounded-lg group-hover:scale-110 transition-transform duration-200">
                 {template.icon}

@@ -125,6 +125,8 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
                         type={project.type}
                         isFavorite={project.isFavorite}
                         width="min-w-[240px] max-w-[240px]"
+                        completedTasks={project.completedTasks}
+                        totalTasks={project.totalTasks}
                     />
                 ))}
 

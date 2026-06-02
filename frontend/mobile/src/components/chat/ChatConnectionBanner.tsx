@@ -9,11 +9,26 @@ interface Props {
   shouldShowErrorBanner: boolean;
   error: string;
   onRetry: () => void;
+  isOffline?: boolean;
+  isShowingStaleCache?: boolean;
+  queuedCount?: number;
+  failedCount?: number;
+  serverChangedWhileOffline?: boolean;
 }
 
-export function ChatConnectionBanner({ isConnected, shouldShowErrorBanner, error, onRetry }: Props) {
+export function ChatConnectionBanner({
+  isConnected,
+  shouldShowErrorBanner,
+  error,
+  onRetry,
+  isOffline = false,
+  isShowingStaleCache = false,
+  queuedCount = 0,
+  failedCount = 0,
+  serverChangedWhileOffline = false,
+}: Props) {
   const height = useSharedValue(0);
-  const showBanner = !isConnected || shouldShowErrorBanner;
+  const showBanner = !isConnected || shouldShowErrorBanner || isShowingStaleCache || queuedCount > 0 || failedCount > 0 || serverChangedWhileOffline;
   const isError = shouldShowErrorBanner;
 
   useEffect(() => {
@@ -30,8 +45,18 @@ export function ChatConnectionBanner({ isConnected, shouldShowErrorBanner, error
   const tone = isError ? 'error' : 'warning';
   const iconName = isError ? 'alert-circle-outline' : 'wifi-outline';
   const textColor = isError ? Colors.bannerRedText : Colors.bannerAmberText;
-  const message = isError ? error : 'Reconnecting…';
-  const actionLabel = isError ? 'Retry' : 'Reconnect';
+  const message = isError
+    ? error
+    : failedCount > 0
+      ? `${failedCount} message${failedCount === 1 ? '' : 's'} failed to send`
+      : queuedCount > 0
+        ? `${queuedCount} message${queuedCount === 1 ? '' : 's'} queued for sync`
+        : serverChangedWhileOffline
+          ? 'Chat updated while you were offline. Messages were refreshed before sync.'
+          : isShowingStaleCache || isOffline
+            ? 'Offline. Showing cached messages.'
+            : 'Reconnecting...';
+  const actionLabel = isError || failedCount > 0 ? 'Retry' : 'Reconnect';
 
   return (
     <Animated.View style={animatedStyle}>

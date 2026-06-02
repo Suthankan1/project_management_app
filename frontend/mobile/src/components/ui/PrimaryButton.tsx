@@ -8,6 +8,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { Colors } from '../../constants/colors';
 import { shouldUseNativeDriver } from '../../lib/platform';
 
@@ -36,6 +37,17 @@ export default function PrimaryButton({
     Animated.spring(pressAnim, { toValue: 1, useNativeDriver: shouldUseNativeDriver }).start();
   };
 
+  const handlePress = async () => {
+    if (Platform.OS !== 'web') {
+      try {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {
+        // Ignore haptics error if not supported in simulator/environment
+      }
+    }
+    onPress();
+  };
+
   const isPrimary = variant === 'primary';
   const isDisabled = disabled || loading;
 
@@ -57,7 +69,7 @@ export default function PrimaryButton({
           style={styles.base}
         >
           <Pressable
-            onPress={onPress}
+            onPress={handlePress}
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
             disabled={isDisabled}
@@ -72,7 +84,7 @@ export default function PrimaryButton({
         </LinearGradient>
       ) : (
         <Pressable
-          onPress={onPress}
+          onPress={handlePress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           disabled={isDisabled}
@@ -88,6 +100,7 @@ export default function PrimaryButton({
     </Animated.View>
   );
 }
+
 
 const styles = StyleSheet.create({
   wrap: {

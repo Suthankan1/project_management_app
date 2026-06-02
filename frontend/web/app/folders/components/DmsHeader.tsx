@@ -10,14 +10,14 @@ interface DmsHeaderProps {
 
 export default function DmsHeader({ title, isTrashMode, onUpload }: DmsHeaderProps) {
     return (
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E6E8EC] bg-white">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-cu-border bg-cu-bg">
             <div>
-                <p className="text-[11px] uppercase tracking-[0.08em] text-[#667085]">Knowledge</p>
-                <h1 className="text-[20px] font-semibold text-[#101828]">{title}</h1>
+                <p className="text-[11px] uppercase tracking-[0.08em] text-cu-text-secondary">Knowledge</p>
+                <h1 className="text-[20px] font-semibold text-cu-text-primary">{title}</h1>
             </div>
             <div className="flex items-center gap-2">
                 {!isTrashMode && (
-                    <label className="inline-flex items-center gap-2 bg-[#155DFC] hover:bg-[#004EEB] text-white px-4 py-2 rounded-md cursor-pointer text-sm font-medium">
+                    <label className="inline-flex items-center gap-2 bg-cu-primary hover:bg-cu-primary-hover text-white px-4 py-2 rounded-md cursor-pointer text-sm font-medium transition-colors">
                         <Upload size={16} />
                         Upload
                         <input type="file" className="hidden" onChange={onUpload} />

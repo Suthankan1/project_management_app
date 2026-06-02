@@ -24,23 +24,21 @@ import com.planora.backend.model.User;
 import com.planora.backend.repository.ProjectRepository;
 import com.planora.backend.repository.TaskRepository;
 
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class GithubIssueImportService {
 
-    @Autowired
-    private GithubIssuesSyncService githubIssuesSyncService;
+    private final GithubIssuesSyncService githubIssuesSyncService;
 
-    @Autowired
-    private ProjectRepository projectRepository;
+    private final ProjectRepository projectRepository;
 
-    @Autowired
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
-    @Autowired
-    private TeamMembershipLookupService teamMembershipLookupService;
+    private final TeamMembershipLookupService teamMembershipLookupService;
 
-    @Autowired
-    private GithubIssueConversionService githubIssueConversionService;
+    private final GithubIssueConversionService githubIssueConversionService;
 
     @Transactional
     public GithubIssueImportResponseDTO importIssues(GithubIssueImportRequestDTO request, User currentUser) {

@@ -23,23 +23,22 @@ import com.planora.backend.repository.KanbanColumnRepository;
 import com.planora.backend.repository.KanbanRepository;
 import com.planora.backend.repository.TaskRepository;
 
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class GithubIssueConversionService {
 
     private static final Logger log = LoggerFactory.getLogger(GithubIssueConversionService.class);
     private static final int MAX_LABEL_NAME_LENGTH = 50;
 
-    @Autowired
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
-    @Autowired
-    private KanbanRepository kanbanRepository;
+    private final KanbanRepository kanbanRepository;
 
-    @Autowired
-    private KanbanColumnRepository kanbanColumnRepository;
+    private final KanbanColumnRepository kanbanColumnRepository;
 
-    @Autowired
-    private LabelService labelService;
+    private final LabelService labelService;
 
     public Task convertIssueToTask(GithubIssueDTO issue, Project project) {
         Task task = new Task();

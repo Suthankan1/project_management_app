@@ -19,20 +19,19 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class MilestoneService {
 
-    @Autowired
-    private MilestoneRepository milestoneRepository;
+    private final MilestoneRepository milestoneRepository;
 
-    @Autowired
-    private ProjectRepository projectRepository;
+    private final ProjectRepository projectRepository;
 
-    @Autowired
-    private TeamMemberRepository teamMemberRepository;
+    private final TeamMemberRepository teamMemberRepository;
 
-    @Autowired
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
     // Creates a new milestone for a specific project.
     @Transactional

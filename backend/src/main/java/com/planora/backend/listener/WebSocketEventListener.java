@@ -15,20 +15,20 @@ import com.planora.backend.controller.ChatController;
 import com.planora.backend.repository.UserRepository;
 import com.planora.backend.service.ChatPresenceService;
 
+import lombok.RequiredArgsConstructor;
+
 @Component
+@RequiredArgsConstructor
 public class WebSocketEventListener {
 
     private static final Logger logger = LoggerFactory.getLogger(WebSocketEventListener.class);
 
     // This template is used to send messages to WebSocket destinations
-    @Autowired
-    private SimpMessageSendingOperations messagingTemplate;
+    private final SimpMessageSendingOperations messagingTemplate;
 
-    @Autowired
-    private ChatPresenceService chatPresenceService;
+    private final ChatPresenceService chatPresenceService;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
     // This method is called whenever a WebSocket connection is disconnected
     @EventListener

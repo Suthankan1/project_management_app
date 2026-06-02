@@ -1,6 +1,8 @@
 package com.planora.backend.configuration;
 
 import com.planora.backend.service.JWTService;
+import com.planora.backend.dto.ApiErrorResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.MalformedJwtException;
@@ -81,9 +83,15 @@ public class JwtFilter extends OncePerRequestFilter {
             if (!userDetails.isEnabled()) {
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 response.setContentType("application/json");
-                response.getWriter().write(
-                        "{\"error\": \"Email not verified\", \"errorCode\": \"EMAIL_NOT_VERIFIED\"}"
+                ApiErrorResponse errorResponse = new ApiErrorResponse(
+                    java.time.LocalDateTime.now().toString(),
+                    HttpServletResponse.SC_FORBIDDEN,
+                    "EMAIL_NOT_VERIFIED",
+                    "Email not verified",
+                    request.getRequestURI(),
+                    null
                 );
+                response.getWriter().write(new ObjectMapper().writeValueAsString(errorResponse));
                 return;
             }
 
@@ -101,24 +109,32 @@ public class JwtFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
         } catch (UsernameNotFoundException e) {
             logger.info("User not found for token: {}", e.getMessage());
-            sendErrorResponse(response, "User not found");
+            sendErrorResponse(request, response, "User not found");
         } catch (ExpiredJwtException e) {
             logger.debug("JWT expired for request: {}", request.getRequestURI());
-            sendErrorResponse(response, "Token has expired");
+            sendErrorResponse(request, response, "Token has expired");
         } catch (MalformedJwtException e) {
             logger.debug("Malformed JWT on request: {}", request.getRequestURI());
-            sendErrorResponse(response, "Invalid token format");
+            sendErrorResponse(request, response, "Invalid token format");
         } catch (JwtException | IllegalArgumentException e) {
             logger.error("JWT Error: {}", e.getMessage());
-            sendErrorResponse(response, "Invalid or expired token");
+            sendErrorResponse(request, response, "Invalid or expired token");
         }
 
     }
 
-    private void sendErrorResponse(HttpServletResponse response, String message) throws IOException {
+    private void sendErrorResponse(HttpServletRequest request, HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setHeader("WWW-Authenticate", "Bearer realm=\"planora\"");
         response.setContentType("application/json");
-        response.getWriter().write("{\"error\": \"" + message + "\"}");
+        ApiErrorResponse errorResponse = new ApiErrorResponse(
+            java.time.LocalDateTime.now().toString(),
+            HttpServletResponse.SC_UNAUTHORIZED,
+            "UNAUTHORIZED",
+            message,
+            request.getRequestURI(),
+            null
+        );
+        response.getWriter().write(new ObjectMapper().writeValueAsString(errorResponse));
     }
 }

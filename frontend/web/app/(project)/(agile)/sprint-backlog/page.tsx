@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, BarChart3, Rocket } from 'lucide-react';
+import { AlertTriangle, BarChart3, Rocket, Archive } from 'lucide-react';
 import BacklogCard from './components/BacklogCard';
 import ProductBacklogSection from './components/ProductBacklogSection';
 import FilterBar, { type BacklogFilters } from './components/FilterBar';
@@ -10,8 +10,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 const VelocityChart = dynamic(() => import('./components/VelocityChart'), { ssr: false });
 import type { SprintVelocityPoint } from './components/VelocityChart';
-import api from '@/lib/axios';
 import { getUserFromToken } from '@/lib/auth';
+import api from '@/lib/axios';
 import { toast } from '@/components/ui';
 import { getProjectLabels, createLabel } from '@/services/labels-service';
 import type { TaskItem, SprintItem, Label } from '@/types';
@@ -20,6 +20,7 @@ import { type CreateTaskData } from '@/components/shared/CreateTaskModal';
 import { useTaskStore } from '@/stores/task-store';
 import { buildSessionCacheKey, getSessionCache, setSessionCache, removeSessionCache } from '@/lib/session-cache';
 import { motion, AnimatePresence } from 'framer-motion';
+import { projectsApi, sprintboardsApi, sprintsApi, tasksApi } from '@/services/api-contract';
 
 const LABEL_PALETTE = ["#EF4444","#F97316","#F59E0B","#84CC16","#22C55E","#14B8A6","#06B6D4","#3B82F6","#6366F1","#8B5CF6","#EC4899","#6B7280"];
 
@@ -43,6 +44,7 @@ type RawTask = {
   startDate?: string;
   dueDate?: string;
   labels?: Label[];
+  archived?: boolean;
 };
 
 interface ProjectMember {
@@ -72,6 +74,7 @@ export default function SprintBacklogPage() {
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [projectLabels, setProjectLabels] = useState<Array<{ id: number; name: string; color?: string }>>([]);
   const [activeBoardStatuses, setActiveBoardStatuses] = useState<Array<{ value: string; label: string }>>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [filters, setFilters] = useState<BacklogFilters>({
     search: '',
     statuses: [],
@@ -117,11 +120,12 @@ export default function SprintBacklogPage() {
     startDate: raw.startDate ?? '',
     dueDate: raw.dueDate ?? '',
     labels: raw.labels ?? [],
+    archived: raw.archived ?? false,
   });
 
   const persistOrder = useCallback(async (targetSprintId: number | null, orderedTaskIds: number[]) => {
     if (!projectId || orderedTaskIds.length === 0) return;
-    await api.patch('/api/tasks/reorder', {
+    await tasksApi.reorderTasks({
       projectId: Number(projectId),
       sprintId: targetSprintId,
       orderedTaskIds,
@@ -132,12 +136,12 @@ export default function SprintBacklogPage() {
     if (!projectId) return;
     try {
       const [membersRes, projectRes, labelsRes] = await Promise.all([
-        api.get(`/api/projects/${projectId}/members`),
-        api.get(`/api/projects/${projectId}`),
+        projectsApi.getMembers(projectId),
+        projectsApi.get(projectId),
         getProjectLabels(Number(projectId)),
       ]);
 
-      const membersData = membersRes.data as ProjectMember[];
+      const membersData = membersRes as ProjectMember[];
       setProjectLabels(Array.isArray(labelsRes) ? labelsRes : []);
 
       const currentUser = getUserFromToken();
@@ -147,7 +151,7 @@ export default function SprintBacklogPage() {
         );
         if (projectMember) setCurrentUserRole(projectMember.role);
       }
-      setProjectKey((projectRes.data as { projectKey?: string }).projectKey || '');
+      setProjectKey((projectRes as { projectKey?: string }).projectKey || '');
     } catch (err) {
       console.error('Failed to fetch project static data:', err);
     }
@@ -155,8 +159,9 @@ export default function SprintBacklogPage() {
 
   const fetchData = useCallback(async (options: { showSpinner?: boolean; forceNetwork?: boolean } = {}) => {
     const { showSpinner = true, forceNetwork = false } = options;
+    if (!projectId) return;
     
-    const cKey = buildSessionCacheKey('sprint-backlog', [projectId]);
+    const cKey = buildSessionCacheKey('sprint-backlog', [projectId, showArchived.toString()]);
     let hasCachedData = false;
     if (cKey && !forceNetwork) {
       const cached = getSessionCache<CacheShape>(cKey, { allowStale: true });
@@ -171,20 +176,26 @@ export default function SprintBacklogPage() {
 
     if (showSpinner && !hasCachedData) setLoading(true);
     try {
-      const [sprintsRes, tasksRes] = await Promise.all([
-        api.get(`/api/sprints/project/${projectId}`),
-        api.get(`/api/tasks/project/${projectId}`),
-      ]);
+      const tasksPromises = [
+        tasksApi.listAllByProject(projectId),
+      ];
+      if (showArchived) {
+        tasksPromises.push(tasksApi.listAllByProject(projectId, { archived: true }));
+      }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rawSprints = sprintsRes.data as any[];
-      const rawTasks = tasksRes.data as RawTask[];
+      const [rawSprints, ...tasksResList] = await Promise.all([
+        sprintsApi.listByProject(projectId),
+        ...tasksPromises,
+      ]);
+      const rawTasks: RawTask[] = [];
+      tasksResList.forEach((res) => {
+        rawTasks.push(...(res as RawTask[]));
+      });
       const uniqueRaw = Array.from(new Map(rawTasks.map(t => [t.id, t])).values());
       const mappedTasks = uniqueRaw.map((t) => mapRawTask(t));
 
       if (projectIdNum) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setTasksForProject(projectIdNum, rawTasks as any);
+        setTasksForProject(projectIdNum, mappedTasks);
       }
 
       const backlogTasks = mappedTasks.filter((t) => !t.sprintId);
@@ -195,9 +206,13 @@ export default function SprintBacklogPage() {
         sprintTaskMap.get(sid)!.push(t);
       });
 
-      const newSprints = rawSprints.map((s) => ({
-        ...s,
-        goal: s.goal ?? '',
+      const newSprints: SprintItem[] = rawSprints.map((s) => ({
+        id: s.id,
+        name: s.name,
+        status: s.status,
+        startDate: s.startDate ?? undefined,
+        endDate: s.endDate ?? undefined,
+        goal: (s as SprintItem & { goal?: string }).goal ?? '',
         tasks: sprintTaskMap.get(s.id) ?? []
       }));
 
@@ -207,10 +222,10 @@ export default function SprintBacklogPage() {
 
       const activeSprint = rawSprints.find((s) => s.status === 'ACTIVE');
       if (activeSprint) {
-        api.get(`/api/sprintboards/sprint/${activeSprint.id}`)
+        sprintboardsApi.get(activeSprint.id)
           .then((res) => {
             const defaultStatuses = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
-            const extra = (res.data.columns ?? [])
+            const extra = (res.columns ?? [])
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               .filter((c: any) => !defaultStatuses.includes(c.columnStatus))
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -228,27 +243,27 @@ export default function SprintBacklogPage() {
     } finally {
       if (showSpinner && !hasCachedData) setLoading(false);
     }
-  }, [projectId, projectIdNum, projectKey, setTasksForProject]);
+  }, [projectId, projectIdNum, projectKey, setTasksForProject, showArchived]);
 
   const createSprint = useCallback(async (name: string, startDate?: string, endDate?: string, goal?: string) => {
     const trimmed = name.trim();
     if (!trimmed || !projectId) return;
 
     try {
-      const response = await api.post('/api/sprints', {
+      const response = await sprintsApi.create({
         proId: Number(projectId),
         name: trimmed,
         startDate: startDate || null,
         endDate: endDate || null,
         goal: goal || null,
       });
-      const created = response.data as { id: number; name: string; status: string; startDate?: string; endDate?: string; goal?: string };
+      const created = response as { id: number; name: string; status: string; startDate?: string; endDate?: string; goal?: string };
 
       const selectedTasks = productTasks.filter((task) => task.selected);
       const remainingTasks = productTasks.filter((task) => !task.selected);
 
       await Promise.all(
-        selectedTasks.map((task) => api.put(`/api/tasks/${task.id}`, { sprintId: created.id }))
+        selectedTasks.map((task) => tasksApi.update(task.id, { sprintId: created.id }))
       );
 
       const cleanedTasks = selectedTasks.map((task) => ({ ...task, selected: false, sprintId: created.id }));
@@ -309,7 +324,7 @@ export default function SprintBacklogPage() {
     if (!trimmed || !projectId) return;
 
     try {
-      const response = await api.post('/api/tasks', {
+      const response = await tasksApi.create({
         projectId: Number(projectId),
         title: trimmed,
         storyPoint: data.storyPoint ?? 0,
@@ -317,7 +332,7 @@ export default function SprintBacklogPage() {
         assigneeId: data.assigneeId,
         labelIds: data.labelIds,
       });
-      const raw = response.data as RawTask;
+      const raw = response as RawTask;
       const newTask: TaskItem = {
         id: raw.id,
         taskNo: raw.projectTaskNumber ?? raw.id,
@@ -344,13 +359,13 @@ export default function SprintBacklogPage() {
     if (!trimmed || !projectId) return;
 
     try {
-      const response = await api.post('/api/tasks', {
+      const response = await tasksApi.create({
         projectId: Number(projectId),
         title: trimmed,
         storyPoint: 0,
         sprintId,
       });
-      const raw = response.data as RawTask;
+      const raw = response as RawTask;
       const newTask: TaskItem = {
         id: raw.id,
         taskNo: raw.projectTaskNumber ?? raw.id,
@@ -474,7 +489,7 @@ export default function SprintBacklogPage() {
     }
 
     try {
-      await api.put(`/api/tasks/${taskId}`, { sprintId: toSprintId });
+      await tasksApi.update(taskId, { sprintId: toSprintId });
       if (fromSprintId !== toSprintId) {
         await persistOrder(fromSprintId, sourceRemainingIds);
       }
@@ -499,7 +514,7 @@ export default function SprintBacklogPage() {
 
   const handleTaskStatusChange = useCallback(async (taskId: number, newStatus: string) => {
     try {
-      await api.put(`/api/tasks/${taskId}`, { status: newStatus });
+      await tasksApi.updateStatus(taskId, newStatus);
       setProductTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
       setSprints(prev => prev.map(s => ({
         ...s,
@@ -523,7 +538,7 @@ export default function SprintBacklogPage() {
       tasks: s.tasks.map((t) => t.id === taskId ? { ...t, dueDate: normalized } : t),
     })));
     try {
-      await api.patch(`/api/tasks/${taskId}/dates`, { dueDate: normalized || null });
+      await tasksApi.updateDates(taskId, { dueDate: normalized || null });
       const cKey = buildSessionCacheKey('sprint-backlog', [projectId]);
       if (cKey) removeSessionCache(cKey);
     } catch {
@@ -611,7 +626,7 @@ export default function SprintBacklogPage() {
     const ids = getSelectedTaskIds();
     if (ids.length === 0) return;
     try {
-      await api.patch('/api/tasks/bulk/status', { taskIds: ids, status });
+      await tasksApi.bulkUpdateStatus({ taskIds: ids, status });
       setProductTasks(prev => prev.map(t => t.selected ? { ...t, status, selected: false } : t));
       setSprints(prev => prev.map(s => ({
         ...s, tasks: s.tasks.map(t => t.selected ? { ...t, status, selected: false } : t)
@@ -626,7 +641,7 @@ export default function SprintBacklogPage() {
     const ids = getSelectedTaskIds();
     if (ids.length === 0) return;
     try {
-      await api.delete('/api/tasks/bulk', { data: { taskIds: ids } });
+      await tasksApi.bulkDelete({ taskIds: ids });
       setProductTasks(prev => prev.filter(t => !t.selected));
       setSprints(prev => prev.map(s => ({ ...s, tasks: s.tasks.filter(t => !t.selected) })));
       toast(`Deleted ${ids.length} task(s)`, 'success');
@@ -668,7 +683,11 @@ export default function SprintBacklogPage() {
         sprintId: t.sprintId ?? null,
         status: t.status ?? 'TODO',
         priority: t.priority ?? 'LOW',
+        archived: t.archived ?? false,
       };
+      if (newTask.archived && !showArchived) {
+        return;
+      }
       if (newTask.sprintId) {
         setSprints(prev => prev.map(s =>
           s.id === newTask.sprintId
@@ -691,12 +710,16 @@ export default function SprintBacklogPage() {
         assigneePhotoUrl: t.assigneePhotoUrl ?? null,
         sprintId: t.sprintId ?? null,
         dueDate: t.dueDate ?? '',
+        archived: t.archived ?? false,
       };
 
       const updateList = (prev: TaskItem[], targetSprintId: number | null | undefined) => {
         const existingIndex = prev.findIndex(x => x.id === t.id);
         const existing = existingIndex >= 0 ? prev[existingIndex] : undefined;
         const filtered = prev.filter(x => x.id !== t.id);
+        if (t.archived && !showArchived) {
+          return filtered;
+        }
         if (!t.sprintId && targetSprintId === null) {
           const taskToUse = existing || { id: t.id } as TaskItem;
           if (existingIndex < 0) return [...filtered, { ...taskToUse, ...updated }];
@@ -712,6 +735,9 @@ export default function SprintBacklogPage() {
         const existingIndex = s.tasks.findIndex(x => x.id === t.id);
         const existing = existingIndex >= 0 ? s.tasks[existingIndex] : undefined;
         const filtered = s.tasks.filter(x => x.id !== t.id);
+        if (t.archived && !showArchived) {
+          return { ...s, tasks: filtered };
+        }
         if (s.id === t.sprintId) {
           const taskToUse = existing || { id: t.id } as TaskItem;
           if (existingIndex < 0) {
@@ -730,7 +756,7 @@ export default function SprintBacklogPage() {
         ...s, tasks: s.tasks.filter(x => x.id !== deletedId)
       })));
     }
-  }, []));
+  }, [showArchived]));
 
   useEffect(() => {
     const action = searchParams.get('action');
@@ -775,6 +801,16 @@ export default function SprintBacklogPage() {
         <div className="flex items-start justify-between gap-4">
           <FilterBar filters={filters} onChange={setFilters} assigneeNames={allAssigneeNames} />
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 pt-0.5">
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className={`flex h-11 items-center gap-2 rounded-xl px-4 text-[13px] font-bold shadow-sm transition-all active:scale-95 ${
+                showArchived ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Archive size={18} />
+              <span className="hidden sm:inline">{showArchived ? 'Hide Archived' : 'Show Archived'}</span>
+              <span className="inline sm:hidden">{showArchived ? 'Hide' : 'Show'}</span>
+            </button>
             <button
               onClick={() => setShowVelocity(!showVelocity)}
               className={`flex h-11 items-center gap-2 rounded-xl px-4 text-[13px] font-bold shadow-sm transition-all active:scale-95 ${

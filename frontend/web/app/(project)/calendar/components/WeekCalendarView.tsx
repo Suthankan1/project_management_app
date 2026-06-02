@@ -32,8 +32,8 @@ export default function WeekCalendarView({ currentDate, events, onDayClick, onEv
   const dateKey = (d: Date) => d.toISOString().slice(0, 10);
 
   return (
-    <div className="rounded-xl border border-cu-border bg-cu-bg">
-      <div className="grid grid-cols-7 border-b border-cu-border">
+    <div className="rounded-xl border border-cu-primary/15 bg-cu-bg shadow-cu-sm overflow-hidden">
+      <div className="grid grid-cols-7 border-b border-cu-primary/15 bg-gradient-to-r from-cu-primary/10 via-cyan-500/10 to-emerald-500/10">
         {weekDays.map((day, idx) => (
           <div key={day.toISOString()} className="px-3 py-2">
             <div className="text-xs uppercase tracking-wide text-cu-text-muted">{DAY_NAMES[idx]}</div>
@@ -51,7 +51,7 @@ export default function WeekCalendarView({ currentDate, events, onDayClick, onEv
           return (
             <div
               key={day.toISOString()}
-              className={`min-h-[340px] border-r border-cu-border p-2 align-top transition-colors${onDayClick ? ' cursor-pointer hover:bg-cu-hover' : ''}${isDropTarget ? ' bg-cu-primary/5' : ''}`}
+              className={`min-h-[340px] border-r border-cu-border p-2 align-top transition-colors ${day.getDay() === 0 || day.getDay() === 6 ? 'bg-violet-500/5' : 'bg-cu-bg'}${onDayClick ? ' cursor-pointer hover:bg-cu-primary/10' : ''}${isDropTarget ? ' bg-cu-primary/10' : ''}`}
               onClick={() => onDayClick?.(day)}
               onDragOver={(e) => { if (draggedId) { e.preventDefault(); setDropTargetDate(key); } }}
               onDragLeave={() => setDropTargetDate(null)}

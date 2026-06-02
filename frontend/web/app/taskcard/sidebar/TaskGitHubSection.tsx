@@ -21,7 +21,8 @@ import {
 import { getGitHubToken, getProjectGitHubRepo } from '@/services/githubService';
 import { CIStatusBadge } from '@/components/ui';
 import SidebarField from './SidebarField';
-import CreateIssueModal from './CreateIssueModal';
+import CreateIssueFromTaskModal from '@/components/github/CreateIssueFromTaskModal';
+import type { GitHubIssue } from '@/services/githubService';
 
 // ── Backend DTO shapes ────────────────────────────────────────────────────────
 
@@ -214,9 +215,18 @@ const CollapseSection: React.FC<CollapseSectionProps> = ({
 interface TaskGitHubSectionProps {
   taskId: number;
   projectId?: number;
+  taskTitle: string;
+  taskDescription?: string;
+  taskLabels: string[];
 }
 
-const TaskGitHubSection: React.FC<TaskGitHubSectionProps> = ({ taskId, projectId }) => {
+const TaskGitHubSection: React.FC<TaskGitHubSectionProps> = ({
+  taskId,
+  projectId,
+  taskTitle,
+  taskDescription,
+  taskLabels,
+}) => {
   const [open, setOpen]               = useState(true);
   const [prsOpen, setPrsOpen]         = useState(true);
   const [commitsOpen, setCommitsOpen] = useState(true);
@@ -238,6 +248,8 @@ const TaskGitHubSection: React.FC<TaskGitHubSectionProps> = ({ taskId, projectId
   const [branchError, setBranchError]     = useState<string | null>(null);
   const [savingBranch, setSavingBranch]   = useState(false);
   const [branchSaved, setBranchSaved]     = useState(false);
+
+  const connectedRepo = projectId != null ? getProjectGitHubRepo(projectId) : null;
 
   // Restore per-task collapse prefs
   useEffect(() => {
@@ -312,6 +324,10 @@ const TaskGitHubSection: React.FC<TaskGitHubSectionProps> = ({ taskId, projectId
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleCreateIssue = () => setIssueModalOpen(true);
+
+  const handleIssueCreated = (_issue: GitHubIssue) => {
+    void fetchData();
+  };
 
   const copyBranch = async () => {
     if (!summary?.githubBranch) return;
@@ -545,6 +561,7 @@ const TaskGitHubSection: React.FC<TaskGitHubSectionProps> = ({ taskId, projectId
                 </button>
                 <button
                   onClick={handleCreateIssue}
+                  disabled={!connectedRepo}
                   className="flex items-center gap-1.5 rounded-lg border border-[#155DFC] bg-[#155DFC] px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#1248CC]"
                 >
                   <Plus size={11} />
@@ -754,12 +771,18 @@ const TaskGitHubSection: React.FC<TaskGitHubSectionProps> = ({ taskId, projectId
         )}
       </AnimatePresence>
 
-      <CreateIssueModal
-        open={issueModalOpen}
-        onClose={() => setIssueModalOpen(false)}
-        taskId={taskId}
-        projectId={projectId}
-      />
+      {connectedRepo && (
+        <CreateIssueFromTaskModal
+          open={issueModalOpen}
+          taskId={taskId}
+          taskTitle={taskTitle}
+          taskDescription={taskDescription}
+          taskLabels={taskLabels}
+          repoFullName={connectedRepo.repoFullName}
+          onClose={() => setIssueModalOpen(false)}
+          onCreated={handleIssueCreated}
+        />
+      )}
     </div>
   );
 };

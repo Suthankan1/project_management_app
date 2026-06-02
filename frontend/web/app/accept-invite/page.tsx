@@ -3,8 +3,8 @@ export const dynamic = 'force-dynamic';
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import api from '@/lib/axios';
 import { getValidToken } from '@/lib/auth';
+import { projectsApi } from '@/services/api-contract';
 
 function AcceptInviteContent() {
     const searchParams = useSearchParams();
@@ -41,7 +41,7 @@ function AcceptInviteContent() {
 
         try {
             setLoading(true);
-            await api.post('/api/projects/invitations/accept', { token });
+            await projectsApi.acceptInvitation(token);
             setMsg({ type: 'success', text: 'Invitation accepted! You are now a member of the project team.' });
 
             // Redirect to dashboard after brief delay
