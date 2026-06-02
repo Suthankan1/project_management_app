@@ -23,7 +23,12 @@ export default function CustomFieldsManager({ projectId }: Props) {
   const load = useCallback(async () => {
     try {
       const res = await projectsApi.getCustomFields(projectId);
-      setFields(res);
+      setFields(res.map((field, index) => ({
+        ...field,
+        projectId,
+        position: field.position ?? index,
+        fieldType: field.fieldType as CustomField['fieldType'],
+      })));
     } catch {
       toast('Failed to load custom fields', 'error');
     } finally {

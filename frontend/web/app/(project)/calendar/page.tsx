@@ -13,6 +13,7 @@ import type { CalendarEventItem, CalendarFilters, CalendarView } from './types';
 import { addDays, addMonths, formatMonthLabel, formatWeekLabel } from './utils/date';
 import CreateTaskModal, { type CreateTaskData } from '@/components/shared/CreateTaskModal';
 import { patchTaskDates } from './api';
+import { tasksApi } from '@/services/api-contract';
 
 const DEFAULT_FILTERS: CalendarFilters = {
   search: '',

@@ -10,7 +10,9 @@ import { useStomp } from '@/ws/stomp-provider';
 import { getProjectGitHubRepo } from '@/services/githubService';
 import CreateIssueFromTaskModal from '@/components/github/CreateIssueFromTaskModal';
 import { authApi } from '@/services/auth-contract';
+import api from '@/lib/axios';
 import { labelsApi, projectsApi, sprintsApi, tasksApi } from '@/services/api-contract';
+import type { Task } from '@/types';
 
 interface MultiAssignee {
   memberId: number;
@@ -74,6 +76,52 @@ interface TaskCardModalProps {
   onClose: (wasModified: boolean) => void;
 }
 
+const toTaskData = (task: Task & {
+  projectName?: string;
+  reporterName?: string;
+  assigneeName?: string;
+  sprintName?: string;
+  githubIssueNumber?: number | null;
+  githubRepoFullName?: string | null;
+}): TaskData => ({
+  id: task.id,
+  title: task.title,
+  description: task.description ?? '',
+  projectId: task.projectId ?? 0,
+  projectName: task.projectName ?? '',
+  status: task.status ?? 'TODO',
+  priority: task.priority ?? 'MEDIUM',
+  storyPoint: task.storyPoint ?? 0,
+  reporterName: task.reporterName ?? '',
+  assigneeName: task.assigneeName ?? '',
+  sprintName: task.sprintName ?? '',
+  milestoneId: task.milestoneId ?? null,
+  milestoneName: task.milestoneName ?? null,
+  labels: task.labels ?? [],
+  createdAt: task.createdAt ?? '',
+  updatedAt: task.updatedAt ?? '',
+  dueDate: task.dueDate ?? null,
+  subtasks: task.subtasks ?? [],
+  dependencies: task.dependencies ?? [],
+  assignees: task.assignees?.map((assignee) => ({
+    memberId: assignee.id,
+    userId: assignee.id,
+    name: assignee.name,
+    photoUrl: assignee.avatar ?? assignee.profilePicUrl ?? null,
+  })),
+  recurrenceRule: task.recurrenceRule ?? null,
+  recurrenceEnd: task.recurrenceEnd ?? null,
+  customInterval: task.customInterval ?? null,
+  recurrenceLimit: task.recurrenceLimit ?? null,
+  reporterId: task.reporterId ?? null,
+  sprintId: task.sprintId ?? null,
+  startDate: task.startDate ?? null,
+  completedAt: task.completedAt ?? null,
+  githubIssueNumber: task.githubIssueNumber ?? null,
+  githubRepoFullName: task.githubRepoFullName ?? null,
+  archived: task.archived ?? false,
+});
+
 export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
   const [taskData, setTaskData] = useState<TaskData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,7 +142,14 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
     try {
       setLoading(true);
       const response = await tasksApi.get(taskId);
-      setTaskData(response);
+      setTaskData(toTaskData(response as Task & {
+        projectName?: string;
+        reporterName?: string;
+        assigneeName?: string;
+        sprintName?: string;
+        githubIssueNumber?: number | null;
+        githubRepoFullName?: string | null;
+      }));
       localStorage.setItem(`planora:task:${taskId}`, JSON.stringify({ ...response, timestamp: Date.now() }));
       setError(null);
       if (response?.projectId) {

@@ -9,20 +9,16 @@ import {
   setSessionCache,
 } from '@/lib/session-cache';
 import { projectsApi } from '@/services/api-contract';
+import type { ProjectSummary as ApiProjectSummary } from '@/services/projects-contract';
 
 // Data will stay fresh in cache for 2 minutes
 const DASHBOARD_PROJECTS_CACHE_TTL = 2 * 60_000;
 
 // Structure for a single project summary
-export interface ProjectSummary {
-  id: number;
-  name: string;
-  projectKey?: string;
-  isFavorite?: boolean;
-  type: 'AGILE' | 'KANBAN' | string;
+export type ProjectSummary = ApiProjectSummary & {
   completedTasks?: number;
   totalTasks?: number;
-}
+};
 
 // Return type for this hook
 interface UseDashboardProjectsReturn {

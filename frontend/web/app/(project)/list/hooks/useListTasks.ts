@@ -7,6 +7,7 @@ import { getMilestones, assignTaskToMilestone } from '@/services/milestone-servi
 import { useTaskWebSocket } from '@/hooks/useTaskWebSocket';
 import type { CreateTaskData } from '@/components/shared/CreateTaskModal';
 import type { Label, MilestoneResponse, Task } from '@/types';
+import api from '@/lib/axios';
 import { labelsApi, projectsApi, tasksApi } from '@/services/api-contract';
 
 const MEMBERS_CACHE_TTL_MS = 1000 * 60 * 30;
