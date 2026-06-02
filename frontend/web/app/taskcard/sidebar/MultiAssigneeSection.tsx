@@ -29,9 +29,21 @@ const MultiAssigneeSection: React.FC<MultiAssigneeSectionProps> = ({
   readOnly = false,
 }) => {
   const [members, setMembers] = useState<{ memberId: number; userId: number; name: string; photoUrl: string | null }[]>([]);
-  const [localAssignees, setLocalAssignees] = useState(assignees);
+  const [assigneeState, setAssigneeState] = useState({ source: assignees, value: assignees });
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  if (assigneeState.source !== assignees) {
+    setAssigneeState({ source: assignees, value: assignees });
+  }
+
+  const localAssignees = assigneeState.source === assignees ? assigneeState.value : assignees;
+  const setLocalAssignees = (updater: React.SetStateAction<AssigneeRow[]>) => {
+    setAssigneeState((prev) => ({
+      source: prev.source,
+      value: typeof updater === 'function' ? updater(prev.value) : updater,
+    }));
+  };
 
   useEffect(() => {
     // Lazy-load members only when the dropdown opens — avoids an API call for every task card that renders
@@ -49,15 +61,12 @@ const MultiAssigneeSection: React.FC<MultiAssigneeSectionProps> = ({
   }, [projectId, open]);
 
   useEffect(() => {
-    // Keep local assignees in sync with prop updates
-    setLocalAssignees(assignees);
-
     const handleClickOutside = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [assignees]);
+  }, []);
 
   const currentIds = new Set(assignees.map((a) => a.memberId));
 
@@ -73,7 +82,7 @@ const MultiAssigneeSection: React.FC<MultiAssigneeSectionProps> = ({
     try {
       await api.patch(`/api/tasks/${taskId}/assignees`, { assigneeIds: updated });
       onChanged();
-    } catch (err) {
+    } catch {
       setLocalAssignees(previous);
       toast('Failed to add assignee', 'error', 8000, 'Retry', async () => {
         try {
@@ -94,7 +103,7 @@ const MultiAssigneeSection: React.FC<MultiAssigneeSectionProps> = ({
     try {
       await api.patch(`/api/tasks/${taskId}/assignees`, { assigneeIds: updated });
       onChanged();
-    } catch (err) {
+    } catch {
       setLocalAssignees(previous);
       toast('Failed to remove assignee', 'error', 8000, 'Retry', async () => {
         try {

@@ -80,7 +80,7 @@ const SubtaskList: React.FC<SubtaskListProps> = ({ subtasks: initialSubtasks, ta
     setSubtasks(prev => prev.map(s => s.id === st.id ? { ...s, status: newStatus } : s));
     try {
       await api.patch(`/api/tasks/${st.id}/status`, { status: newStatus });
-    } catch (err) {
+    } catch {
       // revert
       setSubtasks(prev => prev.map(s => s.id === st.id ? { ...s, status: st.status } : s));
       // offer retry
@@ -88,7 +88,7 @@ const SubtaskList: React.FC<SubtaskListProps> = ({ subtasks: initialSubtasks, ta
         setToggleLoading(st.id);
         try {
           await api.patch(`/api/tasks/${st.id}/status`, { status: newStatus });
-        } catch (e) {
+        } catch {
           toast('Retry failed', 'error');
         } finally {
           setToggleLoading(null);

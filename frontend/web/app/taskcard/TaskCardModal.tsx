@@ -128,7 +128,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [canEdit, setCanEdit] = useState(true);
   const [canChangeReporter, setCanChangeReporter] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [, setIsSyncing] = useState(false);
   const [projectMembers, setProjectMembers] = useState<ProjectMemberOption[]>([]);
   const [projectLabels, setProjectLabels] = useState<LabelOption[]>([]);
   const [projectSprints, setProjectSprints] = useState<SprintOption[]>([]);

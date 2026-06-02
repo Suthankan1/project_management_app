@@ -80,7 +80,6 @@ export function useKanbanActions(
     if (task.status === newStatus) return;
 
     // Optimistic update + retryable toast
-    const previousTasks = tasks;
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
     setUpdatingTaskId(taskId);
 

@@ -1,7 +1,9 @@
 import { optimisticUpdateTaskStatusHelper } from './hooks/useKanbanActions';
 
+type TestTask = { id: number; status: string };
+
 describe('optimisticUpdateTaskStatusHelper', () => {
-  const tasks = [ { id: 1, status: 'TODO' }, { id: 2, status: 'IN_PROGRESS' } ];
+  const tasks: TestTask[] = [ { id: 1, status: 'TODO' }, { id: 2, status: 'IN_PROGRESS' } ];
 
   it('applies optimistic update and resolves on success', async () => {
     const setTasks = jest.fn();
@@ -13,7 +15,7 @@ describe('optimisticUpdateTaskStatusHelper', () => {
     // first call should be optimistic updater
     const firstCall = setTasks.mock.calls[0][0];
     const optimistic = firstCall(tasks);
-    expect(optimistic.find((t: any) => t.id === 1).status).toBe('IN_REVIEW');
+    expect(optimistic.find((t: TestTask) => t.id === 1)?.status).toBe('IN_REVIEW');
     expect(updateFn).toHaveBeenCalledWith(1, 'IN_REVIEW', undefined);
   });
 
@@ -27,8 +29,8 @@ describe('optimisticUpdateTaskStatusHelper', () => {
     const optimisticUpdater = setTasks.mock.calls[0][0];
     const revertedUpdater = setTasks.mock.calls[1][0];
     const optimistic = optimisticUpdater(tasks);
-    expect(optimistic.find((t: any) => t.id === 1).status).toBe('DONE');
+    expect(optimistic.find((t: TestTask) => t.id === 1)?.status).toBe('DONE');
     const reverted = revertedUpdater(tasks);
-    expect(reverted.find((t: any) => t.id === 1).status).toBe('TODO');
+    expect(reverted.find((t: TestTask) => t.id === 1)?.status).toBe('TODO');
   });
 });
