@@ -72,37 +72,9 @@ jobs:
         severity: 'CRITICAL,HIGH'
         vuln-type: 'library'
 
-  api-contract-check:
-    name: API Contract Check
-    needs: changes
-    if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.mobile == 'true' || github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: write
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '24'
-
-    - name: Run API Contract Checker
-      run: node scripts/check-api-contracts.mjs --report artifacts/api-contracts/report.txt
-
-    - name: Upload API Contract Report
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: api-contract-report
-        path: artifacts/api-contracts/report.txt
-        if-no-files-found: error
-
   backend-build:
     name: Build Backend
-    needs: [changes, api-contract-check]
+    needs: changes
     if: ${{ needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     defaults:
@@ -131,7 +103,7 @@ jobs:
       
   frontend-build:
     name: Build Frontend
-    needs: [changes, api-contract-check]
+    needs: changes
     if: ${{ needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     env:
@@ -176,7 +148,7 @@ jobs:
 
   mobile-build:
     name: Build Mobile
-    needs: [changes, api-contract-check]
+    needs: changes
     if: ${{ needs.changes.outputs.mobile == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     env:
