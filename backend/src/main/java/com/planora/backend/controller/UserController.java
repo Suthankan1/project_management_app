@@ -95,7 +95,7 @@ public class UserController {
 
     @PostMapping("/reset")
     public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
-        boolean isSuccess = service.resetPassword(request.getToken(), request.getNewPassword());
+        boolean isSuccess = service.resetPassword(request.getEmail(), request.getToken(), request.getNewPassword());
         if (isSuccess) {
             return new ResponseEntity<>("Password reset successfully", HttpStatus.OK);
         } else {

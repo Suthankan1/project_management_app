@@ -11,6 +11,7 @@ import { authApi } from '@/services/api-contract';
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
+  const [email, setEmail] = useState(() => searchParams.get('email') ?? '');
   const [otp, setOtp] = useState(() => searchParams.get('token') ?? '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,6 +22,11 @@ export default function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
+
+    if (!email || email.trim() === '') {
+      setError('Please enter your email address.');
+      return;
+    }
 
     if (!otp || otp.trim().length < 6) {
       setError('Please enter the 6-digit reset code from your email.');
@@ -42,6 +48,7 @@ export default function ResetPasswordPage() {
 
     try {
       await authApi.resetPassword({
+        email: email.trim(),
         token: otp.trim(),
         newPassword,
       });
@@ -89,11 +96,13 @@ export default function ResetPasswordPage() {
           <SuccessMessage />
         ) : (
           <ResetPasswordForm
+            email={email}
             otp={otp}
             newPassword={newPassword}
             confirmPassword={confirmPassword}
             error={error}
             isLoading={isLoading}
+            onEmailChange={setEmail}
             onOtpChange={setOtp}
             onPasswordChange={setNewPassword}
             onConfirmPasswordChange={setConfirmPassword}

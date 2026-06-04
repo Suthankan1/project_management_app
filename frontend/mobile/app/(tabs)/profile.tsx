@@ -176,7 +176,7 @@ function ChangePasswordSection({ email }: { email: string }) {
     
     setResetting(true);
     try {
-      await api.post('/api/auth/reset', { token: otp.trim(), newPassword: newPw });
+      await api.post('/api/auth/reset', { email, token: otp.trim(), newPassword: newPw });
       setStep('done');
       showMsg('Password changed successfully!');
       setOtp('');

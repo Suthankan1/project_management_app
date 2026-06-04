@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useResetPassword } from '@/src/hooks/useResetPassword';
 import BrandHeader from '@/src/components/ui/BrandHeader';
+import TextInputField from '@/src/components/ui/TextInputField';
 import PasswordInput from '@/src/components/ui/PasswordInput';
 import PasswordStrengthBar from '@/src/components/ui/PasswordStrengthBar';
 import PrimaryButton from '@/src/components/ui/PrimaryButton';
@@ -28,6 +29,7 @@ import { shouldUseNativeDriver } from '@/src/lib/platform';
 export default function ResetPasswordScreen() {
   const router = useRouter();
   const {
+    email, setEmail,
     otp, setOtp,
     newPassword, setNewPassword,
     confirmPassword, setConfirmPassword,
@@ -175,6 +177,16 @@ export default function ResetPasswordScreen() {
               {!submitted ? (
                 <View style={styles.formGap}>
                   <ErrorBanner message={error} visible={!!error} />
+
+                  <TextInputField
+                    label="Email Address"
+                    value={email}
+                    onChangeText={t => setEmail(t.toLowerCase())}
+                    placeholder="Enter your email"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    editable={!isLoading}
+                  />
 
                   {/* OTP Input */}
                   <View>

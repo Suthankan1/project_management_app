@@ -11,6 +11,7 @@ import { authApi } from '@/services/api-contract';
 export function useForgotPasswordForm() {
   // Step 1: Define the strict state required for this specific view.
   const [email, setEmail] = useState('');
+  const [submittedEmail, setSubmittedEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
@@ -58,6 +59,7 @@ export function useForgotPasswordForm() {
 
       // On success:
       setSuccess(response.message || 'Verification code sent.');
+      setSubmittedEmail(email);
       setSubmitted(true);
       setCooldown(60);
       setEmail(''); // Clear the input field for security/cleanliness.
@@ -85,6 +87,7 @@ export function useForgotPasswordForm() {
   // Step 5: Expose the state and the action function to the consuming component.
   return {
     email, setEmail,
+    submittedEmail,
     isLoading,
     submitted, setSubmitted,
     error,

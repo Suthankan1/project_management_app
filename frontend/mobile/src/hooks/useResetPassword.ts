@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import api from '../api/axios';
 import { validatePassword } from '../lib/validation';
 
 export function useResetPassword() {
+  const { email: initialEmail } = useLocalSearchParams<{ email?: string }>();
+  const [email,           setEmail]           = useState(initialEmail || '');
   const [otp,             setOtp]             = useState('');
   const [newPassword,     setNewPassword]     = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -13,6 +16,11 @@ export function useResetPassword() {
   const handleSubmit = async () => {
     if (isLoading) return;
     setError('');
+
+    if (!email || email.trim() === '') {
+      setError('Please enter your email.');
+      return;
+    }
 
     if (otp.trim().length < 6) {
       setError('Please enter the 6-digit code.');
@@ -32,7 +40,7 @@ export function useResetPassword() {
 
     setIsLoading(true);
     try {
-      await api.post('/api/auth/reset', { token: otp.trim(), newPassword });
+      await api.post('/api/auth/reset', { email: email.trim(), token: otp.trim(), newPassword });
       setNewPassword('');
       setConfirmPassword('');
       setSubmitted(true);
@@ -51,6 +59,7 @@ export function useResetPassword() {
   };
 
   return {
+    email, setEmail,
     otp, setOtp,
     newPassword, setNewPassword,
     confirmPassword, setConfirmPassword,

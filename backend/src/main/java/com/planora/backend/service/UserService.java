@@ -85,6 +85,10 @@ public class UserService {
             .expireAfterWrite(Duration.ofMinutes(20))
             .build();
 
+    private final Cache<String, Instant> forgotPasswordRateLimitCache = Caffeine.newBuilder()
+            .expireAfterWrite(Duration.ofMinutes(1))
+            .build();
+
     private record LoginAttemptRecord(int failedAttempts, Instant lockedUntil) {
         boolean isLocked(Instant now) {
             return lockedUntil != null && now.isBefore(lockedUntil);
@@ -397,8 +401,19 @@ public class UserService {
     // Initiate the forgotten password flow.
     @Transactional
     public String forgotPassword(String email) {
+        // Rate limiting check
+        String lowerEmail = email.toLowerCase();
+        Instant lastRequest = forgotPasswordRateLimitCache.getIfPresent(lowerEmail);
+        if (lastRequest != null && Duration.between(lastRequest, Instant.now()).getSeconds() < 60) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.TOO_MANY_REQUESTS,
+                    "Too many requests. Please wait before requesting another OTP."
+            );
+        }
+        forgotPasswordRateLimitCache.put(lowerEmail, Instant.now());
+
         // Step 1. Attempt to fetch the user.
-        User user = userRepository.findByEmail(email.toLowerCase());
+        User user = userRepository.findByEmail(lowerEmail);
 
         // Step 2. Security Check: Mask user non-existence.
         if (user == null)
@@ -415,41 +430,66 @@ public class UserService {
         String otp = String.valueOf(new Random().nextInt(900000) + 100000);
         VerificationToken verificationToken = new VerificationToken();
         verificationToken.setUser(user);
-        verificationToken.setToken(otp);
+        verificationToken.setToken(hashToken(otp));
         verificationToken.setTokenType(VerificationToken.TokenType.PASSWORD_RESET);
         verificationToken.setExpiry(Instant.now().plus(Duration.ofMinutes(10)));
         tokenRepository.save(verificationToken);
 
         // Step 5. Dispatch the reset email.
         try {
-            emailService.sendPasswordResetRequest(email.toLowerCase(), otp);
+            emailService.sendPasswordResetRequest(lowerEmail, otp);
         } catch (Exception e) {
             logger.error("Failed to send password reset email to {}: {}", email, e.getMessage());
         }
-        return "Password reset OTP sent successfully.";
+        return "If that email exists, an OTP has been sent.";
     }
 
     /**
-     * Resets the password using the OTP received by email (which is the token stored in VerificationToken).
+     * Resets the password using the OTP received by email.
      * The token must be of type PASSWORD_RESET and must not be expired or already used.
      */
     @Transactional
-    public boolean resetPassword(String token, String newPassword) {
-        // Step 1. Fetch the token directly.
-        VerificationToken verificationToken = tokenRepository.findByToken(token);
-
-        // Step 2. Validate the token state and ensure it's specifically a password reset token.
-        if (verificationToken == null || verificationToken.isUsed() || verificationToken.isExpired()
-                || verificationToken.getTokenType() != VerificationToken.TokenType.PASSWORD_RESET) {
+    public boolean resetPassword(String email, String token, String newPassword) {
+        if (email == null || token == null) {
             return false;
         }
 
-        // Step 3. Retrieve the associated user and update their password using Bcrypt.
-        User user = verificationToken.getUser();
+        // Step 1. Fetch user by email.
+        User user = userRepository.findFirstByEmailIgnoreCase(email.toLowerCase()).orElse(null);
+        if (user == null) {
+            return false;
+        }
+
+        // Step 2. Fetch the active PASSWORD_RESET token for this user.
+        VerificationToken verificationToken = tokenRepository.findByUserAndTokenType(user, VerificationToken.TokenType.PASSWORD_RESET);
+        if (verificationToken == null || verificationToken.getTokenType() != VerificationToken.TokenType.PASSWORD_RESET) {
+            return false;
+        }
+
+        // Step 3. Validate attempts / brute force limit.
+        if (verificationToken.getAttempts() >= 5) {
+            return false;
+        }
+
+        // Step 4. Validate used / expired.
+        if (verificationToken.isUsed() || verificationToken.isExpired()) {
+            return false;
+        }
+
+        // Step 5. Check if the provided OTP matches the stored token hash.
+        String hashedInputToken = hashToken(token);
+        if (!verificationToken.getToken().equals(hashedInputToken)) {
+            verificationToken.setAttempts(verificationToken.getAttempts() + 1);
+            tokenRepository.save(verificationToken);
+            return false;
+        }
+
+        // Step 6. Update user's password using Bcrypt.
         user.setPassword(encoder.encode(newPassword));
 
-        // Step 4. Burn the token so it cannot be reused and save both entities.
+        // Step 7. Burn the token, set used-at timestamp, and save.
         verificationToken.setUsed(true);
+        verificationToken.setUsedAt(Instant.now());
         userRepository.save(user);
         tokenRepository.save(verificationToken);
         return true;
@@ -812,6 +852,25 @@ public class UserService {
         } catch (Exception e) {
             logger.error("Failed to generate presigned URL for key={}: {}", key, e.getMessage());
             return null;
+        }
+    }
+
+    private String hashToken(String rawToken) {
+        if (rawToken == null) {
+            return null;
+        }
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(rawToken.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 algorithm not found", e);
         }
     }
 

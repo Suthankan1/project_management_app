@@ -179,9 +179,10 @@ public class UserControllerTest {
     @WithMockUserPrincipal
     void testResetPassword_InvalidToken_Returns401() throws Exception {
         ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setEmail("test@example.com");
         request.setToken("999999");
         request.setNewPassword("NewPassword1!");
-        when(userService.resetPassword(anyString(), anyString())).thenReturn(false);
+        when(userService.resetPassword(anyString(), anyString(), anyString())).thenReturn(false);
 
         mockMvc.perform(post("/api/auth/reset")
                 .with(csrf())
@@ -211,6 +212,7 @@ public class UserControllerTest {
     @WithMockUserPrincipal
     void testResetPassword_WeakNewPassword_Returns400() throws Exception {
         ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setEmail("test@example.com");
         request.setToken("123456");
         request.setNewPassword("weakpass");
 
