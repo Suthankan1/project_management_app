@@ -18,6 +18,7 @@ const mockedAxios = axiosInstance as jest.Mocked<typeof axiosInstance>;
 describe('usePages hook', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
   });
 
   it('loads pages and filters by search and tab', async () => {
@@ -74,6 +75,96 @@ describe('usePages hook', () => {
       await result.current.deletePage(11);
     });
     expect(result.current.pages).toHaveLength(0);
+  });
+
+  it('keeps a created page visible after the hook reloads from cache', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: [] });
+    mockedAxios.post.mockResolvedValueOnce({
+      data: { id: 11, title: 'Spec', content: 'v1', updatedAt: '2026-03-01T12:00:00' },
+    });
+
+    const { result, unmount } = renderHook(() => usePages(5));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.createPage('Spec', 'v1');
+    });
+    expect(result.current.pages).toHaveLength(1);
+    unmount();
+
+    mockedAxios.get.mockRejectedValueOnce(new Error('Network Error'));
+    const { result: reloaded } = renderHook(() => usePages(5));
+
+    await waitFor(() => {
+      expect(reloaded.current.pages).toHaveLength(1);
+    });
+    expect(reloaded.current.pages[0].title).toBe('Spec');
+  });
+
+  it('reloads updated page metadata from cache without unsupported content fields', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: [{ id: 11, title: 'Spec', updatedAt: '2026-03-01T12:00:00' }],
+    });
+    mockedAxios.put.mockResolvedValueOnce({
+      data: { id: 11, title: 'Spec v2', content: 'v2', updatedAt: '2026-03-02T12:00:00' },
+    });
+
+    const { result, unmount } = renderHook(() => usePages(5));
+
+    await waitFor(() => {
+      expect(result.current.pages).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.updatePage(11, 'Spec v2', 'v2');
+    });
+    expect(result.current.pages[0].title).toBe('Spec v2');
+    unmount();
+
+    mockedAxios.get.mockRejectedValueOnce(new Error('Network Error'));
+    const { result: reloaded } = renderHook(() => usePages(5));
+
+    await waitFor(() => {
+      expect(reloaded.current.pages[0].title).toBe('Spec v2');
+    });
+    expect(reloaded.current.pages[0].content).toBeUndefined();
+  });
+
+  it('does not resurrect a deleted page from stale localStorage after reload', async () => {
+    localStorage.setItem(
+      'planora:pages:5',
+      JSON.stringify({
+        version: 2,
+        projectId: '5',
+        timestamp: Date.now(),
+        pages: [{ id: 11, title: 'Spec', updatedAt: '2026-03-01T12:00:00' }],
+      })
+    );
+    mockedAxios.get.mockRejectedValueOnce(new Error('Network Error'));
+    mockedAxios.delete.mockResolvedValueOnce({});
+
+    const { result, unmount } = renderHook(() => usePages(5));
+
+    await waitFor(() => {
+      expect(result.current.pages).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.deletePage(11);
+    });
+    expect(result.current.pages).toHaveLength(0);
+    unmount();
+
+    mockedAxios.get.mockRejectedValueOnce(new Error('Network Error'));
+    const { result: reloaded } = renderHook(() => usePages(5));
+
+    await waitFor(() => {
+      expect(reloaded.current.loading).toBe(false);
+    });
+    expect(reloaded.current.pages).toHaveLength(0);
   });
 
   it('toggles star with optimistic updates and falls back on error', async () => {

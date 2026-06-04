@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { pagesApi } from '@/services/api-contract';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { pagesApi, type PageDetailDto, type PageSummaryDto } from '@/services/api-contract';
 
 import { PageItem } from './types';
 export type { PageItem };
@@ -23,6 +23,85 @@ interface UsePagesReturn {
   movePage: (pageId: string | number, parentPageId: string | number | null) => Promise<void>;
 }
 
+const PAGES_CACHE_VERSION = 2;
+const PAGES_CACHE_TTL_MS = 5 * 60 * 1000;
+
+interface PagesCacheEnvelope {
+  version: number;
+  projectId: string;
+  timestamp: number;
+  pages: PageItem[];
+}
+
+const getPagesCacheKey = (projectId: string | number) => `planora:pages:${projectId}`;
+
+const isBrowser = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+
+const toPageItem = (page: PageSummaryDto | PageDetailDto, existing?: PageItem): PageItem => ({
+  id: page.id,
+  title: page.title,
+  parentId: page.parentPageId ?? existing?.parentId ?? null,
+  isStarred: page.isStarred ?? existing?.isStarred ?? false,
+  updatedAt: page.updatedAt ?? existing?.updatedAt,
+});
+
+const toStatePageItem = (page: PageDetailDto, existing?: PageItem): PageItem => ({
+  ...toPageItem(page, existing),
+  content: page.content,
+  createdAt: page.createdAt,
+});
+
+const toCachedPageItem = (page: PageItem): PageItem => ({
+  id: page.id,
+  title: page.title,
+  parentId: page.parentId ?? null,
+  isStarred: page.isStarred ?? false,
+  updatedAt: page.updatedAt,
+});
+
+const readPagesCache = (projectId: string | number): PageItem[] | null => {
+  if (!isBrowser()) return null;
+
+  const cacheKey = getPagesCacheKey(projectId);
+  const cached = window.localStorage.getItem(cacheKey);
+  if (!cached) return null;
+
+  try {
+    const parsed = JSON.parse(cached) as PagesCacheEnvelope | PageItem[];
+    if (Array.isArray(parsed)) {
+      window.localStorage.removeItem(cacheKey);
+      return null;
+    }
+
+    if (
+      parsed.version !== PAGES_CACHE_VERSION ||
+      parsed.projectId !== String(projectId) ||
+      Date.now() - parsed.timestamp > PAGES_CACHE_TTL_MS ||
+      !Array.isArray(parsed.pages)
+    ) {
+      window.localStorage.removeItem(cacheKey);
+      return null;
+    }
+
+    return parsed.pages.map(toCachedPageItem);
+  } catch {
+    window.localStorage.removeItem(cacheKey);
+    return null;
+  }
+};
+
+const writePagesCache = (projectId: string | number | null, pages: PageItem[]) => {
+  if (!projectId || !isBrowser()) return;
+
+  const envelope: PagesCacheEnvelope = {
+    version: PAGES_CACHE_VERSION,
+    projectId: String(projectId),
+    timestamp: Date.now(),
+    pages: pages.map(toCachedPageItem),
+  };
+  window.localStorage.setItem(getPagesCacheKey(projectId), JSON.stringify(envelope));
+};
+
 export function usePages(projectId: string | number | null): UsePagesReturn {
   const [pages, setPages] = useState<PageItem[]>([]);
   const [recentPages, setRecentPages] = useState<PageItem[]>([]);
@@ -30,6 +109,27 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'starred' | 'recent'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const pagesRef = useRef<PageItem[]>([]);
+
+  const hydratePages = useCallback((nextPages: PageItem[]) => {
+    pagesRef.current = nextPages;
+    setPages(nextPages);
+  }, []);
+
+  const applyPages = useCallback((nextPages: PageItem[]) => {
+    pagesRef.current = nextPages;
+    setPages(nextPages);
+    writePagesCache(projectId, nextPages);
+  }, [projectId]);
+
+  const updatePages = useCallback((updater: (prev: PageItem[]) => PageItem[]) => {
+    setPages((prev) => {
+      const nextPages = updater(prev);
+      pagesRef.current = nextPages;
+      writePagesCache(projectId, nextPages);
+      return nextPages;
+    });
+  }, [projectId]);
 
   // Fetch all pages for the project
   const fetchPages = useCallback(async () => {
@@ -38,28 +138,18 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
       return;
     }
 
-    const cacheKey = `planora:pages:${projectId}`;
     // Stale-while-revalidate: the sidebar populates instantly from cache while the fresh list loads in the background
-    const cached = localStorage.getItem(cacheKey);
+    const cached = readPagesCache(projectId);
     if (cached) {
-      try {
-        setPages(JSON.parse(cached) as PageItem[]);
-        setLoading(false);
-      } catch { /* ignore corrupt cache */ }
+      hydratePages(cached);
+      setLoading(false);
     }
 
     setError(null);
     try {
       const response = await pagesApi.listByProject(projectId);
-      const pagesData = (response || []).map((page) => ({
-        id: page.id,
-        title: page.title,
-        parentId: page.parentPageId,
-        isStarred: page.isStarred || false,
-        updatedAt: page.updatedAt,
-      }));
-      setPages(pagesData);
-      localStorage.setItem(cacheKey, JSON.stringify(pagesData));
+      const pagesData = (response || []).map((page) => toPageItem(page));
+      applyPages(pagesData);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       const message = err.response?.data?.message || 'Failed to fetch pages';
@@ -68,7 +158,7 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, applyPages, hydratePages]);
 
   // Fetch pages on mount or when projectId changes
   useEffect(() => {
@@ -79,13 +169,7 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
     if (!projectId) return;
     try {
       const response = await pagesApi.getRecent(projectId);
-      const recentData = (response || []).map((page) => ({
-        id: page.id,
-        title: page.title,
-        parentId: page.parentPageId,
-        isStarred: page.isStarred || false,
-        updatedAt: page.updatedAt,
-      }));
+      const recentData = (response || []).map((page) => toPageItem(page));
       setRecentPages(recentData);
     } catch (err) {
       console.error('Error fetching recent pages:', err);
@@ -97,6 +181,29 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
       void fetchRecentPages();
     }
   }, [activeTab, fetchRecentPages]);
+
+  useEffect(() => {
+    if (!projectId || !isBrowser()) return undefined;
+
+    const cacheKey = getPagesCacheKey(projectId);
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== cacheKey) return;
+      const cachedPages = readPagesCache(projectId);
+      if (cachedPages) hydratePages(cachedPages);
+      void fetchPages();
+    };
+    const handleFocus = () => {
+      void fetchPages();
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [projectId, hydratePages, fetchPages]);
 
   // Filter pages based on active tab and search query
   const filteredPages = (activeTab === 'recent' ? recentPages : pages).filter((page) => {
@@ -121,14 +228,8 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
 
     try {
       const response = await pagesApi.create(projectId, { title, content });
-      const newPage: PageItem = {
-        id: response.id,
-        title: response.title,
-        content: response.content,
-        updatedAt: response.updatedAt,
-        isStarred: false,
-      };
-      setPages((prev) => [...prev, newPage]);
+      const newPage = toStatePageItem(response);
+      updatePages((prev) => [...prev, newPage]);
       return newPage;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
@@ -145,14 +246,9 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
         title,
         content,
       });
-      const updatedPage: PageItem = {
-        id: response.id,
-        title: response.title,
-        content: response.content,
-        updatedAt: response.updatedAt,
-        isStarred: pages.find((p) => p.id === pageId)?.isStarred || false,
-      };
-      setPages((prev) => prev.map((p) => (p.id === pageId ? updatedPage : p)));
+      const existingPage = pagesRef.current.find((p) => p.id === pageId);
+      const updatedPage = toStatePageItem(response, existingPage);
+      updatePages((prev) => prev.map((p) => (p.id === pageId ? updatedPage : p)));
       return updatedPage;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
@@ -166,7 +262,7 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
   const deletePage = async (pageId: string | number): Promise<void> => {
     try {
       await pagesApi.delete(pageId);
-      setPages((prev) => prev.filter((p) => p.id !== pageId));
+      updatePages((prev) => prev.filter((p) => p.id !== pageId));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       const message = err.response?.data?.message || 'Failed to delete page';
@@ -180,16 +276,17 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
     if (!projectId) return;
     try {
       // Optimistic update
-      setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: !p.isStarred } : p)));
+      updatePages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: !p.isStarred } : p)));
       setRecentPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: !p.isStarred } : p)));
       
       const response = await pagesApi.toggleStar(projectId, pageId);
-      setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: response.isStarred || false } : p)));
-      setRecentPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: response.isStarred || false } : p)));
+      const isStarred = response.isStarred ?? false;
+      updatePages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred } : p)));
+      setRecentPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred } : p)));
     } catch (err) {
       console.error('Error toggling star:', err);
       // Revert optimistic update
-      setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: !p.isStarred } : p)));
+      updatePages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: !p.isStarred } : p)));
       setRecentPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: !p.isStarred } : p)));
     }
   };
@@ -199,9 +296,9 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
     if (!projectId) return;
     try {
       // Optimistic update
-      setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, parentId: parentPageId } : p)));
+      updatePages((prev) => prev.map((p) => (p.id === pageId ? { ...p, parentId: parentPageId } : p)));
       const response = await pagesApi.movePage(projectId, pageId, parentPageId);
-      setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, parentId: response.parentPageId || null } : p)));
+      updatePages((prev) => prev.map((p) => (p.id === pageId ? { ...p, parentId: response.parentPageId ?? null } : p)));
     } catch (err) {
       console.error('Error moving page:', err);
       refetch();
