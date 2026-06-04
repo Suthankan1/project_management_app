@@ -85,6 +85,15 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
       
+    - name: Check for Empty Flyway Migrations
+      run: |
+        EMPTY_FILES=$(find src/main/resources/db/migration -type f -empty 2>/dev/null || true)
+        if [ -n "$EMPTY_FILES" ]; then
+          echo "Error: Found empty Flyway migration files:"
+          echo "$EMPTY_FILES"
+          exit 1
+        fi
+        echo "No empty Flyway migration files found."
     - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
