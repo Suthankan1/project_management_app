@@ -145,14 +145,13 @@ export function saveRefreshToken(token: string): void {
         sessionStorage.removeItem('refreshToken');
         localStorage.removeItem(REFRESH_TOKEN_KEY);
         sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-        tokenStorage().setItem(REFRESH_TOKEN_KEY, token);
+        localStorage.setItem('planora:has_refresh_token', 'true');
     }
 }
 
 export function getRefreshToken(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(REFRESH_TOKEN_KEY) || localStorage.getItem('refreshToken')
-        || sessionStorage.getItem(REFRESH_TOKEN_KEY) || sessionStorage.getItem('refreshToken');
+    return localStorage.getItem('planora:has_refresh_token') === 'true' ? 'true' : null;
 }
 
 export function clearTokens(): void {
@@ -163,6 +162,7 @@ export function clearTokens(): void {
         localStorage.removeItem(REFRESH_TOKEN_KEY);
         localStorage.removeItem('userProfile');
         localStorage.removeItem('rememberMe');
+        localStorage.removeItem('planora:has_refresh_token');
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('refreshToken');
         sessionStorage.removeItem(TOKEN_KEY);
@@ -175,6 +175,13 @@ export function clearTokens(): void {
         Object.keys(sessionStorage)
             .filter((k) => k.startsWith('planora:'))
             .forEach((k) => sessionStorage.removeItem(k));
+
+        // Non-blocking logout call to clear HttpOnly cookie
+        fetch(`${getApiBaseUrl()}/api/auth/logout`, {
+            method: 'POST',
+            credentials: 'include',
+        }).catch((err) => console.error('Failed to logout backend session', err));
+
         emitAuthTokenChanged();
     }
 }
@@ -207,7 +214,7 @@ async function requestRefreshAccessToken(): Promise<string> {
     const res = await fetch(`${getApiBaseUrl()}/api/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: rt }),
+        credentials: 'include',
     });
     if (!res.ok) {
         clearTokens();
@@ -215,7 +222,7 @@ async function requestRefreshAccessToken(): Promise<string> {
     }
     const data = await res.json();
     saveToken(data.token);
-    if (data.refreshToken) saveRefreshToken(data.refreshToken);
+    saveRefreshToken('true');
     return data.token;
 }
 

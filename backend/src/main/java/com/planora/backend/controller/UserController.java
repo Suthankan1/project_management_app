@@ -19,6 +19,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.security.core.Authentication;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
+import org.springframework.web.bind.annotation.CookieValue;
 
 import lombok.RequiredArgsConstructor;
 
@@ -53,7 +56,17 @@ public class UserController {
     public ResponseEntity<?> login(@RequestBody User user) {
         LoginResponse response = service.loginUser(user);
         if (response.isSuccess()) {
-            return new ResponseEntity<>(response, HttpStatus.OK);
+            ResponseCookie cookie = ResponseCookie.from("planora_refresh_token", response.getRefreshToken())
+                    .httpOnly(true)
+                    .secure(true)
+                    .path("/")
+                    .maxAge(30 * 24 * 60 * 60) // 30 days
+                    .sameSite("Lax")
+                    .build();
+            response.setRefreshToken(null);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(response);
         } else if ("UNVERIFIED_EMAIL".equals(response.getErrorCode())) {
             // We return a specific FORBIDDEN (403) status and error code here so the frontend
             // client knows to redirect the user to the OTP verification page,
@@ -90,22 +103,44 @@ public class UserController {
         }
     }
 
-    // Using a Map for the body allows to quickly extract just the refreshToken without
-    // needing to build and maintain a dedicated DTO class.
     @PostMapping("/refresh")
-    public ResponseEntity<?> refreshToken(@RequestBody Map<String, String> body) {
-        String refreshToken = body.get("refreshToken");
+    public ResponseEntity<?> refreshToken(
+            @CookieValue(name = "planora_refresh_token", required = false) String refreshToken) {
 
         // Fail fast if the client didn't send the token, preventing unnecessary DB queries.
         if (refreshToken == null || refreshToken.isBlank()) {
-            return new ResponseEntity<>("Refresh token is required", HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>("Refresh token cookie is required", HttpStatus.BAD_REQUEST);
         }
 
         LoginResponse response = service.refreshTokens(refreshToken);
         if (response != null && response.isSuccess()) {
-            return new ResponseEntity<>(response, HttpStatus.OK);
+            ResponseCookie cookie = ResponseCookie.from("planora_refresh_token", response.getRefreshToken())
+                    .httpOnly(true)
+                    .secure(true)
+                    .path("/")
+                    .maxAge(30 * 24 * 60 * 60)
+                    .sameSite("Lax")
+                    .build();
+            response.setRefreshToken(null);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(response);
         }
         return new ResponseEntity<>("Invalid or expired refresh token", HttpStatus.UNAUTHORIZED);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout() {
+        ResponseCookie cookie = ResponseCookie.from("planora_refresh_token", "")
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(0) // immediately expire
+                .sameSite("Lax")
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(Map.of("success", true, "message", "Logged out successfully"));
     }
 
     // The 'excludeEmail' parameter allows clients to fetch a list of peers without

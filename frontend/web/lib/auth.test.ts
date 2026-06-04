@@ -35,12 +35,12 @@ describe('auth requestRefreshAccessToken URL handling', () => {
     expect(fetchMock.mock.calls[0][1]).toMatchObject({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: 'mock-refresh-token' }),
+      credentials: 'include',
     });
   });
 
   it('falls back to empty string / relative path in development when NEXT_PUBLIC_API_BASE_URL is not set', async () => {
-    process.env.NODE_ENV = 'development';
+    (process.env as any).NODE_ENV = 'development';
     delete process.env.NEXT_PUBLIC_API_BASE_URL;
     saveRefreshToken('mock-refresh-token');
 
@@ -58,7 +58,7 @@ describe('auth requestRefreshAccessToken URL handling', () => {
   });
 
   it('throws in production when NEXT_PUBLIC_API_BASE_URL is missing', async () => {
-    process.env.NODE_ENV = 'production';
+    (process.env as any).NODE_ENV = 'production';
     delete process.env.NEXT_PUBLIC_API_BASE_URL;
     saveRefreshToken('mock-refresh-token');
 
