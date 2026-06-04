@@ -9,7 +9,10 @@
 export function getApiBaseUrl(): string {
     const url = process.env.NEXT_PUBLIC_API_BASE_URL;
     if (!url) {
-        if (process.env.NODE_ENV === 'production') {
+        const isProdRuntime = process.env.NODE_ENV === 'production';
+        const isNextProductionBuild = process.env.NEXT_PHASE === 'phase-production-build';
+
+        if (isProdRuntime && !isNextProductionBuild) {
             throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is missing.');
         }
         return 'http://localhost:8080';
