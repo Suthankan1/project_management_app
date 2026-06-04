@@ -20,10 +20,12 @@ interface UsePagesReturn {
   deletePage: (pageId: string | number) => Promise<void>;
   refetch: () => Promise<void>;
   toggleStar: (pageId: string | number) => void;
+  movePage: (pageId: string | number, parentPageId: string | number | null) => Promise<void>;
 }
 
 export function usePages(projectId: string | number | null): UsePagesReturn {
   const [pages, setPages] = useState<PageItem[]>([]);
+  const [recentPages, setRecentPages] = useState<PageItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'starred' | 'recent'>('all');
@@ -52,7 +54,9 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
       const pagesData = (response || []).map((page) => ({
         id: page.id,
         title: page.title,
-        isStarred: false, // TODO: sync with backend when implemented
+        parentId: page.parentPageId,
+        isStarred: page.isStarred || false,
+        updatedAt: page.updatedAt,
       }));
       setPages(pagesData);
       localStorage.setItem(cacheKey, JSON.stringify(pagesData));
@@ -71,8 +75,31 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
     fetchPages();
   }, [projectId, fetchPages]);
 
+  const fetchRecentPages = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const response = await pagesApi.getRecent(projectId);
+      const recentData = (response || []).map((page) => ({
+        id: page.id,
+        title: page.title,
+        parentId: page.parentPageId,
+        isStarred: page.isStarred || false,
+        updatedAt: page.updatedAt,
+      }));
+      setRecentPages(recentData);
+    } catch (err) {
+      console.error('Error fetching recent pages:', err);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    if (activeTab === 'recent') {
+      void fetchRecentPages();
+    }
+  }, [activeTab, fetchRecentPages]);
+
   // Filter pages based on active tab and search query
-  const filteredPages = pages.filter((page) => {
+  const filteredPages = (activeTab === 'recent' ? recentPages : pages).filter((page) => {
     const matchesSearch = page.title.toLowerCase().includes(searchQuery.toLowerCase());
     
     if (!matchesSearch) return false;
@@ -81,8 +108,7 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
       case 'starred':
         return page.isStarred;
       case 'recent':
-        // Show 5 most recent pages
-        return pages.indexOf(page) < 5;
+        return true;
       case 'all':
       default:
         return true;
@@ -150,8 +176,37 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
   };
 
   // Toggle star status
-  const toggleStar = (pageId: string | number) => {
-    setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: !p.isStarred } : p)));
+  const toggleStar = async (pageId: string | number) => {
+    if (!projectId) return;
+    try {
+      // Optimistic update
+      setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: !p.isStarred } : p)));
+      setRecentPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: !p.isStarred } : p)));
+      
+      const response = await pagesApi.toggleStar(projectId, pageId);
+      setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: response.isStarred || false } : p)));
+      setRecentPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: response.isStarred || false } : p)));
+    } catch (err) {
+      console.error('Error toggling star:', err);
+      // Revert optimistic update
+      setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: !p.isStarred } : p)));
+      setRecentPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isStarred: !p.isStarred } : p)));
+    }
+  };
+
+  // Move page status
+  const movePage = async (pageId: string | number, parentPageId: string | number | null) => {
+    if (!projectId) return;
+    try {
+      // Optimistic update
+      setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, parentId: parentPageId } : p)));
+      const response = await pagesApi.movePage(projectId, pageId, parentPageId);
+      setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, parentId: response.parentPageId || null } : p)));
+    } catch (err) {
+      console.error('Error moving page:', err);
+      refetch();
+      throw err;
+    }
   };
 
   // Refetch pages
@@ -171,5 +226,6 @@ export function usePages(projectId: string | number | null): UsePagesReturn {
     deletePage,
     refetch,
     toggleStar,
+    movePage,
   };
 }

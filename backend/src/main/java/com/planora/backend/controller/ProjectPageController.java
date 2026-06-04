@@ -1,5 +1,6 @@
 package com.planora.backend.controller;
 
+import com.planora.backend.dto.MovePageRequestDto;
 import com.planora.backend.dto.PageDetailResponseDto;
 import com.planora.backend.dto.PageRequestDto;
 import com.planora.backend.dto.PageSummaryResponseDto;
@@ -83,6 +84,39 @@ public class ProjectPageController {
             @AuthenticationPrincipal UserPrincipal principal) {
         service.deletePage(pageId, principal.getUserId());
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
+    @PatchMapping("/projects/{projectId}/pages/{pageId}/star")
+    public ResponseEntity<PageDetailResponseDto> toggleStar(
+            @PathVariable Long projectId,
+            @PathVariable Long pageId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(service.toggleStar(projectId, pageId, principal.getUserId()), HttpStatus.OK);
+    }
+
+    @PatchMapping("/projects/{projectId}/pages/{pageId}/move")
+    public ResponseEntity<PageDetailResponseDto> movePage(
+            @PathVariable Long projectId,
+            @PathVariable Long pageId,
+            @RequestBody MovePageRequestDto request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(service.movePage(projectId, pageId, request.getParentPageId(), principal.getUserId()), HttpStatus.OK);
+    }
+
+    @PostMapping("/projects/{projectId}/pages/{pageId}/viewed")
+    public ResponseEntity<Void> markViewed(
+            @PathVariable Long projectId,
+            @PathVariable Long pageId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        service.markViewed(projectId, pageId, principal.getUserId());
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
+    @GetMapping("/projects/{projectId}/pages/recent")
+    public ResponseEntity<List<PageSummaryResponseDto>> getRecentPages(
+            @PathVariable Long projectId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(service.getRecentPages(projectId, principal.getUserId()), HttpStatus.OK);
     }
 
 }

@@ -8,6 +8,7 @@ jest.mock('../../../../lib/axios', () => ({
     get: jest.fn(),
     post: jest.fn(),
     put: jest.fn(),
+    patch: jest.fn(),
     delete: jest.fn(),
   },
 }));
@@ -73,6 +74,83 @@ describe('usePages hook', () => {
       await result.current.deletePage(11);
     });
     expect(result.current.pages).toHaveLength(0);
+  });
+
+  it('toggles star with optimistic updates and falls back on error', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: [{ id: 1, title: 'Release Notes', isStarred: false }],
+    });
+    mockedAxios.patch.mockResolvedValueOnce({
+      data: { id: 1, title: 'Release Notes', isStarred: true },
+    });
+    mockedAxios.patch.mockRejectedValueOnce(new Error('Network Error'));
+
+    const { result } = renderHook(() => usePages(7));
+
+    await waitFor(() => {
+      expect(result.current.pages).toHaveLength(1);
+    });
+
+    act(() => {
+      result.current.toggleStar(1);
+    });
+    expect(result.current.pages[0].isStarred).toBe(true);
+
+    await waitFor(() => {
+      expect(result.current.pages[0].isStarred).toBe(true);
+    });
+
+    act(() => {
+      result.current.toggleStar(1);
+    });
+    expect(result.current.pages[0].isStarred).toBe(false);
+    
+    await waitFor(() => {
+      expect(result.current.pages[0].isStarred).toBe(true);
+    });
+  });
+
+  it('moves page and updates parentPageId', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: [{ id: 1, title: 'Child', parentPageId: null }],
+    });
+    mockedAxios.patch.mockResolvedValueOnce({
+      data: { id: 1, title: 'Child', parentPageId: 3 },
+    });
+
+    const { result } = renderHook(() => usePages(7));
+
+    await waitFor(() => {
+      expect(result.current.pages).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.movePage(1, 3);
+    });
+
+    expect(result.current.pages[0].parentId).toBe(3);
+  });
+
+  it('fetches recent pages when tab changes to recent', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: [] });
+    mockedAxios.get.mockResolvedValueOnce({
+      data: [{ id: 1, title: 'Recent Document' }],
+    });
+
+    const { result } = renderHook(() => usePages(7));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    await act(async () => {
+      result.current.setActiveTab('recent');
+    });
+
+    await waitFor(() => {
+      expect(result.current.filteredPages).toHaveLength(1);
+      expect(result.current.filteredPages[0].title).toBe('Recent Document');
+    });
   });
 
   it('sets a friendly error when project id is missing', async () => {

@@ -20,6 +20,7 @@ export function usePageContent(pageId: string, projectId: string | null) {
     const {
         filteredPages, error, searchQuery, setSearchQuery,
         updatePage, createPage, deletePage, refetch,
+        toggleStar, movePage,
     } = usePages(projectId);
 
     useEffect(() => {
@@ -41,12 +42,15 @@ export function usePageContent(pageId: string, projectId: string | null) {
             setLoadingPage(true);
             try {
                 const response = await pagesApi.get(pageId);
+                if (projectId) {
+                    void pagesApi.markViewed(projectId, pageId);
+                }
                 const pageData: PageItem = {
                     id: response.id,
                     title: response.title,
                     content: response.content || '',
                     updatedAt: response.updatedAt,
-                    isStarred: false,
+                    isStarred: response.isStarred || false,
                 };
                 // Both updates inside an async callback — not synchronous setState in effect body
                 setSelectedPage(pageData);
@@ -85,5 +89,6 @@ export function usePageContent(pageId: string, projectId: string | null) {
         isDraft,
         filteredPages, error, searchQuery, setSearchQuery,
         updatePage, createPage, deletePage, refetch,
+        toggleStar, movePage,
     };
 }

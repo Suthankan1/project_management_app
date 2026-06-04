@@ -220,6 +220,74 @@ public class ProjectPageService {
         notifyUsersByIds(recipientIds, message, link);
     }
 
+    @Transactional
+    public PageDetailResponseDto toggleStar(Long projectId, Long pageId, Long userId) {
+        ProjectPage page = findPage(pageId);
+        Project project = findProject(projectId);
+        validateProjectMembership(project.getTeam().getId(), userId, false);
+
+        page.setIsStarred(page.getIsStarred() == null ? true : !page.getIsStarred());
+        ProjectPage saved = repository.save(page);
+        return toDetailDto(saved);
+    }
+
+    @Transactional
+    public PageDetailResponseDto movePage(Long projectId, Long pageId, Long parentPageId, Long userId) {
+        ProjectPage page = findPage(pageId);
+        Project project = findProject(projectId);
+        validateProjectMembership(project.getTeam().getId(), userId, true); // Viewers cannot move pages
+
+        if (parentPageId != null) {
+            ProjectPage parentPage = findPage(parentPageId);
+            if (!parentPage.getProjectId().equals(projectId)) {
+                throw new IllegalArgumentException("Parent page must belong to the same project");
+            }
+            if (isDescendant(pageId, parentPageId)) {
+                throw new IllegalArgumentException("Cannot move a page to one of its own subpages or itself");
+            }
+            page.setParentPageId(parentPageId);
+        } else {
+            page.setParentPageId(null);
+        }
+
+        ProjectPage saved = repository.save(page);
+        return toDetailDto(saved);
+    }
+
+    private boolean isDescendant(Long pageId, Long potentialParentId) {
+        if (pageId.equals(potentialParentId)) {
+            return true;
+        }
+        ProjectPage current = repository.findById(potentialParentId).orElse(null);
+        while (current != null && current.getParentPageId() != null) {
+            if (current.getParentPageId().equals(pageId)) {
+                return true;
+            }
+            current = repository.findById(current.getParentPageId()).orElse(null);
+        }
+        return false;
+    }
+
+    @Transactional
+    public void markViewed(Long projectId, Long pageId, Long userId) {
+        ProjectPage page = findPage(pageId);
+        Project project = findProject(projectId);
+        validateProjectMembership(project.getTeam().getId(), userId, false);
+
+        page.setLastViewedAt(java.time.LocalDateTime.now());
+        repository.save(page);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PageSummaryResponseDto> getRecentPages(Long projectId, Long userId) {
+        Project project = findProject(projectId);
+        validateProjectMembership(project.getTeam().getId(), userId, false);
+
+        return repository.findTop5ByProjectIdAndLastViewedAtIsNotNullOrderByLastViewedAtDesc(projectId).stream()
+                .map(this::toSummaryDto)
+                .collect(Collectors.toList());
+    }
+
     // ── Internal Helpers ──────────────────────────────────────────────────────────
 
     // Resolves the display name for notifications, preferring Full Name over Username.
@@ -267,6 +335,12 @@ public class ProjectPageService {
         dto.setTitle(page.getTitle());
         dto.setUpdatedAt(page.getUpdatedAt() != null ? page.getUpdatedAt().toString() : null);
         dto.setUpdatedByUsername(page.getUpdatedByUserId() != null ? resolveUsername(page.getUpdatedByUserId()) : null);
+        dto.setParentPageId(page.getParentPageId());
+        dto.setIsStarred(page.getIsStarred());
+        dto.setLastViewedAt(page.getLastViewedAt() != null ? page.getLastViewedAt().toString() : null);
+        dto.setSortOrder(page.getSortOrder());
+        dto.setIcon(page.getIcon());
+        dto.setCover(page.getCover());
         return dto;
     }
 
@@ -282,6 +356,12 @@ public class ProjectPageService {
         dto.setUpdatedByUsername(page.getUpdatedByUserId() != null ? resolveUsername(page.getUpdatedByUserId()) : null);
         dto.setCreatedAt(page.getCreatedAt() != null ? page.getCreatedAt().toString() : null);
         dto.setUpdatedAt(page.getUpdatedAt() != null ? page.getUpdatedAt().toString() : null);
+        dto.setParentPageId(page.getParentPageId());
+        dto.setIsStarred(page.getIsStarred());
+        dto.setLastViewedAt(page.getLastViewedAt() != null ? page.getLastViewedAt().toString() : null);
+        dto.setSortOrder(page.getSortOrder());
+        dto.setIcon(page.getIcon());
+        dto.setCover(page.getCover());
         return dto;
     }
 

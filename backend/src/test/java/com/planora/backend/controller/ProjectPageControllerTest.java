@@ -3,6 +3,7 @@ package com.planora.backend.controller;
 import com.planora.backend.annotation.WithMockUserPrincipal;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.planora.backend.dto.MovePageRequestDto;
 import com.planora.backend.dto.PageDetailResponseDto;
 import com.planora.backend.dto.PageRequestDto;
 import com.planora.backend.dto.PageSummaryResponseDto;
@@ -121,6 +122,54 @@ class ProjectPageControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(service).deletePage(eq(1L), any());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void toggleStar_returns200WithUpdatedPage() throws Exception {
+        pageDetail.setIsStarred(true);
+        when(service.toggleStar(eq(10L), eq(1L), any())).thenReturn(pageDetail);
+
+        mockMvc.perform(patch("/api/projects/10/pages/1/star").with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isStarred").value(true));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void movePage_returns200WithUpdatedPage() throws Exception {
+        MovePageRequestDto moveReq = new MovePageRequestDto();
+        moveReq.setParentPageId(5L);
+        pageDetail.setParentPageId(5L);
+        when(service.movePage(eq(10L), eq(1L), eq(5L), any())).thenReturn(pageDetail);
+
+        mockMvc.perform(patch("/api/projects/10/pages/1/move")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(moveReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.parentPageId").value(5));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void markViewed_returns204NoContent() throws Exception {
+        doNothing().when(service).markViewed(eq(10L), eq(1L), any());
+
+        mockMvc.perform(post("/api/projects/10/pages/1/viewed").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(service).markViewed(eq(10L), eq(1L), any());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void getRecentPages_returnsPageSummaryList() throws Exception {
+        when(service.getRecentPages(eq(10L), any())).thenReturn(List.of(pageSummary));
+
+        mockMvc.perform(get("/api/projects/10/pages/recent"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].title").value("My First Page"));
     }
 
     @Test

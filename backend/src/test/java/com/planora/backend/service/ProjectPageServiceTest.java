@@ -350,5 +350,90 @@ class ProjectPageServiceTest {
             "actor deleted page: Release Notes",
             "/pages?projectId=33");
         verify(repository).delete(page);
-        }
+    }
+
+    @Test
+    void toggleStar_togglesStatus() {
+        Team team = new Team();
+        team.setId(1L);
+        Project project = new Project();
+        project.setId(10L);
+        project.setTeam(team);
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+        ProjectPage page = ProjectPage.builder().id(2L).projectId(10L).title("Test").isStarred(false).build();
+
+        when(repository.findById(2L)).thenReturn(Optional.of(page));
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(1L, 5L)).thenReturn(Optional.of(member));
+        when(repository.save(any(ProjectPage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PageDetailResponseDto result = service.toggleStar(10L, 2L, 5L);
+
+        assertEquals(true, result.getIsStarred());
+    }
+
+    @Test
+    void movePage_setsParentPageId() {
+        Team team = new Team();
+        team.setId(1L);
+        Project project = new Project();
+        project.setId(10L);
+        project.setTeam(team);
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+        ProjectPage page = ProjectPage.builder().id(2L).projectId(10L).title("Child").build();
+        ProjectPage parentPage = ProjectPage.builder().id(3L).projectId(10L).title("Parent").build();
+
+        when(repository.findById(2L)).thenReturn(Optional.of(page));
+        when(repository.findById(3L)).thenReturn(Optional.of(parentPage));
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(1L, 5L)).thenReturn(Optional.of(member));
+        when(repository.save(any(ProjectPage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PageDetailResponseDto result = service.movePage(10L, 2L, 3L, 5L);
+
+        assertEquals(3L, result.getParentPageId());
+    }
+
+    @Test
+    void movePage_circularReference_throwsException() {
+        Team team = new Team();
+        team.setId(1L);
+        Project project = new Project();
+        project.setId(10L);
+        project.setTeam(team);
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+        ProjectPage page = ProjectPage.builder().id(2L).projectId(10L).title("Page").parentPageId(3L).build();
+        ProjectPage parentPage = ProjectPage.builder().id(3L).projectId(10L).title("Parent").parentPageId(2L).build();
+
+        when(repository.findById(2L)).thenReturn(Optional.of(page));
+        when(repository.findById(3L)).thenReturn(Optional.of(parentPage));
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(1L, 5L)).thenReturn(Optional.of(member));
+
+        assertThrows(IllegalArgumentException.class, () -> service.movePage(10L, 2L, 3L, 5L));
+    }
+
+    @Test
+    void markViewed_updatesLastViewedAt() {
+        Team team = new Team();
+        team.setId(1L);
+        Project project = new Project();
+        project.setId(10L);
+        project.setTeam(team);
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+        ProjectPage page = ProjectPage.builder().id(2L).projectId(10L).title("Test").build();
+
+        when(repository.findById(2L)).thenReturn(Optional.of(page));
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(1L, 5L)).thenReturn(Optional.of(member));
+        when(repository.save(any(ProjectPage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.markViewed(10L, 2L, 5L);
+
+        verify(repository).save(page);
+    }
 }

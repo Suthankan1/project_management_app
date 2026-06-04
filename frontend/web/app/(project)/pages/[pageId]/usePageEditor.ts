@@ -24,6 +24,7 @@ export function usePageEditor() {
     isDraft,
     filteredPages, error, searchQuery, setSearchQuery,
     updatePage, createPage, deletePage, refetch,
+    toggleStar, movePage,
   } = usePageContent(pageId, projectId);
 
   // saveStatus starts as 'draft' for new pages, 'idle' otherwise
@@ -210,5 +211,7 @@ export function usePageEditor() {
     showDeleteConfirm, setShowDeleteConfirm,
     handleFileImport,
     handleExport,
+    toggleStar,
+    movePage,
   };
 }
