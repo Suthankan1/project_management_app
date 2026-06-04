@@ -22,6 +22,43 @@ export interface AssignedTaskQueryParams {
   limit?: number;
 }
 
+// ── Strongly-typed request DTOs (mirrors backend patch DTOs) ────────────────
+
+/** PATCH /api/tasks/{taskId}/assignees */
+export interface UpdateAssigneesRequest {
+  /** Complete replacement list of assignee user IDs. Empty array clears all. */
+  assigneeIds: number[];
+}
+
+/** PATCH /api/tasks/bulk/status */
+export interface BulkUpdateStatusRequest {
+  taskIds: number[];
+  status: string;
+}
+
+/** DELETE /api/tasks/bulk */
+export interface BulkDeleteTasksRequest {
+  taskIds: number[];
+}
+
+/** PATCH /api/tasks/{taskId}/priority */
+export interface UpdatePriorityRequest {
+  priority: 'LOW' | 'NORMAL' | 'MEDIUM' | 'HIGH' | 'URGENT';
+}
+
+/** PATCH /api/tasks/{taskId}/status */
+export interface UpdateStatusRequest {
+  status: string;
+}
+
+/** PATCH /api/tasks/{taskId}/dates */
+export interface PatchTaskDatesRequest {
+  /** ISO date string (YYYY-MM-DD) or null to clear. Field can be omitted to leave unchanged. */
+  startDate?: string | null;
+  /** ISO date string (YYYY-MM-DD) or null to clear. Field can be omitted to leave unchanged. */
+  dueDate?: string | null;
+}
+
 export interface TaskAttachment {
   id: number;
   fileName: string;
@@ -170,27 +207,13 @@ export interface UpdateTaskRequest {
   archived?: boolean;
 }
 
-export interface PatchTaskDatesRequest {
-  startDate?: string | null;
-  dueDate?: string | null;
-}
-
-export interface BulkStatusRequest {
-  taskIds: number[];
-  status: string;
-}
-
-export interface BulkDeleteRequest {
-  taskIds: number[];
-}
-
-export interface AssigneeRequest {
-  assigneeIds: number[];
-}
-
+/** PATCH /api/tasks/reorder */
 export interface ReorderTasksRequest {
+  /** Required. Must be a positive integer. */
   projectId: number;
+  /** Optional sprint scope; null means backlog / un-sprinted list. */
   sprintId: number | null;
+  /** Ordered task IDs reflecting the desired display position. Must not be null (send [] for a no-op). */
   orderedTaskIds: number[];
 }
 
@@ -242,14 +265,21 @@ export const tasksApi = {
     return data;
   },
   updateStatus: async (taskId: number | string, status: string): Promise<Task> => {
-    const { data } = await api.patch(`/api/tasks/${taskId}/status`, { status });
+    const payload: UpdateStatusRequest = { status };
+    const { data } = await api.patch(`/api/tasks/${taskId}/status`, payload);
+    return data;
+  },
+  updatePriority: async (taskId: number | string, priority: UpdatePriorityRequest['priority']): Promise<Task> => {
+    const payload: UpdatePriorityRequest = { priority };
+    const { data } = await api.patch(`/api/tasks/${taskId}/priority`, payload);
     return data;
   },
   updateDates: async (taskId: number | string, payload: PatchTaskDatesRequest): Promise<void> => {
-    await api.patch(`/api/tasks/${taskId}/dates`, {
-      startDate: payload.startDate == null ? payload.startDate : formatLocalDate(payload.startDate),
-      dueDate: payload.dueDate == null ? payload.dueDate : formatLocalDate(payload.dueDate),
-    });
+    const body: PatchTaskDatesRequest = {
+      ...(payload.startDate !== undefined && { startDate: payload.startDate == null ? payload.startDate : formatLocalDate(payload.startDate) }),
+      ...(payload.dueDate !== undefined && { dueDate: payload.dueDate == null ? payload.dueDate : formatLocalDate(payload.dueDate) }),
+    };
+    await api.patch(`/api/tasks/${taskId}/dates`, body);
   },
   saveAsTemplate: async (taskId: number | string, payload: { templateName: string }): Promise<void> => {
     await api.post(`/api/tasks/${taskId}/save-as-template`, payload);
@@ -290,10 +320,10 @@ export const tasksApi = {
   deleteAttachment: async (taskId: number | string, attachmentId: number): Promise<void> => {
     await api.delete(`/api/tasks/${taskId}/attachments/${attachmentId}`);
   },
-  bulkUpdateStatus: async (payload: BulkStatusRequest): Promise<void> => {
+  bulkUpdateStatus: async (payload: BulkUpdateStatusRequest): Promise<void> => {
     await api.patch('/api/tasks/bulk/status', payload);
   },
-  bulkDelete: async (payload: BulkDeleteRequest): Promise<void> => {
+  bulkDelete: async (payload: BulkDeleteTasksRequest): Promise<void> => {
     await api.delete('/api/tasks/bulk', { data: payload });
   },
   reorderTasks: async (payload: ReorderTasksRequest): Promise<void> => {
@@ -302,7 +332,7 @@ export const tasksApi = {
   assignTaskSingle: async (taskId: number | string, userId: number): Promise<void> => {
     await api.patch(`/api/tasks/${taskId}/assign/${userId}`);
   },
-  assignTaskMultiple: async (taskId: number | string, payload: AssigneeRequest): Promise<void> => {
+  assignTaskMultiple: async (taskId: number | string, payload: UpdateAssigneesRequest): Promise<void> => {
     await api.patch(`/api/tasks/${taskId}/assignees`, payload);
   },
   getCalendarEvents: async (projectId: number | string): Promise<Record<string, unknown>[]> => {

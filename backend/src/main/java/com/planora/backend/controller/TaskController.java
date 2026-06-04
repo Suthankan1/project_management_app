@@ -1,18 +1,22 @@
 package com.planora.backend.controller;
 
+import com.planora.backend.dto.BulkDeleteTasksRequest;
+import com.planora.backend.dto.BulkUpdateStatusRequest;
 import com.planora.backend.dto.CommentRequestDTO;
 import com.planora.backend.dto.LinkedCommitResponseDTO;
 import com.planora.backend.dto.LinkedPrResponseDTO;
+import com.planora.backend.dto.PatchTaskDatesRequest;
+import com.planora.backend.dto.ReorderTasksRequest;
 import com.planora.backend.dto.TaskActivityResponseDTO;
 import com.planora.backend.dto.TaskBranchUpdateDTO;
 import com.planora.backend.dto.TaskGithubSummaryDTO;
 import com.planora.backend.dto.TaskRequestDTO;
 import com.planora.backend.dto.TaskResponseDTO;
 import com.planora.backend.dto.TaskTemplateDTO;
-import com.planora.backend.dto.TaskDatesPatchDTO;
-import com.planora.backend.dto.TaskStatusPatchDTO;
-import com.planora.backend.dto.TaskBulkStatusRequestDTO;
-import com.planora.backend.dto.TaskAssigneesPatchDTO;
+import com.planora.backend.dto.UpdateAssigneesRequest;
+import com.planora.backend.dto.UpdatePriorityRequest;
+import com.planora.backend.dto.UpdateStatusRequest;
+
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.service.TaskActivityService;
 import com.planora.backend.service.TaskGithubService;
@@ -34,10 +38,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 import lombok.RequiredArgsConstructor;
 
@@ -442,11 +444,10 @@ public class TaskController {
     @PatchMapping("/{taskId}/assignees")
     public ResponseEntity<TaskResponseDTO> updateAssignees(
             @PathVariable Long taskId,
-            @Valid @RequestBody TaskAssigneesPatchDTO request,
+            @Valid @RequestBody UpdateAssigneesRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        List<Long> assigneeIds = request.getAssigneeIds() != null ? request.getAssigneeIds() : List.of();
-        TaskResponseDTO task = service.updateAssignees(taskId, assigneeIds, currentUser.getUserId());
+        TaskResponseDTO task = service.updateAssignees(taskId, request.getAssigneeIds(), currentUser.getUserId());
         messagingTemplate.convertAndSend(
                 "/topic/project/" + task.getProjectId() + "/tasks",
                 Map.of("type", "TASK_UPDATED", "task", task));
@@ -457,7 +458,7 @@ public class TaskController {
 
     @PatchMapping("/bulk/status")
     public ResponseEntity<Void> bulkUpdateStatus(
-            @Valid @RequestBody TaskBulkStatusRequestDTO request,
+            @Valid @RequestBody BulkUpdateStatusRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         service.bulkUpdateStatus(request.getTaskIds(), request.getStatus(), currentUser.getUserId());
@@ -466,16 +467,10 @@ public class TaskController {
 
     @DeleteMapping("/bulk")
     public ResponseEntity<Void> bulkDelete(
-            @RequestBody Map<String, Object> body,
+            @Valid @RequestBody BulkDeleteTasksRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
-        List<Long> taskIds = body.containsKey("taskIds")
-                ? ((List<?>) body.get("taskIds")).stream()
-                    .filter(Objects::nonNull)
-                    .map(id -> Long.valueOf(id.toString()))
-                    .toList()
-                : List.of();
-        service.bulkDelete(taskIds, currentUser.getUserId());
+        service.bulkDelete(request.getTaskIds(), currentUser.getUserId());
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
@@ -484,12 +479,11 @@ public class TaskController {
     @PatchMapping("/{taskId}/priority")
     public ResponseEntity<TaskResponseDTO> updatePriority(
             @PathVariable Long taskId,
-            @RequestBody java.util.Map<String, String> body,
+            @Valid @RequestBody UpdatePriorityRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
-        String priority = body.get("priority");
-        return new ResponseEntity<>(service.updatePriority(taskId, priority, currentUserId), HttpStatus.OK);
+        return new ResponseEntity<>(service.updatePriority(taskId, request.getPriority(), currentUserId), HttpStatus.OK);
     }
 
     /**
@@ -500,7 +494,7 @@ public class TaskController {
     @PatchMapping("/{taskId}/status")
     public ResponseEntity<TaskResponseDTO> updateStatus(
             @PathVariable Long taskId,
-            @Valid @RequestBody TaskStatusPatchDTO request,
+            @Valid @RequestBody UpdateStatusRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
@@ -524,29 +518,27 @@ public class TaskController {
     @PatchMapping("/{taskId}/dates")
     public ResponseEntity<Void> patchTaskDates(
             @PathVariable Long taskId,
-            @Valid @RequestBody TaskDatesPatchDTO request,
+            @Valid @RequestBody PatchTaskDatesRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        service.patchTaskDates(taskId, request.getStartDate(), request.isStartDateProvided(), request.getDueDate(), request.isDueDateProvided(), currentUser.getUserId());
+        service.patchTaskDates(
+                taskId,
+                request.getStartDate(), request.isStartDateProvided(),
+                request.getDueDate(), request.isDueDateProvided(),
+                currentUser.getUserId());
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
     @PatchMapping("/reorder")
     public ResponseEntity<Void> reorderTasks(
-            @RequestBody Map<String, Object> body,
+            @Valid @RequestBody ReorderTasksRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        Long projectId = body.get("projectId") == null ? null : Long.valueOf(String.valueOf(body.get("projectId")));
-        Long sprintId = body.get("sprintId") == null ? null : Long.valueOf(String.valueOf(body.get("sprintId")));
-        @SuppressWarnings("unchecked")
-        List<Object> rawIds = (List<Object>) body.get("orderedTaskIds");
-        List<Long> orderedTaskIds = rawIds == null
-                ? List.of()
-                : rawIds.stream().map(id -> Long.valueOf(String.valueOf(id))).toList();
-        if (projectId == null) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
-        service.reorderTasks(projectId, sprintId, orderedTaskIds, currentUser.getUserId());
+        service.reorderTasks(
+                request.getProjectId(),
+                request.getSprintId(),
+                request.getOrderedTaskIds() != null ? request.getOrderedTaskIds() : List.of(),
+                currentUser.getUserId());
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
