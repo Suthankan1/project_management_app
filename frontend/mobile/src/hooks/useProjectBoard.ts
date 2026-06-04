@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { taskService, kanbanService } from '../services/task-service';
+import { taskService, kanbanService, type CreateTaskRequest } from '../services/task-service';
 import { projectService } from '../services/project-service';
 import { T } from '../constants/tokens';
 import { offlineSyncManager, QueuedMutation } from '../services/offlineSyncManager';
@@ -318,7 +318,7 @@ export function useProjectBoard(projectId: number) {
     const cleanTitle = title.trim();
     if (!cleanTitle) return;
 
-    const payload = {
+    const payload: CreateTaskRequest = {
       projectId,
       title: cleanTitle,
       status,

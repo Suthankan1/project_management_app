@@ -6,6 +6,7 @@ export interface ProjectDetails {
   id: number;
   name: string;
   projectKey?: string;
+  key?: string;
   description?: string;
   type?: ProjectType;
   createdAt?: string;

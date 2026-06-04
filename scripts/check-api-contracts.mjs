@@ -8,6 +8,7 @@ const defaultReportPath = path.join(repoRoot, 'artifacts', 'api-contracts', 'rep
 
 const args = process.argv.slice(2);
 const reportPath = getArgValue('--report') ?? defaultReportPath;
+const selfTest = args.includes('--self-test');
 
 const frontendRoots = [
   path.join(repoRoot, 'frontend', 'web'),
@@ -18,9 +19,14 @@ const backendRoot = path.join(repoRoot, 'backend', 'src', 'main', 'java');
 const frontendUsages = [];
 const backendRoutes = [];
 const suspiciousMappings = [];
+const parserMisses = [];
 const unreadableFiles = [];
 
-await main();
+if (selfTest) {
+  runSelfTests();
+} else {
+  await main();
+}
 
 async function main() {
   const frontendFiles = [
@@ -45,6 +51,7 @@ async function main() {
     const parsed = extractBackendRoutes(filePath, text);
     backendRoutes.push(...parsed.routes);
     suspiciousMappings.push(...parsed.suspicious);
+    parserMisses.push(...parsed.parserMisses);
   }
 
   const frontendIndex = buildRouteIndex(frontendUsages);
@@ -77,6 +84,7 @@ async function main() {
     criticalUnmatchedFrontendUsages,
     unusedBackendRoutes,
     suspiciousMappings,
+    parserMisses,
     duplicateReports,
     unreadableFiles,
   });
@@ -84,7 +92,7 @@ async function main() {
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
   await fs.writeFile(reportPath, report, 'utf8');
 
-  if (criticalUnmatchedFrontendUsages.length || suspiciousMappings.length || duplicateReports.length) {
+  if (criticalUnmatchedFrontendUsages.length || suspiciousMappings.length || duplicateReports.length || parserMisses.length) {
     process.exitCode = 1;
   }
 }
@@ -277,57 +285,65 @@ function buildRouteIndex(routes) {
 }
 
 function extractBackendRoutes(filePath, text) {
-  const lines = text.split(/\r?\n/);
+  const scanText = stripJavaComments(text);
   const routes = [];
   const suspicious = [];
-  let pendingAnnotations = [];
-  let classBasePaths = [''];
-  let classSeen = false;
+  const parserMisses = [];
+  const annotations = findMappingAnnotations(scanText);
+  const classes = findControllerClassDeclarations(scanText);
 
-  for (let index = 0; index < lines.length; index++) {
-    const line = lines[index];
-    const trimmed = line.trim();
+  for (let classIndex = 0; classIndex < classes.length; classIndex++) {
+    const classInfo = classes[classIndex];
+    const classEnd = classInfo.end ?? scanText.length;
+    const classAnnotations = findClassMappingAnnotations(annotations, classInfo.index);
+    const classBasePaths = classAnnotations.flatMap((annotation) => extractAnnotationPaths(annotation));
+    const effectiveClassPaths = classBasePaths.length ? classBasePaths : [''];
+    const classPathLine = classAnnotations[0]?.line ?? classInfo.line;
 
-    if (isMappingAnnotationLine(trimmed)) {
-      const block = collectAnnotationBlock(lines, index);
-      pendingAnnotations.push(block);
-      index = block.endLine;
-      continue;
-    }
-
-    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('*')) {
-      continue;
-    }
-
-    if (!classSeen && /\bclass\b/.test(trimmed)) {
-      classBasePaths = extractAnnotationPaths(pendingAnnotations);
-      const classPathLine = pendingAnnotations.length ? pendingAnnotations[0].line : index + 1;
-      for (const rawPath of classBasePaths) {
-        if (isSuspiciousPathFragment(rawPath)) {
-          suspicious.push({
-            filePath,
-            line: classPathLine,
-            rawPath,
-            context: 'class-level mapping',
-          });
-        }
+    for (const rawPath of effectiveClassPaths) {
+      if (isSuspiciousPathFragment(rawPath)) {
+        suspicious.push({
+          filePath,
+          line: classPathLine,
+          rawPath,
+          context: 'class-level mapping',
+        });
       }
-      classSeen = true;
-      pendingAnnotations = [];
-      continue;
     }
 
-    if (trimmed.startsWith('@')) {
-      continue;
+    const methodGroups = new Map();
+    const classMethodAnnotations = annotations.filter((annotation) => annotation.index > classInfo.bodyStart && annotation.index < classEnd);
+
+    for (const annotation of classMethodAnnotations) {
+      const method = findNextMethodDeclaration(scanText, annotation.end, classEnd);
+      if (!method) {
+        parserMisses.push({
+          filePath,
+          line: annotation.line,
+          annotation: annotation.name,
+          reason: 'mapping annotation not followed by a method declaration',
+        });
+        continue;
+      }
+
+      if (!methodGroups.has(method.index)) {
+        methodGroups.set(method.index, {
+          method,
+          annotations: [],
+        });
+      }
+      methodGroups.get(method.index).annotations.push(annotation);
     }
 
-    if (classSeen && isMethodDeclaration(trimmed) && pendingAnnotations.length) {
-      const methodPaths = extractAnnotationPaths(pendingAnnotations);
-      const methods = extractAnnotationMethods(pendingAnnotations);
-      const methodLine = pendingAnnotations[0].line;
+    for (const group of methodGroups.values()) {
+      const methodAnnotations = uniqueAnnotations(group.annotations);
+      const methodPaths = methodAnnotations.flatMap((annotation) => extractAnnotationPaths(annotation));
+      const methods = extractAnnotationMethods(methodAnnotations);
+      const effectiveMethodPaths = methodPaths.length ? methodPaths : [''];
+      const methodLine = methodAnnotations[0]?.line ?? group.method.line;
 
-      for (const rawClassPath of classBasePaths) {
-        for (const rawMethodPath of methodPaths) {
+      for (const rawClassPath of effectiveClassPaths) {
+        for (const rawMethodPath of effectiveMethodPaths) {
           const combinedRoute = normalizeRoute(joinRoute(rawClassPath, rawMethodPath));
           if (!combinedRoute || !combinedRoute.startsWith('/api/')) {
             continue;
@@ -344,7 +360,7 @@ function extractBackendRoutes(filePath, text) {
         }
       }
 
-      for (const rawPath of [...classBasePaths, ...methodPaths]) {
+      for (const rawPath of [...effectiveClassPaths, ...effectiveMethodPaths]) {
         if (isSuspiciousPathFragment(rawPath)) {
           suspicious.push({
             filePath,
@@ -354,45 +370,266 @@ function extractBackendRoutes(filePath, text) {
           });
         }
       }
-
-      pendingAnnotations = [];
-      continue;
-    }
-
-    if (pendingAnnotations.length) {
-      pendingAnnotations = [];
     }
   }
 
-  return { routes, suspicious };
+  return { routes: dedupeRoutes(routes), suspicious: dedupeIssues(suspicious), parserMisses: dedupeIssues(parserMisses) };
 }
 
-function collectAnnotationBlock(lines, startLine) {
-  let endLine = startLine;
-  let text = lines[startLine];
-  let balance = countParens(text);
-
-  while (balance > 0 && endLine + 1 < lines.length) {
-    endLine += 1;
-    text += `\n${lines[endLine]}`;
-    balance += countParens(lines[endLine]);
-  }
-
-  return {
-    text,
-    line: startLine + 1,
-    endLine,
-  };
-}
-
-function countParens(text) {
-  let count = 0;
+function stripJavaComments(text) {
+  let result = '';
+  let index = 0;
   let inSingle = false;
   let inDouble = false;
   let escape = false;
 
-  for (let index = 0; index < text.length; index++) {
+  while (index < text.length) {
     const char = text[index];
+    const next = text[index + 1];
+
+    if (escape) {
+      result += char;
+      escape = false;
+      index += 1;
+      continue;
+    }
+
+    if (char === '\\') {
+      result += char;
+      escape = true;
+      index += 1;
+      continue;
+    }
+
+    if (!inDouble && char === '\'') {
+      inSingle = !inSingle;
+      result += char;
+      index += 1;
+      continue;
+    }
+
+    if (!inSingle && char === '"') {
+      inDouble = !inDouble;
+      result += char;
+      index += 1;
+      continue;
+    }
+
+    if (!inSingle && !inDouble && char === '/' && next === '/') {
+      result += '  ';
+      index += 2;
+      while (index < text.length && text[index] !== '\n') {
+        result += ' ';
+        index += 1;
+      }
+      continue;
+    }
+
+    if (!inSingle && !inDouble && char === '/' && next === '*') {
+      result += '  ';
+      index += 2;
+      while (index < text.length - 1 && !(text[index] === '*' && text[index + 1] === '/')) {
+        result += text[index] === '\n' ? '\n' : ' ';
+        index += 1;
+      }
+      if (index < text.length) {
+        result += '  ';
+        index += 2;
+      }
+      continue;
+    }
+
+    result += char;
+    index += 1;
+  }
+
+  return result;
+}
+
+function findMappingAnnotations(text) {
+  const annotations = [];
+  const annotationRegex = /@(?:[A-Za-z_$][\w$]*\.)*(RequestMapping|GetMapping|PostMapping|PutMapping|PatchMapping|DeleteMapping)\b/g;
+  let match;
+
+  while ((match = annotationRegex.exec(text))) {
+    let end = annotationRegex.lastIndex;
+    let content = '';
+    while (/\s/.test(text[end] ?? '')) {
+      end += 1;
+    }
+
+    if (text[end] === '(') {
+      const balanced = extractBalanced(text, end, '(', ')');
+      if (balanced) {
+        content = balanced.content;
+        end = balanced.endIndex + 1;
+      }
+    }
+
+    annotations.push({
+      name: match[1],
+      text: text.slice(match.index, end),
+      content,
+      index: match.index,
+      end,
+      line: lineFromIndex(text, match.index),
+    });
+    annotationRegex.lastIndex = end;
+  }
+
+  return annotations;
+}
+
+function findControllerClassDeclarations(text) {
+  const classes = [];
+  const classRegex = /\b(?:public|protected|private|abstract|final|static|\s)*class\s+([A-Za-z_$][\w$]*)\b/g;
+  let match;
+  while ((match = classRegex.exec(text))) {
+    const annotationWindow = text.slice(Math.max(0, match.index - 2000), match.index);
+    if (!/@(?:[A-Za-z_$][\w$]*\.)*(?:RestController|Controller)\b/.test(annotationWindow)) {
+      continue;
+    }
+
+    const bodyStart = text.indexOf('{', classRegex.lastIndex);
+    const bodyEnd = bodyStart >= 0 ? findMatchingBrace(text, bodyStart) : -1;
+    classes.push({
+      name: match[1],
+      index: match.index,
+      bodyStart,
+      end: bodyEnd > bodyStart ? bodyEnd : text.length,
+      line: lineFromIndex(text, match.index),
+    });
+  }
+  return classes;
+}
+
+function findMatchingBrace(text, openIndex) {
+  const balanced = extractBalanced(text, openIndex, '{', '}');
+  return balanced ? balanced.endIndex : -1;
+}
+
+function findClassMappingAnnotations(annotations, classIndex) {
+  const windowStart = Math.max(0, classIndex - 2000);
+  return annotations.filter((annotation) => annotation.name === 'RequestMapping' && annotation.end <= classIndex && annotation.index >= windowStart);
+}
+
+function findNextMethodDeclaration(text, startIndex, endIndex) {
+  const slice = text.slice(startIndex, endIndex);
+  const methodRegex = /\b(?:public|protected|private)\s+(?:static\s+)?(?:final\s+)?(?:<[^>{}]+>\s+)?[\w<>\[\],.? extends super&\s]+\s+([A-Za-z_$][\w$]*)\s*\([^;{}]*\)\s*(?:throws\s+[\w<>\[\],.? extends super&\s]+)?\{/g;
+  const match = methodRegex.exec(slice);
+  if (!match) {
+    return null;
+  }
+  const index = startIndex + match.index;
+  return {
+    name: match[1],
+    index,
+    line: lineFromIndex(text, index),
+  };
+}
+
+function uniqueAnnotations(annotations) {
+  const seen = new Set();
+  const unique = [];
+  for (const annotation of annotations) {
+    if (seen.has(annotation.index)) {
+      continue;
+    }
+    seen.add(annotation.index);
+    unique.push(annotation);
+  }
+  return unique.sort((a, b) => a.index - b.index);
+}
+
+function dedupeRoutes(routes) {
+  const seen = new Set();
+  const deduped = [];
+  for (const route of routes) {
+    const key = `${route.filePath}:${route.line}:${route.method}:${route.route}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push(route);
+  }
+  return deduped;
+}
+
+function dedupeIssues(issues) {
+  const seen = new Set();
+  const deduped = [];
+  for (const issue of issues) {
+    const key = JSON.stringify(issue);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push(issue);
+  }
+  return deduped;
+}
+
+function extractAnnotationPaths(annotations) {
+  const paths = [];
+  const list = Array.isArray(annotations) ? annotations : [annotations];
+  for (const annotation of list) {
+    paths.push(...extractMappingPathValues(annotation.content));
+  }
+  return paths.length ? paths : [''];
+}
+
+function extractMappingPathValues(content) {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    return [''];
+  }
+
+  const explicitValues = [];
+  for (const attrValue of findPathValueAttributes(trimmed)) {
+    explicitValues.push(...extractQuotedStrings(attrValue));
+  }
+
+  if (explicitValues.length) {
+    return explicitValues;
+  }
+
+  const firstArg = splitTopLevelArguments(trimmed)[0]?.trim();
+  if (!firstArg || /=/.test(firstArg)) {
+    return [''];
+  }
+
+  const positionalValues = extractQuotedStrings(firstArg);
+  return positionalValues.length ? positionalValues : [''];
+}
+
+function findPathValueAttributes(text) {
+  const values = [];
+  const attrRegex = /\b(path|value)\b\s*=/g;
+  let match;
+  while ((match = attrRegex.exec(text))) {
+    let valueStart = attrRegex.lastIndex;
+    while (/\s/.test(text[valueStart] ?? '')) {
+      valueStart += 1;
+    }
+    const attrValue = readJavaAnnotationValue(text, valueStart);
+    if (attrValue) {
+      values.push(attrValue.value);
+      attrRegex.lastIndex = attrValue.end;
+    }
+  }
+  return values;
+}
+
+function readJavaAnnotationValue(text, startIndex) {
+  let depthParen = 0;
+  let depthBrace = 0;
+  let inSingle = false;
+  let inDouble = false;
+  let escape = false;
+
+  for (let index = startIndex; index < text.length; index++) {
+    const char = text[index];
+
     if (escape) {
       escape = false;
       continue;
@@ -401,59 +638,67 @@ function countParens(text) {
       escape = true;
       continue;
     }
-    if (!inDouble && char === '\'') {
-      inSingle = !inSingle;
+    if (inSingle) {
+      if (char === '\'') {
+        inSingle = false;
+      }
       continue;
     }
-    if (!inSingle && char === '"') {
-      inDouble = !inDouble;
+    if (inDouble) {
+      if (char === '"') {
+        inDouble = false;
+      }
       continue;
     }
-    if (inSingle || inDouble) {
+    if (char === '\'') {
+      inSingle = true;
+      continue;
+    }
+    if (char === '"') {
+      inDouble = true;
       continue;
     }
     if (char === '(') {
-      count += 1;
-    } else if (char === ')') {
-      count -= 1;
+      depthParen += 1;
+      continue;
+    }
+    if (char === ')') {
+      if (depthParen > 0) {
+        depthParen -= 1;
+      }
+      continue;
+    }
+    if (char === '{') {
+      depthBrace += 1;
+      continue;
+    }
+    if (char === '}') {
+      if (depthBrace > 0) {
+        depthBrace -= 1;
+      }
+      continue;
+    }
+    if (char === ',' && depthParen === 0 && depthBrace === 0) {
+      return {
+        value: text.slice(startIndex, index).trim(),
+        end: index,
+      };
     }
   }
 
-  return count;
-}
-
-function isMappingAnnotationLine(trimmedLine) {
-  return /^@(?:RequestMapping|GetMapping|PostMapping|PutMapping|PatchMapping|DeleteMapping)\s*\(/.test(trimmedLine);
-}
-
-function isMethodDeclaration(trimmedLine) {
-  return /^(?:public|protected|private)\s+.*\([^;]*\)\s*(?:\{|throws\b|$)/.test(trimmedLine) && !/\bclass\b/.test(trimmedLine);
-}
-
-function extractAnnotationPaths(annotations) {
-  const paths = [];
-  for (const annotation of annotations) {
-    const strings = extractQuotedStrings(annotation.text);
-    if (strings.length) {
-      paths.push(...strings);
-    }
-  }
-  return paths.length ? paths : [''];
+  const value = text.slice(startIndex).trim();
+  return value ? { value, end: text.length } : null;
 }
 
 function extractAnnotationMethods(annotations) {
   const methods = [];
   for (const annotation of annotations) {
-    const name = annotation.text.match(/^@(\w+Mapping)\b/)?.[1];
-    if (!name) {
-      continue;
-    }
-    if (name !== 'RequestMapping') {
-      methods.push(name.replace('Mapping', '').toUpperCase());
+    if (annotation.name !== 'RequestMapping') {
+      methods.push(annotation.name.replace('Mapping', '').toUpperCase());
       continue;
     }
 
-    const requestMethods = [...annotation.text.matchAll(/RequestMethod\.(GET|POST|PUT|PATCH|DELETE)/g)].map((match) => match[1]);
+    const requestMethods = [...annotation.content.matchAll(/RequestMethod\.(GET|POST|PUT|PATCH|DELETE)/g)].map((match) => match[1]);
     if (requestMethods.length) {
       methods.push(...requestMethods);
     } else {
@@ -840,6 +1085,7 @@ function buildReport({
   criticalUnmatchedFrontendUsages,
   unusedBackendRoutes,
   suspiciousMappings,
+  parserMisses,
   duplicateReports,
   unreadableFiles,
 }) {
@@ -856,6 +1102,17 @@ function buildReport({
     }
     if (suspiciousMappings.length > 50) {
       lines.push(`- ... ${suspiciousMappings.length - 50} more`);
+    }
+    lines.push('');
+  }
+
+  if (parserMisses.length) {
+    lines.push(`Likely backend parser misses: ${parserMisses.length}`);
+    for (const miss of parserMisses.slice(0, 50)) {
+      lines.push(`- ${relativePath(miss.filePath)}:${miss.line} @${miss.annotation} ${miss.reason}`);
+    }
+    if (parserMisses.length > 50) {
+      lines.push(`- ... ${parserMisses.length - 50} more`);
     }
     lines.push('');
   }
@@ -916,6 +1173,7 @@ function buildReport({
 
   lines.push('Summary');
   lines.push(`- Critical issues: ${unmatchedFrontendUsages.length + suspiciousMappings.length + duplicateReports.length}`);
+  lines.push(`- Likely parser misses: ${parserMisses.length}`);
   lines.push(`- Informational backend-only routes: ${unusedBackendRoutes.length}`);
 
   return `${lines.join('\n')}\n`;
@@ -936,4 +1194,163 @@ function isContractBoundaryFile(filePath) {
     || /\/src\/hooks\//.test(relative)
     || /\/src\/lib\//.test(relative)
   );
+}
+
+function runSelfTests() {
+  const cases = [
+    {
+      name: 'TeamController-style class base plus empty method mappings',
+      source: `
+        package test;
+        @RestController
+        @RequestMapping("/api/teams")
+        @RequiredArgsConstructor
+        public class TeamController {
+          @GetMapping("/check-name")
+          public ResponseEntity<Map<String, Boolean>> checkTeamName(@RequestParam String name) {
+            return null;
+          }
+
+          @PostMapping
+          public ResponseEntity<TeamSummaryDTO> createTeam(
+              @Valid @RequestBody TeamCreationDTO creationDTO) {
+            return null;
+          }
+
+          @GetMapping
+          public ResponseEntity<List<TeamSummaryDTO>> getAllTeams() {
+            return null;
+          }
+
+          @PutMapping("/{id}")
+          public ResponseEntity<TeamSummaryDTO> updateTeam(@PathVariable Long id) {
+            return null;
+          }
+        }
+      `,
+      expected: [
+        'GET /api/teams/check-name',
+        'POST /api/teams',
+        'GET /api/teams',
+        'PUT /api/teams/:id',
+      ],
+    },
+    {
+      name: 'TaskController-style path variables and attribute mappings',
+      source: `
+        @RestController
+        @RequestMapping(path = "/api/tasks")
+        public class TaskController {
+          @PostMapping
+          public ResponseEntity<TaskResponseDTO> createTask(
+              @Validated @RequestBody TaskRequestDTO request,
+              @AuthenticationPrincipal UserPrincipal currentUser) {
+            return null;
+          }
+
+          @GetMapping(value = "/{taskId}")
+          public ResponseEntity<TaskResponseDTO> getTaskById(
+              @PathVariable Long taskId,
+              @RequestParam(required = false) String repoFullName) {
+            return null;
+          }
+
+          @PatchMapping(path = "/{taskId}/dates")
+          public ResponseEntity<Void> patchTaskDates(
+              @PathVariable Long taskId,
+              @Valid @RequestBody PatchTaskDatesRequest request) {
+            return null;
+          }
+
+          @DeleteMapping(value = "/bulk")
+          public ResponseEntity<Void> bulkDelete(@Valid @RequestBody BulkDeleteTasksRequest request) {
+            return null;
+          }
+        }
+      `,
+      expected: [
+        'POST /api/tasks',
+        'GET /api/tasks/:taskId',
+        'PATCH /api/tasks/:taskId/dates',
+        'DELETE /api/tasks/bulk',
+      ],
+    },
+    {
+      name: 'Arrays, multiline declarations, and non-path attributes',
+      source: `
+        @RestController
+        @RequestMapping({"/api/github/webhook", "/api/github/webhooks"})
+        public
+        class GitHubWebhookController {
+          @PostMapping(
+              consumes = "application/json"
+          )
+          public ResponseEntity<Void> receiveWebhook() {
+            return null;
+          }
+
+          @GetMapping(path = {"/issues/{owner}/{repo}/labels", "/labels"})
+          public
+          ResponseEntity<Void>
+          labels() {
+            return null;
+          }
+        }
+      `,
+      expected: [
+        'POST /api/github/webhook',
+        'POST /api/github/webhooks',
+        'GET /api/github/webhook/issues/:owner/:repo/labels',
+        'GET /api/github/webhook/labels',
+        'GET /api/github/webhooks/issues/:owner/:repo/labels',
+        'GET /api/github/webhooks/labels',
+      ],
+      rejected: [
+        'POST /api/github/webhook/application/json',
+      ],
+    },
+    {
+      name: 'Missing slash warning mirrors TeamController typo',
+      source: `
+        @RestController
+        @RequestMapping("api/teams")
+        public class TeamController {
+          @GetMapping("check-name")
+          public ResponseEntity<Void> checkTeamName() {
+            return null;
+          }
+        }
+      `,
+      expected: [
+        'GET /api/teams/check-name',
+      ],
+      suspicious: [
+        'api/teams',
+        'check-name',
+      ],
+    },
+  ];
+
+  for (const testCase of cases) {
+    const parsed = extractBackendRoutes(`${testCase.name}.java`, testCase.source);
+    const actual = new Set(parsed.routes.map((route) => `${route.method} ${route.route}`));
+    for (const expectedRoute of testCase.expected) {
+      assert(actual.has(expectedRoute), `${testCase.name}: expected ${expectedRoute}`);
+    }
+    for (const rejectedRoute of testCase.rejected ?? []) {
+      assert(!actual.has(rejectedRoute), `${testCase.name}: rejected ${rejectedRoute}`);
+    }
+    for (const expectedSuspicious of testCase.suspicious ?? []) {
+      assert(parsed.suspicious.some((issue) => issue.rawPath === expectedSuspicious), `${testCase.name}: expected suspicious ${expectedSuspicious}`);
+    }
+    assert(parsed.parserMisses.length === 0, `${testCase.name}: unexpected parser misses ${JSON.stringify(parsed.parserMisses)}`);
+  }
+
+  console.log(`check-api-contracts self-test passed (${cases.length} fixtures)`);
+}
+
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
 }

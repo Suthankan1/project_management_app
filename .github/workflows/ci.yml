@@ -216,6 +216,9 @@ jobs:
     - name: TypeScript Check
       run: npx tsc --noEmit
 
+    - name: Run Mobile Tests
+      run: npm run test
+
     - name: Smoke Check EAS Build Profiles
       run: |
         node -e "
