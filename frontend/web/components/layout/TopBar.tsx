@@ -4,7 +4,7 @@
 import { useState, useEffect, useSyncExternalStore, Suspense, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
-import { Menu, Plus, Settings, Github } from 'lucide-react';
+import { Menu, Plus, Settings, Github, Figma } from 'lucide-react';
 
 import { useNavigation } from '@/lib/navigation-context';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -16,6 +16,7 @@ import { TabBar } from './topbar/TabBar';
 import { SpacesDropdown } from './sidebar/SpacesDropdown';
 import GlobalSearch from './topbar/GlobalSearch';
 import { ProjectTypeIcon } from '@/components/shared/ProjectTypeIcon';
+import { Modal } from '@/components/ui/Modal';
 
 // Extracted hooks for cleaner logic separation
 import { useProjectContext, subscribeToBrowserStorage } from '@/hooks/useProjectContext';
@@ -44,6 +45,9 @@ function TopBarContent() {
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
   const switcherRef = useRef<HTMLDivElement>(null);
   const [recentProjectsList, setRecentProjectsList] = useState<{ id: number; name: string }[]>([]);
+  const [figmaModalOpen, setFigmaModalOpen] = useState(false);
+  const [figmaLinkInput, setFigmaLinkInput] = useState('');
+  const [figmaLinkError, setFigmaLinkError] = useState('');
 
   // Close project dropdown on outside click
   useEffect(() => {
@@ -79,6 +83,50 @@ function TopBarContent() {
   const handleSwitchProject = (proj: { id: number; name: string }) => {
     switchProject(proj);
     setProjectsOpen(false);
+    router.push(getTabHref(activeTab, String(proj.id)));
+  };
+
+  const normalizeFigmaUrl = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    try {
+      const url = new URL(withProtocol);
+      return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleOpenFigma = () => {
+    if (!projectId) return;
+
+    const storageKey = `planora:project:${projectId}:figma-link`;
+    const savedLink = window.localStorage.getItem(storageKey);
+    if (savedLink) {
+      window.open(savedLink, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    setFigmaLinkInput('');
+    setFigmaLinkError('');
+    setFigmaModalOpen(true);
+  };
+
+  const handleSaveFigmaLink = () => {
+    if (!projectId) return;
+
+    const figmaLink = normalizeFigmaUrl(figmaLinkInput);
+    if (!figmaLink) {
+      setFigmaLinkError('Enter a valid Figma link.');
+      return;
+    }
+
+    const storageKey = `planora:project:${projectId}:figma-link`;
+    window.localStorage.setItem(storageKey, figmaLink);
+    setFigmaModalOpen(false);
+    window.open(figmaLink, '_blank', 'noopener,noreferrer');
   };
 
   /* ── Profile avatar block (shared) ── */
@@ -191,7 +239,7 @@ function TopBarContent() {
 
         {/* Right Side Actions */}
         <div className="flex items-center gap-4 flex-1 justify-end max-w-[900px] ml-auto">
-          {/* GitHub + Settings Icons */}
+          {/* Integration + Settings Icons */}
           {projectId && (
             <div className="flex items-center gap-1 shrink-0">
               <button
@@ -205,6 +253,14 @@ function TopBarContent() {
                 aria-label="GitHub"
               >
                 <Github size={18} strokeWidth={pathname.startsWith('/github') ? 2.5 : 2} />
+              </button>
+              <button
+                onClick={handleOpenFigma}
+                className="p-2 rounded-lg transition-all text-cu-text-muted hover:text-cu-text-secondary hover:bg-cu-hover"
+                title="Figma"
+                aria-label="Figma"
+              >
+                <Figma size={18} strokeWidth={2} />
               </button>
               <button
                 onClick={() => router.push(`/project/${projectId}/settings`)}
@@ -269,6 +325,67 @@ function TopBarContent() {
       <div className="px-4 sm:px-8 mt-1 mb-0.5">
         <TabBar tabs={tabs} activeTab={activeTab} getTabHref={getTabHref} />
       </div>
+
+      <Modal
+        open={figmaModalOpen}
+        onOpenChange={setFigmaModalOpen}
+        title="Connect Figma"
+        description="Save one Figma file or prototype link for this project."
+        size="md"
+      >
+        <form
+          className="pt-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleSaveFigmaLink();
+          }}
+        >
+          <div className="flex items-center gap-3 rounded-lg border border-cu-border bg-cu-bg-secondary px-3 py-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cu-bg text-cu-primary ring-1 ring-cu-border">
+              <Figma size={20} strokeWidth={2.2} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-cu-text-primary font-outfit">Project design link</p>
+              <p className="text-xs text-cu-text-secondary font-outfit">This will open directly next time.</p>
+            </div>
+          </div>
+
+          <label className="mt-5 block text-xs font-bold uppercase tracking-[0.04em] text-cu-text-muted font-outfit">
+            Figma URL
+          </label>
+          <input
+            value={figmaLinkInput}
+            onChange={(event) => {
+              setFigmaLinkInput(event.target.value);
+              if (figmaLinkError) setFigmaLinkError('');
+            }}
+            autoFocus
+            placeholder="https://www.figma.com/file/..."
+            className={`mt-2 h-11 w-full rounded-lg border bg-cu-bg px-3 text-sm font-medium text-cu-text-primary outline-none transition-all placeholder:text-cu-text-muted focus:ring-2 focus:ring-cu-primary/20 ${
+              figmaLinkError ? 'border-red-400 focus:border-red-400' : 'border-cu-border focus:border-cu-primary'
+            }`}
+          />
+          {figmaLinkError && (
+            <p className="mt-2 text-xs font-semibold text-red-500 font-outfit">{figmaLinkError}</p>
+          )}
+
+          <div className="mt-6 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setFigmaModalOpen(false)}
+              className="h-10 rounded-lg border border-cu-border px-4 text-sm font-bold text-cu-text-secondary transition-colors hover:bg-cu-hover hover:text-cu-text-primary font-outfit"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="h-10 rounded-lg bg-cu-primary px-4 text-sm font-bold text-white shadow-sm shadow-cu-primary/20 transition-colors hover:bg-cu-primary-hover font-outfit"
+            >
+              Save & Open
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
