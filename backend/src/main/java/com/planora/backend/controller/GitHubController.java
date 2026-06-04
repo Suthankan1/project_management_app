@@ -1,6 +1,8 @@
 package com.planora.backend.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.planora.backend.dto.GitHubRepositoryDTO;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.service.GitHubIntegrationService;
@@ -77,7 +79,7 @@ public class GitHubController {
         if (token == null || token.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(gitHubIntegrationService.fetchGitHubUser(token));
+        return ResponseEntity.ok(sanitizeTokenFields(gitHubIntegrationService.fetchGitHubUser(token)));
     }
 
     @GetMapping("/pull-requests")
@@ -92,7 +94,7 @@ public class GitHubController {
         if (token == null || token.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(gitHubIntegrationService.fetchPullRequests(owner, repo, token));
+        return ResponseEntity.ok(sanitizeTokenFields(gitHubIntegrationService.fetchPullRequests(owner, repo, token)));
     }
 
     @GetMapping("/pull-requests/{prNumber}")
@@ -108,7 +110,7 @@ public class GitHubController {
         if (token == null || token.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(gitHubIntegrationService.fetchPullRequest(owner, repo, prNumber, token));
+        return ResponseEntity.ok(sanitizeTokenFields(gitHubIntegrationService.fetchPullRequest(owner, repo, prNumber, token)));
     }
 
     @GetMapping("/commits")
@@ -123,6 +125,26 @@ public class GitHubController {
         if (token == null || token.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(gitHubIntegrationService.fetchCommits(owner, repo, token));
+        return ResponseEntity.ok(sanitizeTokenFields(gitHubIntegrationService.fetchCommits(owner, repo, token)));
+    }
+
+    private JsonNode sanitizeTokenFields(JsonNode node) {
+        if (node == null) {
+            return null;
+        }
+        JsonNode copy = node.deepCopy();
+        removeTokenFields(copy);
+        return copy;
+    }
+
+    private void removeTokenFields(JsonNode node) {
+        if (node instanceof ObjectNode objectNode) {
+            objectNode.remove(List.of("access_token", "token", "github_access_token", "githubAccessToken"));
+            objectNode.elements().forEachRemaining(this::removeTokenFields);
+            return;
+        }
+        if (node instanceof ArrayNode arrayNode) {
+            arrayNode.elements().forEachRemaining(this::removeTokenFields);
+        }
     }
 }

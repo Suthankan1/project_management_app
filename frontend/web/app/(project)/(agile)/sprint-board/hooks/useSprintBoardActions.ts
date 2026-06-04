@@ -154,7 +154,7 @@ export function useSprintBoardActions({
         taskId: res.id, projectTaskNumber: res.projectTaskNumber ?? res.id,
         title: res.title, storyPoint: res.storyPoint ?? 0, status,
         priority: res.priority ?? 'MEDIUM', assigneeName: res.assigneeName,
-        assigneePhotoUrl: res.assigneePhotoUrl ?? null, updatedAt: res.updatedAt,
+        assigneePhotoUrl: res.assigneePhotoUrl ?? undefined, updatedAt: res.updatedAt,
         attachmentCount: 0, commentCount: 0,
       };
       setAllBoards((prev) => prev.map((entry, idx) => idx === selectedIdx

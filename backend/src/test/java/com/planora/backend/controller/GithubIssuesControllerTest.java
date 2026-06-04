@@ -188,7 +188,6 @@ class GithubIssuesControllerTest {
         mockMvc.perform(post("/api/github/issues/import")
                         .with(user(principal))
                         .with(csrf())
-                        .header("X-GitHub-Token", "browser-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(java.util.Map.of(
                                 "projectId", 10L,
@@ -241,7 +240,10 @@ class GithubIssuesControllerTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.number").value(34))
-                .andExpect(jsonPath("$.title").value("Fix login"));
+                .andExpect(jsonPath("$.title").value("Fix login"))
+                .andExpect(jsonPath("$.access_token").doesNotExist())
+                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(jsonPath("$.githubAccessToken").doesNotExist());
 
         verify(githubNotificationService).notifyIssueEvent(
                 "planora/app",

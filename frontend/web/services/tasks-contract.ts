@@ -43,8 +43,20 @@ export interface BulkDeleteTasksRequest {
 
 /** PATCH /api/tasks/{taskId}/priority */
 export interface UpdatePriorityRequest {
-  priority: 'LOW' | 'NORMAL' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  priority: TaskPriorityValue;
 }
+
+export type TaskPriorityValue = 'LOW' | 'NORMAL' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+export const normalizeTaskPriority = (priority?: string): TaskPriorityValue => {
+  if (priority === 'LOW' || priority === 'NORMAL' || priority === 'MEDIUM' || priority === 'HIGH' || priority === 'URGENT') {
+    return priority;
+  }
+  if (priority === 'CRITICAL') {
+    return 'URGENT';
+  }
+  return 'MEDIUM';
+};
 
 /** PATCH /api/tasks/{taskId}/status */
 export interface UpdateStatusRequest {
@@ -162,7 +174,7 @@ export interface CreateTaskRequest {
   title: string;
   projectId: number;
   description?: string;
-  priority?: 'LOW' | 'NORMAL' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  priority?: TaskPriorityValue;
   status?: string;
   storyPoint?: number;
   startDate?: string | null;
@@ -186,12 +198,12 @@ export interface UpdateTaskRequest {
   title?: string;
   projectId?: number;
   description?: string;
-  priority?: 'LOW' | 'NORMAL' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  priority?: TaskPriorityValue;
   status?: string;
   storyPoint?: number;
   startDate?: string | null;
   dueDate?: string | null;
-  assigneeId?: number;
+  assigneeId?: number | null;
   reporterId?: number;
   assigneeIds?: number[];
   sprintId?: number | null;

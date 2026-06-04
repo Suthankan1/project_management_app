@@ -18,7 +18,7 @@ import {
   RefreshCw,
   XCircle,
 } from 'lucide-react';
-import { getGitHubToken, getProjectGitHubRepo } from '@/services/githubService';
+import { hasConnectedGitHubAccount, getProjectGitHubRepo } from '@/services/githubService';
 import api from '@/lib/axios';
 import { CIStatusBadge } from '@/components/ui';
 import SidebarField from './SidebarField';
@@ -279,9 +279,8 @@ const TaskGitHubSection: React.FC<TaskGitHubSectionProps> = ({
   };
 
   const fetchData = useCallback(async (withSync = false) => {
-    const token   = getGitHubToken();
     const repo    = projectId != null ? getProjectGitHubRepo(projectId) : null;
-    const canSync = withSync && !!token && !!repo;
+    const canSync = withSync && hasConnectedGitHubAccount() && !!repo;
     const syncQS  = canSync ? `?repoFullName=${encodeURIComponent(repo!.repoFullName)}` : '';
 
     setError(null);

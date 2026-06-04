@@ -26,8 +26,7 @@ import {
   getProjectGitHubRepo,
   setProjectGitHubRepo,
   clearProjectGitHubRepo,
-  getGitHubToken,
-  clearGitHubToken,
+  hasConnectedGitHubAccount,
   fetchRepositories,
   fetchGitHubUser,
   fetchPullRequest,
@@ -1057,7 +1056,7 @@ function IssuesPanel({
             <AlertCircle size={16} className="text-red-400" />
           </div>
           <p className="text-xs text-slate-500 font-outfit">{error}</p>
-          {(!getGitHubToken() || error.toLowerCase().includes('connect')) ? (
+          {(!hasConnectedGitHubAccount() || error.toLowerCase().includes('connect')) ? (
             <motion.button
               onClick={() => onRequireLogin()}
               whileHover={{ scale: 1.03 }}
@@ -1770,16 +1769,14 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   }, [projectId]);
 
   const loadData = useCallback(async (conn: ProjectGitHubConnection) => {
-    const token = getGitHubToken();
-    if (!token) return;
     setLoading(true);
     setPRError(null);
     setCommitError(null);
     setIssueError(null);
 
     const [prResult, commitResult, issueResult, userResult] = await Promise.allSettled([
-      fetchPullRequests(undefined, conn.ownerLogin, conn.repoName),
-      fetchCommits(undefined, conn.ownerLogin, conn.repoName),
+      fetchPullRequests(conn.ownerLogin, conn.repoName),
+      fetchCommits(conn.ownerLogin, conn.repoName),
       fetchIssues(conn.repoFullName),
       fetchGitHubUser(),
     ]);
@@ -1803,9 +1800,6 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   }, []);
 
   const loadIssues = useCallback(async (conn: ProjectGitHubConnection) => {
-    const token = getGitHubToken();
-    if (!token) return;
-
     try {
       const latestIssues = await fetchIssues(conn.repoFullName);
       setIssues(latestIssues);
@@ -1864,8 +1858,6 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   }, [connection, loadAutomationLogs, loadAutomationRules]);
 
   const loadRepos = useCallback(async () => {
-    const token = getGitHubToken();
-    if (!token) return;
     setLoadingRepos(true);
     setRepoError(null);
     try {
@@ -1908,8 +1900,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   };
 
   const handleOpenModal = async () => {
-    const token = getGitHubToken();
-    if (!token) {
+    if (!hasConnectedGitHubAccount()) {
       if (savedAccounts.length > 0) setShowAccountPicker(true);
       else handleConnectGitHub();
       return;
@@ -1951,7 +1942,6 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
         }
       }
     }
-    clearGitHubToken();
     clearProjectGitHubRepo(projectId);
     setIsPostLogout(true);
     setConnection(null);
@@ -1993,11 +1983,8 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     if (!connection) return;
 
     if (update.type === 'opened') {
-      const token = getGitHubToken();
-      if (!token) return;
-
       try {
-        const pr = await fetchPullRequest(undefined, connection.ownerLogin, connection.repoName, update.prNumber);
+        const pr = await fetchPullRequest(connection.ownerLogin, connection.repoName, update.prNumber);
         setPRs((current) => [pr, ...current.filter((existing) => existing.number !== pr.number)]);
         setPRError(null);
       } catch (error) {

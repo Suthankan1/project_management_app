@@ -15,6 +15,7 @@ import { type CreateTaskData } from '@/components/shared/CreateTaskModal';
 import { buildSessionCacheKey, getSessionCache, setSessionCache, removeSessionCache } from '@/lib/session-cache';
 import { toast } from '@/components/ui';
 import { tasksApi } from '@/services/api-contract';
+import { normalizeTaskPriority } from '@/services/tasks-contract';
 
 export function useBacklogData(projectId: string | null, showArchived = false) {
 
@@ -190,7 +191,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
             const res = await tasksApi.create({
                 projectId: parseInt(projectId, 10),
                 title: data.title,
-                priority: data.priority,
+                priority: normalizeTaskPriority(data.priority),
                 assigneeId: data.assigneeId,
                 labelIds: data.labelIds,
             });

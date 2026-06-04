@@ -8,6 +8,7 @@ import { useTaskWebSocket } from '@/hooks/useTaskWebSocket';
 import type { CreateTaskData } from '@/components/shared/CreateTaskModal';
 import type { Label, MilestoneResponse, Task } from '@/types';
 import { labelsApi, projectsApi, tasksApi } from '@/services/api-contract';
+import { normalizeTaskPriority } from '@/services/tasks-contract';
 
 const MEMBERS_CACHE_TTL_MS = 1000 * 60 * 30;
 
@@ -415,7 +416,7 @@ export function useListTasks() {
         projectId,
         title: data.title,
         storyPoint: data.storyPoint,
-        priority: data.priority,
+        priority: normalizeTaskPriority(data.priority),
         assigneeId: data.assigneeId,
         labelIds: data.labelIds,
         dueDate: data.dueDate,

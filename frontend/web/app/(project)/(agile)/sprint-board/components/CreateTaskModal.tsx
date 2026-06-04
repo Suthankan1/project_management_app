@@ -17,6 +17,33 @@ interface CreateTaskModalProps {
   loading?: boolean;
 }
 
+interface TeamMemberOption {
+  id: number;
+  name?: string;
+  username?: string;
+  fullName?: string;
+  user?: {
+    fullName?: string;
+    username?: string;
+  };
+}
+
+const getNestedTeamId = (team: unknown): number | undefined => {
+  if (!team || typeof team !== 'object' || !('id' in team)) return undefined;
+  const id = (team as { id?: unknown }).id;
+  return typeof id === 'number' ? id : undefined;
+};
+
+const getMemberArray = (payload: unknown): TeamMemberOption[] => {
+  if (Array.isArray(payload)) return payload as TeamMemberOption[];
+  if (!payload || typeof payload !== 'object') return [];
+  const record = payload as Record<string, unknown>;
+  if (Array.isArray(record.members)) return record.members as TeamMemberOption[];
+  if (Array.isArray(record.data)) return record.data as TeamMemberOption[];
+  if (Array.isArray(record.content)) return record.content as TeamMemberOption[];
+  return [];
+};
+
 export default function CreateTaskModal({
   isOpen,
   onClose,
@@ -83,20 +110,12 @@ export default function CreateTaskModal({
       setLoadingMembers(true);
       try {
         const project = await projectsApi.get(projectId);
-        if (project.team?.id) {
-          const payload = await projectsApi.getTeamMembers(project.team.id);
+        const teamId = project.teamId ?? getNestedTeamId(project.team);
+        if (teamId) {
+          const payload = await projectsApi.getTeamMembers(teamId);
+          const rawMembers = getMemberArray(payload);
 
-          const rawMembers = Array.isArray(payload)
-            ? payload
-            : Array.isArray(payload?.members)
-              ? payload.members
-              : Array.isArray(payload?.data)
-                ? payload.data
-                : Array.isArray(payload?.content)
-                  ? payload.content
-                  : [];
-
-          setTeamMembers(rawMembers.map((m: { id: number; name?: string; username?: string; fullName?: string; user?: { fullName?: string; username?: string } }) => ({
+          setTeamMembers(rawMembers.map((m) => ({
               id: m.id,
               name: m.name ?? m.username ?? m.fullName ?? m.user?.fullName ?? m.user?.username ?? 'Unknown'
           })));

@@ -23,6 +23,7 @@ export interface PageSummaryDto {
   title: string;
   parentPageId?: number | null;
   isStarred?: boolean;
+  updatedAt?: string;
   lastViewedAt?: string | null;
   sortOrder?: number;
   icon?: string | null;

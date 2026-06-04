@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import com.planora.backend.dto.GithubLinkRequestDTO;
 import com.planora.backend.dto.ProjectGithubRepositoryDTO;
 import com.planora.backend.exception.ConflictException;
+import com.planora.backend.exception.GithubAuthenticationException;
 import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.GithubIntegration;
 import com.planora.backend.model.Project;
@@ -23,10 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProjectGithubIntegrationService {
     private final GithubIntegrationRepository integrationRepository;
     private final GithubApiClient githubApiClient;
+    private final GithubTokenService githubTokenService;
     private final ProjectRepository projectRepository;
 
     @Transactional
-    public ProjectGithubRepositoryDTO linkRepository(GithubLinkRequestDTO request) {
+    public ProjectGithubRepositoryDTO linkRepository(GithubLinkRequestDTO request, Long userId) {
         if (integrationRepository.existsByProjectIdAndRepositoryFullName(
                 request.getProjectId(), request.getRepositoryFullName())) {
             throw new ConflictException("Repository '" + request.getRepositoryFullName()
@@ -36,8 +38,13 @@ public class ProjectGithubIntegrationService {
         Project project = projectRepository.findById(request.getProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found: " + request.getProjectId()));
 
+        String accessToken = githubTokenService.getToken(userId);
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new GithubAuthenticationException("GitHub account is not connected");
+        }
+
         try {
-            githubApiClient.fetchRepository(request.getRepositoryFullName(), request.getAccessToken());
+            githubApiClient.fetchRepository(request.getRepositoryFullName(), accessToken);
         } catch (GithubApiClient.GithubApiException e) {
             throw new RuntimeException("Cannot access GitHub repository: " + e.getMessage());
         }
@@ -46,8 +53,8 @@ public class ProjectGithubIntegrationService {
         integration.setProject(project);
         integration.setRepositoryFullName(request.getRepositoryFullName());
         integration.setRepositoryUrl("https://github.com/" + request.getRepositoryFullName());
-        integration.setEncryptedAccessToken(request.getAccessToken());
-        integration.setTokenType(resolveTokenType(request.getTokenType()));
+        integration.setEncryptedAccessToken(githubTokenService.encryptToken(accessToken));
+        integration.setTokenType(GithubIntegration.TokenType.OAUTH);
         integration.setActive(true);
 
         GithubIntegration saved = integrationRepository.save(integration);
@@ -70,15 +77,6 @@ public class ProjectGithubIntegrationService {
                 .stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
-    }
-
-    private GithubIntegration.TokenType resolveTokenType(String raw) {
-        if (raw == null) return GithubIntegration.TokenType.PERSONAL_ACCESS_TOKEN;
-        try {
-            return GithubIntegration.TokenType.valueOf(raw.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return GithubIntegration.TokenType.PERSONAL_ACCESS_TOKEN;
-        }
     }
 
     private ProjectGithubRepositoryDTO toDTO(GithubIntegration integration) {

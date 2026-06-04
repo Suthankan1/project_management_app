@@ -130,6 +130,8 @@ class GitHubControllerTest {
         ObjectNode mockUser = objectMapper.createObjectNode();
         mockUser.put("login", "gituser");
         mockUser.put("id", 12345);
+        mockUser.put("access_token", "must-not-leak");
+        mockUser.put("githubAccessToken", "must-not-leak");
 
         when(gitHubIntegrationService.fetchGitHubUser(mockToken)).thenReturn(mockUser);
 
@@ -138,6 +140,55 @@ class GitHubControllerTest {
                         .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.login").value("gituser"))
-                .andExpect(jsonPath("$.id").value(12345));
+                .andExpect(jsonPath("$.id").value(12345))
+                .andExpect(jsonPath("$.access_token").doesNotExist())
+                .andExpect(jsonPath("$.githubAccessToken").doesNotExist());
+    }
+
+    @Test
+    void getPullRequests_stripsTokenFieldsFromProxiedResponse() throws Exception {
+        String mockToken = "decrypted-token";
+        when(githubTokenService.getToken(1L)).thenReturn(mockToken);
+
+        ObjectNode author = objectMapper.createObjectNode();
+        author.put("login", "octocat");
+        author.put("token", "must-not-leak");
+        ObjectNode pr = objectMapper.createObjectNode();
+        pr.put("number", 17);
+        pr.set("user", author);
+        pr.put("access_token", "must-not-leak");
+        var pullRequests = objectMapper.createArrayNode().add(pr);
+
+        when(gitHubIntegrationService.fetchPullRequests("planora", "app", mockToken)).thenReturn(pullRequests);
+
+        mockMvc.perform(get("/api/github/pull-requests")
+                        .with(user(principal))
+                        .param("owner", "planora")
+                        .param("repo", "app"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].number").value(17))
+                .andExpect(jsonPath("$[0].access_token").doesNotExist())
+                .andExpect(jsonPath("$[0].user.token").doesNotExist());
+    }
+
+    @Test
+    void getCommits_stripsTokenFieldsFromProxiedResponse() throws Exception {
+        String mockToken = "decrypted-token";
+        when(githubTokenService.getToken(1L)).thenReturn(mockToken);
+
+        ObjectNode commit = objectMapper.createObjectNode();
+        commit.put("sha", "abc123");
+        commit.put("github_access_token", "must-not-leak");
+        var commits = objectMapper.createArrayNode().add(commit);
+
+        when(gitHubIntegrationService.fetchCommits("planora", "app", mockToken)).thenReturn(commits);
+
+        mockMvc.perform(get("/api/github/commits")
+                        .with(user(principal))
+                        .param("owner", "planora")
+                        .param("repo", "app"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].sha").value("abc123"))
+                .andExpect(jsonPath("$[0].github_access_token").doesNotExist());
     }
 }

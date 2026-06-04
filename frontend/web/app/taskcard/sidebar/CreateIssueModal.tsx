@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Check, CircleDot, ExternalLink, Loader2, X } from 'lucide-react';
 import {
   fetchRepositories,
-  getGitHubToken,
+  hasConnectedGitHubAccount,
   getProjectGitHubRepo,
 } from '@/services/githubService';
 import api from '@/lib/axios';
@@ -74,7 +74,7 @@ const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
     setSuccess(null);
 
     const connected  = projectId != null ? getProjectGitHubRepo(projectId) : null;
-    const token      = getGitHubToken();
+    const isConnected = hasConnectedGitHubAccount();
     const connRepo   = connected?.repoFullName ?? '';
 
     setRepoFullName(connRepo);
@@ -83,23 +83,23 @@ const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
       ? [{ value: connected.repoFullName, label: `${connected.repoFullName} (connected)` }]
       : [];
 
-    // No token AND no connected repo → free-text input
-    if (!token && connOption.length === 0) {
+    // No linked GitHub account and no connected repo → free-text input
+    if (!isConnected && connOption.length === 0) {
       setRepoInputMode('text');
       setRepoOptions([]);
       setLoadingRepos(false);
       return;
     }
 
-    // No token but has connected repo → single-option select
-    if (!token) {
+    // No linked GitHub account but has connected repo → single-option select
+    if (!isConnected) {
       setRepoOptions(connOption);
       setRepoInputMode('select');
       setLoadingRepos(false);
       return;
     }
 
-    // Has token → fetch the user's repos from GitHub
+    // Has a linked account → fetch the user's repos through the backend
     let cancelled = false;
     setLoadingRepos(true);
 

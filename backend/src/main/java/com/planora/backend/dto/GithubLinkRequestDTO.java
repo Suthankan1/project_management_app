@@ -14,10 +14,6 @@ public class GithubLinkRequestDTO {
     @Size(max = 255, message = "Repository full name must be 255 characters or fewer")
     private String repositoryFullName;
 
-    @NotBlank(message = "Access token is required")
-    @Size(max = 255, message = "Access token must be 255 characters or fewer")
-    private String accessToken;
-
     @Pattern(regexp = "^(PERSONAL_ACCESS_TOKEN|OAUTH)$", message = "Token type must be PERSONAL_ACCESS_TOKEN or OAUTH")
     private String tokenType = "PERSONAL_ACCESS_TOKEN";
 }

@@ -1,4 +1,5 @@
 import { tasksApi, kanbanApi, projectsApi, labelsApi } from '@/services/api-contract';
+import { normalizeTaskPriority } from '@/services/tasks-contract';
 import { Task, Label, KanbanColumnConfig } from './types';
 
 export type TaskResponseDTO = Task;
@@ -207,11 +208,11 @@ export async function createTask(taskData: Partial<Task> & { projectId: number; 
       title: taskData.title.trim(),
       description: taskData.description || '',
       status: taskData.status,
-      priority: taskData.priority || 'MEDIUM',
+      priority: normalizeTaskPriority(taskData.priority),
       projectId: taskData.projectId,
       dueDate: taskData.dueDate || null,
       startDate: taskData.startDate || null,
-      assigneeId: taskData.assigneeId ? Number(taskData.assigneeId) : null,
+      assigneeId: taskData.assigneeId ? Number(taskData.assigneeId) : undefined,
     };
 
     if (process.env.NODE_ENV === 'development') console.log('Creating task with data:', requestData);

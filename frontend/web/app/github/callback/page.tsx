@@ -44,7 +44,7 @@ export default function GitHubCallbackPage() {
     };
 
     void exchangeToken();
-  }, [searchParams, router, state]);
+  }, [searchParams, router]);
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4">

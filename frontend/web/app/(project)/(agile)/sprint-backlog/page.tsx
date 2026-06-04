@@ -21,6 +21,7 @@ import { useTaskStore } from '@/stores/task-store';
 import { buildSessionCacheKey, getSessionCache, setSessionCache, removeSessionCache } from '@/lib/session-cache';
 import { motion, AnimatePresence } from 'framer-motion';
 import { projectsApi, sprintboardsApi, sprintsApi, tasksApi } from '@/services/api-contract';
+import { normalizeTaskPriority } from '@/services/tasks-contract';
 
 const LABEL_PALETTE = ["#EF4444","#F97316","#F59E0B","#84CC16","#22C55E","#14B8A6","#06B6D4","#3B82F6","#6366F1","#8B5CF6","#EC4899","#6B7280"];
 
@@ -328,7 +329,7 @@ export default function SprintBacklogPage() {
         projectId: Number(projectId),
         title: trimmed,
         storyPoint: data.storyPoint ?? 0,
-        priority: data.priority ?? 'MEDIUM',
+        priority: normalizeTaskPriority(data.priority),
         assigneeId: data.assigneeId,
         labelIds: data.labelIds,
       });
@@ -785,7 +786,10 @@ export default function SprintBacklogPage() {
   useEffect(() => {
     if (!showVelocity || !projectId) return;
     sprintsApi.getVelocity(projectId)
-      .then((data) => setVelocityData(data))
+      .then((data) => setVelocityData(data.map((point, index) => ({
+        sprintId: index + 1,
+        ...point,
+      }))))
       .catch(() => setVelocityData([]));
   }, [showVelocity, projectId]);
 

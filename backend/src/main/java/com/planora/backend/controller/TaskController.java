@@ -90,8 +90,9 @@ public class TaskController {
      * Fetches a single task and silently logs that the user viewed it
      * (used to populate their "Recently Viewed" dashboard).
      *
-     * Optional GitHub enrichment: supply both X-GitHub-Token header and
-     * repoFullName query param (e.g. "owner/repo") to populate the
+     * Optional GitHub enrichment: supply repoFullName query param
+     * (e.g. "owner/repo") while authenticated with a connected GitHub account
+     * to populate the
      * githubPrCount, ciStatus, linkedPrs, and recentCommits response fields.
      * Omitting either parameter returns the task with null GitHub fields —
      * fully backward-compatible with existing API consumers.

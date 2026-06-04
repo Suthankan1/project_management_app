@@ -166,13 +166,12 @@ export async function fetchIssues(
   }));
 }
 
-export async function fetchGitHubUser(token?: string): Promise<GitHubUser> {
+export async function fetchGitHubUser(): Promise<GitHubUser> {
   const { data } = await api.get<GitHubUser>('/api/github/user');
   return data;
 }
 
 export async function fetchPullRequests(
-  token: string | null | undefined,
   owner: string,
   repo: string,
 ): Promise<GitHubPullRequest[]> {
@@ -183,7 +182,6 @@ export async function fetchPullRequests(
 }
 
 export async function fetchPullRequest(
-  token: string | null | undefined,
   owner: string,
   repo: string,
   prNumber: number,
@@ -195,7 +193,6 @@ export async function fetchPullRequest(
 }
 
 export async function fetchCommits(
-  token: string | null | undefined,
   owner: string,
   repo: string,
 ): Promise<GitHubCommit[]> {
@@ -205,30 +202,22 @@ export async function fetchCommits(
   return data;
 }
 
-// ── GitHub token (stored per browser session) ────────────────────────────────
+// ── GitHub account connection status ────────────────────────────────────────
 
-export function getGitHubToken(): string | null {
-  if (typeof window === 'undefined') return null;
+export function hasConnectedGitHubAccount(): boolean {
+  if (typeof window === 'undefined') return false;
   const profile = localStorage.getItem('userProfile');
   if (profile) {
     try {
       const parsed = JSON.parse(profile);
       if (parsed && parsed.githubUsername) {
-        return 'connected';
+        return true;
       }
     } catch {
       // ignore
     }
   }
-  return null;
-}
-
-export function setGitHubToken(token: string): void {
-  // NO-OP to remove localStorage usage
-}
-
-export function clearGitHubToken(): void {
-  // NO-OP to remove localStorage usage
+  return false;
 }
 
 // ── Per-project GitHub repo connection ───────────────────────────────────────

@@ -14,6 +14,7 @@ import { addDays, addMonths, formatMonthLabel, formatWeekLabel } from './utils/d
 import CreateTaskModal, { type CreateTaskData } from '@/components/shared/CreateTaskModal';
 import { patchTaskDates } from './api';
 import { tasksApi } from '@/services/api-contract';
+import { normalizeTaskPriority } from '@/services/tasks-contract';
 
 const DEFAULT_FILTERS: CalendarFilters = {
   search: '',
@@ -206,7 +207,7 @@ export default function CalendarPage() {
     await tasksApi.create({
       projectId: parseInt(projectId, 10),
       title: data.title,
-      priority: data.priority,
+      priority: normalizeTaskPriority(data.priority),
       storyPoint: data.storyPoint,
       assigneeId: data.assigneeId,
       labelIds: data.labelIds,
