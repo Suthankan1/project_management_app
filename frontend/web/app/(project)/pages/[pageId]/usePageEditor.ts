@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { usePageContent } from './hooks/usePageContent';
 import TurndownService from 'turndown';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 export function usePageEditor() {
   const router = useRouter();
@@ -29,6 +30,7 @@ export function usePageEditor() {
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle' | 'draft'>(
     () => (pageId === 'new' ? 'draft' : 'idle'),
   );
+  const [localError, setLocalError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showDocSidebar, setShowDocSidebar] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -126,14 +128,45 @@ export function usePageEditor() {
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedPage) return;
+
+    setLocalError(null);
+
+    // Enforce max file size: 1MB
+    const MAX_FILE_SIZE = 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      setLocalError('File size exceeds the 1MB limit.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const isMd = file.name.endsWith('.md');
+    const isHtml = file.name.endsWith('.html') || file.name.endsWith('.htm');
+
+    if (!isMd && !isHtml) {
+      setLocalError('Invalid file type. Only Markdown (.md) and HTML (.html) files are allowed.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = async (event) => {
-      const text = event.target?.result as string;
-      let htmlContent = text;
-      if (file.name.endsWith('.md')) {
-        htmlContent = await marked.parse(text);
+      try {
+        const text = event.target?.result as string;
+        let htmlContent = text;
+        if (isMd) {
+          const rawHtml = await marked.parse(text);
+          htmlContent = typeof window !== 'undefined' ? DOMPurify.sanitize(rawHtml) : rawHtml;
+        } else if (isHtml) {
+          htmlContent = typeof window !== 'undefined' ? DOMPurify.sanitize(text) : text;
+        }
+        handleUpdateContent(htmlContent);
+      } catch (err) {
+        console.error('Error parsing file:', err);
+        setLocalError('Failed to parse imported file.');
       }
-      handleUpdateContent(htmlContent);
+    };
+    reader.onerror = () => {
+      setLocalError('Failed to read file.');
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -167,7 +200,7 @@ export function usePageEditor() {
     showDocSidebar, setShowDocSidebar,
     fileInputRef,
     filteredPages,
-    error,
+    error: error || localError,
     searchQuery, setSearchQuery,
     handleUpdateContent,
     setLatestContent,

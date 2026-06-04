@@ -25,8 +25,41 @@ import {
 import { Collaboration } from '@tiptap/extension-collaboration';
 import * as Y from 'yjs';
 import SlashCommand, { slashSuggestion } from './slashCommand';
+import { Modal } from '@/components/ui/Modal';
 
 interface CollaborationUser { name: string; color: string; }
+
+export function validateUrl(url: string): boolean {
+  const trimmed = url.trim();
+  if (!trimmed) return true;
+
+  // Remove all spaces and control characters to check for bad schemes
+  const normalized = trimmed.replace(/[\s\u0000-\u001F]/g, '');
+  if (/^(javascript|data|vbscript|file|ftp):/i.test(normalized)) {
+    return false;
+  }
+
+  if (trimmed.startsWith('//')) {
+    return false;
+  }
+
+  try {
+    const base = 'http://relative-base.internal';
+    const parsed = new URL(trimmed, base);
+
+    if (parsed.origin === base) {
+      return true;
+    }
+
+    return (
+      parsed.protocol === 'http:' ||
+      parsed.protocol === 'https:' ||
+      parsed.protocol === 'mailto:'
+    );
+  } catch (e) {
+    return false;
+  }
+}
 
 interface EditorProps {
   content: string;
@@ -67,6 +100,9 @@ function Divider() {
 
 export default function Editor({ content, onUpdate, onImmediateUpdate, editable = true, ydoc, collaborationUser: _collaborationUser }: EditorProps) {
   const [isMounted, setIsMounted] = useState(false);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [urlValidationError, setUrlValidationError] = useState<string | null>(null);
 
   // 800ms debounce avoids a save API call on every keystroke while still feeling responsive
   const handleUpdate = useMemo(
@@ -145,14 +181,28 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
   }
 
   const toggleLink = () => {
-    const previousUrl = editor.getAttributes('link').href;
-    const url = window.prompt('Enter URL:', previousUrl);
-    if (url === null) return;
-    if (url === '') {
+    const previousUrl = editor.getAttributes('link').href || '';
+    setLinkUrl(previousUrl);
+    setUrlValidationError(null);
+    setIsLinkModalOpen(true);
+  };
+
+  const handleLinkSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedUrl = linkUrl.trim();
+    if (trimmedUrl === '') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      setIsLinkModalOpen(false);
       return;
     }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+
+    if (!validateUrl(trimmedUrl)) {
+      setUrlValidationError('Invalid URL. Only http, https, mailto, and relative app-safe URLs are allowed.');
+      return;
+    }
+
+    editor.chain().focus().extendMarkRange('link').setLink({ href: trimmedUrl }).run();
+    setIsLinkModalOpen(false);
   };
 
   return (
@@ -305,6 +355,52 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
           <EditorContent editor={editor} />
         </div>
       </div>
+
+      <Modal
+        open={isLinkModalOpen}
+        onOpenChange={setIsLinkModalOpen}
+        title="Insert / Edit Link"
+        description="Enter a URL for this link. Only safe protocols (http, https, mailto) and relative app-safe URLs are allowed."
+        size="md"
+      >
+        <form onSubmit={handleLinkSubmit} className="space-y-4 mt-2">
+          <div>
+            <label htmlFor="link-url-input" className="block text-sm font-medium text-cu-text-secondary mb-1">
+              URL
+            </label>
+            <input
+              id="link-url-input"
+              type="text"
+              value={linkUrl}
+              onChange={(e) => {
+                setLinkUrl(e.target.value);
+                if (urlValidationError) setUrlValidationError(null);
+              }}
+              placeholder="https://example.com or /dashboard"
+              className="w-full px-3 py-2 border border-cu-border rounded-cu-md bg-cu-bg text-cu-text-primary focus:outline-none focus:ring-2 focus:ring-cu-primary/20 text-sm"
+              autoFocus
+            />
+            {urlValidationError && (
+              <p className="mt-1.5 text-xs text-red-500 font-medium" role="alert">{urlValidationError}</p>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsLinkModalOpen(false)}
+              className="px-4 py-2 text-xs font-medium text-cu-text-primary bg-cu-bg-secondary hover:bg-cu-bg-tertiary rounded-cu-md transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-xs font-medium text-white bg-cu-primary hover:bg-cu-primary-dark rounded-cu-md transition-colors"
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
