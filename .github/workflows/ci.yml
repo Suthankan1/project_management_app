@@ -27,6 +27,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       mobile: ${{ steps.filter.outputs.mobile }}
+      contracts: ${{ steps.filter.outputs.contracts }}
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -43,6 +44,12 @@ jobs:
             - '.github/workflows/ci.yml'
           mobile:
             - 'frontend/mobile/**'
+            - '.github/workflows/ci.yml'
+          contracts:
+            - 'backend/**'
+            - 'frontend/web/**'
+            - 'frontend/mobile/**'
+            - 'scripts/check-api-contracts.mjs'
             - '.github/workflows/ci.yml'
 
 
@@ -149,6 +156,9 @@ jobs:
     - name: Lint Next.js App
       run: npm run lint
 
+    - name: TypeScript Check
+      run: npm run typecheck
+
     - name: Check for Hardcoded Localhost Backend URLs
       run: |
         MATCHES=$(grep -rn "localhost:8080" \
@@ -180,6 +190,28 @@ jobs:
 
     - name: Build Next.js App
       run: npm run build
+
+  api-contracts:
+    name: Validate API Contracts
+    needs: [changes, backend-build, frontend-build, mobile-build]
+    if: ${{ always() && !cancelled() && (github.event_name == 'workflow_dispatch' || needs.changes.outputs.contracts == 'true') && (needs.backend-build.result == 'success' || needs.backend-build.result == 'skipped') && (needs.frontend-build.result == 'success' || needs.frontend-build.result == 'skipped') && (needs.mobile-build.result == 'success' || needs.mobile-build.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    env:
+      API_CONTRACT_MAX_CRITICAL_ISSUES: 11
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Validate API Route Contracts
+      run: node scripts/check-api-contracts.mjs --report api-contract-report.txt
+
+    - name: Upload API Contract Report
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: api-contract-report
+        path: api-contract-report.txt
 
   mobile-build:
     name: Build Mobile

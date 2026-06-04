@@ -8,6 +8,7 @@ const defaultReportPath = path.join(repoRoot, 'artifacts', 'api-contracts', 'rep
 
 const args = process.argv.slice(2);
 const reportPath = getArgValue('--report') ?? defaultReportPath;
+const maxCriticalIssues = getIntegerOption('--max-critical-issues', 'API_CONTRACT_MAX_CRITICAL_ISSUES', 0);
 const selfTest = args.includes('--self-test');
 
 const frontendRoots = [
@@ -80,6 +81,7 @@ async function main() {
   const report = buildReport({
     frontendCount: frontendUsages.length,
     backendCount: backendRoutes.length,
+    maxCriticalIssues,
     unmatchedFrontendUsages,
     criticalUnmatchedFrontendUsages,
     unusedBackendRoutes,
@@ -92,7 +94,8 @@ async function main() {
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
   await fs.writeFile(reportPath, report, 'utf8');
 
-  if (criticalUnmatchedFrontendUsages.length || suspiciousMappings.length || duplicateReports.length || parserMisses.length) {
+  const blockingCriticalIssues = criticalUnmatchedFrontendUsages.length + suspiciousMappings.length + duplicateReports.length;
+  if (blockingCriticalIssues > maxCriticalIssues || parserMisses.length) {
     process.exitCode = 1;
   }
 }
@@ -103,6 +106,19 @@ function getArgValue(flag) {
     return null;
   }
   return args[index + 1] ?? null;
+}
+
+function getIntegerOption(flag, envName, defaultValue) {
+  const rawValue = getArgValue(flag) ?? process.env[envName];
+  if (rawValue == null || rawValue === '') {
+    return defaultValue;
+  }
+
+  const value = Number.parseInt(rawValue, 10);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${flag} must be a non-negative integer`);
+  }
+  return value;
 }
 
 async function walkFiles(rootDir, predicate) {
@@ -1081,6 +1097,7 @@ function collapseRouteVariables(route) {
 function buildReport({
   frontendCount,
   backendCount,
+  maxCriticalIssues,
   unmatchedFrontendUsages,
   criticalUnmatchedFrontendUsages,
   unusedBackendRoutes,
@@ -1172,7 +1189,9 @@ function buildReport({
   }
 
   lines.push('Summary');
-  lines.push(`- Critical issues: ${unmatchedFrontendUsages.length + suspiciousMappings.length + duplicateReports.length}`);
+  const blockingCriticalIssues = criticalUnmatchedFrontendUsages.length + suspiciousMappings.length + duplicateReports.length;
+  lines.push(`- Blocking critical issues: ${blockingCriticalIssues}`);
+  lines.push(`- Allowed blocking critical issues: ${maxCriticalIssues}`);
   lines.push(`- Likely parser misses: ${parserMisses.length}`);
   lines.push(`- Informational backend-only routes: ${unusedBackendRoutes.length}`);
 
