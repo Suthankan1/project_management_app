@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -87,6 +88,24 @@ public class TaskService {
     private final MilestoneRepository milestoneRepository;
 
     private final UserService userService;
+
+    public static final List<String> ALLOWED_SORT_FIELDS = List.of(
+            "createdAt",
+            "updatedAt",
+            "dueDate",
+            "priority",
+            "status",
+            "title",
+            "projectTaskNumber"
+    );
+
+    public static boolean isAllowedTaskSortField(String sortBy) {
+        return sortBy != null && ALLOWED_SORT_FIELDS.contains(sortBy);
+    }
+
+    public static boolean isAllowedTaskSortDirection(String sortDir) {
+        return sortDir != null && ("asc".equalsIgnoreCase(sortDir) || "desc".equalsIgnoreCase(sortDir));
+    }
 
     private final TeamMembershipLookupService teamMembershipLookupService;
 
@@ -522,6 +541,8 @@ public class TaskService {
     // ── 5. GET TASKS BY PROJECT (Highly Optimized Fetch) ────────────────────────
     @Transactional(readOnly = true)
     public Page<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId, Pageable pageable) {
+        validateTaskSort(pageable.getSort());
+
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
         requireMinimumRole(project.getTeam().getId(), currentUserId, null);
@@ -538,6 +559,16 @@ public class TaskService {
                 .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
 
         return taskPage.map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap));
+    }
+
+    private void validateTaskSort(Sort sort) {
+        for (Sort.Order order : sort) {
+            String property = order.getProperty();
+            if (!isAllowedTaskSortField(property)) {
+                throw new IllegalArgumentException(
+                        "Invalid task sort field '" + property + "'. Allowed values: " + String.join(", ", ALLOWED_SORT_FIELDS));
+            }
+        }
     }
 
     @Transactional(readOnly = true)

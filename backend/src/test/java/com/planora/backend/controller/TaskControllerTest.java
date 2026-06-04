@@ -107,6 +107,29 @@ class TaskControllerTest {
 
     @Test
     @WithMockUserPrincipal
+    void getTasksByProject_invalidSortByReturnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/tasks/project/10").param("sortBy", "project.team.owner.passwordHash"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Invalid sortBy")))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Allowed values")));
+
+        verify(service, never()).getTasksByProject(anyLong(), any(), any(Pageable.class));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void getTasksByProject_invalidSortDirReturnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/tasks/project/10").param("sortDir", "sideways"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("Invalid sortDir 'sideways'. Allowed values: asc, desc"));
+
+        verify(service, never()).getTasksByProject(anyLong(), any(), any(Pageable.class));
+    }
+
+    @Test
+    @WithMockUserPrincipal
     void getAllTasksByProject_returnsListOfTasks() throws Exception {
         when(service.getTasksByProject(eq(10L), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of(sampleTask));

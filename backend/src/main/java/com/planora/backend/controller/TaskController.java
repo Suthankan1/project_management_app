@@ -2,6 +2,7 @@ package com.planora.backend.controller;
 
 import com.planora.backend.dto.BulkDeleteTasksRequest;
 import com.planora.backend.dto.BulkUpdateStatusRequest;
+import com.planora.backend.dto.ApiErrorResponse;
 import com.planora.backend.dto.CommentRequestDTO;
 import com.planora.backend.dto.LinkedCommitResponseDTO;
 import com.planora.backend.dto.LinkedPrResponseDTO;
@@ -27,6 +28,7 @@ import com.planora.backend.service.GithubIssuesSyncService;
 import com.planora.backend.service.GithubNotificationService;
 import com.planora.backend.dto.GithubIssueCreateRequestDTO;
 import com.planora.backend.dto.GithubIssueDTO;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.groups.Default;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +47,7 @@ import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
 
 import lombok.RequiredArgsConstructor;
 
@@ -308,18 +311,39 @@ public class TaskController {
      * Supports multiple optional filters via query parameters.
      */
     @GetMapping("/project/{projectId}")
-    public ResponseEntity<Page<TaskResponseDTO>> getTasksByProject(
+    public ResponseEntity<?> getTasksByProject(
             @PathVariable Long projectId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir,
+            HttpServletRequest servletRequest,
             @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (!TaskService.isAllowedTaskSortField(sortBy)) {
+            return badTaskSortRequest(
+                    "Invalid sortBy '" + sortBy + "'. Allowed values: " + String.join(", ", TaskService.ALLOWED_SORT_FIELDS),
+                    servletRequest);
+        }
+        if (!TaskService.isAllowedTaskSortDirection(sortDir)) {
+            return badTaskSortRequest("Invalid sortDir '" + sortDir + "'. Allowed values: asc, desc", servletRequest);
+        }
         Pageable pageable = PageRequest.of(page, size,
                 sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() :
                         Sort.by(sortBy).descending());
         return ResponseEntity.ok(service.getTasksByProject(projectId,
                 currentUser.getUserId(), pageable));
+    }
+
+    private ResponseEntity<ApiErrorResponse> badTaskSortRequest(String message, HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                LocalDateTime.now().toString(),
+                HttpStatus.BAD_REQUEST.value(),
+                "BAD_REQUEST",
+                message,
+                request.getRequestURI(),
+                null
+        );
+        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
 
     @GetMapping("/project/{projectId}/all")

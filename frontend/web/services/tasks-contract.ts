@@ -22,6 +22,25 @@ export interface AssignedTaskQueryParams {
   limit?: number;
 }
 
+export type TaskSortField = 'createdAt' | 'updatedAt' | 'dueDate' | 'priority' | 'status' | 'title' | 'projectTaskNumber';
+export type TaskSortDirection = 'asc' | 'desc';
+
+export interface TaskListQueryParams {
+  page?: number;
+  size?: number;
+  sortBy?: TaskSortField;
+  sortDir?: TaskSortDirection;
+}
+
+export interface TaskListAllQueryParams {
+  status?: string;
+  assigneeId?: number;
+  priority?: TaskPriorityValue | string;
+  sprintId?: number;
+  milestoneId?: number;
+  archived?: boolean;
+}
+
 // ── Strongly-typed request DTOs (mirrors backend patch DTOs) ────────────────
 
 /** PATCH /api/tasks/{taskId}/assignees */
@@ -241,11 +260,11 @@ export interface SprintVelocityPoint {
 }
 
 export const tasksApi = {
-  listByProject: async (projectId: number | string, params?: Record<string, unknown>): Promise<PageResponse<Task>> => {
+  listByProject: async (projectId: number | string, params?: TaskListQueryParams): Promise<PageResponse<Task>> => {
     const { data } = await api.get(`/api/tasks/project/${projectId}`, { params });
     return data;
   },
-  listAllByProject: async (projectId: number | string, params?: Record<string, unknown>): Promise<Task[]> => {
+  listAllByProject: async (projectId: number | string, params?: TaskListAllQueryParams): Promise<Task[]> => {
     const { data } = await api.get(`/api/tasks/project/${projectId}/all`, { params });
     return data;
   },

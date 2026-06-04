@@ -68,6 +68,25 @@ export interface ReorderTasksRequest {
   orderedTaskIds: number[];
 }
 
+export type TaskSortField = 'createdAt' | 'updatedAt' | 'dueDate' | 'priority' | 'status' | 'title' | 'projectTaskNumber';
+export type TaskSortDirection = 'asc' | 'desc';
+
+export interface TaskListQueryParams {
+  page?: number;
+  size?: number;
+  sortBy?: TaskSortField;
+  sortDir?: TaskSortDirection;
+}
+
+export interface TaskListAllQueryParams {
+  status?: string;
+  assigneeId?: number;
+  priority?: string;
+  sprintId?: number;
+  milestoneId?: number;
+  archived?: boolean;
+}
+
 export interface SprintStartRequest {
   startDate: string;
   endDate: string;
@@ -80,10 +99,10 @@ export interface SprintVelocityPoint {
 }
 
 export const taskService = {
-  listByProject: (projectId: number | string, params?: Record<string, unknown>): Promise<any> =>
+  listByProject: (projectId: number | string, params?: TaskListQueryParams): Promise<any> =>
     api.get(`/api/tasks/project/${projectId}`, { params }).then(r => r.data),
 
-  listAllByProject: (projectId: number | string, params?: Record<string, unknown>): Promise<any[]> =>
+  listAllByProject: (projectId: number | string, params?: TaskListAllQueryParams): Promise<any[]> =>
     api.get(`/api/tasks/project/${projectId}/all`, { params }).then(r => r.data),
 
   get: (taskId: number | string): Promise<any> =>

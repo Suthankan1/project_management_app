@@ -1,5 +1,6 @@
 import { tasksApi, kanbanApi, projectsApi, labelsApi } from '@/services/api-contract';
 import { normalizeTaskPriority } from '@/services/tasks-contract';
+import type { TaskListQueryParams, TaskListAllQueryParams } from '@/services/tasks-contract';
 import { Task, Label, KanbanColumnConfig } from './types';
 
 export type TaskResponseDTO = Task;
@@ -26,16 +27,10 @@ export async function fetchTasksByProject(
   filters?: { milestoneId?: number | null; archived?: boolean }
 ): Promise<Task[]> {
   try {
-    const params: Record<string, unknown> = {
+    const params: TaskListQueryParams = {
       page: 0,
       size: 500,
     };
-    if (filters?.milestoneId != null) {
-      params.milestoneId = filters.milestoneId;
-    }
-    if (filters?.archived !== undefined) {
-      params.archived = filters.archived;
-    }
     const response = await tasksApi.listByProject(projectId, params);
     return response.content || [];
   } catch (error) {
@@ -54,7 +49,7 @@ export async function fetchAllTasksByProject(
   filters?: { milestoneId?: number | null; archived?: boolean }
 ): Promise<Task[]> {
   try {
-    const params: Record<string, unknown> = {};
+    const params: TaskListAllQueryParams = {};
     if (filters?.milestoneId != null) {
       params.milestoneId = filters.milestoneId;
     }

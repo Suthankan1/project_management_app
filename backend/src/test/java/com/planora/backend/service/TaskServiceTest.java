@@ -38,6 +38,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -280,6 +281,29 @@ class TaskServiceTest {
         assertEquals(34L, result.getContent().getFirst().getGithubIssueNumber());
         assertEquals("planora/app", result.getContent().getFirst().getGithubRepoFullName());
         verify(taskRepository, times(1)).findDependencyRowsByTaskIds(List.of(71L, 72L));
+    }
+
+    @Test
+    void getTasksByProject_paginated_invalidSortByThrowsBeforeRepositoryLookup() {
+        PageRequest pageable = PageRequest.of(0, 10, Sort.by("project.team.owner.passwordHash").ascending());
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> taskService.getTasksByProject(10L, 500L, pageable));
+
+        assertEquals(
+                "Invalid task sort field 'project.team.owner.passwordHash'. Allowed values: createdAt, updatedAt, dueDate, priority, status, title, projectTaskNumber",
+                exception.getMessage());
+        verify(projectRepository, never()).findById(anyLong());
+        verify(taskRepository, never()).findByProjectIdAndArchivedFalse(anyLong(), any(Pageable.class));
+    }
+
+    @Test
+    void taskSortDirectionValidationAcceptsOnlyAscOrDesc() {
+        assertEquals(true, TaskService.isAllowedTaskSortDirection("asc"));
+        assertEquals(true, TaskService.isAllowedTaskSortDirection("DESC"));
+        assertEquals(false, TaskService.isAllowedTaskSortDirection("sideways"));
+        assertEquals(false, TaskService.isAllowedTaskSortDirection(null));
     }
 
     @Test
