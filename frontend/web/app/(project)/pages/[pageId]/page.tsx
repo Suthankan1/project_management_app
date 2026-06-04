@@ -18,7 +18,7 @@ export default function PageDetailPage() {
   const router = useRouter();
   const {
     pageId, isDraft, projectId, selectedPage, loadingPage, saveStatus,
-    title, setTitle, showHistory, setShowHistory, historyMock,
+    title, setTitle, showHistory, setShowHistory, versions, handleRestoreVersion,
     showDocSidebar, setShowDocSidebar, fileInputRef,
     filteredPages, error, searchQuery, setSearchQuery,
     handleUpdateContent, setLatestContent, handleManualCreate, handleDeletePage,
@@ -287,24 +287,43 @@ export default function PageDetailPage() {
                     </button>
                   </div>
                   <div className="flex-1 overflow-y-auto p-4">
-                    <div className="space-y-5">
-                      {historyMock.map((history) => (
-                        <div key={history.id} className="relative pl-5 border-l-2 border-gray-200 py-0.5">
-                          <div className="absolute -left-[7px] top-1.5 h-3 w-3 rounded-full bg-white dark:bg-cu-bg border-2 border-blue-500 dark:border-cu-primary" />
-                          <p className="text-sm font-medium text-gray-900 mb-0.5 flex items-center gap-1.5 flex-wrap">
-                            {history.editedBy}
-                            <span className="text-xs font-normal px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                              {history.action}
-                            </span>
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {new Date(history.editedAt).toLocaleString(undefined, {
-                              month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-                            })}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
+                    {versions.length === 0 ? (
+                      <div className="text-center text-gray-400 py-8 text-sm">
+                        No version history available.
+                      </div>
+                    ) : (
+                      <div className="space-y-5">
+                        {versions.map((v) => (
+                          <div key={v.id} className="relative pl-5 border-l-2 border-gray-200 py-0.5">
+                            <div className="absolute -left-[7px] top-1.5 h-3 w-3 rounded-full bg-white dark:bg-cu-bg border-2 border-blue-500 dark:border-cu-primary" />
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-gray-900 mb-0.5">
+                                  Version {v.versionNumber}
+                                </p>
+                                <p className="text-xs text-gray-500 mb-0.5 truncate">
+                                  Edited by <span className="font-medium">{v.authorName}</span>
+                                </p>
+                                <p className="text-[11px] text-gray-400">
+                                  {new Date(v.createdAt).toLocaleString(undefined, {
+                                    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                                  })}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => handleRestoreVersion(v.id)}
+                                className="text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 font-medium px-2 py-1 rounded transition-colors flex-shrink-0"
+                              >
+                                Restore
+                              </button>
+                            </div>
+                            <p className="text-xs text-gray-500 italic mt-1.5 bg-white px-2 py-1 rounded border border-gray-150 truncate" title={v.title}>
+                              &ldquo;{v.title}&rdquo;
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="p-3 bg-white border-t border-gray-100 text-xs text-gray-400 text-center">
                     Tracking edits in real time

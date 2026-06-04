@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { usePageContent } from './hooks/usePageContent';
+import { pagesApi } from '@/services/api-contract';
 import TurndownService from 'turndown';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -20,7 +21,7 @@ export function usePageEditor() {
     selectedPage, setSelectedPage,
     title, setTitle,
     loadingPage,
-    historyMock, setHistoryMock,
+    versions, setVersions,
     isDraft,
     filteredPages, error, searchQuery, setSearchQuery,
     updatePage, createPage, deletePage, refetch,
@@ -54,18 +55,14 @@ export function usePageEditor() {
       await updatePage(selectedPage.id, title, htmlContent);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
-      setHistoryMock(prev => [{
-        id: Math.random().toString(),
-        pageId: selectedPage.id,
-        action: 'edited',
-        editedBy: 'You',
-        editedAt: new Date().toISOString(),
-      }, ...prev.slice(0, 9)]);
+      
+      const versionsData = await pagesApi.getVersions(projectId, selectedPage.id);
+      setVersions(versionsData);
     } catch (err) {
       console.error('Error auto-saving:', err);
       setSaveStatus('error');
     }
-  }, [selectedPage, title, projectId, updatePage, isDraft, setSelectedPage, setHistoryMock]);
+  }, [selectedPage, title, projectId, updatePage, isDraft, setSelectedPage, setVersions]);
 
   // Debounced title save
   useEffect(() => {
@@ -80,6 +77,9 @@ export function usePageEditor() {
         refetch();
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
+
+        const versionsData = await pagesApi.getVersions(projectId, selectedPage.id);
+        setVersions(versionsData);
       } catch (err) {
         console.error('Error auto-saving title:', err);
         setSaveStatus('error');
@@ -87,7 +87,7 @@ export function usePageEditor() {
     }, 1000);
 
     return () => clearTimeout(timeoutId);
-  }, [title, selectedPage, projectId, updatePage, refetch, isDraft, setSelectedPage]);
+  }, [title, selectedPage, projectId, updatePage, refetch, isDraft, setSelectedPage, setVersions]);
 
   const handleManualCreate = async () => {
     if (!selectedPage || !projectId) return;
@@ -188,6 +188,31 @@ export function usePageEditor() {
     URL.revokeObjectURL(url);
   };
 
+  const handleRestoreVersion = async (versionId: string | number) => {
+    if (!selectedPage || !projectId) return;
+    setSaveStatus('saving');
+    try {
+      const restoredPage = await pagesApi.restoreVersion(projectId, selectedPage.id, versionId);
+      setSelectedPage({
+        id: restoredPage.id,
+        title: restoredPage.title,
+        content: restoredPage.content || '',
+        updatedAt: restoredPage.updatedAt,
+        isStarred: restoredPage.isStarred || false,
+      });
+      setTitle(restoredPage.title);
+
+      const versionsData = await pagesApi.getVersions(projectId, selectedPage.id);
+      setVersions(versionsData);
+
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (err) {
+      console.error('Error restoring version:', err);
+      setSaveStatus('error');
+    }
+  };
+
   return {
     pageId,
     isDraft,
@@ -197,7 +222,8 @@ export function usePageEditor() {
     saveStatus,
     title, setTitle,
     showHistory, setShowHistory,
-    historyMock,
+    versions,
+    handleRestoreVersion,
     showDocSidebar, setShowDocSidebar,
     fileInputRef,
     filteredPages,

@@ -4,6 +4,7 @@ import com.planora.backend.dto.MovePageRequestDto;
 import com.planora.backend.dto.PageDetailResponseDto;
 import com.planora.backend.dto.PageRequestDto;
 import com.planora.backend.dto.PageSummaryResponseDto;
+import com.planora.backend.dto.PageVersionResponseDto;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.service.ProjectPageService;
 import jakarta.validation.Valid;
@@ -117,6 +118,29 @@ public class ProjectPageController {
             @PathVariable Long projectId,
             @AuthenticationPrincipal UserPrincipal principal) {
         return new ResponseEntity<>(service.getRecentPages(projectId, principal.getUserId()), HttpStatus.OK);
+    }
+
+    @GetMapping("/projects/{projectId}/pages/{pageId}/versions")
+    public ResponseEntity<List<PageVersionResponseDto>> getPageVersions(
+            @PathVariable Long projectId,
+            @PathVariable Long pageId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(
+                service.getPageVersions(projectId, pageId, principal.getUserId()),
+                HttpStatus.OK
+        );
+    }
+
+    @PostMapping("/projects/{projectId}/pages/{pageId}/versions/{versionId}/restore")
+    public ResponseEntity<PageDetailResponseDto> restorePageVersion(
+            @PathVariable Long projectId,
+            @PathVariable Long pageId,
+            @PathVariable Long versionId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(
+                service.restorePageVersion(projectId, pageId, versionId, principal.getUserId()),
+                HttpStatus.OK
+        );
     }
 
 }

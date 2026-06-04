@@ -7,6 +7,7 @@ import com.planora.backend.dto.MovePageRequestDto;
 import com.planora.backend.dto.PageDetailResponseDto;
 import com.planora.backend.dto.PageRequestDto;
 import com.planora.backend.dto.PageSummaryResponseDto;
+import com.planora.backend.dto.PageVersionResponseDto;
 import com.planora.backend.service.JWTService;
 import com.planora.backend.service.ProjectPageService;
 import org.junit.jupiter.api.BeforeEach;
@@ -184,5 +185,37 @@ class ProjectPageControllerTest {
                         .content(objectMapper.writeValueAsString(invalidReq)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void getPageVersions_returnsPageVersionResponseList() throws Exception {
+        PageVersionResponseDto version = PageVersionResponseDto.builder()
+                .id(100L)
+                .pageId(1L)
+                .title("Version Title")
+                .content("Version Content")
+                .versionNumber(1)
+                .authorName("User")
+                .build();
+
+        when(service.getPageVersions(eq(10L), eq(1L), any())).thenReturn(List.of(version));
+
+        mockMvc.perform(get("/api/projects/10/pages/1/versions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(100))
+                .andExpect(jsonPath("$[0].title").value("Version Title"))
+                .andExpect(jsonPath("$[0].versionNumber").value(1));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void restorePageVersion_returnsRestoredPage() throws Exception {
+        when(service.restorePageVersion(eq(10L), eq(1L), eq(100L), any())).thenReturn(pageDetail);
+
+        mockMvc.perform(post("/api/projects/10/pages/1/versions/100/restore").with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.title").value("My First Page"));
     }
 }

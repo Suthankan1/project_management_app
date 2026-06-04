@@ -29,6 +29,18 @@ jest.mock('marked', () => ({
   },
 }));
 
+jest.mock('@/services/api-contract', () => ({
+  pagesApi: {
+    getVersions: jest.fn(async () => []),
+    restoreVersion: jest.fn(async () => ({
+      id: '1',
+      title: 'Restored Page',
+      content: '<p>Restored Content</p>',
+      isStarred: false,
+    })),
+  },
+}));
+
 const mockUsePageContent = usePageContent as jest.Mock;
 
 describe('usePageEditor Hook', () => {
@@ -45,8 +57,8 @@ describe('usePageEditor Hook', () => {
       title: 'Test Page',
       setTitle: jest.fn(),
       loadingPage: false,
-      historyMock: [],
-      setHistoryMock: jest.fn(),
+      versions: [],
+      setVersions: jest.fn(),
       isDraft: false,
       filteredPages: [],
       error: null,
@@ -152,5 +164,22 @@ describe('usePageEditor Hook', () => {
     expect(updatedState.content).toContain('<h1>Header</h1>');
     expect(updatedState.content).not.toContain('<script>');
     expect(updatedState.content).not.toContain('href="javascript:');
+  });
+
+  it('restores a version and updates state', async () => {
+    const { result } = renderHook(() => usePageEditor());
+    const { pagesApi } = require('@/services/api-contract');
+
+    await act(async () => {
+      await result.current.handleRestoreVersion('version-123');
+    });
+
+    expect(pagesApi.restoreVersion).toHaveBeenCalledWith('123', '1', 'version-123');
+    expect(mockSetSelectedPage).toHaveBeenCalledWith({
+      id: '1',
+      title: 'Restored Page',
+      content: '<p>Restored Content</p>',
+      isStarred: false,
+    });
   });
 });

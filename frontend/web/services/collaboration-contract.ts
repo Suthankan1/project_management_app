@@ -43,6 +43,17 @@ export interface PageDetailDto {
   cover?: string | null;
 }
 
+export interface PageVersionDto {
+  id: number;
+  pageId: number;
+  title: string;
+  content: string;
+  versionNumber: number;
+  authorId?: number | null;
+  authorName: string;
+  createdAt: string;
+}
+
 export interface ChatInboxActivity {
   projectId: number;
   projectName: string;
@@ -117,6 +128,14 @@ export const pagesApi = {
   },
   getRecent: async (projectId: number | string): Promise<PageSummaryDto[]> => {
     const { data } = await api.get(`/api/projects/${projectId}/pages/recent`);
+    return data;
+  },
+  getVersions: async (projectId: number | string, pageId: number | string): Promise<PageVersionDto[]> => {
+    const { data } = await api.get(`/api/projects/${projectId}/pages/${pageId}/versions`);
+    return data;
+  },
+  restoreVersion: async (projectId: number | string, pageId: number | string, versionId: number | string): Promise<PageDetailDto> => {
+    const { data } = await api.post(`/api/projects/${projectId}/pages/${pageId}/versions/${versionId}/restore`);
     return data;
   },
 };
