@@ -1,42 +1,10 @@
 import axios from 'axios';
-import { Platform } from 'react-native';
-import Constants from 'expo-constants';
 import { clearTokens, getRefreshToken, getValidToken, getUserFromToken, refreshAccessToken } from './auth';
 import { router } from 'expo-router';
-
-function resolveApiBaseUrl() {
-  const configuredUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_API_URL || '';
-
-  if (!configuredUrl || Platform.OS === 'web') {
-    return configuredUrl;
-  }
-
-  const isLocalhostUrl = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredUrl);
-
-  if (!isLocalhostUrl) {
-    return configuredUrl;
-  }
-
-  try {
-    const hostUri = Constants.expoConfig?.hostUri || Constants.manifest2?.extra?.expoGo?.debuggerHost || Constants.manifest?.debuggerHost;
-    const devHost = typeof hostUri === 'string' ? hostUri.split(':')[0] : undefined;
-
-    if (devHost && devHost !== 'localhost' && devHost !== '127.0.0.1') {
-      return configuredUrl.replace(/:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, `://${devHost}:8080`);
-    }
-
-    if (Platform.OS === 'android') {
-      return configuredUrl.replace(/:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, `://10.0.2.2:8080`);
-    }
-  } catch {
-    // Fallback to configuredUrl
-  }
-
-  return configuredUrl;
-}
+import { API_BASE_URL } from '../api/baseUrl';
 
 const api = axios.create({
-  baseURL: resolveApiBaseUrl(),
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },

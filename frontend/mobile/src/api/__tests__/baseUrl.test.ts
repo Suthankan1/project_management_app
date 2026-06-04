@@ -1,10 +1,16 @@
 async function loadResolver(options: {
-  apiUrl: string;
+  apiUrl?: string;
+  apiBaseUrl?: string;
   hostUri?: string;
   os: 'android' | 'ios' | 'web';
 }) {
   jest.resetModules();
-  process.env.EXPO_PUBLIC_API_URL = options.apiUrl;
+  if (options.apiUrl !== undefined) {
+    process.env.EXPO_PUBLIC_API_URL = options.apiUrl;
+  }
+  if (options.apiBaseUrl !== undefined) {
+    process.env.EXPO_PUBLIC_API_BASE_URL = options.apiBaseUrl;
+  }
 
   jest.doMock('react-native', () => ({
     Platform: { OS: options.os },
@@ -25,19 +31,21 @@ async function loadResolver(options: {
 describe('resolveApiBaseUrl', () => {
   afterEach(() => {
     delete process.env.EXPO_PUBLIC_API_URL;
+    delete process.env.EXPO_PUBLIC_API_BASE_URL;
     jest.resetModules();
   });
 
   test('keeps configured URL on web', async () => {
-    const { resolveApiBaseUrl } = await loadResolver({
+    const { buildApiUrl, resolveApiBaseUrl } = await loadResolver({
       apiUrl: 'http://localhost:8080',
       os: 'web',
     });
 
     expect(resolveApiBaseUrl()).toBe('http://localhost:8080');
+    expect(buildApiUrl('/api/auth/refresh')).toBe('http://localhost:8080/api/auth/refresh');
   });
 
-  test('maps localhost to Expo dev host on native devices', async () => {
+  test('maps localhost to Expo dev host on physical Expo devices', async () => {
     const { resolveApiBaseUrl } = await loadResolver({
       apiUrl: 'http://localhost:8080',
       hostUri: '192.168.1.20:8081',
@@ -54,5 +62,32 @@ describe('resolveApiBaseUrl', () => {
     });
 
     expect(resolveApiBaseUrl()).toBe('http://10.0.2.2:8080');
+  });
+
+  test('keeps localhost for iOS simulator when no Expo dev host exists', async () => {
+    const { resolveApiBaseUrl } = await loadResolver({
+      apiUrl: 'http://127.0.0.1:8080',
+      os: 'ios',
+    });
+
+    expect(resolveApiBaseUrl()).toBe('http://127.0.0.1:8080');
+  });
+
+  test('prefers EXPO_PUBLIC_API_BASE_URL over EXPO_PUBLIC_API_URL', async () => {
+    const { resolveApiBaseUrl } = await loadResolver({
+      apiUrl: 'http://localhost:8080',
+      apiBaseUrl: 'https://api.example.com',
+      os: 'ios',
+    });
+
+    expect(resolveApiBaseUrl()).toBe('https://api.example.com');
+  });
+
+  test('builds relative API paths when no base URL is configured', async () => {
+    const { buildApiUrl } = await loadResolver({
+      os: 'web',
+    });
+
+    expect(buildApiUrl('api/auth/refresh')).toBe('/api/auth/refresh');
   });
 });

@@ -7,15 +7,15 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  ActivityIndicator, Platform, Alert,
+  ActivityIndicator, Alert,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing   from 'expo-sharing';
-import Constants      from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Polyline } from 'react-native-svg';
 import { T } from '../../constants/tokens';
 import { getToken } from '../../auth/storage';
+import { buildApiUrl } from '../../api/baseUrl';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -78,31 +78,6 @@ interface Props {
   projectName: string;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Resolve the backend base URL the same way the axios instance does. */
-function resolveBaseUrl(): string {
-  const configured = process.env.EXPO_PUBLIC_API_URL || '';
-  if (!configured) return '';
-
-  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configured);
-  if (!isLocalhost) return configured;
-
-  const hostUri =
-    Constants.expoConfig?.hostUri ||
-    (Constants.manifest2 as any)?.extra?.expoGo?.debuggerHost ||
-    (Constants as any).manifest?.debuggerHost;
-  const devHost = typeof hostUri === 'string' ? hostUri.split(':')[0] : undefined;
-
-  if (devHost && devHost !== 'localhost' && devHost !== '127.0.0.1') {
-    return configured.replace(/:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, `://${devHost}:8080`);
-  }
-  if (Platform.OS === 'android') {
-    return configured.replace(/:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, '://10.0.2.2:8080');
-  }
-  return configured;
-}
-
 // ── Core download logic ───────────────────────────────────────────────────────
 
 /**
@@ -115,15 +90,13 @@ async function downloadAndShare(
   format: 'PDF' | 'EXCEL',
 ): Promise<void> {
   const token    = await getToken();
-  const baseUrl  = resolveBaseUrl().replace(/\/$/, '');
   const fileName = format === 'PDF' ? 'project_report.pdf' : 'project_report.xlsx';
   const mimeType =
     format === 'PDF'
       ? 'application/pdf'
       : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-  const url =
-    `${baseUrl}/api/projects/${projectId}/reports/download?format=${format}`;
+  const url = buildApiUrl(`/api/projects/${projectId}/reports/download?format=${format}`);
 
   const cacheDir = FileSystem.cacheDirectory ?? FileSystem.documentDirectory ?? '';
   const localUri = `${cacheDir}${fileName}`;

@@ -1,6 +1,6 @@
 import { DeviceEventEmitter, Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import Constants from 'expo-constants';
+import { buildApiUrl } from '../api/baseUrl';
 
 export interface User {
   email: string;
@@ -175,27 +175,7 @@ async function requestRefreshAccessToken(): Promise<string> {
     throw new Error('No refresh token available');
   }
 
-  const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_API_URL || '';
-  let resolvedBaseUrl = baseUrl;
-  
-  if (Platform.OS !== 'web' && baseUrl) {
-    const isLocalhostUrl = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(baseUrl);
-    if (isLocalhostUrl) {
-      try {
-        const hostUri = Constants.expoConfig?.hostUri || Constants.manifest2?.extra?.expoGo?.debuggerHost || Constants.manifest?.debuggerHost;
-        const devHost = typeof hostUri === 'string' ? hostUri.split(':')[0] : undefined;
-        if (devHost && devHost !== 'localhost' && devHost !== '127.0.0.1') {
-          resolvedBaseUrl = baseUrl.replace(/:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, `://${devHost}:8080`);
-        } else if (Platform.OS === 'android') {
-          resolvedBaseUrl = baseUrl.replace(/:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, `://10.0.2.2:8080`);
-        }
-      } catch {
-        // Fallback to configuredUrl
-      }
-    }
-  }
-
-  const refreshUrl = resolvedBaseUrl ? `${resolvedBaseUrl}/api/auth/refresh` : '/api/auth/refresh';
+  const refreshUrl = buildApiUrl('/api/auth/refresh');
 
   const res = await fetch(refreshUrl, {
     method: 'POST',
