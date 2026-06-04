@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../api/axios';
+import { taskService, kanbanService } from '../services/task-service';
+import { projectService } from '../services/project-service';
 import { T } from '../constants/tokens';
 import { offlineSyncManager, QueuedMutation } from '../services/offlineSyncManager';
 
@@ -188,16 +189,16 @@ export function useProjectBoard(projectId: number) {
     setError(null);
 
     try {
-      const [boardRes, tasksRes, membersRes] = await Promise.all([
-        api.get(`/api/kanbans/project/${projectId}/board`),
-        api.get(`/api/tasks/project/${projectId}`),
-        api.get(`/api/projects/${projectId}/members`).catch(() => ({ data: [] })),
+      const [boardData, tasksData, membersData] = await Promise.all([
+        kanbanService.getBoard(projectId),
+        taskService.listByProject(projectId),
+        projectService.getMembers(projectId).catch(() => []),
       ]);
 
-      const rawBoard = boardRes.data as KanbanBoardData | null;
+      const rawBoard = boardData as KanbanBoardData | null;
       const normalizedBoard = rawBoard ? { ...rawBoard, columns: normalizeColumns(rawBoard.columns) } : null;
-      const fetchedTasks = Array.isArray(tasksRes.data) ? tasksRes.data : [];
-      const rawMembers = Array.isArray(membersRes.data) ? membersRes.data : [];
+      const fetchedTasks = Array.isArray(tasksData) ? tasksData : [];
+      const rawMembers = Array.isArray(membersData) ? membersData : [];
 
       const parsedMembers = rawMembers.map((member: {
         id?: number;
@@ -280,8 +281,7 @@ export function useProjectBoard(projectId: number) {
     )));
 
     try {
-      const response = await api.patch(`/api/tasks/${task.id}/status`, { status });
-      const updated = response.data as BoardTask;
+      const updated = await taskService.updateStatus(task.id, status) as BoardTask;
       setRawTasks((current) => current.map((item) => (
         item.id === task.id ? { ...item, ...updated } : item
       )));
@@ -339,8 +339,7 @@ export function useProjectBoard(projectId: number) {
     }
 
     try {
-      const response = await api.post('/api/tasks', payload);
-      const created = response.data as BoardTask;
+      const created = await taskService.create(payload) as BoardTask;
       setRawTasks((current) => current.some((task) => task.id === created.id) ? current : [...current, created]);
     } catch (err: any) {
       if (!err.response || err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
@@ -379,7 +378,7 @@ export function useProjectBoard(projectId: number) {
     )));
 
     try {
-      await api.patch(`/api/tasks/${taskId}/dates`, { dueDate });
+      await taskService.updateDates(taskId, { dueDate });
     } catch (err: any) {
       if (!err.response || err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
         setRawTasks(previous);
@@ -421,9 +420,9 @@ export function useProjectBoard(projectId: number) {
 
     try {
       if (assigneeId) {
-        await api.patch(`/api/tasks/${taskId}/assign/${assigneeId}`);
+        await taskService.assignTaskSingle(taskId, assigneeId);
       } else {
-        await api.delete(`/api/tasks/${taskId}/assignee`);
+        await taskService.unassignTask(taskId);
       }
     } catch (err: any) {
       if (!err.response || err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
@@ -447,7 +446,7 @@ export function useProjectBoard(projectId: number) {
     const previous = rawTasks;
     setRawTasks((current) => current.filter((task) => task.id !== taskId));
     try {
-      await api.delete(`/api/tasks/${taskId}`);
+      await taskService.delete(taskId);
     } catch (err) {
       setRawTasks(previous);
       throw err;
@@ -463,8 +462,7 @@ export function useProjectBoard(projectId: number) {
       task.id === taskId ? { ...task, title: cleanTitle } : task
     )));
     try {
-      const response = await api.put(`/api/tasks/${taskId}`, { title: cleanTitle });
-      const updated = response.data as BoardTask;
+      const updated = await taskService.update(taskId, { title: cleanTitle }) as BoardTask;
       setRawTasks((current) => current.map((task) => (
         task.id === taskId ? { ...task, ...updated } : task
       )));
@@ -482,12 +480,11 @@ export function useProjectBoard(projectId: number) {
       throw new Error('Board configuration is not loaded.');
     }
 
-    const response = await api.post('/api/kanban-columns', {
+    const created = await kanbanService.createColumn({
       name: cleanName,
       position: columns.length,
       kanbanId: board.kanbanId,
-    });
-    const created = response.data as KanbanBoardColumn;
+    }) as KanbanBoardColumn;
     setBoard((current) => current ? {
       ...current,
       columns: normalizeColumns([...current.columns, created]),
@@ -505,7 +502,7 @@ export function useProjectBoard(projectId: number) {
     } : current);
 
     try {
-      await api.delete(`/api/kanban-columns/${columnId}`);
+      await kanbanService.deleteColumn(columnId);
     } catch (err) {
       setBoard(previous);
       throw err;

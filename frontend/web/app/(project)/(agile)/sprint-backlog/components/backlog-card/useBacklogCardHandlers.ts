@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import api from '@/lib/axios';
+import { tasksApi, sprintsApi, projectsApi } from '@/services/api-contract';
 import { toast } from '@/components/ui';
 import type { SprintItem, TaskItem } from '@/types';
 
@@ -126,10 +126,12 @@ export function useBacklogCardHandlers({
     if (loadingMembers) return;
     try {
       setLoadingMembers(true);
-      const projectRes = await api.get(`/api/projects/${projectId}`);
-      const teamId = projectRes.data.teamId;
-      const membersRes = await api.get(`/api/teams/${teamId}/members`);
-      setTeamMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
+      const project = await projectsApi.get(projectId);
+      const teamId = project.teamId;
+      if (teamId) {
+        const data = await projectsApi.getTeamMembers(teamId);
+        setTeamMembers(Array.isArray(data) ? (data as TeamMemberInfo[]) : []);
+      }
     } catch {
       if (showError) { /* silent */ }
     } finally {
@@ -149,7 +151,7 @@ export function useBacklogCardHandlers({
   };
 
   const updateTaskOnServer = async (taskId: number, payload: Record<string, unknown>) => {
-    try { await api.put(`/api/tasks/${taskId}`, payload); } catch { /* silent */ }
+    try { await tasksApi.update(taskId, payload); } catch { /* silent */ }
   };
 
   const handleStatusChange = (taskId: number, status: SprintStatus) => {
@@ -171,7 +173,7 @@ export function useBacklogCardHandlers({
     updateTask(taskId, { dueDate: normalizedDate });
     try {
       if (onDueDateChange) await onDueDateChange(taskId, normalizedDate);
-      else await api.patch(`/api/tasks/${taskId}/dates`, { dueDate: normalizedDate || null });
+      else await tasksApi.updateDates(taskId, { dueDate: normalizedDate || null });
     } catch {
       updateTask(taskId, { dueDate: previousDate });
     }
@@ -182,20 +184,20 @@ export function useBacklogCardHandlers({
     if (!trimmed) return;
     updateTask(taskId, { title: trimmed });
     if (onRenameTask) onRenameTask(taskId, trimmed);
-    else { try { await api.put(`/api/tasks/${taskId}`, { title: trimmed }); } catch { /* silent */ } }
+    else { try { await tasksApi.update(taskId, { title: trimmed }); } catch { /* silent */ } }
   };
 
   const handleDeleteTask = async (taskId: number) => {
     const saved = localTasks.find((t) => t.id === taskId);
     setLocalTasks((prev) => prev.filter((t) => t.id !== taskId));
-    try { await api.delete(`/api/tasks/${taskId}`); } catch {
+    try { await tasksApi.delete(taskId); } catch {
       if (saved) setLocalTasks((prev) => [...prev, saved]);
     }
   };
 
   const handleAssignTask = async (taskId: number, userId: number) => {
     try {
-      await api.patch(`/api/tasks/${taskId}/assign/${userId}`);
+      await tasksApi.assignTaskSingle(taskId, userId);
       const member = teamMembers.find((m) => m.user.userId === userId);
       if (member) {
         const name = getMemberDisplayName(member);
@@ -208,7 +210,7 @@ export function useBacklogCardHandlers({
 
   const handleAddLabel = async (taskId: number, labelId: number) => {
     try {
-      await api.post(`/api/tasks/${taskId}/label/${labelId}`);
+      await tasksApi.addLabel(taskId, labelId);
       const label = projectLabels.find((l) => l.id === labelId);
       if (label) {
         setLocalTasks((prev) =>
@@ -222,7 +224,7 @@ export function useBacklogCardHandlers({
 
   const handleRemoveLabel = async (taskId: number, labelId: number) => {
     try {
-      await api.delete(`/api/tasks/${taskId}/label/${labelId}`);
+      await tasksApi.removeLabel(taskId, labelId);
       setLocalTasks((prev) =>
         prev.map((t) => t.id !== taskId ? t : { ...t, labels: (t.labels ?? []).filter((l) => l.id !== labelId) })
       );
@@ -234,7 +236,7 @@ export function useBacklogCardHandlers({
   const handleNameSave = async (name: string) => {
     setEditingSprintLoading(true);
     try {
-      await api.put(`/api/sprints/${sprint.id}`, { name });
+      await sprintsApi.update(sprint.id, { name });
       sprint.name = name;
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
@@ -260,7 +262,7 @@ export function useBacklogCardHandlers({
     setEditingSprintLoading(true);
     setEditSprintError('');
     try {
-      await api.put(`/api/sprints/${sprint.id}`, { name: trimmedName });
+      await sprintsApi.update(sprint.id, { name: trimmedName });
       setShowEditSprintModal(false);
       sprint.name = trimmedName;
     } catch (err: unknown) {
@@ -275,7 +277,7 @@ export function useBacklogCardHandlers({
 
   const saveGoal = async () => {
     setSavingGoal(true);
-    try { await api.put(`/api/sprints/${sprint.id}`, { goal: goalText.trim() }); setEditingGoal(false); }
+    try { await sprintsApi.update(sprint.id, { goal: goalText.trim() }); setEditingGoal(false); }
     catch { /* silent */ } finally { setSavingGoal(false); }
   };
 
@@ -299,7 +301,7 @@ export function useBacklogCardHandlers({
     endDate.setDate(baseDate.getDate() + durationDays);
 
     try {
-      await api.put(`/api/sprints/${sprint.id}/start`, {
+      await sprintsApi.start(sprint.id, {
         startDate: baseDate.toISOString().split('T')[0],
         endDate: endDate.toISOString().split('T')[0],
       });
@@ -326,7 +328,7 @@ export function useBacklogCardHandlers({
   const doCompleteSprint = async () => {
     setCompletingSprintLoading(true);
     try {
-      await api.put(`/api/sprints/${sprint.id}/complete`, { moveIncompleteTo: completeDestination });
+      await sprintsApi.complete(sprint.id, completeDestination);
       setConfirmCompleteSprint(false);
       sprint.status = 'COMPLETED';
       window.dispatchEvent(new CustomEvent('planora:task-updated'));
@@ -343,7 +345,7 @@ export function useBacklogCardHandlers({
   const doDeleteSprint = async () => {
     setDeletingSprintLoading(true);
     try {
-      await api.delete(`/api/sprints/${sprint.id}`);
+      await sprintsApi.delete(sprint.id);
       setConfirmDeleteSprint(false);
       onSprintDeleted(sprint.id, sprint.tasks);
     } catch {

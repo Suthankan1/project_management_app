@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { X, Calendar, User, Plus } from 'lucide-react';
-import axios from '@/lib/axios';
+import { projectsApi } from '@/services/api-contract';
 import { AxiosError } from 'axios';
 
 interface CreateTaskModalProps {
@@ -82,11 +82,9 @@ export default function CreateTaskModal({
     const loadMembers = async () => {
       setLoadingMembers(true);
       try {
-        const projectRes = await axios.get(`/api/projects/${projectId}`);
-        const project = projectRes.data;
+        const project = await projectsApi.get(projectId);
         if (project.team?.id) {
-          const membersRes = await axios.get(`/api/teams/${project.team.id}/members`);
-          const payload = membersRes.data;
+          const payload = await projectsApi.getTeamMembers(project.team.id);
 
           const rawMembers = Array.isArray(payload)
             ? payload

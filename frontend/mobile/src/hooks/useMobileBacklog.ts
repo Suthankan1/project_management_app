@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
-import api from '../api/axios';
+import { taskService, sprintService } from '../services/task-service';
+import { projectService } from '../services/project-service';
 import { apiErrorMessage } from '../utils/apiError';
 
 export type BacklogGroupBy = 'none' | 'status' | 'priority' | 'assignee';
@@ -88,17 +89,17 @@ export function useMobileBacklog(projectId: number) {
     setError(null);
 
     try {
-      const [tasksRes, sprintsRes, projectRes, membersRes] = await Promise.all([
-        api.get(`/api/tasks/project/${projectId}`),
-        api.get(`/api/sprints/project/${projectId}`).catch(() => ({ data: [] })),
-        api.get(`/api/projects/${projectId}`).catch(() => ({ data: null })),
-        api.get(`/api/projects/${projectId}/members`).catch(() => ({ data: [] })),
+      const [tasksData, sprintsData, projectData, membersData] = await Promise.all([
+        taskService.listByProject(projectId),
+        sprintService.listByProject(projectId).catch(() => []),
+        projectService.get(projectId).catch(() => null),
+        projectService.getMembers(projectId).catch(() => []),
       ]);
 
-      const normalizedTasks = Array.isArray(tasksRes.data)
-        ? (tasksRes.data as MobileTask[]).map(normalizeTask)
+      const normalizedTasks = Array.isArray(tasksData)
+        ? (tasksData as MobileTask[]).map(normalizeTask)
         : [];
-      const rawSprints = Array.isArray(sprintsRes.data) ? sprintsRes.data as MobileSprint[] : [];
+      const rawSprints = Array.isArray(sprintsData) ? sprintsData as MobileSprint[] : [];
 
       const tasksBySprint = new Map<number, MobileTask[]>();
       normalizedTasks.forEach((task) => {
@@ -112,9 +113,9 @@ export function useMobileBacklog(projectId: number) {
         ...sprint,
         tasks: tasksBySprint.get(sprint.id) ?? [],
       })));
-      setProjectKey(projectRes.data?.projectKey || projectRes.data?.key || '');
+      setProjectKey(projectData?.projectKey || projectData?.key || '');
 
-      const members = Array.isArray(membersRes.data) ? membersRes.data : [];
+      const members = Array.isArray(membersData) ? membersData : [];
       const role = members.find((member: { currentUser?: boolean; me?: boolean }) => member.currentUser || member.me)?.role;
       if (role) setCurrentUserRole(role);
     } catch (err) {
@@ -225,7 +226,7 @@ export function useMobileBacklog(projectId: number) {
     const cleanTitle = title.trim();
     if (!cleanTitle) return;
     try {
-      await api.post('/api/tasks', {
+      await taskService.create({
         projectId,
         title: cleanTitle,
         sprintId: sprintId ?? undefined,
@@ -242,7 +243,7 @@ export function useMobileBacklog(projectId: number) {
     const fallback = projectKey ? `${projectKey} Sprint ${sprints.length + 1}` : `Sprint ${sprints.length + 1}`;
     const cleanName = (name || fallback).trim();
     try {
-      await api.post('/api/sprints', { proId: projectId, name: cleanName });
+      await sprintService.create({ proId: projectId, name: cleanName });
       await fetchBacklog(true);
     } catch (err) {
       Alert.alert('Sprint not created', apiErrorMessage(err, 'Please try again.'));
@@ -253,7 +254,7 @@ export function useMobileBacklog(projectId: number) {
     const previous = tasks;
     setTasks((current) => current.map((task) => task.id === taskId ? { ...task, status } : task));
     try {
-      await api.patch(`/api/tasks/${taskId}/status`, { status });
+      await taskService.updateStatus(taskId, status);
       await fetchBacklog(true);
     } catch (err) {
       setTasks(previous);
@@ -266,7 +267,7 @@ export function useMobileBacklog(projectId: number) {
     const previous = tasks;
     setTasks((current) => current.map((task) => task.id === taskId ? { ...task, storyPoint: value } : task));
     try {
-      await api.put(`/api/tasks/${taskId}`, { storyPoint: value });
+      await taskService.update(taskId, { storyPoint: value });
       await fetchBacklog(true);
     } catch (err) {
       setTasks(previous);
@@ -278,7 +279,7 @@ export function useMobileBacklog(projectId: number) {
     const previous = tasks;
     setTasks((current) => current.map((task) => task.id === taskId ? { ...task, sprintId, selected: false } : task));
     try {
-      await api.put(`/api/tasks/${taskId}`, { sprintId });
+      await taskService.update(taskId, { sprintId });
       await fetchBacklog(true);
     } catch (err) {
       setTasks(previous);
@@ -290,7 +291,7 @@ export function useMobileBacklog(projectId: number) {
     const previous = tasks;
     setTasks((current) => current.filter((task) => task.id !== taskId));
     try {
-      await api.delete(`/api/tasks/${taskId}`);
+      await taskService.delete(taskId);
       await fetchBacklog(true);
     } catch (err) {
       setTasks(previous);
@@ -301,7 +302,7 @@ export function useMobileBacklog(projectId: number) {
   const bulkStatus = useCallback(async (status: string) => {
     if (!selectedIds.length) return;
     try {
-      await api.patch('/api/tasks/bulk/status', { taskIds: selectedIds, status });
+      await taskService.bulkUpdateStatus({ taskIds: selectedIds, status });
       clearSelection();
       await fetchBacklog(true);
     } catch (err) {
@@ -312,7 +313,7 @@ export function useMobileBacklog(projectId: number) {
   const bulkDelete = useCallback(async () => {
     if (!selectedIds.length) return;
     try {
-      await api.delete('/api/tasks/bulk', { data: { taskIds: selectedIds } });
+      await taskService.bulkDelete({ taskIds: selectedIds });
       clearSelection();
       await fetchBacklog(true);
     } catch (err) {
@@ -323,7 +324,7 @@ export function useMobileBacklog(projectId: number) {
   const bulkMoveToSprint = useCallback(async (sprintId: number | null) => {
     if (!selectedIds.length) return;
     try {
-      await Promise.all(selectedIds.map((taskId) => api.put(`/api/tasks/${taskId}`, { sprintId })));
+      await Promise.all(selectedIds.map((taskId) => taskService.update(taskId, { sprintId })));
       clearSelection();
       await fetchBacklog(true);
     } catch (err) {

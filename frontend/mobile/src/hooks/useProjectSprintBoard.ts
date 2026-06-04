@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import api from '../api/axios';
+import { taskService, sprintService, sprintboardService } from '../services/task-service';
 
 export interface SprintSummary {
   id: number;
@@ -79,8 +79,8 @@ export function useProjectSprintBoard(projectId: number) {
     setError(null);
 
     try {
-      const sprintsRes = await api.get(`/api/sprints/project/${projectId}`);
-      const sprintList = Array.isArray(sprintsRes.data) ? sprintsRes.data as SprintSummary[] : [];
+      const sprintsData = await sprintService.listByProject(projectId);
+      const sprintList = Array.isArray(sprintsData) ? sprintsData as SprintSummary[] : [];
       const activeSprint = sprintList.find((sprint) => sprint.status === 'ACTIVE') ?? sprintList[0] ?? null;
       const sprintId = sprintIdOverride ?? selectedSprintId ?? activeSprint?.id ?? null;
 
@@ -92,8 +92,8 @@ export function useProjectSprintBoard(projectId: number) {
         return;
       }
 
-      const boardRes = await api.get(`/api/sprintboards/sprint/${sprintId}/full`);
-      const raw = boardRes.data as Sprintboard;
+      const boardData = await sprintboardService.getFull(sprintId);
+      const raw = boardData as Sprintboard;
       setBoard({
         ...raw,
         columns: normalizeColumns(raw.columns),
@@ -120,7 +120,7 @@ export function useProjectSprintBoard(projectId: number) {
     const cleanTitle = title.trim();
     if (!cleanTitle || !selectedSprintId) return;
 
-    await api.post('/api/tasks', {
+    await taskService.create({
       projectId,
       sprintId: selectedSprintId,
       title: cleanTitle,
@@ -135,7 +135,7 @@ export function useProjectSprintBoard(projectId: number) {
     if (!cleanName || !board?.id) return;
     const status = cleanName.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '') || 'CUSTOM';
 
-    await api.post(`/api/sprintboards/${board.id}/columns`, {
+    await sprintboardService.addColumn(board.id, {
       name: cleanName,
       status,
     });
@@ -144,7 +144,7 @@ export function useProjectSprintBoard(projectId: number) {
 
   const deleteTask = useCallback(async (taskId: number) => {
     if (!selectedSprintId) return;
-    await api.delete(`/api/tasks/${taskId}`);
+    await taskService.delete(taskId);
     await fetchBoard(true, selectedSprintId);
   }, [fetchBoard, selectedSprintId]);
 
@@ -152,13 +152,13 @@ export function useProjectSprintBoard(projectId: number) {
     if (!selectedSprintId) return;
     const cleanTitle = title.trim();
     if (!cleanTitle) return;
-    await api.put(`/api/tasks/${taskId}`, { title: cleanTitle });
+    await taskService.update(taskId, { title: cleanTitle });
     await fetchBoard(true, selectedSprintId);
   }, [fetchBoard, selectedSprintId]);
 
   const deleteColumn = useCallback(async (columnId: number) => {
     if (!board?.id || !columnId || !selectedSprintId) return;
-    await api.delete(`/api/sprintboards/${board.id}/columns/${columnId}`);
+    await sprintboardService.deleteColumn(board.id, columnId);
     await fetchBoard(true, selectedSprintId);
   }, [board?.id, fetchBoard, selectedSprintId]);
 

@@ -121,6 +121,90 @@ export interface SprintboardFullResponse extends Sprintboard {
   };
 }
 
+export interface CreateTaskRequest {
+  title: string;
+  projectId: number;
+  description?: string;
+  priority?: 'LOW' | 'NORMAL' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  status?: string;
+  storyPoint?: number;
+  startDate?: string | null;
+  dueDate?: string | null;
+  assigneeId?: number;
+  reporterId?: number;
+  assigneeIds?: number[];
+  sprintId?: number | null;
+  KanbanColumnId?: number;
+  parentId?: number;
+  labelIds?: number[];
+  milestoneId?: number | null;
+  recurrenceRule?: string;
+  recurrenceEnd?: string;
+  recurrenceActive?: boolean;
+  customInterval?: number;
+  recurrenceLimit?: number;
+}
+
+export interface UpdateTaskRequest {
+  title?: string;
+  projectId?: number;
+  description?: string;
+  priority?: 'LOW' | 'NORMAL' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  status?: string;
+  storyPoint?: number;
+  startDate?: string | null;
+  dueDate?: string | null;
+  assigneeId?: number;
+  reporterId?: number;
+  assigneeIds?: number[];
+  sprintId?: number | null;
+  KanbanColumnId?: number;
+  parentId?: number;
+  labelIds?: number[];
+  milestoneId?: number | null;
+  recurrenceRule?: string;
+  recurrenceEnd?: string;
+  recurrenceActive?: boolean;
+  customInterval?: number;
+  recurrenceLimit?: number;
+  archived?: boolean;
+}
+
+export interface PatchTaskDatesRequest {
+  startDate?: string | null;
+  dueDate?: string | null;
+}
+
+export interface BulkStatusRequest {
+  taskIds: number[];
+  status: string;
+}
+
+export interface BulkDeleteRequest {
+  taskIds: number[];
+}
+
+export interface AssigneeRequest {
+  assigneeIds: number[];
+}
+
+export interface ReorderTasksRequest {
+  projectId: number;
+  sprintId: number | null;
+  orderedTaskIds: number[];
+}
+
+export interface SprintStartRequest {
+  startDate: string;
+  endDate: string;
+}
+
+export interface SprintVelocityPoint {
+  sprintName: string;
+  committedPoints: number;
+  completedPoints: number;
+}
+
 export const tasksApi = {
   listByProject: async (projectId: number | string, params?: Record<string, unknown>): Promise<PageResponse<Task>> => {
     const { data } = await api.get(`/api/tasks/project/${projectId}`, { params });
@@ -134,11 +218,11 @@ export const tasksApi = {
     const { data } = await api.get(`/api/tasks/${taskId}`);
     return data;
   },
-  create: async (payload: Record<string, unknown>): Promise<Task> => {
+  create: async (payload: CreateTaskRequest): Promise<Task> => {
     const { data } = await api.post('/api/tasks', payload);
     return data;
   },
-  update: async (taskId: number | string, payload: Record<string, unknown>): Promise<Task> => {
+  update: async (taskId: number | string, payload: UpdateTaskRequest): Promise<Task> => {
     const { data } = await api.put(`/api/tasks/${taskId}`, payload);
     return data;
   },
@@ -161,7 +245,7 @@ export const tasksApi = {
     const { data } = await api.patch(`/api/tasks/${taskId}/status`, { status });
     return data;
   },
-  updateDates: async (taskId: number | string, payload: { startDate?: string | null; dueDate?: string | null }): Promise<void> => {
+  updateDates: async (taskId: number | string, payload: PatchTaskDatesRequest): Promise<void> => {
     await api.patch(`/api/tasks/${taskId}/dates`, {
       startDate: payload.startDate == null ? payload.startDate : formatLocalDate(payload.startDate),
       dueDate: payload.dueDate == null ? payload.dueDate : formatLocalDate(payload.dueDate),
@@ -206,19 +290,19 @@ export const tasksApi = {
   deleteAttachment: async (taskId: number | string, attachmentId: number): Promise<void> => {
     await api.delete(`/api/tasks/${taskId}/attachments/${attachmentId}`);
   },
-  bulkUpdateStatus: async (payload: { taskIds: number[]; status: string }): Promise<void> => {
+  bulkUpdateStatus: async (payload: BulkStatusRequest): Promise<void> => {
     await api.patch('/api/tasks/bulk/status', payload);
   },
-  bulkDelete: async (payload: { taskIds: number[] }): Promise<void> => {
+  bulkDelete: async (payload: BulkDeleteRequest): Promise<void> => {
     await api.delete('/api/tasks/bulk', { data: payload });
   },
-  reorderTasks: async (payload: Record<string, unknown>): Promise<void> => {
+  reorderTasks: async (payload: ReorderTasksRequest): Promise<void> => {
     await api.patch('/api/tasks/reorder', payload);
   },
   assignTaskSingle: async (taskId: number | string, userId: number): Promise<void> => {
     await api.patch(`/api/tasks/${taskId}/assign/${userId}`);
   },
-  assignTaskMultiple: async (taskId: number | string, payload: { assigneeIds: number[] }): Promise<void> => {
+  assignTaskMultiple: async (taskId: number | string, payload: AssigneeRequest): Promise<void> => {
     await api.patch(`/api/tasks/${taskId}/assignees`, payload);
   },
   getCalendarEvents: async (projectId: number | string): Promise<Record<string, unknown>[]> => {
@@ -270,8 +354,15 @@ export const sprintsApi = {
   complete: async (sprintId: number | string, moveIncompleteTo: number | null = null): Promise<void> => {
     await api.put(`/api/sprints/${sprintId}/complete`, { moveIncompleteTo });
   },
-  getBurndown: async (sprintId: number | string): Promise<BurndownResponse> => {
-    const { data } = await api.get(`/api/burndown/sprint/${sprintId}`);
+  start: async (sprintId: number | string, payload: SprintStartRequest): Promise<void> => {
+    await api.put(`/api/sprints/${sprintId}/start`, payload);
+  },
+  getBurndown: async (sprintId: number | string, params?: Record<string, unknown> | URLSearchParams): Promise<BurndownResponse> => {
+    const { data } = await api.get(`/api/burndown/sprint/${sprintId}`, { params });
+    return data;
+  },
+  getVelocity: async (projectId: number | string): Promise<SprintVelocityPoint[]> => {
+    const { data } = await api.get(`/api/burndown/project/${projectId}/velocity`);
     return data;
   },
 };

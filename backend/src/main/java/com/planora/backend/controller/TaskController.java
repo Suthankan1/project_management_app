@@ -9,6 +9,10 @@ import com.planora.backend.dto.TaskGithubSummaryDTO;
 import com.planora.backend.dto.TaskRequestDTO;
 import com.planora.backend.dto.TaskResponseDTO;
 import com.planora.backend.dto.TaskTemplateDTO;
+import com.planora.backend.dto.TaskDatesPatchDTO;
+import com.planora.backend.dto.TaskStatusPatchDTO;
+import com.planora.backend.dto.TaskBulkStatusRequestDTO;
+import com.planora.backend.dto.TaskAssigneesPatchDTO;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.service.TaskActivityService;
 import com.planora.backend.service.TaskGithubService;
@@ -438,15 +442,10 @@ public class TaskController {
     @PatchMapping("/{taskId}/assignees")
     public ResponseEntity<TaskResponseDTO> updateAssignees(
             @PathVariable Long taskId,
-            @RequestBody Map<String, Object> body,
+            @Valid @RequestBody TaskAssigneesPatchDTO request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        List<Long> assigneeIds = body.containsKey("assigneeIds")
-                ? ((List<?>) body.get("assigneeIds")).stream()
-                    .filter(Objects::nonNull)
-                    .map(id -> Long.valueOf(id.toString()))
-                    .toList()
-                : List.of();
+        List<Long> assigneeIds = request.getAssigneeIds() != null ? request.getAssigneeIds() : List.of();
         TaskResponseDTO task = service.updateAssignees(taskId, assigneeIds, currentUser.getUserId());
         messagingTemplate.convertAndSend(
                 "/topic/project/" + task.getProjectId() + "/tasks",
@@ -458,17 +457,10 @@ public class TaskController {
 
     @PatchMapping("/bulk/status")
     public ResponseEntity<Void> bulkUpdateStatus(
-            @RequestBody Map<String, Object> body,
+            @Valid @RequestBody TaskBulkStatusRequestDTO request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
-        List<Long> taskIds = body.containsKey("taskIds")
-                ? ((List<?>) body.get("taskIds")).stream()
-                    .filter(Objects::nonNull)
-                    .map(id -> Long.valueOf(id.toString()))
-                    .toList()
-                : List.of();
-        String status = (String) body.get("status");
-        service.bulkUpdateStatus(taskIds, status, currentUser.getUserId());
+        service.bulkUpdateStatus(request.getTaskIds(), request.getStatus(), currentUser.getUserId());
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
@@ -508,12 +500,11 @@ public class TaskController {
     @PatchMapping("/{taskId}/status")
     public ResponseEntity<TaskResponseDTO> updateStatus(
             @PathVariable Long taskId,
-            @RequestBody Map<String, String> body,
+            @Valid @RequestBody TaskStatusPatchDTO request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
-        String status = body.get("status");
-        TaskResponseDTO task = service.updateStatus(taskId, status, currentUserId);
+        TaskResponseDTO task = service.updateStatus(taskId, request.getStatus(), currentUserId);
         messagingTemplate.convertAndSend(
                 "/topic/project/" + task.getProjectId() + "/tasks",
                 Map.of(
@@ -533,16 +524,10 @@ public class TaskController {
     @PatchMapping("/{taskId}/dates")
     public ResponseEntity<Void> patchTaskDates(
             @PathVariable Long taskId,
-            @RequestBody Map<String, String> body,
+            @Valid @RequestBody TaskDatesPatchDTO request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        boolean startDateProvided = body.containsKey("startDate");
-        boolean dueDateProvided = body.containsKey("dueDate");
-        LocalDate startDate = startDateProvided && body.get("startDate") != null && !body.get("startDate").trim().isEmpty()
-                ? LocalDate.parse(body.get("startDate")) : null;
-        LocalDate dueDate = dueDateProvided && body.get("dueDate") != null && !body.get("dueDate").trim().isEmpty()
-                ? LocalDate.parse(body.get("dueDate")) : null;
-        service.patchTaskDates(taskId, startDate, startDateProvided, dueDate, dueDateProvided, currentUser.getUserId());
+        service.patchTaskDates(taskId, request.getStartDate(), request.isStartDateProvided(), request.getDueDate(), request.isDueDateProvided(), currentUser.getUserId());
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 

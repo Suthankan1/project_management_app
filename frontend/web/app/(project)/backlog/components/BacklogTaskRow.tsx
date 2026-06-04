@@ -11,7 +11,7 @@ import AssigneeAvatar from '../../(agile)/sprint-backlog/components/AssigneeAvat
 import * as Popover from '@radix-ui/react-popover';
 import { DayPicker } from 'react-day-picker';
 import { format, parseISO } from 'date-fns';
-import api from '@/lib/axios';
+import { tasksApi } from '@/services/tasks-contract';
 import { ArchiveBadge } from '@/components/ui';
 import 'react-day-picker/dist/style.css';
 
@@ -76,7 +76,7 @@ export default function BacklogTaskRow({
         // Optimistic update
         onDateChange?.(task.id, formattedDate);
         try {
-            await api.patch(`/api/tasks/${task.id}/dates`, { dueDate: formattedDate || "" });
+            await tasksApi.updateDates(task.id, { dueDate: formattedDate });
         } catch (err) {
             console.error('Failed to update date:', err);
             // Revert state hook could be added if needed
