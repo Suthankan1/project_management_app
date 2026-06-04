@@ -18,6 +18,16 @@ jest.mock('./hooks/usePageContent', () => ({
   usePageContent: jest.fn(),
 }));
 
+jest.mock('@/lib/auth', () => ({
+  ...jest.requireActual('@/lib/auth'),
+  getValidToken: jest.fn(() => 'mock-token'),
+  getUserFromToken: jest.fn(() => ({
+    email: 'test@example.com',
+    username: 'testuser',
+    userId: 1,
+  })),
+}));
+
 jest.mock('marked', () => ({
   marked: {
     parse: jest.fn(async (text: string) => {
@@ -181,5 +191,13 @@ describe('usePageEditor Hook', () => {
       content: '<p>Restored Content</p>',
       isStarred: false,
     });
+  });
+
+  it('initializes ydoc and provider when token is present', () => {
+    const { result } = renderHook(() => usePageEditor());
+    expect(result.current.ydoc).toBeDefined();
+    expect(result.current.ydoc).not.toBeNull();
+    expect(result.current.provider).toBeDefined();
+    expect(result.current.provider).not.toBeNull();
   });
 });

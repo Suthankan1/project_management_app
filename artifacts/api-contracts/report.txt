@@ -1,8 +1,8 @@
 Planora API Contract Check
-Frontend call sites scanned: 427
+Frontend call sites scanned: 435
 Backend routes scanned: 39
 
-Frontend calls with no backend match: 373
+Frontend calls with no backend match: 381
 - frontend/web/app/(project)/(agile)/burndown/page.tsx:68 GET /api/sprints/project/:projectId (fetchSprints)
 - frontend/web/app/(project)/(agile)/burndown/page.tsx:102 GET /api/burndown/sprint/:selectedSprintId
 - frontend/web/app/(project)/(agile)/burndown/page.tsx:133 PUT /api/sprints/:id (handleDateSaving)
@@ -52,6 +52,7 @@ Frontend calls with no backend match: 373
 - frontend/web/app/(project)/list/components/TaskRow.tsx:115 PATCH /api/tasks/:id/priority (handlePriorityChange)
 - frontend/web/app/(project)/list/hooks/useListTasks.ts:252 PUT /api/tasks/:taskId
 - frontend/web/app/(project)/list/hooks/useListTasks.ts:266 DELETE /api/tasks/:taskId
+- frontend/web/app/(project)/pages/[pageId]/usePageEditor.ts:76 GET /api/user/profile (fetchProfileAndSetUser)
 - frontend/web/app/(project)/project/[id]/chat/components/chatMessage.tsx:260 GET /api/projects/:projectId/chat/messages/refresh-document
 - frontend/web/app/(project)/project/[id]/chat/components/uploadChatDocument.ts:6 POST /api/projects/:projectId/chat/messages/upload-document
 - frontend/web/app/(project)/project/[id]/settings/RecurringSchedulesManager.tsx:33 GET /api/tasks/project/:projectId/all
@@ -101,11 +102,10 @@ Frontend calls with no backend match: 373
 - frontend/web/components/shared/CreateTaskModal.tsx:79 GET /api/teams/:teamId/members (loadMembers)
 - frontend/web/hooks/useCommandPalette.ts:111 GET /api/search
 - frontend/web/hooks/useCommandPalette.ts:118 GET /api/tasks/project/:projectId/all
-- frontend/web/lib/dms.ts:126 GET /api/projects/:projectId/folders/:folderId/permissions
-- frontend/web/lib/dms.ts:131 PUT /api/projects/:projectId/folders/:folderId/permissions
-- ... 273 more
+- frontend/web/lib/auth.ts:214 POST /api/auth/refresh
+- ... 281 more
 
-Critical frontend contract misses: 265
+Critical frontend contract misses: 272
 - frontend/web/app/(project)/(agile)/sprint-board/hooks/useSprintBoardActions.ts:92 GET /api/sprints/project/:projectIdStr
 - frontend/web/app/(project)/(agile)/sprint-board/hooks/useSprintBoardActions.ts:152 POST /api/tasks
 - frontend/web/app/(project)/calendar/api.ts:7 PATCH /api/tasks/:taskId/dates
@@ -120,6 +120,7 @@ Critical frontend contract misses: 265
 - frontend/web/app/profile/hooks/useProfile.ts:160 POST /api/user/profile/photo
 - frontend/web/hooks/useCommandPalette.ts:111 GET /api/search
 - frontend/web/hooks/useCommandPalette.ts:118 GET /api/tasks/project/:projectId/all
+- frontend/web/lib/auth.ts:214 POST /api/auth/refresh
 - frontend/web/lib/dms.ts:126 GET /api/projects/:projectId/folders/:folderId/permissions
 - frontend/web/lib/dms.ts:131 PUT /api/projects/:projectId/folders/:folderId/permissions
 - frontend/web/lib/dms.ts:135 GET /api/projects/:projectId/storage-quota
@@ -140,23 +141,22 @@ Critical frontend contract misses: 265
 - frontend/web/services/auth-contract.ts:63 GET /api/user/profile
 - frontend/web/services/auth-contract.ts:67 PUT /api/user/profile/update
 - frontend/web/services/auth-contract.ts:71 POST /api/user/profile/photo
-- frontend/web/services/collaboration-contract.ts:68 GET /api/projects/:projectId/documents
-- frontend/web/services/collaboration-contract.ts:77 GET /api/projects/:projectId/pages
-- frontend/web/services/collaboration-contract.ts:81 GET /api/pages/:pageId
-- frontend/web/services/collaboration-contract.ts:85 POST /api/projects/:projectId/pages
-- frontend/web/services/collaboration-contract.ts:89 PUT /api/pages/:pageId
-- frontend/web/services/collaboration-contract.ts:93 DELETE /api/pages/:pageId
-- frontend/web/services/collaboration-contract.ts:99 GET /api/projects/:projectId/chat/summaries
-- frontend/web/services/collaboration-contract.ts:103 POST /api/projects/:projectId/chat/team/read
-- frontend/web/services/collaboration-contract.ts:106 POST /api/projects/:projectId/chat/rooms/:roomId/read
-- frontend/web/services/collaboration-contract.ts:109 POST /api/projects/:projectId/chat/direct/read
-- frontend/web/services/collaboration-contract.ts:118 POST /api/projects/:projectId/chat/telemetry
-- frontend/web/services/collaboration-contract.ts:125 GET /api/projects/:projectId/chat/unread-badge
-- frontend/web/services/collaboration-contract.ts:129 GET /api/search
-- frontend/web/services/collaboration-contract.ts:139 GET /api/chat/inbox
-- frontend/web/services/collaboration-contract.ts:143 GET /api/projects/:projectId/chat/messages
-- frontend/web/services/collaboration-contract.ts:147 GET /api/projects/:projectId/chat/messages
-- ... 215 more
+- frontend/web/services/collaboration-contract.ts:91 GET /api/projects/:projectId/documents
+- frontend/web/services/collaboration-contract.ts:100 GET /api/projects/:projectId/pages
+- frontend/web/services/collaboration-contract.ts:104 GET /api/pages/:pageId
+- frontend/web/services/collaboration-contract.ts:108 POST /api/projects/:projectId/pages
+- frontend/web/services/collaboration-contract.ts:112 PUT /api/pages/:pageId
+- frontend/web/services/collaboration-contract.ts:116 DELETE /api/pages/:pageId
+- frontend/web/services/collaboration-contract.ts:119 PATCH /api/projects/:projectId/pages/:pageId/star
+- frontend/web/services/collaboration-contract.ts:123 PATCH /api/projects/:projectId/pages/:pageId/move
+- frontend/web/services/collaboration-contract.ts:127 POST /api/projects/:projectId/pages/:pageId/viewed
+- frontend/web/services/collaboration-contract.ts:130 GET /api/projects/:projectId/pages/recent
+- frontend/web/services/collaboration-contract.ts:134 GET /api/projects/:projectId/pages/:pageId/versions
+- frontend/web/services/collaboration-contract.ts:138 POST /api/projects/:projectId/pages/:pageId/versions/:versionId/restore
+- frontend/web/services/collaboration-contract.ts:145 GET /api/projects/:projectId/chat/summaries
+- frontend/web/services/collaboration-contract.ts:149 POST /api/projects/:projectId/chat/team/read
+- frontend/web/services/collaboration-contract.ts:152 POST /api/projects/:projectId/chat/rooms/:roomId/read
+- ... 222 more
 
 Duplicate frontend endpoint payloads: 16
 - POST /api/tasks
@@ -186,12 +186,12 @@ Duplicate frontend endpoint payloads: 16
   - object:: frontend/mobile/src/hooks/useForgotPassword.ts:45
 - POST /api/auth/reset
   - expr:payload: frontend/web/services/auth-contract.ts:49
-  - object:newPassword: frontend/mobile/src/hooks/useResetPassword.ts:35
+  - object:newPassword,token: frontend/mobile/src/hooks/useResetPassword.ts:43
 - POST /api/projects/:projectId/chat/telemetry
-  - expr:payload: frontend/web/services/collaboration-contract.ts:118
+  - expr:payload: frontend/web/services/collaboration-contract.ts:164
   - object:target: frontend/mobile/src/services/chatService.ts:244
 - POST /api/projects/:projectId/chat/rooms
-  - expr:payload: frontend/web/services/collaboration-contract.ts:195
+  - expr:payload: frontend/web/services/collaboration-contract.ts:241
   - object:members: frontend/mobile/src/services/chatService.ts:168
 - POST /api/projects
   - expr:payload: frontend/web/services/projects-contract.ts:157
@@ -219,11 +219,11 @@ Backend endpoints with no frontend/mobile usage: 10
 - backend/src/main/java/com/planora/backend/controller/KanbanController.java:47 ANY /api/kanbans/:id
 - backend/src/main/java/com/planora/backend/controller/KanbanController.java:53 ANY /api/kanbans/project/:projectId
 - backend/src/main/java/com/planora/backend/controller/KanbanController.java:65 ANY /api/kanbans/project/:projectId/auto-create
-- backend/src/main/java/com/planora/backend/controller/UserController.java:73 ANY /api/auth/resend-otp
-- backend/src/main/java/com/planora/backend/controller/UserController.java:128 ANY /api/auth/users/:userId/photo
-- backend/src/main/java/com/planora/backend/controller/UserController.java:143 ANY /api/auth/try
-- backend/src/main/java/com/planora/backend/controller/UserController.java:148 ANY /api/auth/me
+- backend/src/main/java/com/planora/backend/controller/UserController.java:86 ANY /api/auth/resend-otp
+- backend/src/main/java/com/planora/backend/controller/UserController.java:163 ANY /api/auth/users/:userId/photo
+- backend/src/main/java/com/planora/backend/controller/UserController.java:178 ANY /api/auth/try
+- backend/src/main/java/com/planora/backend/controller/UserController.java:183 ANY /api/auth/me
 
 Summary
-- Critical issues: 389
+- Critical issues: 397
 - Informational backend-only routes: 10

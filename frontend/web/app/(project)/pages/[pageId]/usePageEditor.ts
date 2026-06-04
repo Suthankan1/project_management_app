@@ -7,6 +7,31 @@ import { pagesApi } from '@/services/api-contract';
 import TurndownService from 'turndown';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import * as Y from 'yjs';
+import { WebsocketProvider } from 'y-websocket';
+import { getValidToken, getUserFromToken, AUTH_TOKEN_CHANGED_EVENT } from '@/lib/auth';
+import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
+import api from '@/lib/axios';
+
+const PALETTE = [
+  '#3b82f6', // blue
+  '#ef4444', // red
+  '#10b981', // green
+  '#f59e0b', // orange
+  '#8b5cf6', // purple
+  '#ec4899', // pink
+  '#14b8a6', // teal
+  '#6366f1', // indigo
+];
+
+function getStableColor(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % PALETTE.length;
+  return PALETTE[index];
+}
 
 export function usePageEditor() {
   const router = useRouter();
@@ -37,6 +62,104 @@ export function usePageEditor() {
   const [showDocSidebar, setShowDocSidebar] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
+  const [provider, setProvider] = useState<any | null>(null);
+  const [collaborationUser, setCollaborationUser] = useState<{ name: string; color: string; avatar?: string } | null>(null);
+
+  useEffect(() => {
+    const fetchProfileAndSetUser = async () => {
+      try {
+        const tokenUser = getUserFromToken();
+        if (!tokenUser) return;
+
+        const response = await api.get('/api/user/profile');
+        const profile = response.data;
+
+        const name = profile.fullName || profile.username || tokenUser.username || tokenUser.email || 'Anonymous';
+        const color = getStableColor(name);
+        const avatar = profile.profilePicUrl || '';
+
+        setCollaborationUser({ name, color, avatar });
+      } catch (err) {
+        console.error('Error fetching profile for collaboration:', err);
+        const tokenUser = getUserFromToken();
+        if (tokenUser) {
+          const name = tokenUser.username || tokenUser.email || 'Anonymous';
+          setCollaborationUser({
+            name,
+            color: getStableColor(name),
+          });
+        }
+      }
+    };
+
+    void fetchProfileAndSetUser();
+  }, []);
+
+  useEffect(() => {
+    if (isDraft || !pageId || pageId === 'new') {
+      setYdoc(null);
+      setProvider(null);
+      return;
+    }
+
+    let wsProvider: WebsocketProvider | null = null;
+    let doc: Y.Doc | null = null;
+
+    const connect = () => {
+      if (wsProvider) {
+        wsProvider.disconnect();
+        wsProvider.destroy();
+      }
+      if (doc) {
+        doc.destroy();
+      }
+
+      doc = new Y.Doc();
+      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+      const wsUrl = resolveWebSocketBaseUrl(backendUrl);
+      const token = getValidToken();
+
+      if (!token) return;
+
+      if (typeof WebSocket === 'undefined') return;
+
+      wsProvider = new WebsocketProvider(
+        `${wsUrl}/yjs`,
+        `page-${pageId}`,
+        doc,
+        {
+          params: { token },
+          connect: true,
+        }
+      );
+
+      setYdoc(doc);
+      setProvider(wsProvider);
+    };
+
+    connect();
+
+    const handleTokenChange = () => {
+      connect();
+    };
+
+    window.addEventListener(AUTH_TOKEN_CHANGED_EVENT, handleTokenChange);
+
+    return () => {
+      window.removeEventListener(AUTH_TOKEN_CHANGED_EVENT, handleTokenChange);
+      if (wsProvider) {
+        wsProvider.disconnect();
+        wsProvider.destroy();
+      }
+      if (doc) {
+        doc.destroy();
+      }
+      setYdoc(null);
+      setProvider(null);
+    };
+  }, [pageId, isDraft]);
 
   // Tracks the latest editor HTML without waiting for the 800ms debounce.
   // Used by handleManualCreate so Publish always captures what the user typed.
@@ -239,5 +362,8 @@ export function usePageEditor() {
     handleExport,
     toggleStar,
     movePage,
+    ydoc,
+    provider,
+    collaborationUser,
   };
 }

@@ -25,6 +25,7 @@ export default function PageDetailPage() {
     handleConfirmDelete, showDeleteConfirm, setShowDeleteConfirm,
     handleFileImport, handleExport,
     toggleStar, movePage,
+    ydoc, provider, collaborationUser,
   } = usePageEditor();
 
   // showMobileActions is local state because it's a purely visual toggle with no effect on data
@@ -272,6 +273,9 @@ export default function PageDetailPage() {
                   content={selectedPage.content || ''}
                   onUpdate={handleUpdateContent}
                   onImmediateUpdate={setLatestContent}
+                  ydoc={ydoc || undefined}
+                  provider={provider || undefined}
+                  collaborationUser={collaborationUser || undefined}
                 />
               </div>
 

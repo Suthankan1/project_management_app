@@ -23,11 +23,12 @@ import {
   Minus, Undo2, Redo2, Type,
 } from 'lucide-react';
 import { Collaboration } from '@tiptap/extension-collaboration';
+import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
 import * as Y from 'yjs';
 import SlashCommand, { slashSuggestion } from './slashCommand';
 import { Modal } from '@/components/ui/Modal';
 
-interface CollaborationUser { name: string; color: string; }
+interface CollaborationUser { name: string; color: string; avatar?: string; }
 
 export function validateUrl(url: string): boolean {
   const trimmed = url.trim();
@@ -67,6 +68,7 @@ interface EditorProps {
   onImmediateUpdate?: (html: string) => void;
   editable?: boolean;
   ydoc?: Y.Doc;
+  provider?: any;
   collaborationUser?: CollaborationUser;
 }
 
@@ -98,7 +100,7 @@ function Divider() {
   return <div className="w-px h-5 bg-gray-200 mx-1 flex-shrink-0" />;
 }
 
-export default function Editor({ content, onUpdate, onImmediateUpdate, editable = true, ydoc, collaborationUser: _collaborationUser }: EditorProps) {
+export default function Editor({ content, onUpdate, onImmediateUpdate, editable = true, ydoc, provider, collaborationUser }: EditorProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
@@ -139,18 +141,56 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
     ...(ydoc ? [
       Collaboration.configure({ document: ydoc }),
     ] : []),
-  ], [ydoc]);
+    ...(ydoc && provider && collaborationUser ? [
+      CollaborationCursor.configure({
+        provider,
+        user: collaborationUser,
+        render(user) {
+          const cursor = document.createElement('span');
+          cursor.classList.add('collaboration-cursor__caret');
+          cursor.style.borderLeftColor = user.color;
+          cursor.style.borderLeftWidth = '2px';
+          cursor.style.borderLeftStyle = 'solid';
+
+          const label = document.createElement('span');
+          label.classList.add('collaboration-cursor__label');
+          label.style.backgroundColor = user.color;
+
+          if (user.avatar) {
+            const img = document.createElement('img');
+            img.src = user.avatar;
+            img.classList.add('collaboration-cursor__avatar');
+            label.appendChild(img);
+          }
+
+          const nameText = document.createTextNode(user.name);
+          label.appendChild(nameText);
+          cursor.appendChild(label);
+          return cursor;
+        }
+      })
+    ] : []),
+  ], [ydoc, provider, collaborationUser]);
 
   const editor = useEditor({
     // immediatelyRender: false prevents a SSR/CSR hydration mismatch since TipTap's output differs server vs browser
     immediatelyRender: false,
     extensions,
-    content,
+    content: ydoc ? undefined : content,
     editable,
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor, transaction }) => {
       const html = editor.getHTML();
       onImmediateUpdate?.(html);
-      handleUpdate(html);
+      
+      const isConnected = provider && provider.wsconnected;
+      if (isConnected) {
+        const isRemote = transaction.getMeta('y-sync$') !== undefined;
+        if (!isRemote) {
+          handleUpdate(html);
+        }
+      } else {
+        handleUpdate(html);
+      }
     },
     editorProps: {
       attributes: {
@@ -163,13 +203,37 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
   // We skip when the editor is focused (user is actively typing) and when content is truly identical.
   // With Collaboration, getHTML() on an empty Yjs doc returns '<p></p>' so we treat that as empty too.
   useEffect(() => {
-    if (!editor || editor.isFocused || !content) return;
+    if (!editor || editor.isFocused || !content || ydoc) return;
     const editorHTML = editor.getHTML();
     const editorIsEmpty = editorHTML === '<p></p>' || editorHTML === '';
     if (editorIsEmpty || content !== editorHTML) {
       editor.commands.setContent(content, { emitUpdate: false });
     }
-  }, [content, editor]);
+  }, [content, editor, ydoc]);
+
+  // Synchronize initial content from DB if we are the first user to open the room
+  useEffect(() => {
+    if (!editor || !provider || !ydoc) return;
+
+    const handleSync = (isSynced: boolean) => {
+      if (isSynced) {
+        const fragment = ydoc.getXmlFragment('default');
+        if (fragment.length === 0 && content) {
+          editor.commands.setContent(content, { emitUpdate: false });
+        }
+      }
+    };
+
+    provider.on('sync', handleSync);
+
+    if (provider.synced) {
+      handleSync(true);
+    }
+
+    return () => {
+      provider.off('sync', handleSync);
+    };
+  }, [editor, provider, ydoc, content]);
 
   if (!isMounted || !editor) {
     return (
