@@ -1,4 +1,5 @@
 import { initializeSessionCacheForCurrentAuth } from '@/lib/session-cache';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
 export interface User {
     email: string;
@@ -203,7 +204,7 @@ async function requestRefreshAccessToken(): Promise<string> {
         clearTokens();
         throw new Error('No refresh token available');
     }
-    const res = await fetch('/api/auth/refresh', {
+    const res = await fetch(`${getApiBaseUrl()}/api/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: rt }),

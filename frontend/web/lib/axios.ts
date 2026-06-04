@@ -1,8 +1,9 @@
 import axios from "axios";
 import { clearTokens, getRefreshToken, getValidToken, getUserFromToken, refreshAccessToken } from "@/lib/auth";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || '',
+    baseURL: getApiBaseUrl(),
     headers: {
         'Content-Type': 'application/json'
     },
