@@ -8,6 +8,7 @@ import {
   getProjectGitHubRepo,
 } from '@/services/githubService';
 import api from '@/lib/axios';
+import { AxiosError } from 'axios';
 
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -173,8 +174,9 @@ const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
 
       const created = response.data;
       setSuccess({ issueNumber: created.issueNumber, htmlUrl: created.htmlUrl });
-    } catch (err: any) {
-      const errMsg = err?.response?.data?.message || err?.message || 'Failed to create issue';
+    } catch (err: unknown) {
+      const axiosError = err as AxiosError<{ message?: string }>;
+      const errMsg = axiosError.response?.data?.message || (err instanceof Error ? err.message : 'Failed to create issue');
       setApiError(errMsg);
     } finally {
       setSubmitting(false);

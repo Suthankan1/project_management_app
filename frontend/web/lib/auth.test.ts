@@ -40,7 +40,7 @@ describe('auth requestRefreshAccessToken URL handling', () => {
   });
 
   it('falls back to localhost in development when NEXT_PUBLIC_API_BASE_URL is not set', async () => {
-    (process.env as any).NODE_ENV = 'development';
+    Object.defineProperty(process.env, 'NODE_ENV', { value: 'development', configurable: true });
     delete process.env.NEXT_PUBLIC_API_BASE_URL;
     saveRefreshToken('mock-refresh-token');
 
@@ -58,7 +58,7 @@ describe('auth requestRefreshAccessToken URL handling', () => {
   });
 
   it('throws in production when NEXT_PUBLIC_API_BASE_URL is missing', async () => {
-    (process.env as any).NODE_ENV = 'production';
+    Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', configurable: true });
     delete process.env.NEXT_PUBLIC_API_BASE_URL;
     saveRefreshToken('mock-refresh-token');
 

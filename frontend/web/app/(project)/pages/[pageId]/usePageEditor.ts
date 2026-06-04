@@ -65,7 +65,7 @@ export function usePageEditor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
-  const [provider, setProvider] = useState<any | null>(null);
+  const [provider, setProvider] = useState<WebsocketProvider | null>(null);
   const [collaborationUser, setCollaborationUser] = useState<{ name: string; color: string; avatar?: string } | null>(null);
 
   useEffect(() => {
@@ -100,6 +100,7 @@ export function usePageEditor() {
 
   useEffect(() => {
     if (isDraft || !pageId || pageId === 'new') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setYdoc(null);
       setProvider(null);
       return;

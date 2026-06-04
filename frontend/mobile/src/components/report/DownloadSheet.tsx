@@ -7,7 +7,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  ActivityIndicator, Alert,
+  ActivityIndicator, Alert, Platform,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing   from 'expo-sharing';

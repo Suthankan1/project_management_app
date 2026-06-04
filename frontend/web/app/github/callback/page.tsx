@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/axios';
+import { AxiosError } from 'axios';
 
 export default function GitHubCallbackPage() {
   const router = useRouter();
@@ -37,8 +38,9 @@ export default function GitHubCallbackPage() {
         } else {
           router.replace('/dashboard');
         }
-      } catch (err: any) {
-        const errMsg = err?.response?.data?.message || err?.message || 'GitHub authentication failed';
+      } catch (err: unknown) {
+        const axiosError = err as AxiosError<{ message?: string }>;
+        const errMsg = axiosError.response?.data?.message || (err instanceof Error ? err.message : 'GitHub authentication failed');
         setError(errMsg);
       }
     };

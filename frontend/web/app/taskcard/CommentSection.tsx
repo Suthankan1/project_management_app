@@ -5,6 +5,7 @@ import { getUserFromToken } from '@/lib/auth';
 import ActivityFeed from './ActivityFeed';
 import CommentItem from './components/CommentItem';
 import { authApi, tasksApi, projectsApi } from '@/services/api-contract';
+import type { Member } from '@/services/projects-contract';
 import { getApiBaseUrl } from '@/lib/api-base-url';
 
 interface Comment {
@@ -18,6 +19,12 @@ interface CommentSectionProps {
   taskId?: number;
   onFetchRef?: (fn: () => void) => void;
   projectId?: number;
+}
+
+interface UserProfile {
+  username?: string;
+  email?: string;
+  profilePicUrl?: string | null;
 }
 
 // Relative profile picture URLs from the API need a host prefix; absolute CDN URLs are used as-is.
@@ -39,10 +46,10 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef, pro
       // Fetch users to populate profile pictures and map them by username
       const fetchUsers = async () => {
         try {
-          let response: any[];
+          let response: UserProfile[];
           if (projectId) {
             const members = await projectsApi.getMembers(projectId);
-            response = members.map((m: any) => m.user ? {
+            response = members.map((m: Member) => m.user ? {
               username: m.user.username,
               email: m.user.email,
               profilePicUrl: m.user.profilePicUrl
@@ -55,8 +62,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef, pro
             response = await authApi.getAllUsers();
           }
           const uidMap: Record<string, string | null> = {};
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          response.forEach((u: any) => {
+          response.forEach((u: UserProfile) => {
              if (u.username) {
                uidMap[u.username] = u.profilePicUrl || null;
              }

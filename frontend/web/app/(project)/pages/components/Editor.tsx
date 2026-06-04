@@ -25,6 +25,7 @@ import {
 import { Collaboration } from '@tiptap/extension-collaboration';
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
 import * as Y from 'yjs';
+import type { WebsocketProvider } from 'y-websocket';
 import SlashCommand, { slashSuggestion } from './slashCommand';
 import { Modal } from '@/components/ui/Modal';
 
@@ -57,7 +58,7 @@ export function validateUrl(url: string): boolean {
       parsed.protocol === 'https:' ||
       parsed.protocol === 'mailto:'
     );
-  } catch (e) {
+  } catch (_e) {
     return false;
   }
 }
@@ -68,7 +69,7 @@ interface EditorProps {
   onImmediateUpdate?: (html: string) => void;
   editable?: boolean;
   ydoc?: Y.Doc;
-  provider?: any;
+  provider?: WebsocketProvider;
   collaborationUser?: CollaborationUser;
 }
 

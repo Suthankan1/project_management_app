@@ -9,6 +9,11 @@ interface TeamMember {
   name: string;
 }
 
+interface TeamMemberPayload {
+  id: number;
+  user?: { fullName?: string; username?: string };
+}
+
 interface CreateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -53,12 +58,13 @@ export default function CreateTaskModal({
       setLoadingMembers(true);
       try {
         const project = await projectsApi.get(projectId);
-        const teamId = project.teamId ?? (project.team as any)?.id;
+        const team = project.team as { id?: number } | undefined;
+        const teamId = project.teamId ?? team?.id;
         if (teamId) {
           const payload = await projectsApi.getTeamMembers(teamId);
           const rawMembers = Array.isArray(payload) ? payload : [];
           setTeamMembers(
-            rawMembers.map((m: { id: number; user?: { fullName?: string; username?: string } }) => ({
+            rawMembers.map((m: TeamMemberPayload) => ({
               id: m.id,
               name: m.user?.fullName ?? m.user?.username ?? 'Unknown',
             }))

@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
     const status = res.status
     const data = await res.json().catch(() => ({}))
     return NextResponse.json(data, { status })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to proxy token exchange' }, { status: 502 })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to proxy token exchange'
+    return NextResponse.json({ error: message }, { status: 502 })
   }
 }

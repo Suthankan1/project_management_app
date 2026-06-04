@@ -2,6 +2,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { usePageEditor } from './usePageEditor';
 import { usePageContent } from './hooks/usePageContent';
 import React from 'react';
+import { pagesApi } from '@/services/api-contract';
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(() => ({
@@ -178,7 +179,6 @@ describe('usePageEditor Hook', () => {
 
   it('restores a version and updates state', async () => {
     const { result } = renderHook(() => usePageEditor());
-    const { pagesApi } = require('@/services/api-contract');
 
     await act(async () => {
       await result.current.handleRestoreVersion('version-123');

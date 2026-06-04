@@ -129,8 +129,11 @@ interface GitHubApiIssue {
   labels: Array<{ name: string; color: string }>;
   assignees: Array<{ login: string; avatar_url: string }>;
   created_at: string;
+  createdAt?: string;
   updated_at: string;
+  updatedAt?: string;
   html_url: string;
+  htmlUrl?: string;
   comments: number;
 }
 
@@ -143,7 +146,7 @@ export async function fetchIssues(
   state: 'open' | 'closed' | 'all' = 'all',
   label?: string,
 ): Promise<GitHubIssue[]> {
-  const response = await api.get<any[]>('/api/github/issues', {
+  const response = await api.get<GitHubApiIssue[]>('/api/github/issues', {
     params: {
       repoFullName,
       state,
@@ -159,9 +162,9 @@ export async function fetchIssues(
     state: issue.state,
     labels: issue.labels,
     assignees: issue.assignees,
-    createdAt: issue.created_at || issue.createdAt,
-    updatedAt: issue.updated_at || issue.updatedAt,
-    htmlUrl: issue.html_url || issue.htmlUrl,
+    createdAt: issue.created_at || issue.createdAt || '',
+    updatedAt: issue.updated_at || issue.updatedAt || '',
+    htmlUrl: issue.html_url || issue.htmlUrl || '',
     comments: issue.comments,
   }));
 }

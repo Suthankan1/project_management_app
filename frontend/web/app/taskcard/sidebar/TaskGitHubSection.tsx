@@ -24,6 +24,7 @@ import { CIStatusBadge } from '@/components/ui';
 import SidebarField from './SidebarField';
 import CreateIssueFromTaskModal from '@/components/github/CreateIssueFromTaskModal';
 import type { GitHubIssue } from '@/services/githubService';
+import { AxiosError } from 'axios';
 
 // ── Backend DTO shapes ────────────────────────────────────────────────────────
 
@@ -307,8 +308,9 @@ const TaskGitHubSection: React.FC<TaskGitHubSectionProps> = ({
       setSummary(summaryRes.data);
       setPrs(Array.isArray(prsRes.data) ? prsRes.data : []);
       setCommits(Array.isArray(commitsRes.data) ? commitsRes.data : []);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || 'Failed to load GitHub data');
+    } catch (err: unknown) {
+      const axiosError = err as AxiosError<{ message?: string }>;
+      setError(axiosError.response?.data?.message || (err instanceof Error ? err.message : 'Failed to load GitHub data'));
     } finally {
       setLoadingSummary(false);
       setLoadingPrs(false);
@@ -363,8 +365,9 @@ const TaskGitHubSection: React.FC<TaskGitHubSectionProps> = ({
       setBranchEditing(false);
       setBranchSaved(true);
       setTimeout(() => setBranchSaved(false), 2500);
-    } catch (err: any) {
-      setBranchError(err?.response?.data?.message || err?.message || 'Failed to save branch name');
+    } catch (err: unknown) {
+      const axiosError = err as AxiosError<{ message?: string }>;
+      setBranchError(axiosError.response?.data?.message || (err instanceof Error ? err.message : 'Failed to save branch name'));
     } finally {
       setSavingBranch(false);
     }
