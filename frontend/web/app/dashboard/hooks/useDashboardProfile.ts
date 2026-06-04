@@ -22,12 +22,9 @@ export function useDashboardProfile(user: User | null): UseDashboardProfileRetur
   useEffect(() => {
     if (!user?.email) return;
     api
-      .get('/api/auth/users')
+      .get('/api/user/profile')
       .then((res) => {
-        const found = (res.data as UserSummary[]).find(
-          (u) => u.email.toLowerCase() === user.email!.toLowerCase()
-        );
-        if (found?.profilePicUrl) setProfilePicUrl(found.profilePicUrl);
+        if (res.data?.profilePicUrl) setProfilePicUrl(res.data.profilePicUrl);
       })
       .catch(() => {});
   }, [user]);

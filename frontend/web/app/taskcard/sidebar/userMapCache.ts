@@ -103,6 +103,7 @@ export function getOrFetchUserMap(options?: { forceRefresh?: boolean }): Promise
       return map;
     })
     .catch(() => {
+      userMapCache = {};
       userMapFetchPromise = null;
       return {};
     });
