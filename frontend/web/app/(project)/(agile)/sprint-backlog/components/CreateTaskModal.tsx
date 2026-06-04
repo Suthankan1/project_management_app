@@ -2,11 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Plus, User, Hash } from 'lucide-react';
-import axios from '@/lib/axios';
+import { projectsApi } from '@/services/api-contract';
 
 interface TeamMember {
   id: number;
   name: string;
+}
+
+interface TeamMemberPayload {
+  id: number;
+  user?: { fullName?: string; username?: string };
 }
 
 interface CreateTaskModalProps {
@@ -52,15 +57,14 @@ export default function CreateTaskModal({
     const loadMembers = async () => {
       setLoadingMembers(true);
       try {
-        const projectRes = await axios.get(`/api/projects/${projectId}`);
-        const project = projectRes.data;
-        const teamId = project.teamId ?? project.team?.id;
+        const project = await projectsApi.get(projectId);
+        const team = project.team as { id?: number } | undefined;
+        const teamId = project.teamId ?? team?.id;
         if (teamId) {
-          const membersRes = await axios.get(`/api/teams/${teamId}/members`);
-          const payload = membersRes.data;
+          const payload = await projectsApi.getTeamMembers(teamId);
           const rawMembers = Array.isArray(payload) ? payload : [];
           setTeamMembers(
-            rawMembers.map((m: { id: number; user?: { fullName?: string; username?: string } }) => ({
+            rawMembers.map((m: TeamMemberPayload) => ({
               id: m.id,
               name: m.user?.fullName ?? m.user?.username ?? 'Unknown',
             }))

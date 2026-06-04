@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TrendingDown, BarChart2 } from 'lucide-react';
-import api from '@/lib/axios';
+import { sprintsApi } from '@/services/api-contract';
 import { toast } from '@/components/ui';
 import BurndownChart, { type BurndownPoint } from './components/BurndownChart';
 import SprintSelector, { type BurndownSprint } from './components/SprintSelector';
@@ -65,8 +65,7 @@ function BurndownContent() {
     }
     const fetchSprints = async () => {
       try {
-        const res = await api.get<BurndownSprint[]>(`/api/sprints/project/${projectId}`);
-        const list = res.data;
+        const list = await sprintsApi.listByProject(projectId);
         setSprints(list);
         if (list.length > 0) {
           // default to the first ACTIVE sprint, or the first one
@@ -99,10 +98,8 @@ function BurndownContent() {
       const params = new URLSearchParams();
       if (filterFrom) params.set('from', filterFrom);
       if (filterTo)   params.set('to',   filterTo);
-      const res = await api.get<BurndownResponse>(
-        `/api/burndown/sprint/${selectedSprintId}?${params.toString()}`
-      );
-      setBurndown(res.data);
+      const data = await sprintsApi.getBurndown(selectedSprintId, params);
+      setBurndown(data);
       setError(null);
     } catch {
       setError('Failed to load burndown data.');
@@ -130,7 +127,7 @@ function BurndownContent() {
     if (!selectedSprint) return;
     const normalized = val ? String(val).slice(0, 10) : null;
     try {
-      await api.put(`/api/sprints/${selectedSprint.id}`, {
+      await sprintsApi.update(selectedSprint.id, {
         name: selectedSprint.name,
         startDate: field === 'start' ? normalized : (selectedSprint.startDate || null),
         endDate: field === 'end' ? normalized : (selectedSprint.endDate || null)

@@ -1,4 +1,6 @@
 import { tasksApi, kanbanApi, projectsApi, labelsApi } from '@/services/api-contract';
+import { normalizeTaskPriority } from '@/services/tasks-contract';
+import type { TaskListQueryParams, TaskListAllQueryParams } from '@/services/tasks-contract';
 import { Task, Label, KanbanColumnConfig } from './types';
 
 export type TaskResponseDTO = Task;
@@ -25,16 +27,10 @@ export async function fetchTasksByProject(
   filters?: { milestoneId?: number | null; archived?: boolean }
 ): Promise<Task[]> {
   try {
-    const params: Record<string, unknown> = {
+    const params: TaskListQueryParams = {
       page: 0,
       size: 500,
     };
-    if (filters?.milestoneId != null) {
-      params.milestoneId = filters.milestoneId;
-    }
-    if (filters?.archived !== undefined) {
-      params.archived = filters.archived;
-    }
     const response = await tasksApi.listByProject(projectId, params);
     return response.content || [];
   } catch (error) {
@@ -53,7 +49,7 @@ export async function fetchAllTasksByProject(
   filters?: { milestoneId?: number | null; archived?: boolean }
 ): Promise<Task[]> {
   try {
-    const params: Record<string, unknown> = {};
+    const params: TaskListAllQueryParams = {};
     if (filters?.milestoneId != null) {
       params.milestoneId = filters.milestoneId;
     }
@@ -207,11 +203,11 @@ export async function createTask(taskData: Partial<Task> & { projectId: number; 
       title: taskData.title.trim(),
       description: taskData.description || '',
       status: taskData.status,
-      priority: taskData.priority || 'MEDIUM',
+      priority: normalizeTaskPriority(taskData.priority),
       projectId: taskData.projectId,
       dueDate: taskData.dueDate || null,
       startDate: taskData.startDate || null,
-      assigneeId: taskData.assigneeId ? Number(taskData.assigneeId) : null,
+      assigneeId: taskData.assigneeId ? Number(taskData.assigneeId) : undefined,
     };
 
     if (process.env.NODE_ENV === 'development') console.log('Creating task with data:', requestData);

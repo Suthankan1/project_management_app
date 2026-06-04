@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import api from '@/lib/axios';
 import type { User } from '@/lib/auth';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+// Fail early if configuration is invalid (e.g. in production)
+getApiBaseUrl();
 
 interface UserSummary {
   email: string;
@@ -22,12 +24,9 @@ export function useDashboardProfile(user: User | null): UseDashboardProfileRetur
   useEffect(() => {
     if (!user?.email) return;
     api
-      .get('/api/auth/users')
+      .get('/api/user/profile')
       .then((res) => {
-        const found = (res.data as UserSummary[]).find(
-          (u) => u.email.toLowerCase() === user.email!.toLowerCase()
-        );
-        if (found?.profilePicUrl) setProfilePicUrl(found.profilePicUrl);
+        if (res.data?.profilePicUrl) setProfilePicUrl(res.data.profilePicUrl);
       })
       .catch(() => {});
   }, [user]);
@@ -39,7 +38,8 @@ export function useDashboardProfile(user: User | null): UseDashboardProfileRetur
     if (profilePicUrl.startsWith('http://') || profilePicUrl.startsWith('https://'))
       return profilePicUrl;
     // Prefix relative URLs with the API base URL
-    return `${API_BASE_URL}${profilePicUrl}`;
+    const baseUrl = getApiBaseUrl();
+    return `${baseUrl || ''}${profilePicUrl}`;
   }, [profilePicUrl]);
 
   return { resolvedProfilePicUrl };

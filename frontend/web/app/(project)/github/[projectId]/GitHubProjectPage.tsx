@@ -10,6 +10,7 @@ import {
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ensureValidToken } from '@/lib/auth';
+import api from '@/lib/axios';
 import { useGlobalNotifications } from '@/components/providers/GlobalNotificationProvider';
 import { useGithubPRSocket, type GithubPRUpdate } from '@/hooks/useGithubPRSocket';
 import { useGithubCISocket, type GithubCIUpdate } from '@/hooks/useGithubCISocket';
@@ -25,9 +26,8 @@ import {
   getProjectGitHubRepo,
   setProjectGitHubRepo,
   clearProjectGitHubRepo,
-  getGitHubToken,
-  clearGitHubToken,
-  fetchRepositoriesWithToken,
+  hasConnectedGitHubAccount,
+  fetchRepositories,
   fetchGitHubUser,
   fetchPullRequest,
   fetchPullRequests,
@@ -1056,7 +1056,7 @@ function IssuesPanel({
             <AlertCircle size={16} className="text-red-400" />
           </div>
           <p className="text-xs text-slate-500 font-outfit">{error}</p>
-          {(!getGitHubToken() || error.toLowerCase().includes('connect')) ? (
+          {(!hasConnectedGitHubAccount() || error.toLowerCase().includes('connect')) ? (
             <motion.button
               onClick={() => onRequireLogin()}
               whileHover={{ scale: 1.03 }}
@@ -1769,18 +1769,16 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   }, [projectId]);
 
   const loadData = useCallback(async (conn: ProjectGitHubConnection) => {
-    const token = getGitHubToken();
-    if (!token) return;
     setLoading(true);
     setPRError(null);
     setCommitError(null);
     setIssueError(null);
 
     const [prResult, commitResult, issueResult, userResult] = await Promise.allSettled([
-      fetchPullRequests(token, conn.ownerLogin, conn.repoName),
-      fetchCommits(token, conn.ownerLogin, conn.repoName),
+      fetchPullRequests(conn.ownerLogin, conn.repoName),
+      fetchCommits(conn.ownerLogin, conn.repoName),
       fetchIssues(conn.repoFullName),
-      fetchGitHubUser(token),
+      fetchGitHubUser(),
     ]);
 
     if (prResult.status === 'fulfilled') setPRs(prResult.value);
@@ -1802,9 +1800,6 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   }, []);
 
   const loadIssues = useCallback(async (conn: ProjectGitHubConnection) => {
-    const token = getGitHubToken();
-    if (!token) return;
-
     try {
       const latestIssues = await fetchIssues(conn.repoFullName);
       setIssues(latestIssues);
@@ -1863,12 +1858,10 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   }, [connection, loadAutomationLogs, loadAutomationRules]);
 
   const loadRepos = useCallback(async () => {
-    const token = getGitHubToken();
-    if (!token) return;
     setLoadingRepos(true);
     setRepoError(null);
     try {
-      const data = await fetchRepositoriesWithToken(token);
+      const data = await fetchRepositories();
       setAllRepos(data);
     } catch (err) {
       setRepoError(err instanceof Error ? err.message : 'Failed to load repositories');
@@ -1907,8 +1900,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   };
 
   const handleOpenModal = async () => {
-    const token = getGitHubToken();
-    if (!token) {
+    if (!hasConnectedGitHubAccount()) {
       if (savedAccounts.length > 0) setShowAccountPicker(true);
       else handleConnectGitHub();
       return;
@@ -1928,17 +1920,28 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   };
 
   const handleLogout = async () => {
-    const token = getGitHubToken();
-    if (token) {
-      try {
-        await fetch('/api/github/revoke', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        });
-      } catch { /* ignore */ }
+    try {
+      await api.post('/api/github/revoke');
+      // Fetch the updated user profile from the backend to clear the githubUsername field in local cache
+      const profileRes = await api.get('/api/user/profile');
+      if (profileRes.data) {
+        localStorage.setItem('userProfile', JSON.stringify(profileRes.data));
+      } else {
+        localStorage.removeItem('userProfile');
+      }
+    } catch {
+      // Fallback: manually delete githubUsername from userProfile in localStorage if request fails
+      const profile = localStorage.getItem('userProfile');
+      if (profile) {
+        try {
+          const parsed = JSON.parse(profile);
+          delete parsed.githubUsername;
+          localStorage.setItem('userProfile', JSON.stringify(parsed));
+        } catch {
+          localStorage.removeItem('userProfile');
+        }
+      }
     }
-    clearGitHubToken();
     clearProjectGitHubRepo(projectId);
     setIsPostLogout(true);
     setConnection(null);
@@ -1980,11 +1983,8 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     if (!connection) return;
 
     if (update.type === 'opened') {
-      const token = getGitHubToken();
-      if (!token) return;
-
       try {
-        const pr = await fetchPullRequest(token, connection.ownerLogin, connection.repoName, update.prNumber);
+        const pr = await fetchPullRequest(connection.ownerLogin, connection.repoName, update.prNumber);
         setPRs((current) => [pr, ...current.filter((existing) => existing.number !== pr.number)]);
         setPRError(null);
       } catch (error) {

@@ -9,6 +9,7 @@ import com.planora.backend.exception.GithubIssueValidationException;
 import com.planora.backend.exception.GithubRateLimitException;
 import com.planora.backend.exception.GithubRepositoryNotFoundException;
 import com.planora.backend.exception.ResourceNotFoundException;
+import com.planora.backend.exception.StorageQuotaExceededException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -68,6 +69,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ApiErrorResponse> handleConflict(ConflictException ex, HttpServletRequest request) {
         return buildError(HttpStatus.CONFLICT, "CONFLICT", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(StorageQuotaExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleStorageQuotaExceeded(StorageQuotaExceededException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.PAYLOAD_TOO_LARGE, "STORAGE_QUOTA_EXCEEDED", ex.getMessage(), request);
     }
 
     @ExceptionHandler(EntityNotFoundException.class)

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import api from "@/lib/axios";
+import { sprintsApi } from "@/services/tasks-contract";
 import {
   LineChart,
   Line,
@@ -25,10 +25,10 @@ export default function BurndownChart({ sprintId }: { sprintId: number }) {
   const [data, setData] = useState<BurndownPoint[]>([]);
 
   useEffect(() => {
-    api
-      .get(`/api/burndown/sprint/${sprintId}`)
+    sprintsApi
+      .getBurndown(sprintId)
       .then((res) => {
-        const points: BurndownPoint[] = (res.data.dataPoints ?? []).map(
+        const points: BurndownPoint[] = (res.dataPoints ?? []).map(
           (p: { date: string; remainingPoints: number; idealPoints: number }) => ({
             date: p.date,
             remainingPoints: p.remainingPoints,

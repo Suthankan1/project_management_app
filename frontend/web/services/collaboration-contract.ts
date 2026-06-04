@@ -21,6 +21,13 @@ export interface ChatSummaries {
 export interface PageSummaryDto {
   id: number;
   title: string;
+  parentPageId?: number | null;
+  isStarred?: boolean;
+  updatedAt?: string;
+  lastViewedAt?: string | null;
+  sortOrder?: number;
+  icon?: string | null;
+  cover?: string | null;
 }
 
 export interface PageDetailDto {
@@ -29,6 +36,23 @@ export interface PageDetailDto {
   content?: string;
   createdAt?: string;
   updatedAt?: string;
+  parentPageId?: number | null;
+  isStarred?: boolean;
+  lastViewedAt?: string | null;
+  sortOrder?: number;
+  icon?: string | null;
+  cover?: string | null;
+}
+
+export interface PageVersionDto {
+  id: number;
+  pageId: number;
+  title: string;
+  content: string;
+  versionNumber: number;
+  authorId?: number | null;
+  authorName: string;
+  createdAt: string;
 }
 
 export interface ChatInboxActivity {
@@ -91,6 +115,29 @@ export const pagesApi = {
   },
   delete: async (pageId: number | string): Promise<void> => {
     await api.delete(`/api/pages/${pageId}`);
+  },
+  toggleStar: async (projectId: number | string, pageId: number | string): Promise<PageDetailDto> => {
+    const { data } = await api.patch(`/api/projects/${projectId}/pages/${pageId}/star`);
+    return data;
+  },
+  movePage: async (projectId: number | string, pageId: number | string, parentPageId: number | string | null): Promise<PageDetailDto> => {
+    const { data } = await api.patch(`/api/projects/${projectId}/pages/${pageId}/move`, { parentPageId });
+    return data;
+  },
+  markViewed: async (projectId: number | string, pageId: number | string): Promise<void> => {
+    await api.post(`/api/projects/${projectId}/pages/${pageId}/viewed`);
+  },
+  getRecent: async (projectId: number | string): Promise<PageSummaryDto[]> => {
+    const { data } = await api.get(`/api/projects/${projectId}/pages/recent`);
+    return data;
+  },
+  getVersions: async (projectId: number | string, pageId: number | string): Promise<PageVersionDto[]> => {
+    const { data } = await api.get(`/api/projects/${projectId}/pages/${pageId}/versions`);
+    return data;
+  },
+  restoreVersion: async (projectId: number | string, pageId: number | string, versionId: number | string): Promise<PageDetailDto> => {
+    const { data } = await api.post(`/api/projects/${projectId}/pages/${pageId}/versions/${versionId}/restore`);
+    return data;
   },
 };
 

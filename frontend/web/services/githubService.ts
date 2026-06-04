@@ -1,4 +1,5 @@
 import { gitHubApi, tasksApi } from './api-contract';
+import api from '@/lib/axios';
 
 export interface GitHubOwner {
   login: string;
@@ -128,8 +129,11 @@ interface GitHubApiIssue {
   labels: Array<{ name: string; color: string }>;
   assignees: Array<{ login: string; avatar_url: string }>;
   created_at: string;
+  createdAt?: string;
   updated_at: string;
+  updatedAt?: string;
   html_url: string;
+  htmlUrl?: string;
   comments: number;
 }
 
@@ -142,40 +146,15 @@ export async function fetchIssues(
   state: 'open' | 'closed' | 'all' = 'all',
   label?: string,
 ): Promise<GitHubIssue[]> {
-  const token = getGitHubToken();
-  if (!token) {
-    throw new Error('Connect GitHub to view issues.');
-  }
-
-  const response = await fetch(
-    `https://api.github.com/repos/${repoFullName}/issues?state=${state}&per_page=100${label?.trim() ? `&labels=${encodeURIComponent(label.trim())}` : ''}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
+  const response = await api.get<GitHubApiIssue[]>('/api/github/issues', {
+    params: {
+      repoFullName,
+      state,
+      label: label?.trim() || undefined,
     },
-  );
+  });
 
-  if (response.status === 401) {
-    throw new Error('Connect GitHub to view issues.');
-  }
-
-  if (response.status === 404) {
-    throw new Error('Repository not found or unavailable.');
-  }
-
-  if (response.status === 429) {
-    throw new Error('GitHub rate limit exceeded. Try again later.');
-  }
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({})) as { message?: string };
-    throw new Error(body.message || 'Failed to load issues.');
-  }
-
-  const issues = await response.json() as GitHubApiIssue[];
-  return issues.map(issue => ({
+  return response.data.map(issue => ({
     id: issue.id,
     number: issue.number,
     title: issue.title,
@@ -183,116 +162,65 @@ export async function fetchIssues(
     state: issue.state,
     labels: issue.labels,
     assignees: issue.assignees,
-    createdAt: issue.created_at,
-    updatedAt: issue.updated_at,
-    htmlUrl: issue.html_url,
+    createdAt: issue.created_at || issue.createdAt || '',
+    updatedAt: issue.updated_at || issue.updatedAt || '',
+    htmlUrl: issue.html_url || issue.htmlUrl || '',
     comments: issue.comments,
   }));
 }
 
-export async function fetchRepositoriesWithToken(token: string): Promise<GitHubRepository[]> {
-  const response = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated', {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github.v3+json',
-    },
-  });
-
-  if (response.status === 401) {
-    throw new Error('Invalid GitHub token. Please reconnect your account.');
-  }
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch repositories from GitHub');
-  }
-
-  return response.json();
-}
-
-export async function fetchGitHubUser(token: string): Promise<GitHubUser> {
-  const response = await fetch('https://api.github.com/user', {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github.v3+json',
-    },
-  });
-  if (!response.ok) throw new Error('Failed to fetch GitHub user');
-  return response.json();
+export async function fetchGitHubUser(): Promise<GitHubUser> {
+  const { data } = await api.get<GitHubUser>('/api/github/user');
+  return data;
 }
 
 export async function fetchPullRequests(
-  token: string,
   owner: string,
   repo: string,
 ): Promise<GitHubPullRequest[]> {
-  const response = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=50&sort=updated&direction=desc`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
-    },
-  );
-  if (response.status === 404) throw new Error('Repository not found or no access');
-  if (!response.ok) throw new Error('Failed to fetch pull requests');
-  return response.json();
+  const { data } = await api.get<GitHubPullRequest[]>('/api/github/pull-requests', {
+    params: { owner, repo },
+  });
+  return data;
 }
 
 export async function fetchPullRequest(
-  token: string,
   owner: string,
   repo: string,
   prNumber: number,
 ): Promise<GitHubPullRequest> {
-  const response = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
-    },
-  );
-  if (response.status === 404) throw new Error('Pull request not found or no access');
-  if (!response.ok) throw new Error('Failed to fetch pull request');
-  return response.json();
+  const { data } = await api.get<GitHubPullRequest>(`/api/github/pull-requests/${prNumber}`, {
+    params: { owner, repo },
+  });
+  return data;
 }
 
 export async function fetchCommits(
-  token: string,
   owner: string,
   repo: string,
 ): Promise<GitHubCommit[]> {
-  const response = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/commits?per_page=50`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
-    },
-  );
-  if (response.status === 404) throw new Error('Repository not found or no access');
-  if (!response.ok) throw new Error('Failed to fetch commits');
-  return response.json();
+  const { data } = await api.get<GitHubCommit[]>('/api/github/commits', {
+    params: { owner, repo },
+  });
+  return data;
 }
 
-// ── GitHub token (stored per browser session) ────────────────────────────────
+// ── GitHub account connection status ────────────────────────────────────────
 
-export function getGitHubToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('github_access_token');
-}
-
-export function setGitHubToken(token: string): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem('github_access_token', token);
-}
-
-export function clearGitHubToken(): void {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem('github_access_token');
+export function hasConnectedGitHubAccount(): boolean {
+  if (typeof window === 'undefined') return false;
+  const profile = localStorage.getItem('userProfile');
+  if (profile) {
+    try {
+      const parsed = JSON.parse(profile);
+      if (parsed && parsed.githubUsername) {
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return false;
 }
 
 // ── Per-project GitHub repo connection ───────────────────────────────────────

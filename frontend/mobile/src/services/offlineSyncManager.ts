@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/axios';
+import { taskService } from './task-service';
 
 export interface QueuedMutation {
   id: string;
@@ -138,8 +139,7 @@ async function syncQueue() {
 
   try {
     if (pendingItem.type === 'CREATE_TASK') {
-      const res = await api.post('/api/tasks', pendingItem.payload);
-      const createdTask = res.data;
+      const createdTask = await taskService.create(pendingItem.payload);
 
       // Replace temporary ID references in other queue items
       const tempId = pendingItem.taskId;
@@ -166,8 +166,7 @@ async function syncQueue() {
       // Fetch latest state to check for conflicts
       let serverTask;
       try {
-        const res = await api.get(`/api/tasks/${taskId}`);
-        serverTask = res.data;
+        serverTask = await taskService.get(taskId);
       } catch (err: any) {
         if (err.response?.status === 404) {
           // Task deleted on server -> sync failed due to deletion conflict
@@ -216,22 +215,19 @@ async function syncQueue() {
       // Perform update request
       let updatedTask;
       if (pendingItem.type === 'UPDATE_STATUS') {
-        const res = await api.patch(`/api/tasks/${taskId}/status`, pendingItem.payload);
-        updatedTask = res.data;
+        updatedTask = await taskService.updateStatus(taskId, pendingItem.payload.status);
       } else if (pendingItem.type === 'UPDATE_ASSIGNEE') {
         const { assigneeId } = pendingItem.payload;
         if (assigneeId) {
-          await api.patch(`/api/tasks/${taskId}/assign/${assigneeId}`);
+          await taskService.assignTaskSingle(taskId, assigneeId);
         } else {
-          await api.delete(`/api/tasks/${taskId}/assignee`);
+          await taskService.unassignTask(taskId);
         }
         // Fetch fresh task representation after assignee change
-        const res = await api.get(`/api/tasks/${taskId}`);
-        updatedTask = res.data;
+        updatedTask = await taskService.get(taskId);
       } else if (pendingItem.type === 'UPDATE_DUE_DATE') {
-        await api.patch(`/api/tasks/${taskId}/dates`, pendingItem.payload);
-        const res = await api.get(`/api/tasks/${taskId}`);
-        updatedTask = res.data;
+        await taskService.updateDates(taskId, pendingItem.payload);
+        updatedTask = await taskService.get(taskId);
       }
 
       // Remove from queue
@@ -316,8 +312,7 @@ export const offlineSyncManager = {
       try {
         // Fetch current server state of task
         if (item.taskId) {
-          const res = await api.get(`/api/tasks/${item.taskId}`);
-          const serverTask = res.data;
+          const serverTask = await taskService.get(item.taskId);
           // Set original task's updatedAt to match server's, bypassing conflict check
           if (item.originalTask) {
             item.originalTask.updatedAt = serverTask.updatedAt;
@@ -338,8 +333,8 @@ export const offlineSyncManager = {
       await saveQueue();
       if (item.taskId) {
         try {
-          const res = await api.get(`/api/tasks/${item.taskId}`);
-          emit({ type: 'TASK_UPDATED', task: res.data });
+          const serverTask = await taskService.get(item.taskId);
+          emit({ type: 'TASK_UPDATED', task: serverTask });
         } catch {
           // If task couldn't be fetched (deleted), keep original UI revert
           emit({ type: 'TASK_UPDATED', task: { id: item.taskId, _deleted: true } });

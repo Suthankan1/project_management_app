@@ -275,7 +275,7 @@ const TaskMainContent: React.FC<TaskMainContentProps> = ({
       )}
 
       {/* Comments Component */}
-      <CommentSection taskId={taskId} />
+      <CommentSection taskId={taskId} projectId={projectId} />
     </div>
   );
 };

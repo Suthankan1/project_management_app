@@ -1,0 +1,204 @@
+Planora API Contract Check
+Frontend call sites scanned: 386
+Backend routes scanned: 39
+
+Frontend calls with no backend match: 331
+- frontend/web/app/(project)/(agile)/sprint-board/page.tsx:59 GET /api/projects/:projectIdStr
+- frontend/web/app/(project)/calendar/api.ts:47 GET /api/calendar/events
+- frontend/web/app/(project)/github/[projectId]/GitHubProjectPage.tsx:1934 POST /api/github/revoke (handleLogout)
+- frontend/web/app/(project)/layout.tsx:63 GET /api/projects/:projectId
+- frontend/web/app/(project)/layout.tsx:78 POST /api/projects/:projectId/access
+- frontend/web/app/(project)/list/components/TaskRow.tsx:115 PATCH /api/tasks/:id/priority (handlePriorityChange)
+- frontend/web/app/(project)/pages/[pageId]/usePageEditor.ts:76 GET /api/user/profile (fetchProfileAndSetUser)
+- frontend/web/app/(project)/project/[id]/chat/components/chatMessage.tsx:260 GET /api/projects/:projectId/chat/messages/refresh-document
+- frontend/web/app/(project)/project/[id]/chat/components/uploadChatDocument.ts:6 POST /api/projects/:projectId/chat/messages/upload-document
+- frontend/web/app/(project)/project/[id]/settings/RecurringSchedulesManager.tsx:33 GET /api/tasks/project/:projectId/all
+- frontend/web/app/(project)/project/[id]/settings/RecurringSchedulesManager.tsx:54 PUT /api/tasks/:id (handleToggleActive)
+- frontend/web/app/(project)/project/[id]/settings/RecurringSchedulesManager.tsx:80 PUT /api/tasks/:id (handleRemoveRecurrence)
+- frontend/web/app/(project)/workload/page.tsx:83 GET /api/projects/:pid
+- frontend/web/app/(project)/workload/page.tsx:86 GET /api/teams/:teamId/members
+- frontend/web/app/createProject/inviteMembers/page.tsx:133 POST /api/projects/:projectId/invitations
+- frontend/web/app/dashboard/components/recentspaces/RecentProjectCard.tsx:51 POST /api/projects/:id/favorite (handleFavoriteClick)
+- frontend/web/app/dashboard/components/recentspaces/RecentProjectCard.tsx:63 POST /api/projects/:id/access (recordProjectAccess)
+- frontend/web/app/dashboard/notifications/hooks/useNotificationTaskProjectLinks.ts:44 GET /api/tasks/:taskId (hydrateTaskProjectLinks)
+- frontend/web/app/github/callback/page.tsx:23 POST /api/github/token (exchangeToken)
+- frontend/web/app/profile/hooks/useProfile.ts:88 GET /api/user/profile (loadProfile)
+- frontend/web/app/profile/hooks/useProfile.ts:122 PUT /api/user/profile/update (onSaveProfile)
+- frontend/web/app/profile/hooks/useProfile.ts:160 POST /api/user/profile/photo (onUploadPhoto)
+- frontend/web/app/taskcard/ActivityFeed.tsx:59 GET /api/tasks/:taskId/activities (load)
+- frontend/web/app/taskcard/SubtaskList.tsx:63 POST /api/tasks/:taskId/subtasks (handleAddSubtask)
+- frontend/web/app/taskcard/SubtaskList.tsx:82 PATCH /api/tasks/:id/status (handleToggle)
+- frontend/web/app/taskcard/SubtaskList.tsx:90 PATCH /api/tasks/:id/status
+- frontend/web/app/taskcard/TaskCardModal.tsx:300 PUT /api/tasks/:taskId
+- frontend/web/app/taskcard/TaskCardModal.tsx:487 DELETE /api/tasks/:id/assignee
+- frontend/web/app/taskcard/TaskHeader.tsx:29 PATCH /api/tasks/:numericTaskId (handleToggleArchive)
+- frontend/web/app/taskcard/TaskHeader.tsx:58 POST /api/tasks/:numericTaskId/save-as-template (handleSaveTemplate)
+- frontend/web/app/taskcard/TaskMainContent.tsx:192 DELETE /api/tasks/:taskId/dependencies/:id
+- frontend/web/app/taskcard/TaskMainContent.tsx:249 DELETE /api/tasks/:id/dependencies/:taskId
+- frontend/web/app/taskcard/TemplatePicker.tsx:18 GET /api/projects/:projectId/templates
+- frontend/web/app/taskcard/components/DependencyPicker.tsx:32 GET /api/tasks/project/:projectId/all
+- frontend/web/app/taskcard/components/DependencyPicker.tsx:49 POST /api/tasks/:taskId/dependencies/:id (handleSelect)
+- frontend/web/app/taskcard/page.tsx:85 GET /api/tasks/:taskId
+- frontend/web/app/taskcard/page.tsx:158 PUT /api/tasks/:taskId
+- frontend/web/app/taskcard/sidebar/CreateIssueModal.tsx:171 POST /api/tasks/:taskId/github-issue (handleSubmit)
+- frontend/web/app/taskcard/sidebar/CustomFieldsSection.tsx:30 GET /api/tasks/:taskId/custom-fields (fetchFields)
+- frontend/web/app/taskcard/sidebar/CustomFieldsSection.tsx:50 PATCH /api/tasks/:taskId/custom-fields (handleUpdate)
+- frontend/web/app/taskcard/sidebar/CustomFieldsSection.tsx:61 GET /api/tasks/:taskId/custom-fields
+- frontend/web/app/taskcard/sidebar/MultiAssigneeSection.tsx:51 GET /api/projects/:projectId/members (setLocalAssignees)
+- frontend/web/app/taskcard/sidebar/MultiAssigneeSection.tsx:83 PATCH /api/tasks/:taskId/assignees (addAssignee)
+- frontend/web/app/taskcard/sidebar/MultiAssigneeSection.tsx:89 PATCH /api/tasks/:taskId/assignees
+- frontend/web/app/taskcard/sidebar/MultiAssigneeSection.tsx:104 PATCH /api/tasks/:taskId/assignees (removeAssignee)
+- frontend/web/app/taskcard/sidebar/MultiAssigneeSection.tsx:110 PATCH /api/tasks/:taskId/assignees
+- frontend/web/app/taskcard/sidebar/TaskGitHubSection.tsx:304 GET /api/tasks/:taskId/github
+- frontend/web/app/taskcard/sidebar/TaskGitHubSection.tsx:305 GET /api/tasks/:taskId/pull-requests:syncQS
+- frontend/web/app/taskcard/sidebar/TaskGitHubSection.tsx:365 PUT /api/tasks/:taskId/github/branch (saveBranch)
+- frontend/web/components/github/CreateIssueFromTaskModal.tsx:87 POST /api/github/issues/create
+- frontend/web/components/github/ImportIssueModal.tsx:52 POST /api/github/issues/import (handleImport)
+- frontend/web/components/layout/topbar/GlobalSearch.tsx:128 GET /api/search
+- frontend/web/components/shared/CreateTaskModal.tsx:75 GET /api/projects/:projectId (loadMembers)
+- frontend/web/components/shared/CreateTaskModal.tsx:79 GET /api/teams/:teamId/members (loadMembers)
+- frontend/web/hooks/useCommandPalette.ts:111 GET /api/search
+- frontend/web/hooks/useCommandPalette.ts:118 GET /api/tasks/project/:projectId/all
+- frontend/web/lib/auth.ts:214 POST /api/auth/refresh
+- frontend/web/lib/dms.ts:126 GET /api/projects/:projectId/folders/:folderId/permissions
+- frontend/web/lib/dms.ts:131 PUT /api/projects/:projectId/folders/:folderId/permissions
+- frontend/web/lib/dms.ts:135 GET /api/projects/:projectId/storage-quota
+- frontend/web/lib/dms.ts:140 GET /api/projects/:projectId/folders
+- frontend/web/lib/dms.ts:145 POST /api/projects/:projectId/folders
+- frontend/web/lib/dms.ts:153 DELETE /api/projects/:projectId/folders/:folderId
+- frontend/web/lib/dms.ts:161 GET /api/projects/:projectId/documents
+- frontend/web/lib/dms.ts:166 GET /api/projects/:projectId/documents/:documentId/versions
+- frontend/web/lib/dms.ts:171 PATCH /api/projects/:projectId/documents/:documentId
+- frontend/web/lib/dms.ts:176 DELETE /api/projects/:projectId/documents/:documentId
+- frontend/web/lib/dms.ts:180 PATCH /api/projects/:projectId/documents/:documentId/restore
+- frontend/web/lib/dms.ts:185 DELETE /api/projects/:projectId/documents/:documentId/permanent
+- frontend/web/lib/dms.ts:189 GET /api/projects/:projectId/documents/:documentId/download-url
+- frontend/web/lib/dms.ts:199 GET /api/projects
+- frontend/web/lib/dms.ts:205 POST /api/projects/:projectId/documents/upload/init
+- frontend/web/lib/dms.ts:214 POST /api/projects/:projectId/documents/upload/finalize
+- frontend/web/lib/dms.ts:229 POST /api/projects/:projectId/documents/upload
+- frontend/web/services/auth-contract.ts:63 GET /api/user/profile (getProfile)
+- frontend/web/services/auth-contract.ts:67 PUT /api/user/profile/update (updateProfile)
+- frontend/web/services/auth-contract.ts:71 POST /api/user/profile/photo (uploadProfilePhoto)
+- frontend/web/services/collaboration-contract.ts:91 GET /api/projects/:projectId/documents (listByProject)
+- frontend/web/services/collaboration-contract.ts:100 GET /api/projects/:projectId/pages (listByProject)
+- frontend/web/services/collaboration-contract.ts:104 GET /api/pages/:pageId (get)
+- frontend/web/services/collaboration-contract.ts:108 POST /api/projects/:projectId/pages (create)
+- frontend/web/services/collaboration-contract.ts:112 PUT /api/pages/:pageId (update)
+- frontend/web/services/collaboration-contract.ts:116 DELETE /api/pages/:pageId (delete)
+- frontend/web/services/collaboration-contract.ts:119 PATCH /api/projects/:projectId/pages/:pageId/star (toggleStar)
+- frontend/web/services/collaboration-contract.ts:123 PATCH /api/projects/:projectId/pages/:pageId/move (movePage)
+- frontend/web/services/collaboration-contract.ts:127 POST /api/projects/:projectId/pages/:pageId/viewed (markViewed)
+- frontend/web/services/collaboration-contract.ts:130 GET /api/projects/:projectId/pages/recent (getRecent)
+- frontend/web/services/collaboration-contract.ts:134 GET /api/projects/:projectId/pages/:pageId/versions (getVersions)
+- frontend/web/services/collaboration-contract.ts:138 POST /api/projects/:projectId/pages/:pageId/versions/:versionId/restore (restoreVersion)
+- frontend/web/services/collaboration-contract.ts:145 GET /api/projects/:projectId/chat/summaries (getSummaries)
+- frontend/web/services/collaboration-contract.ts:149 POST /api/projects/:projectId/chat/team/read (markTeamRead)
+- frontend/web/services/collaboration-contract.ts:152 POST /api/projects/:projectId/chat/rooms/:roomId/read (markRoomRead)
+- frontend/web/services/collaboration-contract.ts:155 POST /api/projects/:projectId/chat/direct/read (markDirectRead)
+- frontend/web/services/collaboration-contract.ts:164 POST /api/projects/:projectId/chat/telemetry (postTelemetry)
+- frontend/web/services/collaboration-contract.ts:171 GET /api/projects/:projectId/chat/unread-badge (getUnreadBadge)
+- frontend/web/services/collaboration-contract.ts:175 GET /api/search (searchMessages)
+- frontend/web/services/collaboration-contract.ts:185 GET /api/chat/inbox (getInbox)
+- frontend/web/services/collaboration-contract.ts:189 GET /api/projects/:projectId/chat/messages (getTeamMessages)
+- frontend/web/services/collaboration-contract.ts:193 GET /api/projects/:projectId/chat/messages (getRoomMessages)
+- frontend/web/services/collaboration-contract.ts:199 GET /api/projects/:projectId/chat/messages (getPrivateMessages)
+- ... 231 more
+
+Critical frontend contract misses: 258
+- frontend/web/app/(project)/calendar/api.ts:47 GET /api/calendar/events
+- frontend/web/app/dashboard/notifications/hooks/useNotificationTaskProjectLinks.ts:44 GET /api/tasks/:taskId
+- frontend/web/app/profile/hooks/useProfile.ts:88 GET /api/user/profile
+- frontend/web/app/profile/hooks/useProfile.ts:122 PUT /api/user/profile/update
+- frontend/web/app/profile/hooks/useProfile.ts:160 POST /api/user/profile/photo
+- frontend/web/hooks/useCommandPalette.ts:111 GET /api/search
+- frontend/web/hooks/useCommandPalette.ts:118 GET /api/tasks/project/:projectId/all
+- frontend/web/lib/auth.ts:214 POST /api/auth/refresh
+- frontend/web/lib/dms.ts:126 GET /api/projects/:projectId/folders/:folderId/permissions
+- frontend/web/lib/dms.ts:131 PUT /api/projects/:projectId/folders/:folderId/permissions
+- frontend/web/lib/dms.ts:135 GET /api/projects/:projectId/storage-quota
+- frontend/web/lib/dms.ts:140 GET /api/projects/:projectId/folders
+- frontend/web/lib/dms.ts:145 POST /api/projects/:projectId/folders
+- frontend/web/lib/dms.ts:153 DELETE /api/projects/:projectId/folders/:folderId
+- frontend/web/lib/dms.ts:161 GET /api/projects/:projectId/documents
+- frontend/web/lib/dms.ts:166 GET /api/projects/:projectId/documents/:documentId/versions
+- frontend/web/lib/dms.ts:171 PATCH /api/projects/:projectId/documents/:documentId
+- frontend/web/lib/dms.ts:176 DELETE /api/projects/:projectId/documents/:documentId
+- frontend/web/lib/dms.ts:180 PATCH /api/projects/:projectId/documents/:documentId/restore
+- frontend/web/lib/dms.ts:185 DELETE /api/projects/:projectId/documents/:documentId/permanent
+- frontend/web/lib/dms.ts:189 GET /api/projects/:projectId/documents/:documentId/download-url
+- frontend/web/lib/dms.ts:199 GET /api/projects
+- frontend/web/lib/dms.ts:205 POST /api/projects/:projectId/documents/upload/init
+- frontend/web/lib/dms.ts:214 POST /api/projects/:projectId/documents/upload/finalize
+- frontend/web/lib/dms.ts:229 POST /api/projects/:projectId/documents/upload
+- frontend/web/services/auth-contract.ts:63 GET /api/user/profile
+- frontend/web/services/auth-contract.ts:67 PUT /api/user/profile/update
+- frontend/web/services/auth-contract.ts:71 POST /api/user/profile/photo
+- frontend/web/services/collaboration-contract.ts:91 GET /api/projects/:projectId/documents
+- frontend/web/services/collaboration-contract.ts:100 GET /api/projects/:projectId/pages
+- frontend/web/services/collaboration-contract.ts:104 GET /api/pages/:pageId
+- frontend/web/services/collaboration-contract.ts:108 POST /api/projects/:projectId/pages
+- frontend/web/services/collaboration-contract.ts:112 PUT /api/pages/:pageId
+- frontend/web/services/collaboration-contract.ts:116 DELETE /api/pages/:pageId
+- frontend/web/services/collaboration-contract.ts:119 PATCH /api/projects/:projectId/pages/:pageId/star
+- frontend/web/services/collaboration-contract.ts:123 PATCH /api/projects/:projectId/pages/:pageId/move
+- frontend/web/services/collaboration-contract.ts:127 POST /api/projects/:projectId/pages/:pageId/viewed
+- frontend/web/services/collaboration-contract.ts:130 GET /api/projects/:projectId/pages/recent
+- frontend/web/services/collaboration-contract.ts:134 GET /api/projects/:projectId/pages/:pageId/versions
+- frontend/web/services/collaboration-contract.ts:138 POST /api/projects/:projectId/pages/:pageId/versions/:versionId/restore
+- frontend/web/services/collaboration-contract.ts:145 GET /api/projects/:projectId/chat/summaries
+- frontend/web/services/collaboration-contract.ts:149 POST /api/projects/:projectId/chat/team/read
+- frontend/web/services/collaboration-contract.ts:152 POST /api/projects/:projectId/chat/rooms/:roomId/read
+- frontend/web/services/collaboration-contract.ts:155 POST /api/projects/:projectId/chat/direct/read
+- frontend/web/services/collaboration-contract.ts:164 POST /api/projects/:projectId/chat/telemetry
+- frontend/web/services/collaboration-contract.ts:171 GET /api/projects/:projectId/chat/unread-badge
+- frontend/web/services/collaboration-contract.ts:175 GET /api/search
+- frontend/web/services/collaboration-contract.ts:185 GET /api/chat/inbox
+- frontend/web/services/collaboration-contract.ts:189 GET /api/projects/:projectId/chat/messages
+- frontend/web/services/collaboration-contract.ts:193 GET /api/projects/:projectId/chat/messages
+- ... 208 more
+
+Duplicate frontend endpoint payloads: 9
+- PUT /api/user/profile/update
+  - object:bio,company,contactNumber,countryCode,firstName,jobTitle,lastName,position: frontend/web/app/profile/hooks/useProfile.ts:122
+  - expr:payload: frontend/web/services/auth-contract.ts:67
+- POST /api/auth/login
+  - expr:credentials: frontend/web/services/auth-contract.ts:38
+  - object:password: frontend/mobile/src/hooks/useLoginForm.ts:39
+- POST /api/auth/register
+  - expr:payload: frontend/web/services/auth-contract.ts:42
+  - object:email,fullName,password: frontend/mobile/src/hooks/useRegisterForm.ts:59
+- POST /api/auth/forgot
+  - expr:payload: frontend/web/services/auth-contract.ts:45
+  - object:: frontend/mobile/src/hooks/useForgotPassword.ts:45
+- POST /api/auth/reset
+  - expr:payload: frontend/web/services/auth-contract.ts:49
+  - object:newPassword,token: frontend/mobile/src/hooks/useResetPassword.ts:43
+- POST /api/projects/:projectId/chat/telemetry
+  - expr:payload: frontend/web/services/collaboration-contract.ts:164
+  - object:target: frontend/mobile/src/services/chatService.ts:244
+- POST /api/projects/:projectId/chat/rooms
+  - expr:payload: frontend/web/services/collaboration-contract.ts:241
+  - object:members: frontend/mobile/src/services/chatService.ts:168
+- POST /api/projects
+  - expr:payload: frontend/web/services/projects-contract.ts:157
+  - object:projectKey,teamOption,type: frontend/mobile/src/hooks/useCreateProject.ts:130
+- POST /api/projects/:projectId/chat/messages
+  - object:formatType,recipient: frontend/mobile/src/services/chatService.ts:109
+  - object:formatType,roomId: frontend/mobile/src/services/chatService.ts:124
+
+Backend endpoints with no frontend/mobile usage: 10
+- backend/src/main/java/com/planora/backend/controller/KanbanColumnController.java:32 ANY /api/kanban-columns/kanban/:kanbanId
+- backend/src/main/java/com/planora/backend/controller/KanbanController.java:35 ANY /api/kanbans/:id
+- backend/src/main/java/com/planora/backend/controller/KanbanController.java:42 ANY /api/kanbans/:id
+- backend/src/main/java/com/planora/backend/controller/KanbanController.java:47 ANY /api/kanbans/:id
+- backend/src/main/java/com/planora/backend/controller/KanbanController.java:53 ANY /api/kanbans/project/:projectId
+- backend/src/main/java/com/planora/backend/controller/KanbanController.java:65 ANY /api/kanbans/project/:projectId/auto-create
+- backend/src/main/java/com/planora/backend/controller/UserController.java:86 ANY /api/auth/resend-otp
+- backend/src/main/java/com/planora/backend/controller/UserController.java:163 ANY /api/auth/users/:userId/photo
+- backend/src/main/java/com/planora/backend/controller/UserController.java:178 ANY /api/auth/try
+- backend/src/main/java/com/planora/backend/controller/UserController.java:183 ANY /api/auth/me
+
+Summary
+- Critical issues: 340
+- Informational backend-only routes: 10

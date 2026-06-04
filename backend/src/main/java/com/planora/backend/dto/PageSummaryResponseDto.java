@@ -12,4 +12,10 @@ public class PageSummaryResponseDto {
     private String title;
     private String updatedAt;
     private String updatedByUsername;
+    private Long parentPageId;
+    private Boolean isStarred;
+    private String lastViewedAt;
+    private Integer sortOrder;
+    private String icon;
+    private String cover;
 }

@@ -1,9 +1,12 @@
 import { optimisticUpdateTaskStatusHelper } from './hooks/useKanbanActions';
 
-type TestTask = { id: number; status: string };
+type TestTask = { id: number; title: string; status: string };
 
 describe('optimisticUpdateTaskStatusHelper', () => {
-  const tasks: TestTask[] = [ { id: 1, status: 'TODO' }, { id: 2, status: 'IN_PROGRESS' } ];
+  const tasks: TestTask[] = [
+    { id: 1, title: 'First task', status: 'TODO' },
+    { id: 2, title: 'Second task', status: 'IN_PROGRESS' },
+  ];
 
   it('applies optimistic update and resolves on success', async () => {
     const setTasks = jest.fn();

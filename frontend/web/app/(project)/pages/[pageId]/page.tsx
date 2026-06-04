@@ -9,6 +9,7 @@ import Editor from '../components/Editor';
 import {
   Download, Upload, Trash2, CheckCircle2, Loader2,
   Save, FileEdit, History, X, PanelLeft, MoreHorizontal,
+  Star, FolderInput,
 } from 'lucide-react';
 import { usePageEditor } from './usePageEditor';
 import { useRouter } from 'next/navigation';
@@ -17,16 +18,25 @@ export default function PageDetailPage() {
   const router = useRouter();
   const {
     pageId, isDraft, projectId, selectedPage, loadingPage, saveStatus,
-    title, setTitle, showHistory, setShowHistory, historyMock,
+    title, setTitle, showHistory, setShowHistory, versions, handleRestoreVersion,
     showDocSidebar, setShowDocSidebar, fileInputRef,
     filteredPages, error, searchQuery, setSearchQuery,
     handleUpdateContent, setLatestContent, handleManualCreate, handleDeletePage,
     handleConfirmDelete, showDeleteConfirm, setShowDeleteConfirm,
     handleFileImport, handleExport,
+    toggleStar, movePage,
+    ydoc, provider, collaborationUser,
   } = usePageEditor();
 
   // showMobileActions is local state because it's a purely visual toggle with no effect on data
   const [showMobileActions, setShowMobileActions] = useState(false);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [targetParentId, setTargetParentId] = useState<string | number | ''>('');
+
+  const handleOpenMoveModal = () => {
+    setTargetParentId(selectedPage?.parentId ? String(selectedPage.parentId) : '');
+    setShowMoveModal(true);
+  };
 
   if (!projectId) {
     return (
@@ -96,6 +106,19 @@ export default function PageDetailPage() {
                   />
                 </div>
 
+                {!isDraft && selectedPage && (
+                  <button
+                    onClick={() => toggleStar(selectedPage.id)}
+                    className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-yellow-500 transition-colors flex-shrink-0 flex items-center justify-center"
+                    title={selectedPage.isStarred ? 'Unstar page' : 'Star page'}
+                  >
+                    <Star
+                      size={18}
+                      className={selectedPage.isStarred ? 'fill-yellow-400 text-yellow-500' : ''}
+                    />
+                  </button>
+                )}
+
                 {/* Save status / Publish button */}
                 <div className="flex items-center text-sm flex-shrink-0">
                   {isDraft ? (
@@ -153,17 +176,26 @@ export default function PageDetailPage() {
                 </button>
 
                 {!isDraft && (
-                  <button
-                    onClick={() => setShowHistory(!showHistory)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                      showHistory
-                        ? 'bg-blue-100 dark:bg-cu-primary-light text-blue-700 dark:text-cu-primary border border-blue-200 dark:border-cu-primary/30'
-                        : 'text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100'
-                    }`}
-                    title="Version History"
-                  >
-                    <History size={14} /> History
-                  </button>
+                  <>
+                    <button
+                      onClick={handleOpenMoveModal}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+                      title="Move Page"
+                    >
+                      <FolderInput size={14} /> Move
+                    </button>
+                    <button
+                      onClick={() => setShowHistory(!showHistory)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                        showHistory
+                          ? 'bg-blue-100 dark:bg-cu-primary-light text-blue-700 dark:text-cu-primary border border-blue-200 dark:border-cu-primary/30'
+                          : 'text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100'
+                      }`}
+                      title="Version History"
+                    >
+                      <History size={14} /> History
+                    </button>
+                  </>
                 )}
 
                 <div className="h-5 w-px bg-gray-200 mx-1" />
@@ -206,12 +238,20 @@ export default function PageDetailPage() {
                         <Download size={16} className="text-gray-400" /> Export .md
                       </button>
                       {!isDraft && (
-                        <button
-                          onClick={() => { setShowHistory(!showHistory); setShowMobileActions(false); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                        >
-                          <History size={16} className="text-gray-400" /> Version History
-                        </button>
+                        <>
+                          <button
+                            onClick={() => { handleOpenMoveModal(); setShowMobileActions(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          >
+                            <FolderInput size={16} className="text-gray-400" /> Move Page
+                          </button>
+                          <button
+                            onClick={() => { setShowHistory(!showHistory); setShowMobileActions(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          >
+                            <History size={16} className="text-gray-400" /> Version History
+                          </button>
+                        </>
                       )}
                       <div className="h-px bg-gray-100 my-1" />
                       <button
@@ -233,6 +273,9 @@ export default function PageDetailPage() {
                   content={selectedPage.content || ''}
                   onUpdate={handleUpdateContent}
                   onImmediateUpdate={setLatestContent}
+                  ydoc={ydoc || undefined}
+                  provider={provider || undefined}
+                  collaborationUser={collaborationUser || undefined}
                 />
               </div>
 
@@ -248,24 +291,43 @@ export default function PageDetailPage() {
                     </button>
                   </div>
                   <div className="flex-1 overflow-y-auto p-4">
-                    <div className="space-y-5">
-                      {historyMock.map((history) => (
-                        <div key={history.id} className="relative pl-5 border-l-2 border-gray-200 py-0.5">
-                          <div className="absolute -left-[7px] top-1.5 h-3 w-3 rounded-full bg-white dark:bg-cu-bg border-2 border-blue-500 dark:border-cu-primary" />
-                          <p className="text-sm font-medium text-gray-900 mb-0.5 flex items-center gap-1.5 flex-wrap">
-                            {history.editedBy}
-                            <span className="text-xs font-normal px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                              {history.action}
-                            </span>
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {new Date(history.editedAt).toLocaleString(undefined, {
-                              month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-                            })}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
+                    {versions.length === 0 ? (
+                      <div className="text-center text-gray-400 py-8 text-sm">
+                        No version history available.
+                      </div>
+                    ) : (
+                      <div className="space-y-5">
+                        {versions.map((v) => (
+                          <div key={v.id} className="relative pl-5 border-l-2 border-gray-200 py-0.5">
+                            <div className="absolute -left-[7px] top-1.5 h-3 w-3 rounded-full bg-white dark:bg-cu-bg border-2 border-blue-500 dark:border-cu-primary" />
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-gray-900 mb-0.5">
+                                  Version {v.versionNumber}
+                                </p>
+                                <p className="text-xs text-gray-500 mb-0.5 truncate">
+                                  Edited by <span className="font-medium">{v.authorName}</span>
+                                </p>
+                                <p className="text-[11px] text-gray-400">
+                                  {new Date(v.createdAt).toLocaleString(undefined, {
+                                    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                                  })}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => handleRestoreVersion(v.id)}
+                                className="text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 font-medium px-2 py-1 rounded transition-colors flex-shrink-0"
+                              >
+                                Restore
+                              </button>
+                            </div>
+                            <p className="text-xs text-gray-500 italic mt-1.5 bg-white px-2 py-1 rounded border border-gray-150 truncate" title={v.title}>
+                              &ldquo;{v.title}&rdquo;
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="p-3 bg-white border-t border-gray-100 text-xs text-gray-400 text-center">
                     Tracking edits in real time
@@ -314,6 +376,75 @@ export default function PageDetailPage() {
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {showMoveModal && selectedPage && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowMoveModal(false)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[380px] bg-white rounded-2xl shadow-xl p-6 flex flex-col gap-4">
+            <div>
+              <p className="font-semibold text-gray-900 text-sm">Move document</p>
+              <p className="text-gray-500 text-xs mt-0.5">
+                Select a new parent folder/page for &ldquo;{selectedPage.title}&rdquo;.
+              </p>
+            </div>
+            
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-gray-500">Parent Page</label>
+              <select
+                value={targetParentId}
+                onChange={(e) => setTargetParentId(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-lg p-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">(None - Root level)</option>
+                {filteredPages
+                  .filter((p) => {
+                    // Cannot move a page to itself
+                    if (String(p.id) === String(selectedPage.id)) return false;
+                    
+                    // Cannot move a page to its subpages (cycle check on client too)
+                    let current = p;
+                    while (current && current.parentId) {
+                      if (String(current.parentId) === String(selectedPage.id)) {
+                        return false;
+                      }
+                      current = filteredPages.find((x) => String(x.id) === String(current.parentId))!;
+                    }
+                    return true;
+                  })
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title}
+                    </option>
+                  ))
+                }
+              </select>
+            </div>
+
+            <div className="flex gap-2 justify-end mt-2">
+              <button
+                onClick={() => setShowMoveModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const pId = targetParentId === '' ? null : targetParentId;
+                    await movePage(selectedPage.id, pId);
+                    setShowMoveModal(false);
+                  } catch (err) {
+                    console.error(err);
+                  }
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+              >
+                Move
               </button>
             </div>
           </div>

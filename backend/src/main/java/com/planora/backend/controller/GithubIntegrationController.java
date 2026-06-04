@@ -2,6 +2,7 @@ package com.planora.backend.controller;
 
 import com.planora.backend.dto.GithubLinkRequestDTO;
 import com.planora.backend.dto.ProjectGithubRepositoryDTO;
+import com.planora.backend.exception.GithubAuthenticationException;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.service.ProjectGithubIntegrationService;
 import jakarta.validation.Valid;
@@ -25,7 +26,10 @@ public class GithubIntegrationController {
             @Valid @RequestBody GithubLinkRequestDTO request,
             @AuthenticationPrincipal UserPrincipal principal) {
 
-        ProjectGithubRepositoryDTO result = integrationService.linkRepository(request);
+        if (principal == null) {
+            throw new GithubAuthenticationException("Authentication is required");
+        }
+        ProjectGithubRepositoryDTO result = integrationService.linkRepository(request, principal.getUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 

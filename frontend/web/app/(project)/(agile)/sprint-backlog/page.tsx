@@ -11,7 +11,7 @@ import { useSearchParams } from 'next/navigation';
 const VelocityChart = dynamic(() => import('./components/VelocityChart'), { ssr: false });
 import type { SprintVelocityPoint } from './components/VelocityChart';
 import { getUserFromToken } from '@/lib/auth';
-import api from '@/lib/axios';
+
 import { toast } from '@/components/ui';
 import { getProjectLabels, createLabel } from '@/services/labels-service';
 import type { TaskItem, SprintItem, Label } from '@/types';
@@ -21,6 +21,7 @@ import { useTaskStore } from '@/stores/task-store';
 import { buildSessionCacheKey, getSessionCache, setSessionCache, removeSessionCache } from '@/lib/session-cache';
 import { motion, AnimatePresence } from 'framer-motion';
 import { projectsApi, sprintboardsApi, sprintsApi, tasksApi } from '@/services/api-contract';
+import { normalizeTaskPriority } from '@/services/tasks-contract';
 
 const LABEL_PALETTE = ["#EF4444","#F97316","#F59E0B","#84CC16","#22C55E","#14B8A6","#06B6D4","#3B82F6","#6366F1","#8B5CF6","#EC4899","#6B7280"];
 
@@ -309,7 +310,7 @@ export default function SprintBacklogPage() {
       )
     );
     try {
-      await api.put(`/api/tasks/${id}`, { storyPoint: value });
+      await tasksApi.update(id, { storyPoint: value });
       const cKey = buildSessionCacheKey('sprint-backlog', [projectId]);
       if (cKey) removeSessionCache(cKey);
       window.dispatchEvent(new CustomEvent('planora:task-updated'));
@@ -328,7 +329,7 @@ export default function SprintBacklogPage() {
         projectId: Number(projectId),
         title: trimmed,
         storyPoint: data.storyPoint ?? 0,
-        priority: data.priority ?? 'MEDIUM',
+        priority: normalizeTaskPriority(data.priority),
         assigneeId: data.assigneeId,
         labelIds: data.labelIds,
       });
@@ -582,7 +583,7 @@ export default function SprintBacklogPage() {
   const handleBulkMoveToSprint = useCallback(async (targetSprintId: number) => {
     const ids = getSelectedTaskIds();
     try {
-      await Promise.all(ids.map(id => api.put(`/api/tasks/${id}`, { sprintId: targetSprintId })));
+      await Promise.all(ids.map(id => tasksApi.update(id, { sprintId: targetSprintId })));
       const movedFromBacklog = productTasks.filter(t => t.selected);
       const movedFromSprints: TaskItem[] = [];
       sprints.forEach(s => {
@@ -613,7 +614,7 @@ export default function SprintBacklogPage() {
     }));
     if (ids.length === 0) return;
     try {
-      await Promise.all(ids.map(id => api.put(`/api/tasks/${id}`, { sprintId: null })));
+      await Promise.all(ids.map(id => tasksApi.update(id, { sprintId: null })));
       setSprints(prev => prev.map(s => ({ ...s, tasks: s.tasks.filter(t => !t.selected) })));
       setProductTasks(prev => [...prev.map(t => ({ ...t, selected: false })), ...movedTasks]);
       toast(`Moved ${ids.length} task(s) to backlog`, 'success');
@@ -784,8 +785,11 @@ export default function SprintBacklogPage() {
 
   useEffect(() => {
     if (!showVelocity || !projectId) return;
-    api.get<SprintVelocityPoint[]>(`/api/burndown/project/${projectId}/velocity`)
-      .then((res) => setVelocityData(res.data))
+    sprintsApi.getVelocity(projectId)
+      .then((data) => setVelocityData(data.map((point, index) => ({
+        sprintId: index + 1,
+        ...point,
+      }))))
       .catch(() => setVelocityData([]));
   }, [showVelocity, projectId]);
 
@@ -885,7 +889,7 @@ export default function SprintBacklogPage() {
                           }}
                           onRenameTask={async (taskId, title) => {
                             try {
-                              await api.put(`/api/tasks/${taskId}`, { title });
+                              await tasksApi.update(taskId, { title });
                               setSprints(prev => prev.map(s => ({
                                 ...s,
                                 tasks: s.tasks.map(t => t.id === taskId ? { ...t, title } : t)
@@ -935,7 +939,7 @@ export default function SprintBacklogPage() {
                   }}
                   onRenameTask={async (taskId, title) => {
                     try {
-                      await api.put(`/api/tasks/${taskId}`, { title });
+                      await tasksApi.update(taskId, { title });
                       setProductTasks(prev => prev.map(t => t.id === taskId ? { ...t, title } : t));
                     } catch { toast('Failed to rename task', 'error'); }
                   }}

@@ -130,6 +130,25 @@ public class TeamControllerTest {
     }
 
     @Test
+    void routeResolution_getTeams_success() throws Exception {
+        TeamSummaryDTO summary = new TeamSummaryDTO(10L, "Test Team", "Owner Name");
+        when(teamService.getMyTeams(anyLong())).thenReturn(List.of(summary));
+
+        mockMvc.perform(get("/api/teams")
+                .with(user(principal)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void routeResolution_deleteTeam_success() throws Exception {
+        mockMvc.perform(delete("/api/teams/10")
+                .with(user(principal))
+                .with(csrf()))
+                .andExpect(status().isNoContent());
+    }
+
+
+    @Test
     void createTeam_invalidPayload_returns400() throws Exception {
         TeamCreationDTO invalidDto = new TeamCreationDTO();
         invalidDto.setName(""); // Blank name

@@ -41,6 +41,7 @@ public class SecurityConfig {
             "/api/auth/register",
             "/api/auth/reg/verify",
             "/api/auth/login",
+            "/api/auth/logout",
             "/api/auth/resend",
             "/api/auth/forgot",
             "/api/auth/reset",
@@ -65,7 +66,9 @@ public class SecurityConfig {
                         .permitAll()
                 .requestMatchers("/api/github/issues/**")
                         .authenticated()
-                        .anyRequest().authenticated())
+                .requestMatchers("/api/auth/users")
+                        .hasAuthority("ADMIN")
+                .anyRequest().authenticated())
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
             .logout(AbstractHttpConfigurer::disable)

@@ -58,7 +58,7 @@ export function useChangePassword({ email }: { email: string }) {
         setSuccess('');
         try {
             setIsResettingPw(true);
-            await authApi.resetPassword({ token: otp, newPassword });
+            await authApi.resetPassword({ email, token: otp, newPassword });
             setSuccess('Password updated successfully.');
             setPwStep('done');
             setOtp('');

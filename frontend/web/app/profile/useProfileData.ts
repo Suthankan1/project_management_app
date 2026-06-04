@@ -115,7 +115,7 @@ export function useProfileData() {
         if (newPassword !== confirmPassword) { setErrorMessage('Passwords do not match.'); return; }
         try {
             setIsResettingPw(true);
-            await authApi.resetPassword({ token: otp.trim(), newPassword });
+            await authApi.resetPassword({ email, token: otp.trim(), newPassword });
             setPwStep('done');
             setOtp('');
             setNewPassword('');

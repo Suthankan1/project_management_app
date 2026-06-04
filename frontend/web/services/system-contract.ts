@@ -100,8 +100,6 @@ export interface GithubStats {
 export interface LinkRepositoryRequest {
   projectId: number;
   repositoryFullName: string;
-  accessToken: string;
-  tokenType?: 'PERSONAL_ACCESS_TOKEN' | 'OAUTH' | 'GITHUB_APP';
 }
 
 export interface CreateIssueRequest {

@@ -1,6 +1,7 @@
 import type { Member, MemberCombined, PendingInvite } from './types';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+const API_BASE_URL = getApiBaseUrl();
 const MEMBERS_CACHE_KEY_PREFIX = 'planora:members:';
 
 export function getMembersCacheKey(projectId: string): string {

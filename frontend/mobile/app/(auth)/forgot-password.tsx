@@ -163,7 +163,7 @@ export default function ForgotPasswordScreen() {
 
                   <PrimaryButton
                     label="Enter Reset Code"
-                    onPress={() => router.push('/(auth)/reset-password')}
+                    onPress={() => router.push({ pathname: '/(auth)/reset-password', params: { email } })}
                   />
 
                   {countdown > 0 ? (

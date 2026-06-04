@@ -226,14 +226,15 @@ public class UserServiceTest {
     @Test
     void testResetPassword_WrongTokenType_ReturnsFalse() {
         VerificationToken token = new VerificationToken();
-        token.setToken("999999");
+        token.setToken(hashToken("999999"));
         token.setExpiry(Instant.now().plusSeconds(600));
         token.setUsed(false);
         token.setTokenType(VerificationToken.TokenType.VERIFICATION); // wrong type
 
-        when(tokenRepository.findByToken("999999")).thenReturn(token);
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.PASSWORD_RESET)).thenReturn(token);
 
-        boolean result = userService.resetPassword("999999", "NewPassword1!");
+        boolean result = userService.resetPassword("test@example.com", "999999", "NewPassword1!");
 
         assertFalse(result);
     }
@@ -359,7 +360,7 @@ public class UserServiceTest {
 
         String result = userService.forgotPassword("test@example.com");
 
-        assertEquals("Password reset OTP sent successfully.", result);
+        assertEquals("If that email exists, an OTP has been sent.", result);
         verify(tokenRepository).save(any(VerificationToken.class));
         verify(emailService).sendPasswordResetRequest(eq("test@example.com"), anyString());
     }
@@ -382,18 +383,20 @@ public class UserServiceTest {
     @Test
     void testResetPassword_ValidToken_UpdatesPasswordAndReturnsTrue() {
         VerificationToken token = new VerificationToken();
-        token.setToken("valid-otp");
+        token.setToken(hashToken("valid-otp"));
         token.setExpiry(Instant.now().plusSeconds(600));
         token.setUsed(false);
         token.setTokenType(VerificationToken.TokenType.PASSWORD_RESET);
         token.setUser(testUser);
 
-        when(tokenRepository.findByToken("valid-otp")).thenReturn(token);
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.PASSWORD_RESET)).thenReturn(token);
 
-        boolean result = userService.resetPassword("valid-otp", "NewSecure@1");
+        boolean result = userService.resetPassword("test@example.com", "valid-otp", "NewSecure@1");
 
         assertTrue(result);
         assertTrue(token.isUsed());
+        assertNotNull(token.getUsedAt());
         verify(userRepository).save(testUser);
         verify(tokenRepository).save(token);
     }
@@ -401,14 +404,15 @@ public class UserServiceTest {
     @Test
     void testResetPassword_ExpiredToken_ReturnsFalse() {
         VerificationToken token = new VerificationToken();
-        token.setToken("expired-otp");
+        token.setToken(hashToken("expired-otp"));
         token.setExpiry(Instant.now().minusSeconds(1));
         token.setUsed(false);
         token.setTokenType(VerificationToken.TokenType.PASSWORD_RESET);
 
-        when(tokenRepository.findByToken("expired-otp")).thenReturn(token);
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.PASSWORD_RESET)).thenReturn(token);
 
-        boolean result = userService.resetPassword("expired-otp", "NewPassword1!");
+        boolean result = userService.resetPassword("test@example.com", "expired-otp", "NewPassword1!");
 
         assertFalse(result);
         verify(userRepository, never()).save(any());
@@ -417,17 +421,66 @@ public class UserServiceTest {
     @Test
     void testResetPassword_UsedToken_ReturnsFalse() {
         VerificationToken token = new VerificationToken();
-        token.setToken("used-otp");
+        token.setToken(hashToken("used-otp"));
         token.setExpiry(Instant.now().plusSeconds(600));
         token.setUsed(true);
         token.setTokenType(VerificationToken.TokenType.PASSWORD_RESET);
 
-        when(tokenRepository.findByToken("used-otp")).thenReturn(token);
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.PASSWORD_RESET)).thenReturn(token);
 
-        boolean result = userService.resetPassword("used-otp", "NewPassword1!");
+        boolean result = userService.resetPassword("test@example.com", "used-otp", "NewPassword1!");
 
         assertFalse(result);
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void testResetPassword_WrongEmail_ReturnsFalse() {
+        when(userRepository.findFirstByEmailIgnoreCase("wrong@example.com")).thenReturn(Optional.empty());
+
+        boolean result = userService.resetPassword("wrong@example.com", "valid-otp", "NewSecure@1");
+
+        assertFalse(result);
+        verify(tokenRepository, never()).save(any());
+    }
+
+    @Test
+    void testResetPassword_WrongOtp_IncrementsAttemptsAndReturnsFalse() {
+        VerificationToken token = new VerificationToken();
+        token.setToken(hashToken("valid-otp"));
+        token.setExpiry(Instant.now().plusSeconds(600));
+        token.setUsed(false);
+        token.setTokenType(VerificationToken.TokenType.PASSWORD_RESET);
+        token.setAttempts(0);
+
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.PASSWORD_RESET)).thenReturn(token);
+
+        boolean result = userService.resetPassword("test@example.com", "wrong-otp", "NewSecure@1");
+
+        assertFalse(result);
+        assertEquals(1, token.getAttempts());
+        verify(tokenRepository).save(token);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void testResetPassword_MaxAttemptsExceeded_ReturnsFalse() {
+        VerificationToken token = new VerificationToken();
+        token.setToken(hashToken("valid-otp"));
+        token.setExpiry(Instant.now().plusSeconds(600));
+        token.setUsed(false);
+        token.setTokenType(VerificationToken.TokenType.PASSWORD_RESET);
+        token.setAttempts(5);
+
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.PASSWORD_RESET)).thenReturn(token);
+
+        boolean result = userService.resetPassword("test@example.com", "valid-otp", "NewSecure@1");
+
+        assertFalse(result);
+        verify(tokenRepository, never()).save(any());
     }
 
     @Test
@@ -622,5 +675,24 @@ public class UserServiceTest {
         String result = userService.generatePresignedUrlForUser(1L);
 
         assertEquals("https://s3.example.com/user-pic.jpg?sig=xyz", result);
+    }
+
+    private String hashToken(String rawToken) {
+        if (rawToken == null) {
+            return null;
+        }
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(rawToken.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

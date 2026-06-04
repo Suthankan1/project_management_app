@@ -18,4 +18,10 @@ public class PageDetailResponseDto {
     private String updatedByUsername;
     private String createdAt;
     private String updatedAt;
+    private Long parentPageId;
+    private Boolean isStarred;
+    private String lastViewedAt;
+    private Integer sortOrder;
+    private String icon;
+    private String cover;
 }

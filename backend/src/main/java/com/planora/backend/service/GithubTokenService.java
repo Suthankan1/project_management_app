@@ -26,7 +26,7 @@ public class GithubTokenService {
 
     public String resolveToken(GithubIntegration integration) {
         if (integration != null && StringUtils.hasText(integration.getEncryptedAccessToken())) {
-            return integration.getEncryptedAccessToken();
+            return decryptToken(integration.getEncryptedAccessToken());
         }
         if (StringUtils.hasText(defaultToken)) {
             return defaultToken;
@@ -52,7 +52,7 @@ public class GithubTokenService {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
         try {
-            String encrypted = TokenEncryptionUtil.encrypt(token, encryptionKey);
+            String encrypted = encryptToken(token);
             user.setGithubAccessToken(encrypted);
             userRepository.save(user);
         } catch (Exception e) {
@@ -72,9 +72,39 @@ public class GithubTokenService {
             return null;
         }
         try {
-            return TokenEncryptionUtil.decrypt(stored, encryptionKey);
+            return decryptToken(stored);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to decrypt GitHub token for user " + userId, e);
+        }
+    }
+
+    @Transactional
+    public void clearToken(Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+        user.setGithubAccessToken(null);
+        userRepository.save(user);
+    }
+
+    public String encryptToken(String token) {
+        if (!StringUtils.hasText(encryptionKey)) {
+            throw new IllegalStateException("GITHUB_TOKEN_ENCRYPTION_KEY is not configured");
+        }
+        try {
+            return TokenEncryptionUtil.encrypt(token, encryptionKey);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to encrypt GitHub token", e);
+        }
+    }
+
+    public String decryptToken(String encryptedToken) {
+        if (!StringUtils.hasText(encryptionKey)) {
+            throw new IllegalStateException("GITHUB_TOKEN_ENCRYPTION_KEY is not configured");
+        }
+        try {
+            return TokenEncryptionUtil.decrypt(encryptedToken, encryptionKey);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to decrypt GitHub token", e);
         }
     }
 }

@@ -7,8 +7,8 @@ import { getMilestones, assignTaskToMilestone } from '@/services/milestone-servi
 import { useTaskWebSocket } from '@/hooks/useTaskWebSocket';
 import type { CreateTaskData } from '@/components/shared/CreateTaskModal';
 import type { Label, MilestoneResponse, Task } from '@/types';
-import api from '@/lib/axios';
 import { labelsApi, projectsApi, tasksApi } from '@/services/api-contract';
+import { normalizeTaskPriority } from '@/services/tasks-contract';
 
 const MEMBERS_CACHE_TTL_MS = 1000 * 60 * 30;
 
@@ -249,7 +249,7 @@ export function useListTasks() {
       return next;
     });
     try {
-      await api.put(`/api/tasks/${taskId}`, { status: newStatus });
+      await tasksApi.update(taskId, { status: newStatus });
     } catch {
       if (cacheKey) localStorage.removeItem(cacheKey);
       void loadTasks();
@@ -263,7 +263,7 @@ export function useListTasks() {
       return next;
     });
     try {
-      await api.delete(`/api/tasks/${taskId}`);
+      await tasksApi.delete(taskId);
     } catch {
       if (cacheKey) localStorage.removeItem(cacheKey);
       void loadTasks();
@@ -416,7 +416,7 @@ export function useListTasks() {
         projectId,
         title: data.title,
         storyPoint: data.storyPoint,
-        priority: data.priority,
+        priority: normalizeTaskPriority(data.priority),
         assigneeId: data.assigneeId,
         labelIds: data.labelIds,
         dueDate: data.dueDate,

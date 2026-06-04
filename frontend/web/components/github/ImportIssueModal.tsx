@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { GitBranch, Loader2, X } from 'lucide-react';
 import api from '@/lib/axios';
-import { getGitHubToken, type GitHubIssue } from '@/services/githubService';
+import { type GitHubIssue } from '@/services/githubService';
 import { IssueStateBadge } from '@/components/github/IssueStateBadge';
 
 interface ImportIssueModalProps {
@@ -48,13 +48,10 @@ export function ImportIssueModal({ issue, projectId, repoFullName, onSuccess, on
     setSuccessMessage(null);
 
     try {
-      const githubToken = getGitHubToken();
       const response = await api.post<ImportIssueResponse>('/api/github/issues/import', {
         projectId,
         repoFullName,
         issueNumbers: [issue.number],
-      }, {
-        headers: githubToken ? { 'X-GitHub-Token': githubToken } : undefined,
       });
 
       const taskId = response.data.imported?.[0];

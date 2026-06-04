@@ -55,38 +55,54 @@ public class YjsWebSocketHandler extends BinaryWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        String roomId = extractRoomId(session);
+        try {
+            String roomId = extractRoomId(session);
 
-        Long pageId = parsePageId(roomId);
-        if (pageId == null) {
-            session.close(BAD_REQUEST);
-            return;
+            Long pageId = parsePageId(roomId);
+            if (pageId == null) {
+                session.close(BAD_REQUEST);
+                return;
+            }
+
+            User user = authenticateUser(session);
+            if (user == null || user.getUserId() == null) {
+                session.close(UNAUTHORIZED);
+                return;
+            }
+
+            ProjectPage page = projectPageRepository.findById(pageId).orElse(null);
+            if (page == null) {
+                session.close(NOT_FOUND);
+                return;
+            }
+
+            if (!projectMembershipService.isProjectMember(page.getProjectId(), user.getUserId())) {
+                session.close(FORBIDDEN);
+                return;
+            }
+
+            rooms.computeIfAbsent(roomId, k -> new CopyOnWriteArraySet<>()).add(session);
+        } catch (Exception e) {
+            try {
+                session.close(FORBIDDEN);
+            } catch (IOException ex) {
+                // ignore
+            }
         }
-
-        User user = authenticateUser(session);
-        if (user == null || user.getUserId() == null) {
-            session.close(UNAUTHORIZED);
-            return;
-        }
-
-        ProjectPage page = projectPageRepository.findById(pageId).orElse(null);
-        if (page == null) {
-            session.close(NOT_FOUND);
-            return;
-        }
-
-        if (!projectMembershipService.isProjectMember(page.getProjectId(), user.getUserId())) {
-            session.close(FORBIDDEN);
-            return;
-        }
-
-        rooms.computeIfAbsent(roomId, k -> new CopyOnWriteArraySet<>()).add(session);
     }
 
     @Override
     protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) {
         String roomId = extractRoomId(session);
-        Set<WebSocketSession> room = rooms.getOrDefault(roomId, new CopyOnWriteArraySet<>());
+        Set<WebSocketSession> room = rooms.get(roomId);
+        if (room == null || !room.contains(session)) {
+            try {
+                session.close(FORBIDDEN);
+            } catch (IOException e) {
+                // ignore
+            }
+            return;
+        }
         for (WebSocketSession peer : room) {
             if (peer.isOpen() && !peer.getId().equals(session.getId())) {
                 try {

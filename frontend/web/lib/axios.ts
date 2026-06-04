@@ -1,16 +1,23 @@
 import axios from "axios";
 import { clearTokens, getRefreshToken, getValidToken, getUserFromToken, refreshAccessToken } from "@/lib/auth";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || '',
     headers: {
         'Content-Type': 'application/json'
     },
+    withCredentials: true,
 });
+
+function resolveBaseUrl(configBaseUrl?: string): string {
+    return configBaseUrl || getApiBaseUrl();
+}
 
 // Add request interceptor to include auth token (exclude auth endpoints)
 api.interceptors.request.use(
     (config) => {
+        config.baseURL = resolveBaseUrl(config.baseURL);
+
         // Don't add token to auth endpoints
         const authEndpoints = ['/api/auth/login', '/api/auth/register', '/api/auth/forgot', '/api/auth/reset', '/api/auth/reg/verify', '/api/auth/resend', '/api/auth/refresh'];
         const isAuthEndpoint = authEndpoints.some(endpoint => config.url?.includes(endpoint));
@@ -30,6 +37,8 @@ api.interceptors.request.use(
 
 // Proactively refresh the access token if it expires within 60 seconds
 api.interceptors.request.use(async (config) => {
+    config.baseURL = resolveBaseUrl(config.baseURL);
+
     const authEndpoints = ['/api/auth/login', '/api/auth/register', '/api/auth/forgot', '/api/auth/reset', '/api/auth/reg/verify', '/api/auth/resend', '/api/auth/refresh'];
     const isAuthEndpoint = authEndpoints.some(endpoint => config.url?.includes(endpoint));
     if (!isAuthEndpoint && typeof window !== 'undefined') {

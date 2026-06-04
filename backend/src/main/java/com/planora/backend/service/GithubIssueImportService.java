@@ -40,6 +40,8 @@ public class GithubIssueImportService {
 
     private final GithubIssueConversionService githubIssueConversionService;
 
+    private final GithubTokenService githubTokenService;
+
     @Transactional
     public GithubIssueImportResponseDTO importIssues(GithubIssueImportRequestDTO request, User currentUser) {
         return importIssues(request, currentUser, null);
@@ -61,7 +63,7 @@ public class GithubIssueImportService {
         }
 
         String token = requestGithubToken == null || requestGithubToken.isBlank()
-                ? currentUser.getGithubAccessToken()
+                ? githubTokenService.getToken(currentUser.getUserId())
                 : requestGithubToken;
         if (token == null || token.isBlank()) {
             throw new GithubAuthenticationException("GitHub account is not connected");

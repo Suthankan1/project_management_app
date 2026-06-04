@@ -6,6 +6,7 @@ export interface ProjectDetails {
   id: number;
   name: string;
   projectKey?: string;
+  key?: string;
   description?: string;
   type?: ProjectType;
   createdAt?: string;
@@ -35,4 +36,13 @@ export const projectService = {
 
   leave: (projectId: number | string): Promise<void> =>
     api.post(`/api/projects/${projectId}/leave`).then(() => undefined),
+
+  getMembers: (projectId: number | string): Promise<any[]> =>
+    api.get<any[]>(`/api/projects/${projectId}/members`).then(r => r.data),
+
+  getMetrics: (projectId: number | string): Promise<any> =>
+    api.get(`/api/projects/${projectId}/metrics`).then(r => r.data),
+
+  getMilestones: (projectId: number | string): Promise<any[]> =>
+    api.get<any[]>(`/api/projects/${projectId}/milestones`).then(r => r.data),
 };

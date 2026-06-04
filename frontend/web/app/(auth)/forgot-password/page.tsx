@@ -8,6 +8,7 @@ export default function ForgotPasswordPage() {
   // Destructure the state and handlers from our custom hook.
   const {
     email, setEmail,
+    submittedEmail,
     isLoading,
     submitted, setSubmitted,
     error,
@@ -50,7 +51,7 @@ export default function ForgotPasswordPage() {
             <h2 className="text-lg font-semibold text-cu-text-primary mb-2">Check your email</h2>
             <p className="text-cu-text-muted text-sm mb-4">
               We&apos;ve sent a password reset code to <br />
-              <span className="font-semibold text-cu-text-primary">{email}</span>
+              <span className="font-semibold text-cu-text-primary">{submittedEmail}</span>
             </p>
             <p className="text-xs text-cu-text-muted mb-6">
               Go to the reset password page and enter the 6-digit code you received. The code will expire in 10 minutes.
@@ -70,7 +71,7 @@ export default function ForgotPasswordPage() {
             >
               Send code to another email
             </button>
-            <Link href="/reset-password" className='block text-cu-primary hover:opacity-80 font-semibold text-sm text-center'>
+            <Link href={`/reset-password?email=${encodeURIComponent(submittedEmail)}`} className='block text-cu-primary hover:opacity-80 font-semibold text-sm text-center'>
               I already have a code
             </Link>
           </div>

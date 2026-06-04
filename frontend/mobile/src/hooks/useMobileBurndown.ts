@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import api from '../api/axios';
+import { sprintService } from '../services/task-service';
 
 export interface BurndownSprint {
   id: number;
@@ -46,8 +46,8 @@ export function useMobileBurndown(projectId: number) {
     setError(null);
 
     try {
-      const sprintsRes = await api.get(`/api/sprints/project/${projectId}`);
-      const sprintList = Array.isArray(sprintsRes.data) ? sprintsRes.data as BurndownSprint[] : [];
+      const sprintsData = await sprintService.listByProject(projectId);
+      const sprintList = Array.isArray(sprintsData) ? sprintsData as BurndownSprint[] : [];
       const fallbackSprint = sprintList.find((sprint) => sprint.status === 'ACTIVE') ?? sprintList[0] ?? null;
       const sprintId = sprintOverride ?? selectedSprintIdRef.current ?? fallbackSprint?.id ?? null;
       const sprint = sprintList.find((item) => item.id === sprintId) ?? fallbackSprint;
@@ -67,15 +67,12 @@ export function useMobileBurndown(projectId: number) {
         return;
       }
 
-      const params = new URLSearchParams();
-      params.set('from', sprint.startDate.slice(0, 10));
-      params.set('to', sprint.endDate.slice(0, 10));
-
-      const chartRes = await api.get<BurndownResponse>(
-        `/api/burndown/sprint/${sprint.id}?${params.toString()}`
-      );
+      const chartData = await sprintService.getBurndown(sprint.id, {
+        from: sprint.startDate.slice(0, 10),
+        to: sprint.endDate.slice(0, 10),
+      }) as BurndownResponse;
       if (!isMounted.current) return;
-      setBurndown(chartRes.data);
+      setBurndown(chartData);
     } catch {
       if (!isMounted.current) return;
       setError('Failed to load burndown. Pull down to retry.');

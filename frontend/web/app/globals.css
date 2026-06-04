@@ -857,3 +857,45 @@ html.dark .react-datepicker__input-container input {
   color: var(--cu-text-primary);
 }
 html.dark .react-datepicker__month-container { background-color: var(--cu-bg); }
+
+/* ── TipTap Collaboration Cursors ── */
+.collaboration-cursor__caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 2px solid;
+  border-color: var(--cursor-color, #3b82f6);
+  word-break: normal;
+  pointer-events: none;
+}
+
+.collaboration-cursor__label {
+  position: absolute;
+  top: -1.6em;
+  left: -2px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  user-select: none;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px 4px 4px 0;
+  background-color: var(--cursor-color, #3b82f6);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.collaboration-cursor__avatar {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}

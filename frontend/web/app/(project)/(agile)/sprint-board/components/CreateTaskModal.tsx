@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { X, Calendar, User, Plus } from 'lucide-react';
-import axios from '@/lib/axios';
+import { projectsApi } from '@/services/api-contract';
 import { AxiosError } from 'axios';
 
 interface CreateTaskModalProps {
@@ -16,6 +16,33 @@ interface CreateTaskModalProps {
   sprintId?: number;
   loading?: boolean;
 }
+
+interface TeamMemberOption {
+  id: number;
+  name?: string;
+  username?: string;
+  fullName?: string;
+  user?: {
+    fullName?: string;
+    username?: string;
+  };
+}
+
+const getNestedTeamId = (team: unknown): number | undefined => {
+  if (!team || typeof team !== 'object' || !('id' in team)) return undefined;
+  const id = (team as { id?: unknown }).id;
+  return typeof id === 'number' ? id : undefined;
+};
+
+const getMemberArray = (payload: unknown): TeamMemberOption[] => {
+  if (Array.isArray(payload)) return payload as TeamMemberOption[];
+  if (!payload || typeof payload !== 'object') return [];
+  const record = payload as Record<string, unknown>;
+  if (Array.isArray(record.members)) return record.members as TeamMemberOption[];
+  if (Array.isArray(record.data)) return record.data as TeamMemberOption[];
+  if (Array.isArray(record.content)) return record.content as TeamMemberOption[];
+  return [];
+};
 
 export default function CreateTaskModal({
   isOpen,
@@ -82,23 +109,13 @@ export default function CreateTaskModal({
     const loadMembers = async () => {
       setLoadingMembers(true);
       try {
-        const projectRes = await axios.get(`/api/projects/${projectId}`);
-        const project = projectRes.data;
-        if (project.team?.id) {
-          const membersRes = await axios.get(`/api/teams/${project.team.id}/members`);
-          const payload = membersRes.data;
+        const project = await projectsApi.get(projectId);
+        const teamId = project.teamId ?? getNestedTeamId(project.team);
+        if (teamId) {
+          const payload = await projectsApi.getTeamMembers(teamId);
+          const rawMembers = getMemberArray(payload);
 
-          const rawMembers = Array.isArray(payload)
-            ? payload
-            : Array.isArray(payload?.members)
-              ? payload.members
-              : Array.isArray(payload?.data)
-                ? payload.data
-                : Array.isArray(payload?.content)
-                  ? payload.content
-                  : [];
-
-          setTeamMembers(rawMembers.map((m: { id: number; name?: string; username?: string; fullName?: string; user?: { fullName?: string; username?: string } }) => ({
+          setTeamMembers(rawMembers.map((m) => ({
               id: m.id,
               name: m.name ?? m.username ?? m.fullName ?? m.user?.fullName ?? m.user?.username ?? 'Unknown'
           })));

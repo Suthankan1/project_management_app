@@ -3,8 +3,9 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { UserCircle2 } from 'lucide-react';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+const API_BASE_URL = getApiBaseUrl();
 
 interface AssigneeAvatarProps {
   name?: string | null;

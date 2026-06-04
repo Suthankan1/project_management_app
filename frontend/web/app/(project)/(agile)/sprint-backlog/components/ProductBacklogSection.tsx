@@ -12,7 +12,7 @@ import {
 import { useTouchDragSort } from './useTouchDragSort';
 import CreateTaskModal, { type CreateTaskData } from '@/components/shared/CreateTaskModal';
 import type { TaskItem } from '@/types';
-import api from '@/lib/axios';
+import { tasksApi, projectsApi } from '@/services/api-contract';
 import { toast } from '@/components/ui';
 import TaskRow from './TaskRow';
 import TaskCardModal from '@/app/taskcard/TaskCardModal';
@@ -120,11 +120,12 @@ export default function ProductBacklogSection({
 
     try {
       setLoadingMembers(true);
-      const projectRes = await api.get(`/api/projects/${projectId}`);
-      const teamId = projectRes.data.teamId;
-      const membersRes = await api.get(`/api/teams/${teamId}/members`);
-      const data = membersRes.data;
-      setTeamMembers(Array.isArray(data) ? data : []);
+      const project = await projectsApi.get(projectId);
+      const teamId = project.teamId;
+      if (teamId) {
+        const data = await projectsApi.getTeamMembers(teamId);
+        setTeamMembers(Array.isArray(data) ? (data as TeamMemberInfo[]) : []);
+      }
     } catch {
       if (showError) {
         toast('Failed to load team members.', 'error');
@@ -136,7 +137,7 @@ export default function ProductBacklogSection({
 
   const handleAssignTask = async (taskId: number, userId: number) => {
     try {
-      await api.patch(`/api/tasks/${taskId}/assign/${userId}`);
+      await tasksApi.assignTaskSingle(taskId, userId);
       const member = teamMembers.find((m) => m.user.userId === userId);
       if (member) {
         onAssignTask(taskId, getMemberDisplayName(member), member.user.profilePicUrl || null);
@@ -149,7 +150,7 @@ export default function ProductBacklogSection({
   const handleDeleteTask = async (taskId: number) => {
     if (onDeleteTask) onDeleteTask(taskId);
     try {
-      await api.delete(`/api/tasks/${taskId}`);
+      await tasksApi.delete(taskId);
     } catch {
       // silent — parent state was already updated optimistically
     }
@@ -161,7 +162,7 @@ export default function ProductBacklogSection({
     if (onRenameTask) onRenameTask(taskId, trimmed);
     else {
       try {
-        await api.put(`/api/tasks/${taskId}`, { title: trimmed });
+        await tasksApi.update(taskId, { title: trimmed });
       } catch {
         // silent
       }
@@ -170,7 +171,7 @@ export default function ProductBacklogSection({
 
   const handleAddLabel = async (taskId: number, labelId: number) => {
     try {
-      await api.post(`/api/tasks/${taskId}/label/${labelId}`);
+      await tasksApi.addLabel(taskId, labelId);
       const label = projectLabels.find((l) => l.id === labelId);
       if (label) {
         setLabelCache((prev) => {
@@ -186,7 +187,7 @@ export default function ProductBacklogSection({
 
   const handleRemoveLabel = async (taskId: number, labelId: number) => {
     try {
-      await api.delete(`/api/tasks/${taskId}/label/${labelId}`);
+      await tasksApi.removeLabel(taskId, labelId);
       setLabelCache((prev) => {
         const existing = prev[taskId] ?? tasks.find((t) => t.id === taskId)?.labels ?? [];
         return { ...prev, [taskId]: existing.filter((l) => l.id !== labelId) };

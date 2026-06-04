@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { AxiosError } from 'axios';
-import axios from '@/lib/axios';
+import { sprintsApi, tasksApi } from '@/services/api-contract';
 import { toast } from '@/components/ui';
 import { buildSessionCacheKey, removeSessionCache } from '@/lib/session-cache';
 import {
@@ -89,8 +89,8 @@ export function useSprintBoardActions({
     setShowCompleteConfirm(true);
     if (!projectIdStr) return;
     try {
-      const res = await axios.get(`/api/sprints/project/${projectIdStr}`);
-      const notStarted = (res.data as Array<{ id: number; name?: string; sprintName?: string; status: string }>)
+      const res = await sprintsApi.listByProject(projectIdStr);
+      const notStarted = (res as Array<{ id: number; name?: string; sprintName?: string; status: string }>)
         .filter((s) => s.status === 'NOT_STARTED' && s.id !== sprintId)
         .map((s) => ({ id: s.id, name: s.sprintName || s.name || `Sprint #${s.id}` }));
       setAvailableDestSprints(notStarted);
@@ -149,12 +149,12 @@ export function useSprintBoardActions({
   const handleInlineCreateTask = useCallback(async (title: string, status: string) => {
     if (!projectIdStr || !activeSprint) return;
     try {
-      const res = await axios.post('/api/tasks', { title, status, projectId: parseInt(projectIdStr, 10), sprintId: activeSprint.id, storyPoint: 0, priority: 'MEDIUM' });
+      const res = await tasksApi.create({ title, status, projectId: parseInt(projectIdStr, 10), sprintId: activeSprint.id, storyPoint: 0, priority: 'MEDIUM' });
       const newTask: SprintboardTask = {
-        taskId: res.data.id, projectTaskNumber: res.data.projectTaskNumber ?? res.data.id,
-        title: res.data.title, storyPoint: res.data.storyPoint ?? 0, status,
-        priority: res.data.priority ?? 'MEDIUM', assigneeName: res.data.assigneeName,
-        assigneePhotoUrl: res.data.assigneePhotoUrl ?? null, updatedAt: res.data.updatedAt,
+        taskId: res.id, projectTaskNumber: res.projectTaskNumber ?? res.id,
+        title: res.title, storyPoint: res.storyPoint ?? 0, status,
+        priority: res.priority ?? 'MEDIUM', assigneeName: res.assigneeName,
+        assigneePhotoUrl: res.assigneePhotoUrl ?? undefined, updatedAt: res.updatedAt,
         attachmentCount: 0, commentCount: 0,
       };
       setAllBoards((prev) => prev.map((entry, idx) => idx === selectedIdx

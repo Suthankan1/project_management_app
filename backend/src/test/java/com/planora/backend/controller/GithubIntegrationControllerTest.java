@@ -18,6 +18,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -58,13 +59,12 @@ class GithubIntegrationControllerTest {
         GithubLinkRequestDTO req = new GithubLinkRequestDTO();
         req.setProjectId(10L);
         req.setRepositoryFullName("owner/repo");
-        req.setAccessToken("token123");
 
         ProjectGithubRepositoryDTO resp = new ProjectGithubRepositoryDTO();
         resp.setIntegrationId(1L);
         resp.setRepositoryFullName("owner/repo");
 
-        when(integrationService.linkRepository(any())).thenReturn(resp);
+        when(integrationService.linkRepository(any(), anyLong())).thenReturn(resp);
 
         mockMvc.perform(post("/api/github/link")
                         .with(csrf())
@@ -80,7 +80,6 @@ class GithubIntegrationControllerTest {
         GithubLinkRequestDTO req = new GithubLinkRequestDTO();
         req.setProjectId(-10L); // Negative ID
         req.setRepositoryFullName(""); // Blank name
-        req.setAccessToken(""); // Blank token
         req.setTokenType("INVALID_TOKEN_TYPE"); // Invalid token type pattern
 
         mockMvc.perform(post("/api/github/link")

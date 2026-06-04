@@ -2,20 +2,28 @@ package com.planora.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.planora.backend.dto.*;
+import com.planora.backend.exception.StorageQuotaExceededException;
 import com.planora.backend.service.DocumentService;
 import com.planora.backend.service.JWTService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import com.planora.backend.annotation.WithMockUserPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.RequestBuilder;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -132,6 +140,21 @@ class DocumentControllerTest {
 
     @Test
     @WithMockUserPrincipal
+    void getVersions_returns200WithVersionList() throws Exception {
+        DocumentVersionResponseDTO version = DocumentVersionResponseDTO.builder()
+                .id(5L)
+                .versionNumber(1)
+                .downloadUrl("https://cdn.example.com/spec-v1.pdf")
+                .build();
+        when(documentService.getVersions(eq(10L), eq(1L), any())).thenReturn(List.of(version));
+
+        mockMvc.perform(get("/api/projects/10/documents/1/versions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].versionNumber").value(1));
+    }
+
+    @Test
+    @WithMockUserPrincipal
     void softDelete_returns204() throws Exception {
         doNothing().when(documentService).softDelete(eq(10L), eq(1L), any());
 
@@ -185,6 +208,65 @@ class DocumentControllerTest {
 
     @Test
     @WithMockUserPrincipal
+    void getFolderPermissions_returns200WithPermissionList() throws Exception {
+        List<FolderPermissionRequest> permissions = List.of(new FolderPermissionRequest("MEMBER", List.of("READ", "WRITE")));
+        when(documentService.getFolderPermissions(eq(10L), eq(1L), any())).thenReturn(permissions);
+
+        mockMvc.perform(get("/api/projects/10/folders/1/permissions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].teamRole").value("MEMBER"))
+                .andExpect(jsonPath("$[0].permissions[0]").value("READ"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void updateFolderPermissions_returns200() throws Exception {
+        List<FolderPermissionRequest> permissions = List.of(new FolderPermissionRequest("MEMBER", List.of("READ")));
+
+        mockMvc.perform(put("/api/projects/10/folders/1/permissions")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(permissions)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Folder permissions updated"));
+
+        verify(documentService).updateFolderPermissions(eq(10L), eq(1L), any(), eq(permissions));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void getStorageQuota_returns200WithQuota() throws Exception {
+        ProjectStorageQuotaResponseDTO quota = ProjectStorageQuotaResponseDTO.builder()
+                .usedBytes(1024L)
+                .quotaBytes(5L * 1024 * 1024 * 1024)
+                .maxFileSizeBytes(100L * 1024 * 1024)
+                .documentCount(2L)
+                .humanReadableUsed("1.0 KB")
+                .humanReadableQuota("5.0 GB")
+                .build();
+        when(documentService.getStorageQuota(eq(10L), any())).thenReturn(quota);
+
+        mockMvc.perform(get("/api/projects/10/storage-quota"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quotaBytes").value(5368709120L));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void uploadViaBackend_returns201WithDocument() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "spec.pdf", "application/pdf", "PDF".getBytes());
+        when(documentService.uploadDocumentViaBackend(eq(10L), any(), any(), eq(1L))).thenReturn(sampleDoc);
+
+        mockMvc.perform(multipart("/api/projects/10/documents/upload")
+                        .file(file)
+                        .param("folderId", "1")
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("spec.pdf"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
     void deleteFolder_returns204() throws Exception {
         doNothing().when(documentService).deleteFolder(eq(10L), eq(1L), any());
 
@@ -206,6 +288,26 @@ class DocumentControllerTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void initUpload_whenQuotaExceeded_returns413WithErrorCode() throws Exception {
+        DocumentUploadInitRequestDTO req = new DocumentUploadInitRequestDTO();
+        req.setFileName("spec.pdf");
+        req.setContentType("application/pdf");
+        req.setFileSize(50000L);
+
+        when(documentService.initUpload(eq(10L), any(), any()))
+                .thenThrow(new StorageQuotaExceededException("Project storage quota exceeded."));
+
+        mockMvc.perform(post("/api/projects/10/documents/upload/init")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.errorCode").value("STORAGE_QUOTA_EXCEEDED"))
+                .andExpect(jsonPath("$.message").value("Project storage quota exceeded."));
     }
 
     @Test
@@ -235,5 +337,83 @@ class DocumentControllerTest {
                         .content(objectMapper.writeValueAsString(invalidPermissions)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
+
+    @ParameterizedTest(name = "{0} returns 403 when service denies access")
+    @MethodSource("authorizationDeniedRoutes")
+    @WithMockUserPrincipal
+    void dmsRoutes_return403WhenAuthorizationFails(String routeName, RequestBuilder requestBuilder) throws Exception {
+        AccessDeniedException denied = new AccessDeniedException("Permission denied");
+
+        switch (routeName) {
+            case "getFolderPermissions" -> when(documentService.getFolderPermissions(eq(10L), eq(1L), any())).thenThrow(denied);
+            case "updateFolderPermissions" -> doThrow(denied).when(documentService).updateFolderPermissions(eq(10L), eq(1L), any(), anyList());
+            case "getStorageQuota" -> when(documentService.getStorageQuota(eq(10L), any())).thenThrow(denied);
+            case "listFolders" -> when(documentService.listFolders(eq(10L), any())).thenThrow(denied);
+            case "createFolder" -> when(documentService.createFolder(eq(10L), any(), any())).thenThrow(denied);
+            case "deleteFolder" -> doThrow(denied).when(documentService).deleteFolder(eq(10L), eq(1L), any());
+            case "listDocuments" -> when(documentService.listDocuments(eq(10L), any(), any(), anyBoolean())).thenThrow(denied);
+            case "getVersions" -> when(documentService.getVersions(eq(10L), eq(1L), any())).thenThrow(denied);
+            case "updateMetadata" -> when(documentService.updateMetadata(eq(10L), eq(1L), any(), any())).thenThrow(denied);
+            case "softDelete" -> doThrow(denied).when(documentService).softDelete(eq(10L), eq(1L), any());
+            case "restore" -> when(documentService.restore(eq(10L), eq(1L), any())).thenThrow(denied);
+            case "permanentDelete" -> doThrow(denied).when(documentService).permanentDelete(eq(10L), eq(1L), any());
+            case "getDownloadUrl" -> when(documentService.getDownloadUrl(eq(10L), eq(1L), any())).thenThrow(denied);
+            case "initUpload" -> when(documentService.initUpload(eq(10L), any(), any())).thenThrow(denied);
+            case "finalizeUpload" -> when(documentService.finalizeUpload(eq(10L), any(), any())).thenThrow(denied);
+            case "uploadViaBackend" -> when(documentService.uploadDocumentViaBackend(eq(10L), any(), any(), any())).thenThrow(denied);
+            default -> throw new IllegalArgumentException("Unhandled route: " + routeName);
+        }
+
+        mockMvc.perform(requestBuilder)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Permission denied"));
+    }
+
+    private static Stream<Arguments> authorizationDeniedRoutes() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        DocumentUploadInitRequestDTO init = new DocumentUploadInitRequestDTO();
+        init.setFileName("spec.pdf");
+        init.setContentType("application/pdf");
+        init.setFileSize(50000L);
+
+        DocumentUploadFinalizeRequestDTO finalize = new DocumentUploadFinalizeRequestDTO();
+        finalize.setFileName("spec.pdf");
+        finalize.setContentType("application/pdf");
+        finalize.setFileSize(50000L);
+        finalize.setObjectKey("project-10/root/key-spec.pdf");
+
+        DocumentFolderCreateRequestDTO folder = new DocumentFolderCreateRequestDTO();
+        folder.setName("Requirements");
+
+        DocumentMetadataUpdateRequestDTO metadata = new DocumentMetadataUpdateRequestDTO();
+        metadata.setName("renamed.pdf");
+
+        List<FolderPermissionRequest> permissions = List.of(new FolderPermissionRequest("MEMBER", List.of("READ")));
+        MockMultipartFile file = new MockMultipartFile("file", "spec.pdf", "application/pdf", "PDF".getBytes());
+
+        return Stream.of(
+                Arguments.of("getFolderPermissions", get("/api/projects/10/folders/1/permissions")),
+                Arguments.of("updateFolderPermissions", put("/api/projects/10/folders/1/permissions")
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(permissions))),
+                Arguments.of("getStorageQuota", get("/api/projects/10/storage-quota")),
+                Arguments.of("listFolders", get("/api/projects/10/folders")),
+                Arguments.of("createFolder", post("/api/projects/10/folders")
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(folder))),
+                Arguments.of("deleteFolder", delete("/api/projects/10/folders/1").with(csrf())),
+                Arguments.of("listDocuments", get("/api/projects/10/documents")),
+                Arguments.of("getVersions", get("/api/projects/10/documents/1/versions")),
+                Arguments.of("updateMetadata", patch("/api/projects/10/documents/1")
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(metadata))),
+                Arguments.of("softDelete", delete("/api/projects/10/documents/1").with(csrf())),
+                Arguments.of("restore", patch("/api/projects/10/documents/1/restore").with(csrf())),
+                Arguments.of("permanentDelete", delete("/api/projects/10/documents/1/permanent").with(csrf())),
+                Arguments.of("getDownloadUrl", get("/api/projects/10/documents/1/download-url")),
+                Arguments.of("initUpload", post("/api/projects/10/documents/upload/init")
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(init))),
+                Arguments.of("finalizeUpload", post("/api/projects/10/documents/upload/finalize")
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(finalize))),
+                Arguments.of("uploadViaBackend", multipart("/api/projects/10/documents/upload").file(file).with(csrf()))
+        );
     }
 }

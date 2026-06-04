@@ -1,6 +1,7 @@
 import { tasksApi, sprintboardsApi, sprintsApi, projectsApi } from '@/services/api-contract';
 import { Sprintboard, SprintboardFullResponse, Sprintcolumn } from './types';
-import type { Sprint } from '@/types';
+import type { Sprint, Task } from '@/types';
+import type { CreateTaskRequest } from '@/services/tasks-contract';
 
 /**
  * Fetch sprint board for a specific sprint
@@ -59,7 +60,7 @@ export async function completeSprint(sprintId: number, moveIncompleteTo: number 
 /**
  * Create a new task within a sprint
  */
-export async function createTask(taskData: Record<string, unknown>): Promise<unknown> {
+export async function createTask(taskData: CreateTaskRequest): Promise<Task> {
   return await tasksApi.create(taskData);
 }
 

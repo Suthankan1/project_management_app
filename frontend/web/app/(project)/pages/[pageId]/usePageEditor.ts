@@ -3,8 +3,36 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { usePageContent } from './hooks/usePageContent';
+import { pagesApi } from '@/services/api-contract';
 import TurndownService from 'turndown';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
+import * as Y from 'yjs';
+import { WebsocketProvider } from 'y-websocket';
+import { getValidToken, getUserFromToken, AUTH_TOKEN_CHANGED_EVENT } from '@/lib/auth';
+import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
+import { getApiBaseUrl } from '@/lib/api-base-url';
+import api from '@/lib/axios';
+
+const PALETTE = [
+  '#3b82f6', // blue
+  '#ef4444', // red
+  '#10b981', // green
+  '#f59e0b', // orange
+  '#8b5cf6', // purple
+  '#ec4899', // pink
+  '#14b8a6', // teal
+  '#6366f1', // indigo
+];
+
+function getStableColor(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % PALETTE.length;
+  return PALETTE[index];
+}
 
 export function usePageEditor() {
   const router = useRouter();
@@ -19,20 +47,121 @@ export function usePageEditor() {
     selectedPage, setSelectedPage,
     title, setTitle,
     loadingPage,
-    historyMock, setHistoryMock,
+    versions, setVersions,
     isDraft,
     filteredPages, error, searchQuery, setSearchQuery,
     updatePage, createPage, deletePage, refetch,
+    toggleStar, movePage,
   } = usePageContent(pageId, projectId);
 
   // saveStatus starts as 'draft' for new pages, 'idle' otherwise
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle' | 'draft'>(
     () => (pageId === 'new' ? 'draft' : 'idle'),
   );
+  const [localError, setLocalError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showDocSidebar, setShowDocSidebar] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
+  const [provider, setProvider] = useState<WebsocketProvider | null>(null);
+  const [collaborationUser, setCollaborationUser] = useState<{ name: string; color: string; avatar?: string } | null>(null);
+
+  useEffect(() => {
+    const fetchProfileAndSetUser = async () => {
+      try {
+        const tokenUser = getUserFromToken();
+        if (!tokenUser) return;
+
+        const response = await api.get('/api/user/profile');
+        const profile = response.data;
+
+        const name = profile.fullName || profile.username || tokenUser.username || tokenUser.email || 'Anonymous';
+        const color = getStableColor(name);
+        const avatar = profile.profilePicUrl || '';
+
+        setCollaborationUser({ name, color, avatar });
+      } catch (err) {
+        console.error('Error fetching profile for collaboration:', err);
+        const tokenUser = getUserFromToken();
+        if (tokenUser) {
+          const name = tokenUser.username || tokenUser.email || 'Anonymous';
+          setCollaborationUser({
+            name,
+            color: getStableColor(name),
+          });
+        }
+      }
+    };
+
+    void fetchProfileAndSetUser();
+  }, []);
+
+  useEffect(() => {
+    if (isDraft || !pageId || pageId === 'new') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setYdoc(null);
+      setProvider(null);
+      return;
+    }
+
+    let wsProvider: WebsocketProvider | null = null;
+    let doc: Y.Doc | null = null;
+
+    const connect = () => {
+      if (wsProvider) {
+        wsProvider.disconnect();
+        wsProvider.destroy();
+      }
+      if (doc) {
+        doc.destroy();
+      }
+
+      doc = new Y.Doc();
+      const backendUrl = getApiBaseUrl();
+      const wsUrl = resolveWebSocketBaseUrl(backendUrl);
+      const token = getValidToken();
+
+      if (!token) return;
+
+      if (typeof WebSocket === 'undefined') return;
+
+      wsProvider = new WebsocketProvider(
+        `${wsUrl}/yjs`,
+        `page-${pageId}`,
+        doc,
+        {
+          params: { token },
+          connect: true,
+        }
+      );
+
+      setYdoc(doc);
+      setProvider(wsProvider);
+    };
+
+    connect();
+
+    const handleTokenChange = () => {
+      connect();
+    };
+
+    window.addEventListener(AUTH_TOKEN_CHANGED_EVENT, handleTokenChange);
+
+    return () => {
+      window.removeEventListener(AUTH_TOKEN_CHANGED_EVENT, handleTokenChange);
+      if (wsProvider) {
+        wsProvider.disconnect();
+        wsProvider.destroy();
+      }
+      if (doc) {
+        doc.destroy();
+      }
+      setYdoc(null);
+      setProvider(null);
+    };
+  }, [pageId, isDraft]);
 
   // Tracks the latest editor HTML without waiting for the 800ms debounce.
   // Used by handleManualCreate so Publish always captures what the user typed.
@@ -51,18 +180,14 @@ export function usePageEditor() {
       await updatePage(selectedPage.id, title, htmlContent);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
-      setHistoryMock(prev => [{
-        id: Math.random().toString(),
-        pageId: selectedPage.id,
-        action: 'edited',
-        editedBy: 'You',
-        editedAt: new Date().toISOString(),
-      }, ...prev.slice(0, 9)]);
+      
+      const versionsData = await pagesApi.getVersions(projectId, selectedPage.id);
+      setVersions(versionsData);
     } catch (err) {
       console.error('Error auto-saving:', err);
       setSaveStatus('error');
     }
-  }, [selectedPage, title, projectId, updatePage, isDraft, setSelectedPage, setHistoryMock]);
+  }, [selectedPage, title, projectId, updatePage, isDraft, setSelectedPage, setVersions]);
 
   // Debounced title save
   useEffect(() => {
@@ -77,6 +202,9 @@ export function usePageEditor() {
         refetch();
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
+
+        const versionsData = await pagesApi.getVersions(projectId, selectedPage.id);
+        setVersions(versionsData);
       } catch (err) {
         console.error('Error auto-saving title:', err);
         setSaveStatus('error');
@@ -84,7 +212,7 @@ export function usePageEditor() {
     }, 1000);
 
     return () => clearTimeout(timeoutId);
-  }, [title, selectedPage, projectId, updatePage, refetch, isDraft, setSelectedPage]);
+  }, [title, selectedPage, projectId, updatePage, refetch, isDraft, setSelectedPage, setVersions]);
 
   const handleManualCreate = async () => {
     if (!selectedPage || !projectId) return;
@@ -126,14 +254,45 @@ export function usePageEditor() {
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedPage) return;
+
+    setLocalError(null);
+
+    // Enforce max file size: 1MB
+    const MAX_FILE_SIZE = 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      setLocalError('File size exceeds the 1MB limit.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const isMd = file.name.endsWith('.md');
+    const isHtml = file.name.endsWith('.html') || file.name.endsWith('.htm');
+
+    if (!isMd && !isHtml) {
+      setLocalError('Invalid file type. Only Markdown (.md) and HTML (.html) files are allowed.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = async (event) => {
-      const text = event.target?.result as string;
-      let htmlContent = text;
-      if (file.name.endsWith('.md')) {
-        htmlContent = await marked.parse(text);
+      try {
+        const text = event.target?.result as string;
+        let htmlContent = text;
+        if (isMd) {
+          const rawHtml = await marked.parse(text);
+          htmlContent = typeof window !== 'undefined' ? DOMPurify.sanitize(rawHtml) : rawHtml;
+        } else if (isHtml) {
+          htmlContent = typeof window !== 'undefined' ? DOMPurify.sanitize(text) : text;
+        }
+        handleUpdateContent(htmlContent);
+      } catch (err) {
+        console.error('Error parsing file:', err);
+        setLocalError('Failed to parse imported file.');
       }
-      handleUpdateContent(htmlContent);
+    };
+    reader.onerror = () => {
+      setLocalError('Failed to read file.');
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -154,6 +313,31 @@ export function usePageEditor() {
     URL.revokeObjectURL(url);
   };
 
+  const handleRestoreVersion = async (versionId: string | number) => {
+    if (!selectedPage || !projectId) return;
+    setSaveStatus('saving');
+    try {
+      const restoredPage = await pagesApi.restoreVersion(projectId, selectedPage.id, versionId);
+      setSelectedPage({
+        id: restoredPage.id,
+        title: restoredPage.title,
+        content: restoredPage.content || '',
+        updatedAt: restoredPage.updatedAt,
+        isStarred: restoredPage.isStarred || false,
+      });
+      setTitle(restoredPage.title);
+
+      const versionsData = await pagesApi.getVersions(projectId, selectedPage.id);
+      setVersions(versionsData);
+
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (err) {
+      console.error('Error restoring version:', err);
+      setSaveStatus('error');
+    }
+  };
+
   return {
     pageId,
     isDraft,
@@ -163,11 +347,12 @@ export function usePageEditor() {
     saveStatus,
     title, setTitle,
     showHistory, setShowHistory,
-    historyMock,
+    versions,
+    handleRestoreVersion,
     showDocSidebar, setShowDocSidebar,
     fileInputRef,
     filteredPages,
-    error,
+    error: error || localError,
     searchQuery, setSearchQuery,
     handleUpdateContent,
     setLatestContent,
@@ -177,5 +362,10 @@ export function usePageEditor() {
     showDeleteConfirm, setShowDeleteConfirm,
     handleFileImport,
     handleExport,
+    toggleStar,
+    movePage,
+    ydoc,
+    provider,
+    collaborationUser,
   };
 }

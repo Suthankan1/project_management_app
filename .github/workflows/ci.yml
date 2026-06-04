@@ -27,6 +27,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       mobile: ${{ steps.filter.outputs.mobile }}
+      contracts: ${{ steps.filter.outputs.contracts }}
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -43,6 +44,12 @@ jobs:
             - '.github/workflows/ci.yml'
           mobile:
             - 'frontend/mobile/**'
+            - '.github/workflows/ci.yml'
+          contracts:
+            - 'backend/**'
+            - 'frontend/web/**'
+            - 'frontend/mobile/**'
+            - 'scripts/check-api-contracts.mjs'
             - '.github/workflows/ci.yml'
 
 
@@ -85,6 +92,15 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
       
+    - name: Check for Empty Flyway Migrations
+      run: |
+        EMPTY_FILES=$(find src/main/resources/db/migration -type f -empty 2>/dev/null || true)
+        if [ -n "$EMPTY_FILES" ]; then
+          echo "Error: Found empty Flyway migration files:"
+          echo "$EMPTY_FILES"
+          exit 1
+        fi
+        echo "No empty Flyway migration files found."
     - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
@@ -140,11 +156,62 @@ jobs:
     - name: Lint Next.js App
       run: npm run lint
 
+    - name: TypeScript Check
+      run: npm run typecheck
+
+    - name: Check for Hardcoded Localhost Backend URLs
+      run: |
+        MATCHES=$(grep -rn "localhost:8080" \
+          --include="*.ts" \
+          --include="*.tsx" \
+          --include="*.js" \
+          --include="*.jsx" \
+          --exclude="*.test.ts" \
+          --exclude="*.test.tsx" \
+          --exclude="*.spec.ts" \
+          --exclude="*.spec.tsx" \
+          --exclude="next.config.*" \
+          --exclude="api-base-url.ts" \
+          --exclude-dir=".next" \
+          --exclude-dir="node_modules" \
+          --exclude-dir="api" \
+          . 2>/dev/null || true)
+        if [ -n "$MATCHES" ]; then
+          echo "❌ Hardcoded localhost:8080 found in production frontend source files:"
+          echo "$MATCHES"
+          echo ""
+          echo "Fix: Use getApiBaseUrl() from @/lib/api-base-url instead of hardcoding the backend URL."
+          exit 1
+        fi
+        echo "✅ No hardcoded localhost backend URLs found."
+
     - name: Run Frontend Tests
       run: npm run test
 
     - name: Build Next.js App
       run: npm run build
+
+  api-contracts:
+    name: Validate API Contracts
+    needs: [changes, backend-build, frontend-build, mobile-build]
+    if: ${{ always() && !cancelled() && (github.event_name == 'workflow_dispatch' || needs.changes.outputs.contracts == 'true') && (needs.backend-build.result == 'success' || needs.backend-build.result == 'skipped') && (needs.frontend-build.result == 'success' || needs.frontend-build.result == 'skipped') && (needs.mobile-build.result == 'success' || needs.mobile-build.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    env:
+      API_CONTRACT_MAX_CRITICAL_ISSUES: 11
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Validate API Route Contracts
+      run: node scripts/check-api-contracts.mjs --report api-contract-report.txt
+
+    - name: Upload API Contract Report
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: api-contract-report
+        path: api-contract-report.txt
 
   mobile-build:
     name: Build Mobile
@@ -180,6 +247,9 @@ jobs:
 
     - name: TypeScript Check
       run: npx tsc --noEmit
+
+    - name: Run Mobile Tests
+      run: npm run test
 
     - name: Smoke Check EAS Build Profiles
       run: |

@@ -4,7 +4,10 @@ import com.planora.backend.dto.DocumentFolderCreateRequestDTO;
 import com.planora.backend.dto.DocumentFolderResponseDTO;
 import com.planora.backend.dto.DocumentResponseDTO;
 import com.planora.backend.dto.DocumentUploadFinalizeRequestDTO;
+import com.planora.backend.dto.DocumentUploadInitRequestDTO;
+import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.ResourceNotFoundException;
+import com.planora.backend.exception.StorageQuotaExceededException;
 import com.planora.backend.model.Document;
 import com.planora.backend.model.DocumentFolder;
 import com.planora.backend.model.DocumentFolderPermission;
@@ -126,6 +129,57 @@ class DocumentServiceTest {
                 () -> documentService.createFolder(5L, 55L, request));
 
         assertEquals("Viewer role does not have permission for this action", exception.getMessage());
+    }
+
+    @Test
+    void initUpload_whenProjectQuotaWouldBeExceeded_throwsStorageQuotaExceeded() {
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+
+        DocumentUploadInitRequestDTO request = new DocumentUploadInitRequestDTO();
+        request.setFileName("large.pdf");
+        request.setContentType("application/pdf");
+        request.setFileSize(2L);
+
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(12L, 55L)).thenReturn(Optional.of(member));
+        doNothing().when(s3StorageService).validateFileRequest(any(), any(), any(), anyLong(), any());
+        when(documentRepository.sumFileSizeByProjectId(5L)).thenReturn(5L * 1024 * 1024 * 1024);
+
+        StorageQuotaExceededException exception = assertThrows(StorageQuotaExceededException.class,
+                () -> documentService.initUpload(5L, 55L, request));
+
+        assertTrue(exception.getMessage().contains("storage quota exceeded"));
+        verify(s3StorageService, never()).generatePresignedUploadUrl(any(), any(), any(), any());
+    }
+
+    @Test
+    void initUpload_withoutFolderWritePermission_throwsForbidden() {
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+
+        DocumentFolder folder = new DocumentFolder();
+        folder.setId(300L);
+        folder.setProject(project);
+
+        DocumentUploadInitRequestDTO request = new DocumentUploadInitRequestDTO();
+        request.setFileName("spec.pdf");
+        request.setContentType("application/pdf");
+        request.setFileSize(1024L);
+        request.setFolderId(300L);
+
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(12L, 55L)).thenReturn(Optional.of(member));
+        doNothing().when(s3StorageService).validateFileRequest(any(), any(), any(), anyLong(), any());
+        when(documentRepository.sumFileSizeByProjectId(5L)).thenReturn(0L);
+        when(documentFolderRepository.findByIdAndProjectId(300L, 5L)).thenReturn(Optional.of(folder));
+        when(folderPermissionRepository.findByFolderIdAndTeamRole(300L, TeamRole.MEMBER)).thenReturn(List.of());
+
+        ForbiddenException exception = assertThrows(ForbiddenException.class,
+                () -> documentService.initUpload(5L, 55L, request));
+
+        assertEquals("You do not have WRITE access to this folder.", exception.getMessage());
+        verify(s3StorageService, never()).generatePresignedUploadUrl(any(), any(), any(), any());
     }
 
     @Test
@@ -502,6 +556,7 @@ class DocumentServiceTest {
         when(teamMemberRepository.findByTeamIdAndUserUserId(12L, 55L)).thenReturn(Optional.of(member));
         when(s3StorageService.resolveContentType(anyString(), anyString())).thenReturn("application/pdf");
         doNothing().when(s3StorageService).validateFileRequest(any(), any(), any(), anyLong(), any());
+        when(documentRepository.sumFileSizeByProjectId(5L)).thenReturn(0L);
         doNothing().when(s3StorageService).putObject(any(), anyString(), any(), any(), anyLong());
         doNothing().when(s3StorageService).verifyObjectExists(any(), anyString());
         when(documentVersionRepository.findByObjectKey(anyString())).thenReturn(Optional.empty());

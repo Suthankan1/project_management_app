@@ -102,7 +102,9 @@ public class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.token").value("mock-access-token"))
-                .andExpect(jsonPath("$.refreshToken").value("mock-refresh-token"));
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().exists("Set-Cookie"))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("planora_refresh_token=mock-refresh-token")));
     }
 
     // (d) Login with unverified account returns 403 with UNVERIFIED_EMAIL errorCode
@@ -177,9 +179,10 @@ public class UserControllerTest {
     @WithMockUserPrincipal
     void testResetPassword_InvalidToken_Returns401() throws Exception {
         ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setEmail("test@example.com");
         request.setToken("999999");
         request.setNewPassword("NewPassword1!");
-        when(userService.resetPassword(anyString(), anyString())).thenReturn(false);
+        when(userService.resetPassword(anyString(), anyString(), anyString())).thenReturn(false);
 
         mockMvc.perform(post("/api/auth/reset")
                 .with(csrf())
@@ -209,6 +212,7 @@ public class UserControllerTest {
     @WithMockUserPrincipal
     void testResetPassword_WeakNewPassword_Returns400() throws Exception {
         ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setEmail("test@example.com");
         request.setToken("123456");
         request.setNewPassword("weakpass");
 
@@ -231,11 +235,23 @@ public class UserControllerTest {
 
         mockMvc.perform(post("/api/auth/refresh")
                 .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"refreshToken\":\"old-refresh-token\"}"))
+                .cookie(new jakarta.servlet.http.Cookie("planora_refresh_token", "old-refresh-token")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value("new-access-token"))
-                .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"));
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().exists("Set-Cookie"))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("planora_refresh_token=new-refresh-token")));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void testLogout_ClearsCookie() throws Exception {
+        mockMvc.perform(post("/api/auth/logout")
+                .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(header().exists("Set-Cookie"))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("planora_refresh_token=;")));
     }
 
     @Test

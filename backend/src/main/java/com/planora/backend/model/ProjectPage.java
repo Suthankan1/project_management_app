@@ -35,6 +35,26 @@ public class ProjectPage {
     @Column(name = "updated_by_user_id")
     private Long updatedByUserId;
 
+    @Column(name = "parent_page_id")
+    private Long parentPageId;
+
+    @Column(name = "is_starred", nullable = false)
+    @Builder.Default
+    private Boolean isStarred = false;
+
+    @Column(name = "last_viewed_at")
+    private LocalDateTime lastViewedAt;
+
+    @Column(name = "sort_order", nullable = false)
+    @Builder.Default
+    private Integer sortOrder = 0;
+
+    @Column
+    private String icon;
+
+    @Column
+    private String cover;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 

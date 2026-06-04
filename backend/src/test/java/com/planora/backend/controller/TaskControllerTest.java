@@ -1,6 +1,7 @@
 package com.planora.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.planora.backend.dto.ReorderTasksRequest;
 import com.planora.backend.dto.TaskActivityResponseDTO;
 import com.planora.backend.dto.TaskRequestDTO;
 import com.planora.backend.dto.TaskResponseDTO;
@@ -57,8 +58,17 @@ class TaskControllerTest {
         @MockBean
     private UserDetailsService userDetailsService;
 
-            @MockBean
-        private com.planora.backend.service.TaskGithubService taskGithubService;
+        @MockBean
+    private com.planora.backend.service.TaskGithubService taskGithubService;
+
+        @MockBean
+    private com.planora.backend.service.GithubTokenService githubTokenService;
+
+        @MockBean
+    private com.planora.backend.service.GithubIssuesSyncService githubIssuesSyncService;
+
+        @MockBean
+    private com.planora.backend.service.GithubNotificationService githubNotificationService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -93,6 +103,29 @@ class TaskControllerTest {
         mockMvc.perform(get("/api/tasks/project/10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].title").value("Implement login"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void getTasksByProject_invalidSortByReturnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/tasks/project/10").param("sortBy", "project.team.owner.passwordHash"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Invalid sortBy")))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Allowed values")));
+
+        verify(service, never()).getTasksByProject(anyLong(), any(), any(Pageable.class));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void getTasksByProject_invalidSortDirReturnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/tasks/project/10").param("sortDir", "sideways"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("Invalid sortDir 'sideways'. Allowed values: asc, desc"));
+
+        verify(service, never()).getTasksByProject(anyLong(), any(), any(Pageable.class));
     }
 
     @Test
@@ -230,12 +263,39 @@ class TaskControllerTest {
 
     @Test
     @WithMockUserPrincipal
-    void reorderTasks_returns400WhenProjectIdMissing() throws Exception {
+    void reorderTasks_missingProjectId_returns400() throws Exception {
+        // projectId is @NotNull — omitting it must trigger a validation error.
+        ReorderTasksRequest request = new ReorderTasksRequest(null, null, List.of(1L, 2L, 3L));
         mockMvc.perform(patch("/api/tasks/reorder")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"orderedTaskIds\":[1,2,3]}"))
-                .andExpect(status().isBadRequest());
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void reorderTasks_nullOrderedTaskIds_returns400() throws Exception {
+        // orderedTaskIds is @NotNull — explicitly sending null must fail validation.
+        mockMvc.perform(patch("/api/tasks/reorder")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10,\"orderedTaskIds\":null}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void reorderTasks_validRequest_returns204() throws Exception {
+        doNothing().when(service).reorderTasks(anyLong(), any(), anyList(), any());
+        ReorderTasksRequest request = new ReorderTasksRequest(10L, null, List.of(3L, 1L, 2L));
+        mockMvc.perform(patch("/api/tasks/reorder")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNoContent());
     }
 
     @Test
@@ -350,5 +410,124 @@ class TaskControllerTest {
                         .content(objectMapper.writeValueAsString(invalidReq)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
+
+    // ── DTO validation tests ─────────────────────────────────────────────────────
+
+    @Test
+    @WithMockUserPrincipal
+    void updateAssignees_nullAssigneeIds_returns400() throws Exception {
+        mockMvc.perform(patch("/api/tasks/1/assignees")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"assigneeIds\":null}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void bulkUpdateStatus_emptyTaskIds_returns400() throws Exception {
+        mockMvc.perform(patch("/api/tasks/bulk/status")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"taskIds\":[],\"status\":\"IN_PROGRESS\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void bulkUpdateStatus_blankStatus_returns400() throws Exception {
+        mockMvc.perform(patch("/api/tasks/bulk/status")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"taskIds\":[1,2],\"status\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void bulkDelete_emptyTaskIds_returns400() throws Exception {
+        mockMvc.perform(delete("/api/tasks/bulk")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"taskIds\":[]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void updatePriority_invalidValue_returns400() throws Exception {
+        mockMvc.perform(patch("/api/tasks/1/priority")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\":\"EXTREME\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void updatePriority_blankValue_returns400() throws Exception {
+        mockMvc.perform(patch("/api/tasks/1/priority")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void updateStatus_blankValue_returns400() throws Exception {
+        mockMvc.perform(patch("/api/tasks/1/status")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void patchTaskDates_emptyBody_succeeds() throws Exception {
+        // Empty body is valid — no fields are required; service handles absent dates gracefully.
+        mockMvc.perform(patch("/api/tasks/1/dates")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void createGithubIssue_returnsCreatedIssue() throws Exception {
+        when(githubTokenService.getToken(anyLong())).thenReturn("github-token");
+
+        com.planora.backend.dto.GithubIssueDTO created = new com.planora.backend.dto.GithubIssueDTO();
+        created.setNumber(42);
+        created.setTitle("Issue title");
+        created.setHtmlUrl("https://github.com/owner/repo/issues/42");
+        created.setState("open");
+
+        when(githubIssuesSyncService.createIssue(any(), eq("github-token"))).thenReturn(created);
+
+        mockMvc.perform(post("/api/tasks/1/github-issue")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "repoFullName", "owner/repo",
+                                "title", "Issue title",
+                                "body", "Issue body"
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.issueNumber").value(42))
+                .andExpect(jsonPath("$.title").value("Issue title"))
+                .andExpect(jsonPath("$.htmlUrl").value("https://github.com/owner/repo/issues/42"));
+
+        verify(service).linkGithubIssue(eq(1L), eq(42L), eq("owner/repo"), anyLong());
     }
 }

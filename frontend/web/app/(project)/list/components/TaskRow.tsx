@@ -4,9 +4,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { CalendarDays, ChevronDown, Minus, MoreHorizontal, Plus, Lock, RefreshCw } from 'lucide-react';
 import { hexToLabelStyle } from '@/components/shared/LabelPicker';
 import { AvatarStack } from '@/components/ui/Avatar';
-import api from '@/lib/axios';
+import { tasksApi } from '@/services/tasks-contract';
 import type { Label, MilestoneResponse, Task } from '@/types';
 import { PRIORITY_CONFIG, STATUS_CONFIG, STATUS_ORDER } from '../lib/list-config';
+
 
 const PRIORITY_ORDER = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];
 
@@ -112,7 +113,7 @@ const TaskRow = React.memo(function TaskRow({
   const handlePriorityChange = async (priority: string) => {
     setLocalPriority(priority);
     setPriorityOpen(false);
-    await api.patch(`/api/tasks/${task.id}/priority`, { priority }).catch(() => {});
+    await tasksApi.updatePriority(task.id, priority as 'LOW' | 'NORMAL' | 'MEDIUM' | 'HIGH' | 'URGENT').catch(() => {});
     onTaskUpdated?.(task.id, { priority });
   };
 

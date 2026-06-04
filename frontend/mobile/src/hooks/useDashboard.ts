@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/axios';
+import { taskService, sprintboardService } from '../services/task-service';
 import { getValidToken } from '../auth/storage';
 import { offlineSyncManager } from '../services/offlineSyncManager';
 
@@ -98,29 +99,29 @@ function mapBoard(b: {
 async function fetchTabData(tab: TabKey): Promise<DashboardItem[]> {
   switch (tab) {
     case 'boards': {
-      const res = await api.get('/api/sprintboards/user/recent?limit=20');
-      return res.data.map(mapBoard);
+      const data = await sprintboardService.getRecent(20);
+      return data.map(mapBoard);
     }
     case 'favorites': {
       const res = await api.get('/api/projects/favorites');
       return res.data.map(mapProject);
     }
     case 'assigned-to-me': {
-      const res = await api.get('/api/tasks/assigned');
-      return res.data.map(mapTask);
+      const data = await taskService.getAssigned();
+      return data.map(mapTask);
     }
     case 'worked-on': {
-      const res = await api.get('/api/tasks/worked-on');
-      return res.data.map(mapTask);
+      const data = await taskService.getWorkedOn();
+      return data.map(mapTask);
     }
     case 'viewed': {
-      const [pRes, tRes] = await Promise.all([
+      const [pRes, tData] = await Promise.all([
         api.get('/api/projects/recent?limit=20').catch(() => ({ data: [] })),
-        api.get('/api/tasks/recent?limit=20').catch(() => ({ data: [] })),
+        taskService.getRecent({ limit: 20 }).catch(() => []),
       ]);
       return [
         ...pRes.data.map(mapProject),
-        ...tRes.data.map(mapTask),
+        ...tData.map(mapTask),
       ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     }
     default:
@@ -230,8 +231,8 @@ export function useDashboard(): UseDashboardReturn {
   // ── Fetch assigned count (always) ───────────────────────────────────────────
   const fetchAssignedCount = useCallback(async () => {
     try {
-      const res = await api.get('/api/tasks/assigned?limit=100');
-      const pending = res.data.filter((t: { status?: string }) => t.status !== 'DONE').length;
+      const data = await taskService.getAssigned({ limit: 100 });
+      const pending = data.filter((t: { status?: string }) => t.status !== 'DONE').length;
       setAssignedCount(pending);
       await AsyncStorage.setItem('dashboard_assigned_count', String(pending));
     } catch { /* silent */ }

@@ -53,6 +53,15 @@ class TaskActivityControllerTest {
     @MockBean
     private com.planora.backend.service.TaskGithubService taskGithubService;
 
+    @MockBean
+    private com.planora.backend.service.GithubTokenService githubTokenService;
+
+    @MockBean
+    private com.planora.backend.service.GithubIssuesSyncService githubIssuesSyncService;
+
+    @MockBean
+    private com.planora.backend.service.GithubNotificationService githubNotificationService;
+
     @Test
     @WithMockUserPrincipal
     void getActivities_returnsActivitiesForTask() throws Exception {

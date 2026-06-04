@@ -5,11 +5,13 @@ import OtpInput from './OtpInput';
 import PasswordInput from './PasswordInput';
 
 interface ResetPasswordFormProps {
+  email: string;
   otp: string;
   newPassword: string;
   confirmPassword: string;
   error: string;
   isLoading: boolean;
+  onEmailChange: (value: string) => void;
   onOtpChange: (value: string) => void;
   onPasswordChange: (password: string) => void;
   onConfirmPasswordChange: (password: string) => void;
@@ -17,11 +19,13 @@ interface ResetPasswordFormProps {
 }
 
 export default function ResetPasswordForm({
+  email,
   otp,
   newPassword,
   confirmPassword,
   error,
   isLoading,
+  onEmailChange,
   onOtpChange,
   onPasswordChange,
   onConfirmPasswordChange,
@@ -34,6 +38,26 @@ export default function ResetPasswordForm({
           {error}
         </div>
       )}
+
+      <div>
+        <label htmlFor="reset-email" className="block text-xs font-semibold text-cu-text-muted mb-1.5 ml-1">
+          Email Address
+        </label>
+        <input
+          id="reset-email"
+          type="email"
+          autoComplete="email"
+          autoCapitalize="off"
+          autoCorrect="off"
+          inputMode="email"
+          className="w-full px-4 py-3 rounded-xl border border-cu-border bg-cu-bg text-cu-text-primary placeholder:text-cu-text-muted focus:border-cu-primary focus:ring-4 focus:ring-cu-primary/10 outline-none transition-all text-[16px] sm:text-sm"
+          placeholder="Enter your email"
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value.toLowerCase())}
+          required
+          disabled={isLoading}
+        />
+      </div>
 
       <OtpInput value={otp} onChange={onOtpChange} disabled={isLoading} />
 

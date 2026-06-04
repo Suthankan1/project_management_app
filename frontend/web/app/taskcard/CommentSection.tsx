@@ -4,7 +4,9 @@ import Image from 'next/image';
 import { getUserFromToken } from '@/lib/auth';
 import ActivityFeed from './ActivityFeed';
 import CommentItem from './components/CommentItem';
-import { authApi, tasksApi } from '@/services/api-contract';
+import { authApi, tasksApi, projectsApi } from '@/services/api-contract';
+import type { Member } from '@/services/projects-contract';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
 interface Comment {
   id: number;
@@ -16,12 +18,19 @@ interface Comment {
 interface CommentSectionProps {
   taskId?: number;
   onFetchRef?: (fn: () => void) => void;
+  projectId?: number;
+}
+
+interface UserProfile {
+  username?: string;
+  email?: string;
+  profilePicUrl?: string | null;
 }
 
 // Relative profile picture URLs from the API need a host prefix; absolute CDN URLs are used as-is.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+const API_BASE_URL = getApiBaseUrl();
 
-const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) => {
+const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef, projectId }) => {
   const [activeTab, setActiveTab] = useState<'Comments' | 'History'>('Comments');
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -37,10 +46,23 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
       // Fetch users to populate profile pictures and map them by username
       const fetchUsers = async () => {
         try {
-          const response = await authApi.getAllUsers();
+          let response: UserProfile[];
+          if (projectId) {
+            const members = await projectsApi.getMembers(projectId);
+            response = members.map((m: Member) => m.user ? {
+              username: m.user.username,
+              email: m.user.email,
+              profilePicUrl: m.user.profilePicUrl
+            } : {
+              username: m.username,
+              email: m.email,
+              profilePicUrl: null
+            });
+          } else {
+            response = await authApi.getAllUsers();
+          }
           const uidMap: Record<string, string | null> = {};
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          response.forEach((u: any) => {
+          response.forEach((u: UserProfile) => {
              if (u.username) {
                uidMap[u.username] = u.profilePicUrl || null;
              }
@@ -55,7 +77,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
       };
       void fetchUsers();
     }
-  }, []);
+  }, [projectId]);
 
   const resolveProfilePic = (url?: string | null) => {
     if (!url) return '';

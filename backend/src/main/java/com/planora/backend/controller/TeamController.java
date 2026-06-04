@@ -18,7 +18,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("api/teams")
+@RequestMapping("/api/teams")
 @RequiredArgsConstructor
 public class TeamController {
 
@@ -84,7 +84,7 @@ public class TeamController {
     }
 
     // 5. DELETE TEAM
-    @DeleteMapping("{id}")
+    @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTeam(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal currentUser) {

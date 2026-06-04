@@ -16,6 +16,10 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.planora.backend.model.User;
+import com.planora.backend.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -41,6 +45,15 @@ public class GitHubIntegrationService {
 
     private static final String GITHUB_API = "https://api.github.com";
     private static final int MAX_ITEMS = 5;
+
+    @Value("${github.client.id:}")
+    private String clientId;
+
+    @Value("${github.client.secret:}")
+    private String clientSecret;
+
+    private final GithubTokenService githubTokenService;
+    private final UserRepository userRepository;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -353,5 +366,177 @@ public class GitHubIntegrationService {
 
     private boolean isBlank(String s) {
         return s == null || s.isBlank();
+    }
+
+    public void exchangeAndSaveToken(Long userId, String email, String code) {
+        if (isBlank(clientId) || isBlank(clientSecret)) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "GitHub OAuth is not configured on this server");
+        }
+
+        String url = "https://github.com/login/oauth/access_token";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.ACCEPT, "application/json");
+        headers.set(HttpHeaders.CONTENT_TYPE, "application/json");
+
+        Map<String, String> requestBody = Map.of(
+                "client_id", clientId,
+                "client_secret", clientSecret,
+                "code", code
+        );
+
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(
+                    url, HttpMethod.POST, new HttpEntity<>(requestBody, headers), JsonNode.class);
+
+            JsonNode body = response.getBody();
+            if (body == null || body.path("access_token").isMissingNode()) {
+                String error = body != null ? body.path("error_description").asText(body.path("error").asText("Unknown error")) : "Empty response";
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to exchange OAuth code: " + error);
+            }
+
+            String accessToken = body.path("access_token").asText();
+
+            // Fetch GitHub profile username (login)
+            String githubUsername = fetchGitHubUsername(accessToken);
+
+            // Save token encrypted
+            githubTokenService.saveToken(userId, accessToken);
+
+            // Save GitHub username
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+            user.setGithubUsername(githubUsername);
+            userRepository.save(user);
+
+        } catch (RestClientException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Failed to connect to GitHub for token exchange", e);
+        }
+    }
+
+    private String fetchGitHubUsername(String accessToken) {
+        String url = GITHUB_API + "/user";
+        HttpHeaders headers = buildHeaders(accessToken);
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+            JsonNode body = response.getBody();
+            if (body != null && !body.path("login").isMissingNode()) {
+                return body.path("login").asText();
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to retrieve username from GitHub profile");
+        } catch (RestClientException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to fetch GitHub user profile during OAuth", e);
+        }
+    }
+
+    public void revokeToken(Long userId) {
+        if (isBlank(clientId) || isBlank(clientSecret)) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "GitHub OAuth is not configured on this server");
+        }
+
+        String token = githubTokenService.getToken(userId);
+        if (isBlank(token)) {
+            return; // Already revoked or not connected
+        }
+
+        String url = GITHUB_API + "/applications/" + clientId + "/grant";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBasicAuth(clientId, clientSecret);
+        headers.set(HttpHeaders.ACCEPT, "application/vnd.github.v3+json");
+        headers.set(HttpHeaders.CONTENT_TYPE, "application/json");
+
+        Map<String, String> requestBody = Map.of("access_token", token);
+
+        try {
+            restTemplate.exchange(url, HttpMethod.DELETE, new HttpEntity<>(requestBody, headers), Void.class);
+        } catch (RestClientException e) {
+            // Log warning but proceed to clear local data
+        }
+
+        // Clear local token and username
+        githubTokenService.clearToken(userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        user.setGithubUsername(null);
+        userRepository.save(user);
+    }
+
+    public JsonNode fetchGitHubUser(String githubToken) {
+        if (isBlank(githubToken)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "GitHub token is required");
+        }
+        String url = GITHUB_API + "/user";
+        HttpHeaders headers = buildHeaders(githubToken);
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+            return response.getBody();
+        } catch (HttpClientErrorException.Unauthorized e) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Invalid GitHub token. Please reconnect your account.", e);
+        } catch (RestClientException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Failed to fetch user from GitHub", e);
+        }
+    }
+
+    public JsonNode fetchPullRequests(String owner, String repo, String githubToken) {
+        if (isBlank(githubToken)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "GitHub token is required");
+        }
+        String url = GITHUB_API + "/repos/" + owner + "/" + repo + "/pulls?state=all&per_page=50&sort=updated&direction=desc";
+        HttpHeaders headers = buildHeaders(githubToken);
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+            return response.getBody();
+        } catch (HttpClientErrorException.Unauthorized e) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Invalid GitHub token. Please reconnect your account.", e);
+        } catch (RestClientException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Failed to fetch pull requests from GitHub", e);
+        }
+    }
+
+    public JsonNode fetchPullRequest(String owner, String repo, int prNumber, String githubToken) {
+        if (isBlank(githubToken)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "GitHub token is required");
+        }
+        String url = GITHUB_API + "/repos/" + owner + "/" + repo + "/pulls/" + prNumber;
+        HttpHeaders headers = buildHeaders(githubToken);
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+            return response.getBody();
+        } catch (HttpClientErrorException.Unauthorized e) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Invalid GitHub token. Please reconnect your account.", e);
+        } catch (RestClientException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Failed to fetch pull request from GitHub", e);
+        }
+    }
+
+    public JsonNode fetchCommits(String owner, String repo, String githubToken) {
+        if (isBlank(githubToken)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "GitHub token is required");
+        }
+        String url = GITHUB_API + "/repos/" + owner + "/" + repo + "/commits?per_page=50";
+        HttpHeaders headers = buildHeaders(githubToken);
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+            return response.getBody();
+        } catch (HttpClientErrorException.Unauthorized e) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Invalid GitHub token. Please reconnect your account.", e);
+        } catch (RestClientException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Failed to fetch commits from GitHub", e);
+        }
     }
 }
