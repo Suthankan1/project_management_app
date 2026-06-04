@@ -16,7 +16,7 @@ public class DocumentUploadFinalizeRequestDTO {
 
     @NotNull(message = "fileSize is required")
     @Min(value = 1, message = "fileSize must be > 0")
-    @Max(value = 26214400, message = "Maximum file size is 25MB")
+    @Max(value = 104857600, message = "Maximum file size is 100MB")
     private Long fileSize;
 
     @NotBlank(message = "objectKey is required")

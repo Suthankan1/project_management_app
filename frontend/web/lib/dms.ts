@@ -1,5 +1,5 @@
 import api from '@/lib/axios';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 export type DocumentStatus = 'ACTIVE' | 'SOFT_DELETED';
 
@@ -64,6 +64,19 @@ interface UploadFinalizeRequest {
     folderId?: number;
 }
 
+export type DmsErrorKind = 'PERMISSION_DENIED' | 'QUOTA_EXCEEDED' | 'UPLOAD_FAILED';
+
+export class DmsError extends Error {
+    constructor(
+        public readonly kind: DmsErrorKind,
+        message: string,
+        public readonly status?: number
+    ) {
+        super(message);
+        this.name = 'DmsError';
+    }
+}
+
 const EXTENSION_MIME_MAP: Record<string, string> = {
     pdf: 'application/pdf',
     doc: 'application/msword',
@@ -87,8 +100,16 @@ function inferContentType(file: File): string {
     return EXTENSION_MIME_MAP[extension] || 'application/octet-stream';
 }
 
+function getResponseData(error: unknown): { message?: string; errorCode?: string } | string | undefined {
+    return (error as { response?: { data?: { message?: string; errorCode?: string } | string } })?.response?.data;
+}
+
+function getResponseStatus(error: unknown): number | undefined {
+    return (error as { response?: { status?: number } })?.response?.status;
+}
+
 function extractErrorMessage(error: unknown, fallback: string): string {
-    const messageFromResponse = (error as { response?: { data?: { message?: string } | string } })?.response?.data;
+    const messageFromResponse = getResponseData(error);
     if (typeof messageFromResponse === 'string' && messageFromResponse.trim()) {
         return messageFromResponse;
     }
@@ -106,6 +127,36 @@ function extractErrorMessage(error: unknown, fallback: string): string {
     }
 
     return fallback;
+}
+
+function toDmsError(error: unknown, fallback: string): DmsError {
+    const status = getResponseStatus(error);
+    const data = getResponseData(error);
+    const errorCode = typeof data === 'object' && data !== null ? data.errorCode : undefined;
+    const message = extractErrorMessage(error, fallback);
+
+    if (status === 403 || errorCode === 'FORBIDDEN') {
+        return new DmsError('PERMISSION_DENIED', message || 'You do not have permission to perform this document action.', status);
+    }
+
+    if (status === 413 || errorCode === 'STORAGE_QUOTA_EXCEEDED') {
+        return new DmsError('QUOTA_EXCEEDED', message || 'Project storage quota exceeded.', status);
+    }
+
+    return new DmsError('UPLOAD_FAILED', message, status);
+}
+
+function shouldFallbackToBackend(error: unknown): boolean {
+    if (!axios.isAxiosError(error)) {
+        return false;
+    }
+
+    const axiosError = error as AxiosError;
+    if (!axiosError.response) {
+        return true;
+    }
+
+    return [408, 429, 500, 502, 503, 504].includes(axiosError.response.status);
 }
 
 export interface FolderPermissionRequest {
@@ -205,7 +256,7 @@ async function initUpload(projectId: number, request: UploadInitRequest): Promis
         const response = await api.post<UploadInitResponse>(`/api/projects/${projectId}/documents/upload/init`, request);
         return response.data;
     } catch (error) {
-        throw new Error(extractErrorMessage(error, 'Failed to initialize upload.'));
+        throw toDmsError(error, 'Failed to initialize upload.');
     }
 }
 
@@ -214,7 +265,7 @@ async function finalizeUpload(projectId: number, request: UploadFinalizeRequest)
         const response = await api.post<DocumentItem>(`/api/projects/${projectId}/documents/upload/finalize`, request);
         return response.data;
     } catch (error) {
-        throw new Error(extractErrorMessage(error, 'Upload was sent to storage, but finalize failed.'));
+        throw toDmsError(error, 'Upload was sent to storage, but finalize failed.');
     }
 }
 
@@ -234,7 +285,7 @@ async function uploadViaBackend(projectId: number, file: File, folderId?: number
 
         return response.data;
     } catch (error) {
-        throw new Error(extractErrorMessage(error, 'Backend upload fallback failed.'));
+        throw toDmsError(error, 'Backend upload fallback failed.');
     }
 }
 
@@ -262,8 +313,11 @@ export async function uploadDocument(
                 }
             },
         });
-    } catch {
-        return uploadViaBackend(projectId, file, folderId);
+    } catch (error) {
+        if (shouldFallbackToBackend(error)) {
+            return uploadViaBackend(projectId, file, folderId);
+        }
+        throw toDmsError(error, 'Presigned upload failed.');
     }
 
     return finalizeUpload(projectId, {

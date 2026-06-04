@@ -3,6 +3,7 @@ package com.planora.backend.service;
 import com.planora.backend.dto.*;
 import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.ResourceNotFoundException;
+import com.planora.backend.exception.StorageQuotaExceededException;
 import com.planora.backend.model.*;
 import com.planora.backend.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class DocumentService {
     private static final Logger logger = LoggerFactory.getLogger(DocumentService.class);
 
     private static final long MAX_FILE_SIZE_BYTES = 100L * 1024 * 1024;
+    private static final long PROJECT_STORAGE_QUOTA_BYTES = 5L * 1024 * 1024 * 1024;
     private static final long VERSION_MIN_INTERVAL_MINUTES = 5;
     private static final long VERSION_MIN_SIZE_DELTA_BYTES = 512;
 
@@ -84,6 +86,7 @@ public class DocumentService {
 
         // Step 2: Sanity check the file metadata before we authorize AWS to accept it.
         validateFileRequest(request.getFileName(), request.getContentType(), request.getFileSize());
+        requireWithinProjectQuota(projectId, request.getFileSize());
 
         // Step 3: Validate the target folder exists and isn't deleted.
         Long folderId = request.getFolderId();
@@ -184,6 +187,7 @@ public class DocumentService {
         String resolvedContentType = resolveContentType(file.getContentType(), fileName);
 
         validateFileRequest(fileName, resolvedContentType, file.getSize());
+        requireWithinProjectQuota(projectId, file.getSize());
 
         if (folderId != null) {
             DocumentFolder folder = resolveFolder(projectId, folderId);
@@ -792,6 +796,14 @@ public class DocumentService {
         s3StorageService.validateFileRequest(fileName, contentType, fileSize, MAX_FILE_SIZE_BYTES, ALLOWED_CONTENT_TYPES);
     }
 
+    private void requireWithinProjectQuota(Long projectId, Long additionalBytes) {
+        long uploadBytes = additionalBytes != null ? additionalBytes : 0L;
+        long usedBytes = documentRepository.sumFileSizeByProjectId(projectId);
+        if (usedBytes + uploadBytes > PROJECT_STORAGE_QUOTA_BYTES) {
+            throw new StorageQuotaExceededException("Project storage quota exceeded. Delete files or contact an admin before uploading more documents.");
+        }
+    }
+
     private String resolveContentType(String contentType, String fileName) {
         return s3StorageService.resolveContentType(contentType, fileName);
     }
@@ -923,7 +935,7 @@ public class DocumentService {
         TeamMember member = getProjectMember(projectId, userId);
         
         long usedBytes = documentRepository.sumFileSizeByProjectId(projectId);
-        long quotaBytes = 5L * 1024 * 1024 * 1024; // 5 GB
+        long quotaBytes = PROJECT_STORAGE_QUOTA_BYTES;
         long maxFileSizeBytes = MAX_FILE_SIZE_BYTES; // 100 MB
         long documentCount = documentRepository.countByProjectIdAndStatus(projectId, DocumentStatus.ACTIVE);
         
