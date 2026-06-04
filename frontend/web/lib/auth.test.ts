@@ -39,7 +39,7 @@ describe('auth requestRefreshAccessToken URL handling', () => {
     });
   });
 
-  it('falls back to empty string / relative path in development when NEXT_PUBLIC_API_BASE_URL is not set', async () => {
+  it('falls back to localhost in development when NEXT_PUBLIC_API_BASE_URL is not set', async () => {
     (process.env as any).NODE_ENV = 'development';
     delete process.env.NEXT_PUBLIC_API_BASE_URL;
     saveRefreshToken('mock-refresh-token');
@@ -54,7 +54,7 @@ describe('auth requestRefreshAccessToken URL handling', () => {
 
     expect(token).toBe('new-access-token-dev');
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/auth/refresh');
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:8080/api/auth/refresh');
   });
 
   it('throws in production when NEXT_PUBLIC_API_BASE_URL is missing', async () => {

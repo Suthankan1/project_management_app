@@ -12,7 +12,7 @@ export function getApiBaseUrl(): string {
         if (process.env.NODE_ENV === 'production') {
             throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is missing.');
         }
-        return '';
+        return 'http://localhost:8080';
     }
     return url;
 }

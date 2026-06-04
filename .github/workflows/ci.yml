@@ -149,6 +149,32 @@ jobs:
     - name: Lint Next.js App
       run: npm run lint
 
+    - name: Check for Hardcoded Localhost Backend URLs
+      run: |
+        MATCHES=$(grep -rn "localhost:8080" \
+          --include="*.ts" \
+          --include="*.tsx" \
+          --include="*.js" \
+          --include="*.jsx" \
+          --exclude="*.test.ts" \
+          --exclude="*.test.tsx" \
+          --exclude="*.spec.ts" \
+          --exclude="*.spec.tsx" \
+          --exclude="next.config.*" \
+          --exclude="api-base-url.ts" \
+          --exclude-dir=".next" \
+          --exclude-dir="node_modules" \
+          --exclude-dir="api" \
+          . 2>/dev/null || true)
+        if [ -n "$MATCHES" ]; then
+          echo "❌ Hardcoded localhost:8080 found in production frontend source files:"
+          echo "$MATCHES"
+          echo ""
+          echo "Fix: Use getApiBaseUrl() from @/lib/api-base-url instead of hardcoding the backend URL."
+          exit 1
+        fi
+        echo "✅ No hardcoded localhost backend URLs found."
+
     - name: Run Frontend Tests
       run: npm run test
 

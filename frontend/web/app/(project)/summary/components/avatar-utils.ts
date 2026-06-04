@@ -1,4 +1,6 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+import { getApiBaseUrl } from '@/lib/api-base-url';
+
+const API_BASE_URL = getApiBaseUrl();
 
 export function resolveSummaryAvatarUrl(profilePicUrl?: string | null): string | null {
   const value = typeof profilePicUrl === 'string' ? profilePicUrl.trim() : '';

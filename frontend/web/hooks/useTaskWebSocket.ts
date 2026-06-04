@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CompatClient, Stomp } from '@stomp/stompjs';
 import { AUTH_TOKEN_CHANGED_EVENT, ensureValidToken } from '@/lib/auth';
 import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
 interface TaskEvent {
   type: 'TASK_CREATED' | 'TASK_UPDATED' | 'TASK_DELETED';
@@ -47,7 +48,7 @@ export function useTaskWebSocket(
 
     let disposed = false;
 
-    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+    const backendUrl = getApiBaseUrl();
     const wsUrl = resolveWebSocketBaseUrl(backendUrl);
 
     const clearReconnectTimer = () => {

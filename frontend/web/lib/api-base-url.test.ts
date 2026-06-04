@@ -17,10 +17,10 @@ describe('getApiBaseUrl', () => {
     expect(getApiBaseUrl()).toBe('https://api.example.com');
   });
 
-  it('returns empty string in development when NEXT_PUBLIC_API_BASE_URL is not set', () => {
+  it('returns localhost fallback in development when NEXT_PUBLIC_API_BASE_URL is not set', () => {
     (process.env as any).NODE_ENV = 'development';
     delete process.env.NEXT_PUBLIC_API_BASE_URL;
-    expect(getApiBaseUrl()).toBe('');
+    expect(getApiBaseUrl()).toBe('http://localhost:8080');
   });
 
   it('throws in production when NEXT_PUBLIC_API_BASE_URL is missing', () => {

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { CompatClient, Stomp, IMessage } from '@stomp/stompjs';
 import { AUTH_TOKEN_CHANGED_EVENT, ensureValidToken, refreshAccessToken } from '@/lib/auth';
 import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
 // ── Types ──
 
@@ -48,7 +49,7 @@ export function StompProvider({ token, children }: StompProviderProps) {
 
   useEffect(() => {
     let disposed = false;
-    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+    const backendUrl = getApiBaseUrl();
     const wsUrl = resolveWebSocketBaseUrl(backendUrl);
 
     const clearReconnectTimer = () => {

@@ -8,6 +8,7 @@ import { Notification } from '@/services/notifications-service';
 import { toast } from '@/components/ui/Toast';
 import { AUTH_TOKEN_CHANGED_EVENT, getValidToken } from '@/lib/auth';
 import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 import { buildSessionCacheKey, getSessionCache, setSessionCache } from '@/lib/session-cache';
 
 interface GlobalNotificationContextType {
@@ -109,7 +110,7 @@ export function GlobalNotificationProvider({ children }: { children: React.React
   const reconnectAttemptRef = useRef(0);
   const queuedRealtimeMessagesRef = useRef<QueuedRealtimeMessage[]>([]);
   const reconnectAttemptHandlerRef = useRef<(token: string) => void>(() => {});
-  const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+  const backendUrl = getApiBaseUrl();
 
   useEffect(() => {
     pathnameRef.current = pathname;

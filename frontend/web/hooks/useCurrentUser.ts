@@ -2,6 +2,7 @@
 
 import useSWR from 'swr';
 import api from '@/lib/axios';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
 interface UserProfile {
     email?: string;
@@ -11,7 +12,7 @@ interface UserProfile {
     githubUsername?: string;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+const API_BASE_URL = getApiBaseUrl();
 
 function resolveUrl(url: string | undefined | null): string {
     if (!url) return '';

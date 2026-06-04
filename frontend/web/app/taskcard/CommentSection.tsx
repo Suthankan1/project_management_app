@@ -5,6 +5,7 @@ import { getUserFromToken } from '@/lib/auth';
 import ActivityFeed from './ActivityFeed';
 import CommentItem from './components/CommentItem';
 import { authApi, tasksApi, projectsApi } from '@/services/api-contract';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
 interface Comment {
   id: number;
@@ -20,7 +21,7 @@ interface CommentSectionProps {
 }
 
 // Relative profile picture URLs from the API need a host prefix; absolute CDN URLs are used as-is.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+const API_BASE_URL = getApiBaseUrl();
 
 const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef, projectId }) => {
   const [activeTab, setActiveTab] = useState<'Comments' | 'History'>('Comments');

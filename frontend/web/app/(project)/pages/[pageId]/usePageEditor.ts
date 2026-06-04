@@ -11,6 +11,7 @@ import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { getValidToken, getUserFromToken, AUTH_TOKEN_CHANGED_EVENT } from '@/lib/auth';
 import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 import api from '@/lib/axios';
 
 const PALETTE = [
@@ -117,7 +118,7 @@ export function usePageEditor() {
       }
 
       doc = new Y.Doc();
-      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+      const backendUrl = getApiBaseUrl();
       const wsUrl = resolveWebSocketBaseUrl(backendUrl);
       const token = getValidToken();
 

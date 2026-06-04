@@ -76,11 +76,6 @@ interface TaskGithubSummaryDTO {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  'http://localhost:8080';
-
 function formatRelative(iso: string | null | undefined): string {
   if (!iso) return '';
   const diff  = Date.now() - new Date(iso).getTime();

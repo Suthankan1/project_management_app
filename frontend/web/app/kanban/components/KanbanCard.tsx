@@ -7,8 +7,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { Task, Subtask } from '../../(project)/kanban/types';
 import { Calendar, Trash2, Edit2 } from 'lucide-react';
 import GitHubIssueBadge from '@/components/github/GitHubIssueBadge';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+const API_BASE_URL = getApiBaseUrl();
 
 function resolveUrl(url?: string | null) {
     if (!url) return null;

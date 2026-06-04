@@ -4,11 +4,11 @@ function isLocalHostname(hostname: string): boolean {
   return LOCAL_HOSTNAMES.has(hostname) || hostname.endsWith('.localhost')
 }
 
-export function resolveWebSocketBaseUrl(backendUrl?: string, fallbackUrl = 'http://localhost:8080'): string {
-  const rawUrl = (backendUrl || fallbackUrl).trim()
+export function resolveWebSocketBaseUrl(backendUrl: string): string {
+  const rawUrl = backendUrl.trim()
 
   if (!rawUrl) {
-    return fallbackUrl
+    throw new Error('WebSocket backend URL is empty.')
   }
 
   try {
