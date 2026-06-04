@@ -3,10 +3,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Check, CircleDot, ExternalLink, Loader2, X } from 'lucide-react';
 import {
-  fetchRepositoriesWithToken,
+  fetchRepositories,
   getGitHubToken,
   getProjectGitHubRepo,
 } from '@/services/githubService';
+import api from '@/lib/axios';
+
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -106,7 +108,7 @@ const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
     let cancelled = false;
     setLoadingRepos(true);
 
-    fetchRepositoriesWithToken(token)
+    fetchRepositories()
       .then(ghRepos => {
         if (cancelled) return;
         const seen  = new Set(connOption.map(o => o.value));
@@ -168,26 +170,17 @@ const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
     setApiError(null);
 
     try {
-      const res = await fetch(`${API_BASE}/api/tasks/${taskId}/github-issue`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          repoFullName: repoFullName.trim(),
-          title: title.trim(),
-          body: body.trim(),
-        }),
+      const response = await api.post<CreatedIssueDTO>(`/api/tasks/${taskId}/github-issue`, {
+        repoFullName: repoFullName.trim(),
+        title: title.trim(),
+        body: body.trim(),
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => null) as { message?: string } | null;
-        throw new Error(data?.message ?? `Failed to create issue (${res.status})`);
-      }
-
-      const created = await res.json() as CreatedIssueDTO;
+      const created = response.data;
       setSuccess({ issueNumber: created.issueNumber, htmlUrl: created.htmlUrl });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : 'Failed to create issue');
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to create issue';
+      setApiError(errMsg);
     } finally {
       setSubmitting(false);
     }

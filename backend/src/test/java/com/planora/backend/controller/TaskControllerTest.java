@@ -58,8 +58,17 @@ class TaskControllerTest {
         @MockBean
     private UserDetailsService userDetailsService;
 
-            @MockBean
-        private com.planora.backend.service.TaskGithubService taskGithubService;
+        @MockBean
+    private com.planora.backend.service.TaskGithubService taskGithubService;
+
+        @MockBean
+    private com.planora.backend.service.GithubTokenService githubTokenService;
+
+        @MockBean
+    private com.planora.backend.service.GithubIssuesSyncService githubIssuesSyncService;
+
+        @MockBean
+    private com.planora.backend.service.GithubNotificationService githubNotificationService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -468,5 +477,34 @@ class TaskControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void createGithubIssue_returnsCreatedIssue() throws Exception {
+        when(githubTokenService.getToken(anyLong())).thenReturn("github-token");
+
+        com.planora.backend.dto.GithubIssueDTO created = new com.planora.backend.dto.GithubIssueDTO();
+        created.setNumber(42);
+        created.setTitle("Issue title");
+        created.setHtmlUrl("https://github.com/owner/repo/issues/42");
+        created.setState("open");
+
+        when(githubIssuesSyncService.createIssue(any(), eq("github-token"))).thenReturn(created);
+
+        mockMvc.perform(post("/api/tasks/1/github-issue")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "repoFullName", "owner/repo",
+                                "title", "Issue title",
+                                "body", "Issue body"
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.issueNumber").value(42))
+                .andExpect(jsonPath("$.title").value("Issue title"))
+                .andExpect(jsonPath("$.htmlUrl").value("https://github.com/owner/repo/issues/42"));
+
+        verify(service).linkGithubIssue(eq(1L), eq(42L), eq("owner/repo"), anyLong());
     }
 }

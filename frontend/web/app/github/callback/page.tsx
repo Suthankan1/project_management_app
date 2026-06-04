@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { setGitHubToken } from '@/services/githubService';
+import api from '@/lib/axios';
 
 export default function GitHubCallbackPage() {
   const router = useRouter();
@@ -20,34 +20,31 @@ export default function GitHubCallbackPage() {
 
     const exchangeToken = async () => {
       try {
-        const res = await fetch('/api/github/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code }),
-        });
+        const res = await api.post('/api/github/token', { code });
 
-        const data = await res.json();
-
-        if (!res.ok || data.error) {
-          throw new Error(data.error_description || data.error || 'Token exchange failed');
+        if (res.data?.error) {
+          throw new Error(res.data.error_description || res.data.error || 'Token exchange failed');
         }
 
-        setGitHubToken(data.access_token as string);
+        // Fetch the updated user profile from the backend to get the newly linked githubUsername
+        const profileRes = await api.get('/api/user/profile');
+        if (profileRes.data) {
+          localStorage.setItem('userProfile', JSON.stringify(profileRes.data));
+        }
 
         if (state) {
           router.replace(`/github/${state}?select_repo=1`);
         } else {
           router.replace('/dashboard');
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'GitHub authentication failed');
+      } catch (err: any) {
+        const errMsg = err?.response?.data?.message || err?.message || 'GitHub authentication failed';
+        setError(errMsg);
       }
     };
 
     void exchangeToken();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+  }, [searchParams, router, state]);
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4">

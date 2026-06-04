@@ -19,6 +19,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { getGitHubToken, getProjectGitHubRepo } from '@/services/githubService';
+import api from '@/lib/axios';
 import { CIStatusBadge } from '@/components/ui';
 import SidebarField from './SidebarField';
 import CreateIssueFromTaskModal from '@/components/github/CreateIssueFromTaskModal';
@@ -287,7 +288,6 @@ const TaskGitHubSection: React.FC<TaskGitHubSectionProps> = ({
     const repo    = projectId != null ? getProjectGitHubRepo(projectId) : null;
     const canSync = withSync && !!token && !!repo;
     const syncQS  = canSync ? `?repoFullName=${encodeURIComponent(repo!.repoFullName)}` : '';
-    const headers: HeadersInit = canSync && token ? { 'X-GitHub-Token': token } : {};
 
     setError(null);
     if (withSync) setSyncing(true);
@@ -297,22 +297,24 @@ const TaskGitHubSection: React.FC<TaskGitHubSectionProps> = ({
 
     try {
       const commitsUrl = syncQS
-        ? `${API_BASE}/api/tasks/${taskId}/commits${syncQS}&limit=10`
-        : `${API_BASE}/api/tasks/${taskId}/commits?limit=10`;
+        ? `/api/tasks/${taskId}/commits${syncQS}&limit=10`
+        : `/api/tasks/${taskId}/commits?limit=10`;
+
+      const prsUrl = syncQS
+        ? `/api/tasks/${taskId}/pull-requests${syncQS}`
+        : `/api/tasks/${taskId}/pull-requests`;
 
       const [summaryRes, prsRes, commitsRes] = await Promise.all([
-        fetch(`${API_BASE}/api/tasks/${taskId}/github`,                  { credentials: 'include', headers }),
-        fetch(`${API_BASE}/api/tasks/${taskId}/pull-requests${syncQS}`,  { credentials: 'include', headers }),
-        fetch(commitsUrl,                                                  { credentials: 'include', headers }),
+        api.get<TaskGithubSummaryDTO>(`/api/tasks/${taskId}/github`),
+        api.get<LinkedPrResponseDTO[]>(prsUrl),
+        api.get<LinkedCommitResponseDTO[]>(commitsUrl),
       ]);
 
-      if (!summaryRes.ok) throw new Error('Failed to load GitHub data');
-      setSummary(await summaryRes.json() as TaskGithubSummaryDTO);
-
-      if (prsRes.ok)     { const p = await prsRes.json();     setPrs(Array.isArray(p) ? p : []); }
-      if (commitsRes.ok) { const c = await commitsRes.json(); setCommits(Array.isArray(c) ? c : []); }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load GitHub data');
+      setSummary(summaryRes.data);
+      setPrs(Array.isArray(prsRes.data) ? prsRes.data : []);
+      setCommits(Array.isArray(commitsRes.data) ? commitsRes.data : []);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Failed to load GitHub data');
     } finally {
       setLoadingSummary(false);
       setLoadingPrs(false);
@@ -362,22 +364,13 @@ const TaskGitHubSection: React.FC<TaskGitHubSectionProps> = ({
     setBranchError(null);
     setSavingBranch(true);
     try {
-      const res = await fetch(`${API_BASE}/api/tasks/${taskId}/github/branch`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ branch: trimmed }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null) as { message?: string } | null;
-        throw new Error(data?.message ?? 'Failed to save branch name');
-      }
+      await api.put(`/api/tasks/${taskId}/github/branch`, { branch: trimmed });
       setSummary(prev => prev ? { ...prev, githubBranch: trimmed } : prev);
       setBranchEditing(false);
       setBranchSaved(true);
       setTimeout(() => setBranchSaved(false), 2500);
-    } catch (err) {
-      setBranchError(err instanceof Error ? err.message : 'Failed to save branch name');
+    } catch (err: any) {
+      setBranchError(err?.response?.data?.message || err?.message || 'Failed to save branch name');
     } finally {
       setSavingBranch(false);
     }

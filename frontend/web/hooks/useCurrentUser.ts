@@ -8,6 +8,7 @@ interface UserProfile {
     username?: string;
     fullName?: string;
     profilePicUrl?: string;
+    githubUsername?: string;
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
@@ -24,6 +25,11 @@ export function useCurrentUser() {
     const { data, error, isLoading } = useSWR<UserProfile>('/api/user/profile', fetcher, {
         dedupingInterval: 3_600_000, // 1 hour — re-use across Sidebar + TopBar
         revalidateOnFocus: false,
+        onSuccess: (profileData) => {
+            if (typeof window !== 'undefined' && profileData) {
+                localStorage.setItem('userProfile', JSON.stringify(profileData));
+            }
+        }
     });
 
     return {

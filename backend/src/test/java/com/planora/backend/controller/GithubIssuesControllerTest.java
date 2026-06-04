@@ -41,6 +41,7 @@ import com.planora.backend.service.GithubIssueCommentSyncService;
 import com.planora.backend.service.GithubIssueImportService;
 import com.planora.backend.service.GithubIssuesSyncService;
 import com.planora.backend.service.GithubNotificationService;
+import com.planora.backend.service.GithubTokenService;
 import com.planora.backend.service.JWTService;
 import com.planora.backend.service.TaskService;
 
@@ -62,6 +63,9 @@ class GithubIssuesControllerTest {
 
     @MockitoBean
     private GithubIssueImportService githubIssueImportService;
+
+    @MockitoBean
+    private GithubTokenService githubTokenService;
 
     @MockitoBean
     private GithubIssueCommentSyncService githubIssueCommentSyncService;
@@ -90,6 +94,7 @@ class GithubIssuesControllerTest {
                 userEntity.setGithubUsername("octocat");
         userEntity.setGithubAccessToken("github-token");
         principal = new UserPrincipal(userEntity);
+        org.mockito.Mockito.lenient().when(githubTokenService.getToken(7L)).thenReturn("github-token");
     }
 
     @Test
@@ -131,6 +136,7 @@ class GithubIssuesControllerTest {
     void getIssues_returnsUnauthorizedWhenGithubTokenIsMissing() throws Exception {
         userEntity.setGithubAccessToken(" ");
         when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
+        when(githubTokenService.getToken(7L)).thenReturn(null);
 
         mockMvc.perform(get("/api/github/issues")
                         .with(user(principal))
@@ -176,8 +182,7 @@ class GithubIssuesControllerTest {
         when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
         when(githubIssueImportService.importIssues(
                 any(),
-                org.mockito.ArgumentMatchers.eq(userEntity),
-                org.mockito.ArgumentMatchers.eq("browser-token")))
+                org.mockito.ArgumentMatchers.eq(userEntity)))
                 .thenReturn(new GithubIssueImportResponseDTO(List.of(101L, 102L), List.of(3)));
 
         mockMvc.perform(post("/api/github/issues/import")
@@ -275,6 +280,7 @@ class GithubIssuesControllerTest {
     void createIssue_returnsUnauthorizedWhenGithubTokenIsMissing() throws Exception {
         userEntity.setGithubAccessToken(" ");
         when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
+        when(githubTokenService.getToken(7L)).thenReturn(null);
 
         mockMvc.perform(post("/api/github/issues/create")
                         .with(user(principal))

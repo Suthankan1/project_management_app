@@ -22,6 +22,11 @@ import com.planora.backend.service.TaskActivityService;
 import com.planora.backend.service.TaskGithubService;
 import com.planora.backend.service.TaskService;
 import com.planora.backend.service.TaskTemplateService;
+import com.planora.backend.service.GithubTokenService;
+import com.planora.backend.service.GithubIssuesSyncService;
+import com.planora.backend.service.GithubNotificationService;
+import com.planora.backend.dto.GithubIssueCreateRequestDTO;
+import com.planora.backend.dto.GithubIssueDTO;
 import jakarta.validation.Valid;
 import jakarta.validation.groups.Default;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +61,12 @@ public class TaskController {
 
     private final TaskGithubService taskGithubService;
 
+    private final GithubTokenService githubTokenService;
+
+    private final GithubIssuesSyncService githubIssuesSyncService;
+
+    private final GithubNotificationService githubNotificationService;
+
     // Spring's WebSocket messaging template used for real-time push notifications.
     private final SimpMessagingTemplate messagingTemplate;
 
@@ -88,12 +99,12 @@ public class TaskController {
     @GetMapping("/{taskId}")
     public ResponseEntity<TaskResponseDTO> getTaskById(
             @PathVariable Long taskId,
-            @RequestHeader(value = "X-GitHub-Token", required = false) String githubToken,
             @RequestParam(required = false) String repoFullName,
             @AuthenticationPrincipal UserPrincipal currentUser) {
         if (currentUser != null) {
             service.recordTaskAccess(taskId, currentUser.getUserId());
         }
+        String githubToken = (currentUser != null) ? githubTokenService.getToken(currentUser.getUserId()) : null;
         TaskResponseDTO dto = (githubToken != null && repoFullName != null)
                 ? service.getTaskById(taskId, repoFullName, githubToken)
                 : service.getTaskById(taskId);
@@ -103,20 +114,18 @@ public class TaskController {
     /**
      * Returns the full GitHub summary (PRs, commits, CI status, branch) for a task.
      *
-     * When X-GitHub-Token and repoFullName are both provided the service syncs fresh
-     * data from the GitHub API before responding. Omit them to get the last cached data.
+     * Omit repoFullName to get the last cached data.
      *
      * GET /api/tasks/{taskId}/github
      *     ?repoFullName=owner/repo          (optional)
-     *     Header: X-GitHub-Token: <token>   (optional)
      */
     @GetMapping("/{taskId}/github")
     public ResponseEntity<TaskGithubSummaryDTO> getTaskGithubSummary(
             @PathVariable Long taskId,
-            @RequestHeader(value = "X-GitHub-Token", required = false) String githubToken,
             @RequestParam(required = false) String repoFullName,
             @AuthenticationPrincipal UserPrincipal currentUser) {
 
+        String githubToken = (currentUser != null) ? githubTokenService.getToken(currentUser.getUserId()) : null;
         TaskGithubSummaryDTO summary = (githubToken != null && repoFullName != null)
                 ? taskGithubService.syncAndGetSummary(taskId, repoFullName, githubToken)
                 : taskGithubService.getTaskGithubSummary(taskId);
@@ -129,17 +138,17 @@ public class TaskController {
      *
      * GET /api/tasks/{taskId}/pull-requests
      *     ?repoFullName=owner/repo          (optional — triggers a fresh GitHub sync first)
-     *     Header: X-GitHub-Token: <token>   (optional — required when repoFullName is set)
      *
-     * Without token+repo the endpoint returns the last cached PR data from the DB.
-     * With token+repo it syncs fresh data from GitHub before responding.
+     * Without repo the endpoint returns the last cached PR data from the DB.
+     * With repo it syncs fresh data from GitHub before responding.
      */
     @GetMapping("/{taskId}/pull-requests")
     public ResponseEntity<List<LinkedPrResponseDTO>> getLinkedPullRequests(
             @PathVariable Long taskId,
-            @RequestHeader(value = "X-GitHub-Token", required = false) String githubToken,
-            @RequestParam(required = false) String repoFullName) {
+            @RequestParam(required = false) String repoFullName,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
 
+        String githubToken = (currentUser != null) ? githubTokenService.getToken(currentUser.getUserId()) : null;
         List<LinkedPrResponseDTO> prs = (githubToken != null && repoFullName != null)
                 ? taskGithubService.syncAndGetLinkedPrs(taskId, repoFullName, githubToken)
                 : taskGithubService.getLinkedPrs(taskId);
@@ -153,28 +162,81 @@ public class TaskController {
      * GET /api/tasks/{taskId}/commits
      *     ?limit=20                          (optional, 1-50, default 20)
      *     ?repoFullName=owner/repo           (optional — triggers a fresh GitHub sync first)
-     *     Header: X-GitHub-Token: <token>   (optional — required when repoFullName is set)
      *
      * Each commit includes:
      *   - sha (7-char), fullSha (40-char), message, author, committedAt, htmlUrl, ciStatus
      *   - referencedTaskNumbers: task project-numbers extracted from the commit message
      *     using the patterns "#<number>" and "TASK-<number>" (case-insensitive)
      *
-     * Without token+repo the endpoint returns cached data from the DB.
-     * With token+repo it syncs fresh data from GitHub before responding.
+     * Without repo the endpoint returns cached data from the DB.
+     * With repo it syncs fresh data from GitHub before responding.
      */
     @GetMapping("/{taskId}/commits")
     public ResponseEntity<List<LinkedCommitResponseDTO>> getLinkedCommits(
             @PathVariable Long taskId,
-            @RequestHeader(value = "X-GitHub-Token", required = false) String githubToken,
             @RequestParam(required = false) String repoFullName,
-            @RequestParam(defaultValue = "20") int limit) {
+            @RequestParam(defaultValue = "20") int limit,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
 
+        String githubToken = (currentUser != null) ? githubTokenService.getToken(currentUser.getUserId()) : null;
         List<LinkedCommitResponseDTO> commits = (githubToken != null && repoFullName != null)
                 ? taskGithubService.syncAndGetLinkedCommits(taskId, repoFullName, githubToken, limit)
                 : taskGithubService.getLinkedCommits(taskId, limit);
 
         return ResponseEntity.ok(commits);
+    }
+
+    @PostMapping("/{taskId}/github-issue")
+    public ResponseEntity<?> createGithubIssue(
+            @PathVariable Long taskId,
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        String repoFullName = (String) body.get("repoFullName");
+        String title = (String) body.get("title");
+        String issueBody = (String) body.get("body");
+
+        if (repoFullName == null || repoFullName.isBlank() || title == null || title.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "repoFullName and title are required"));
+        }
+
+        String accessToken = githubTokenService.getToken(currentUser.getUserId());
+        if (accessToken == null || accessToken.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "GitHub account is not connected"));
+        }
+
+        GithubIssueCreateRequestDTO request = new GithubIssueCreateRequestDTO();
+        request.setRepoFullName(repoFullName);
+        request.setTitle(title);
+        request.setBody(issueBody);
+        request.setTaskId(taskId);
+
+        GithubIssueDTO createdIssue = githubIssuesSyncService.createIssue(request, accessToken);
+
+        service.linkGithubIssue(
+                taskId,
+                createdIssue.getNumber().longValue(),
+                repoFullName,
+                currentUser.getUserId());
+
+        githubNotificationService.notifyIssueEvent(
+                repoFullName,
+                createdIssue.getNumber(),
+                createdIssue.getTitle(),
+                "opened",
+                currentUser.getUsername(),
+                createdIssue.getBody(),
+                List.of());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "issueNumber", createdIssue.getNumber(),
+                "title", createdIssue.getTitle(),
+                "htmlUrl", createdIssue.getHtmlUrl(),
+                "state", createdIssue.getState()
+        ));
     }
 
     /**

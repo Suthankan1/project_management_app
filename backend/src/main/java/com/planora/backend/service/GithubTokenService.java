@@ -77,4 +77,12 @@ public class GithubTokenService {
             throw new IllegalStateException("Failed to decrypt GitHub token for user " + userId, e);
         }
     }
+
+    @Transactional
+    public void clearToken(Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+        user.setGithubAccessToken(null);
+        userRepository.save(user);
+    }
 }

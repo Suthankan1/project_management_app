@@ -39,6 +39,8 @@ public class GithubIssueCommentSyncService {
 
     private final GithubIssuesSyncService githubIssuesSyncService;
 
+    private final GithubTokenService githubTokenService;
+
     @Transactional
     public GithubCommentSyncResponseDTO syncComments(Long projectId, int issueNumber, User currentUser) {
         Project project = projectRepository.findById(projectId)
@@ -47,7 +49,7 @@ public class GithubIssueCommentSyncService {
             throw new ForbiddenException("User is not a member of this project");
         }
 
-        String accessToken = currentUser.getGithubAccessToken();
+        String accessToken = githubTokenService.getToken(currentUser.getUserId());
         if (accessToken == null || accessToken.isBlank()) {
             throw new GithubAuthenticationException("GitHub account is not connected");
         }

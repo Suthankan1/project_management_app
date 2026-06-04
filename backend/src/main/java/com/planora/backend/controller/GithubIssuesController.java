@@ -32,6 +32,7 @@ import com.planora.backend.service.GithubIssueCommentSyncService;
 import com.planora.backend.service.GithubIssueImportService;
 import com.planora.backend.service.GithubIssuesSyncService;
 import com.planora.backend.service.GithubNotificationService;
+import com.planora.backend.service.GithubTokenService;
 import com.planora.backend.service.TaskService;
 
 import jakarta.validation.Valid;
@@ -46,6 +47,7 @@ import lombok.RequiredArgsConstructor;
 public class GithubIssuesController {
 
     private final GithubIssuesSyncService githubIssuesSyncService;
+    private final GithubTokenService githubTokenService;
 
     private final UserRepository userRepository;
 
@@ -73,7 +75,7 @@ public class GithubIssuesController {
         User user = userRepository.findById(currentUser.getUserId())
                 .orElseThrow(() -> new GithubAuthenticationException("Authenticated user not found"));
 
-        String accessToken = user.getGithubAccessToken();
+        String accessToken = githubTokenService.getToken(user.getUserId());
         if (accessToken == null || accessToken.isBlank()) {
             throw new GithubAuthenticationException("GitHub account is not connected");
         }
@@ -90,11 +92,10 @@ public class GithubIssuesController {
     @PostMapping("/issues/import")
     public ResponseEntity<GithubIssueImportResponseDTO> importIssues(
             @Valid @RequestBody GithubIssueImportRequestDTO request,
-            @RequestHeader(value = "X-GitHub-Token", required = false) String githubToken,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
         return ResponseEntity.ok(githubIssueImportService.importIssues(
-                request, getCurrentUser(currentUser), githubToken));
+                request, getCurrentUser(currentUser)));
     }
 
     @PostMapping("/issues/create")
@@ -103,7 +104,7 @@ public class GithubIssuesController {
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
         User user = getCurrentUser(currentUser);
-        String accessToken = user.getGithubAccessToken();
+        String accessToken = githubTokenService.getToken(user.getUserId());
         if (accessToken == null || accessToken.isBlank()) {
             throw new GithubAuthenticationException("GitHub account is not connected");
         }
@@ -134,7 +135,7 @@ public class GithubIssuesController {
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
         User user = getCurrentUser(currentUser);
-        String accessToken = user.getGithubAccessToken();
+        String accessToken = githubTokenService.getToken(user.getUserId());
         if (accessToken == null || accessToken.isBlank()) {
             throw new GithubAuthenticationException("GitHub account is not connected");
         }
@@ -149,7 +150,7 @@ public class GithubIssuesController {
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
         User user = getCurrentUser(currentUser);
-        String accessToken = user.getGithubAccessToken();
+        String accessToken = githubTokenService.getToken(user.getUserId());
         if (accessToken == null || accessToken.isBlank()) {
             throw new GithubAuthenticationException("GitHub account is not connected");
         }

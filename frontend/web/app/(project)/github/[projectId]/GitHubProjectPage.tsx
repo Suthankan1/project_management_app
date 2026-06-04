@@ -10,6 +10,7 @@ import {
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ensureValidToken } from '@/lib/auth';
+import api from '@/lib/axios';
 import { useGlobalNotifications } from '@/components/providers/GlobalNotificationProvider';
 import { useGithubPRSocket, type GithubPRUpdate } from '@/hooks/useGithubPRSocket';
 import { useGithubCISocket, type GithubCIUpdate } from '@/hooks/useGithubCISocket';
@@ -27,7 +28,7 @@ import {
   clearProjectGitHubRepo,
   getGitHubToken,
   clearGitHubToken,
-  fetchRepositoriesWithToken,
+  fetchRepositories,
   fetchGitHubUser,
   fetchPullRequest,
   fetchPullRequests,
@@ -1777,10 +1778,10 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     setIssueError(null);
 
     const [prResult, commitResult, issueResult, userResult] = await Promise.allSettled([
-      fetchPullRequests(token, conn.ownerLogin, conn.repoName),
-      fetchCommits(token, conn.ownerLogin, conn.repoName),
+      fetchPullRequests(undefined, conn.ownerLogin, conn.repoName),
+      fetchCommits(undefined, conn.ownerLogin, conn.repoName),
       fetchIssues(conn.repoFullName),
-      fetchGitHubUser(token),
+      fetchGitHubUser(),
     ]);
 
     if (prResult.status === 'fulfilled') setPRs(prResult.value);
@@ -1868,7 +1869,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     setLoadingRepos(true);
     setRepoError(null);
     try {
-      const data = await fetchRepositoriesWithToken(token);
+      const data = await fetchRepositories();
       setAllRepos(data);
     } catch (err) {
       setRepoError(err instanceof Error ? err.message : 'Failed to load repositories');
@@ -1928,15 +1929,27 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   };
 
   const handleLogout = async () => {
-    const token = getGitHubToken();
-    if (token) {
-      try {
-        await fetch('/api/github/revoke', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        });
-      } catch { /* ignore */ }
+    try {
+      await api.post('/api/github/revoke');
+      // Fetch the updated user profile from the backend to clear the githubUsername field in local cache
+      const profileRes = await api.get('/api/user/profile');
+      if (profileRes.data) {
+        localStorage.setItem('userProfile', JSON.stringify(profileRes.data));
+      } else {
+        localStorage.removeItem('userProfile');
+      }
+    } catch {
+      // Fallback: manually delete githubUsername from userProfile in localStorage if request fails
+      const profile = localStorage.getItem('userProfile');
+      if (profile) {
+        try {
+          const parsed = JSON.parse(profile);
+          delete parsed.githubUsername;
+          localStorage.setItem('userProfile', JSON.stringify(parsed));
+        } catch {
+          localStorage.removeItem('userProfile');
+        }
+      }
     }
     clearGitHubToken();
     clearProjectGitHubRepo(projectId);
@@ -1984,7 +1997,7 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
       if (!token) return;
 
       try {
-        const pr = await fetchPullRequest(token, connection.ownerLogin, connection.repoName, update.prNumber);
+        const pr = await fetchPullRequest(undefined, connection.ownerLogin, connection.repoName, update.prNumber);
         setPRs((current) => [pr, ...current.filter((existing) => existing.number !== pr.number)]);
         setPRError(null);
       } catch (error) {
