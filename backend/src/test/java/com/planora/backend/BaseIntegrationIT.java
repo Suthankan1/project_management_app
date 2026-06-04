@@ -1,29 +1,24 @@
 package com.planora.backend;
 
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@Testcontainers
 public abstract class BaseIntegrationIT {
 
+    @Container
     protected static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withDatabaseName("planora_test")
-            .withUsername("testuser")
-            .withPassword("testpass");
-
-    @BeforeAll
-    static void startContainerIfDockerAvailable() {
-        Assumptions.assumeTrue(DockerClientFactory.instance().isDockerAvailable(),
-                "Docker is required to run integration tests");
-        postgres.start();
-    }
+        .withDatabaseName("planora_test")
+        .withUsername("testuser")
+        .withPassword("testpass");
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
