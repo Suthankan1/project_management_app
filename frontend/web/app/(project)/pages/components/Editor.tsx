@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import { StarterKit } from '@tiptap/starter-kit';
@@ -101,11 +101,114 @@ function Divider() {
   return <div className="w-px h-5 bg-gray-200 mx-1 flex-shrink-0" />;
 }
 
+interface LinkEditModalProps {
+  open: boolean;
+  initialUrl: string;
+  hasExistingLink: boolean;
+  onOpenChange: (open: boolean) => void;
+  onApply: (url: string) => void;
+  onRemove: () => void;
+}
+
+function LinkEditModal({
+  open,
+  initialUrl,
+  hasExistingLink,
+  onOpenChange,
+  onApply,
+  onRemove,
+}: LinkEditModalProps) {
+  const [draftUrl, setDraftUrl] = useState(initialUrl);
+  const [urlValidationError, setUrlValidationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setDraftUrl(initialUrl);
+      setUrlValidationError(null);
+    }
+  }, [initialUrl, open]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedUrl = draftUrl.trim();
+
+    if (trimmedUrl === '') {
+      onRemove();
+      return;
+    }
+
+    if (!validateUrl(trimmedUrl)) {
+      setUrlValidationError('Invalid URL. Only http, https, mailto, and relative app-safe URLs are allowed.');
+      return;
+    }
+
+    onApply(trimmedUrl);
+  };
+
+  return (
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Insert / Edit Link"
+      description="Enter a URL for this link. Only safe protocols (http, https, mailto) and relative app-safe URLs are allowed."
+      size="md"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+        <div>
+          <label htmlFor="link-url-input" className="block text-sm font-medium text-cu-text-secondary mb-1">
+            URL
+          </label>
+          <input
+            id="link-url-input"
+            type="text"
+            value={draftUrl}
+            onChange={(e) => {
+              setDraftUrl(e.target.value);
+              if (urlValidationError) setUrlValidationError(null);
+            }}
+            placeholder="https://example.com or /dashboard"
+            className="w-full px-3 py-2 border border-cu-border rounded-cu-md bg-cu-bg text-cu-text-primary focus:outline-none focus:ring-2 focus:ring-cu-primary/20 text-sm"
+            autoFocus
+          />
+          {urlValidationError && (
+            <p className="mt-1.5 text-xs text-red-500 font-medium" role="alert">{urlValidationError}</p>
+          )}
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 pt-2">
+          {hasExistingLink && (
+            <button
+              type="button"
+              onClick={onRemove}
+              className="mr-auto px-4 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-cu-md transition-colors"
+            >
+              Remove link
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="px-4 py-2 text-xs font-medium text-cu-text-primary bg-cu-bg-secondary hover:bg-cu-bg-tertiary rounded-cu-md transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 text-xs font-medium text-white bg-cu-primary hover:bg-cu-primary-dark rounded-cu-md transition-colors"
+          >
+            Save
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export default function Editor({ content, onUpdate, onImmediateUpdate, editable = true, ydoc, provider, collaborationUser }: EditorProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
-  const [linkUrl, setLinkUrl] = useState('');
-  const [urlValidationError, setUrlValidationError] = useState<string | null>(null);
+  const [linkInitialUrl, setLinkInitialUrl] = useState('');
+  const [hasExistingLink, setHasExistingLink] = useState(false);
+  const savedSelectionRef = useRef<{ from: number; to: number } | null>(null);
 
   // 800ms debounce avoids a save API call on every keystroke while still feeling responsive
   const handleUpdate = useMemo(
@@ -247,26 +350,30 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
 
   const toggleLink = () => {
     const previousUrl = editor.getAttributes('link').href || '';
-    setLinkUrl(previousUrl);
-    setUrlValidationError(null);
+    savedSelectionRef.current = {
+      from: editor.state.selection.from,
+      to: editor.state.selection.to,
+    };
+    setLinkInitialUrl(previousUrl);
+    setHasExistingLink(Boolean(previousUrl));
     setIsLinkModalOpen(true);
   };
 
-  const handleLinkSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmedUrl = linkUrl.trim();
-    if (trimmedUrl === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
-      setIsLinkModalOpen(false);
-      return;
+  const restoreLinkSelection = () => {
+    const chain = editor.chain().focus();
+    if (savedSelectionRef.current) {
+      chain.setTextSelection(savedSelectionRef.current);
     }
+    return chain.extendMarkRange('link');
+  };
 
-    if (!validateUrl(trimmedUrl)) {
-      setUrlValidationError('Invalid URL. Only http, https, mailto, and relative app-safe URLs are allowed.');
-      return;
-    }
+  const applyLink = (url: string) => {
+    restoreLinkSelection().setLink({ href: url }).run();
+    setIsLinkModalOpen(false);
+  };
 
-    editor.chain().focus().extendMarkRange('link').setLink({ href: trimmedUrl }).run();
+  const removeLink = () => {
+    restoreLinkSelection().unsetLink().run();
     setIsLinkModalOpen(false);
   };
 
@@ -421,51 +528,14 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
         </div>
       </div>
 
-      <Modal
+      <LinkEditModal
         open={isLinkModalOpen}
         onOpenChange={setIsLinkModalOpen}
-        title="Insert / Edit Link"
-        description="Enter a URL for this link. Only safe protocols (http, https, mailto) and relative app-safe URLs are allowed."
-        size="md"
-      >
-        <form onSubmit={handleLinkSubmit} className="space-y-4 mt-2">
-          <div>
-            <label htmlFor="link-url-input" className="block text-sm font-medium text-cu-text-secondary mb-1">
-              URL
-            </label>
-            <input
-              id="link-url-input"
-              type="text"
-              value={linkUrl}
-              onChange={(e) => {
-                setLinkUrl(e.target.value);
-                if (urlValidationError) setUrlValidationError(null);
-              }}
-              placeholder="https://example.com or /dashboard"
-              className="w-full px-3 py-2 border border-cu-border rounded-cu-md bg-cu-bg text-cu-text-primary focus:outline-none focus:ring-2 focus:ring-cu-primary/20 text-sm"
-              autoFocus
-            />
-            {urlValidationError && (
-              <p className="mt-1.5 text-xs text-red-500 font-medium" role="alert">{urlValidationError}</p>
-            )}
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={() => setIsLinkModalOpen(false)}
-              className="px-4 py-2 text-xs font-medium text-cu-text-primary bg-cu-bg-secondary hover:bg-cu-bg-tertiary rounded-cu-md transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-xs font-medium text-white bg-cu-primary hover:bg-cu-primary-dark rounded-cu-md transition-colors"
-            >
-              Save
-            </button>
-          </div>
-        </form>
-      </Modal>
+        initialUrl={linkInitialUrl}
+        hasExistingLink={hasExistingLink}
+        onApply={applyLink}
+        onRemove={removeLink}
+      />
     </div>
   );
 }
