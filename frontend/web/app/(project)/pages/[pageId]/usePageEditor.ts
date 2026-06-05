@@ -132,7 +132,7 @@ export function usePageEditor() {
         `page-${pageId}`,
         doc,
         {
-          params: { token },
+          protocols: ['planora-yjs', `planora.jwt.${token}`],
           connect: true,
         }
       );

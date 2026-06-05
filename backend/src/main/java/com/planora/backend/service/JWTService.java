@@ -132,6 +132,24 @@ public class JWTService {
                 && TYPE_ACCESS.equals(type);
     }
 
+    public String validateAccessTokenAndGetSubject(String token) {
+        Claims claims = extractAllClaims(token);
+        if (isTokenExpired(token)) {
+            throw new io.jsonwebtoken.ExpiredJwtException(null, claims, "Access token expired");
+        }
+
+        String type = claims.get(CLAIM_TOKEN_TYPE, String.class);
+        if (!TYPE_ACCESS.equals(type)) {
+            throw new io.jsonwebtoken.JwtException("Token is not an access token");
+        }
+
+        return claims.getSubject();
+    }
+
+    public Date extractExpiration(String token) {
+        return extractClaim(token, Claims::getExpiration);
+    }
+
     /** Validates that the token is a REFRESH token and returns the subject (email). */
     public String validateRefreshToken(String token) {
         // Step 1. Cryptographically parse the token to get all payload data.

@@ -2,12 +2,17 @@ package com.planora.backend.configuration;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
+import java.time.Instant;
+import java.util.Date;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import jakarta.annotation.PreDestroy;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -28,13 +33,22 @@ import io.jsonwebtoken.JwtException;
 @Component
 public class YjsWebSocketHandler extends BinaryWebSocketHandler {
 
+    private static final String ACCESS_TOKEN_COOKIE = "planora_access_token";
+    private static final String JWT_PROTOCOL_PREFIX = "planora.jwt.";
     private static final CloseStatus UNAUTHORIZED = new CloseStatus(4401, "Unauthorized");
+    private static final CloseStatus TOKEN_EXPIRED = new CloseStatus(4401, "Token expired");
     private static final CloseStatus FORBIDDEN = new CloseStatus(4403, "Forbidden");
     private static final CloseStatus BAD_REQUEST = new CloseStatus(4400, "Invalid room");
     private static final CloseStatus NOT_FOUND = new CloseStatus(4404, "Page not found");
 
     private final ConcurrentHashMap<String, CopyOnWriteArraySet<WebSocketSession>> rooms
             = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService tokenExpiryScheduler
+            = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread thread = new Thread(r, "yjs-token-expiry-closer");
+                thread.setDaemon(true);
+                return thread;
+            });
 
     private final JWTService jwtService;
     private final UserCacheService userCacheService;
@@ -81,6 +95,7 @@ public class YjsWebSocketHandler extends BinaryWebSocketHandler {
                 return;
             }
 
+            scheduleTokenExpiryClose(session);
             rooms.computeIfAbsent(roomId, k -> new CopyOnWriteArraySet<>()).add(session);
         } catch (Exception e) {
             try {
@@ -93,6 +108,11 @@ public class YjsWebSocketHandler extends BinaryWebSocketHandler {
 
     @Override
     protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) {
+        if (isTokenExpired(session)) {
+            closeQuietly(session, TOKEN_EXPIRED);
+            return;
+        }
+
         String roomId = extractRoomId(session);
         Set<WebSocketSession> room = rooms.get(roomId);
         if (room == null || !room.contains(session)) {
@@ -138,7 +158,12 @@ public class YjsWebSocketHandler extends BinaryWebSocketHandler {
         }
 
         try {
-            String identity = jwtService.extractUserName(token);
+            String identity = jwtService.validateAccessTokenAndGetSubject(token);
+            Date expiresAt = jwtService.extractExpiration(token);
+            if (expiresAt == null || !expiresAt.toInstant().isAfter(Instant.now())) {
+                return null;
+            }
+            session.getAttributes().put("tokenExpiresAt", expiresAt.toInstant());
             return userCacheService.resolveUserByEmailOrUsername(identity);
         } catch (JwtException | IllegalArgumentException ex) {
             return null;
@@ -172,26 +197,99 @@ public class YjsWebSocketHandler extends BinaryWebSocketHandler {
             return authHeader.trim();
         }
 
-        URI uri = session.getUri();
-        if (uri == null || uri.getQuery() == null || uri.getQuery().isBlank()) {
+        String protocolToken = extractTokenFromProtocols(headers);
+        if (protocolToken != null) {
+            return protocolToken;
+        }
+
+        return extractTokenFromCookie(headers);
+    }
+
+    private String extractTokenFromProtocols(HttpHeaders headers) {
+        if (headers == null) {
             return null;
         }
 
-        HashMap<String, String> queryParams = new HashMap<>();
-        for (String pair : uri.getQuery().split("&")) {
-            String[] keyValue = pair.split("=", 2);
-            if (keyValue.length != 2) {
-                continue;
-            }
-            String key = URLDecoder.decode(keyValue[0], StandardCharsets.UTF_8);
-            String value = URLDecoder.decode(keyValue[1], StandardCharsets.UTF_8);
-            queryParams.put(key, value);
+        List<String> protocolHeaders = headers.get("Sec-WebSocket-Protocol");
+        if (protocolHeaders == null || protocolHeaders.isEmpty()) {
+            return null;
         }
 
-        String queryToken = queryParams.get("token");
-        if (queryToken == null || queryToken.isBlank()) {
-            queryToken = queryParams.get("access_token");
+        for (String header : protocolHeaders) {
+            if (header == null || header.isBlank()) {
+                continue;
+            }
+            for (String protocol : header.split(",")) {
+                String trimmed = protocol.trim();
+                if (trimmed.startsWith(JWT_PROTOCOL_PREFIX)) {
+                    return trimmed.substring(JWT_PROTOCOL_PREFIX.length()).trim();
+                }
+            }
         }
-        return queryToken;
+
+        return null;
+    }
+
+    private String extractTokenFromCookie(HttpHeaders headers) {
+        if (headers == null) {
+            return null;
+        }
+
+        List<String> cookieHeaders = headers.get(HttpHeaders.COOKIE);
+        if (cookieHeaders == null || cookieHeaders.isEmpty()) {
+            return null;
+        }
+
+        for (String header : cookieHeaders) {
+            if (header == null || header.isBlank()) {
+                continue;
+            }
+            for (String cookie : header.split(";")) {
+                String[] keyValue = cookie.trim().split("=", 2);
+                if (keyValue.length == 2 && ACCESS_TOKEN_COOKIE.equals(keyValue[0])) {
+                    return keyValue[1].trim();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private void scheduleTokenExpiryClose(WebSocketSession session) {
+        Object expiresAt = session.getAttributes().get("tokenExpiresAt");
+        if (!(expiresAt instanceof Instant expiry)) {
+            closeQuietly(session, TOKEN_EXPIRED);
+            return;
+        }
+
+        long delayMs = expiry.toEpochMilli() - System.currentTimeMillis();
+        if (delayMs <= 0) {
+            closeQuietly(session, TOKEN_EXPIRED);
+            return;
+        }
+
+        tokenExpiryScheduler.schedule(() -> {
+            if (session.isOpen() && isTokenExpired(session)) {
+                closeQuietly(session, TOKEN_EXPIRED);
+            }
+        }, delayMs, TimeUnit.MILLISECONDS);
+    }
+
+    private boolean isTokenExpired(WebSocketSession session) {
+        Object expiresAt = session.getAttributes().get("tokenExpiresAt");
+        return !(expiresAt instanceof Instant expiry) || !expiry.isAfter(Instant.now());
+    }
+
+    private void closeQuietly(WebSocketSession session, CloseStatus status) {
+        try {
+            session.close(status);
+        } catch (IOException ex) {
+            // ignore
+        }
+    }
+
+    @PreDestroy
+    void shutdownTokenExpiryScheduler() {
+        tokenExpiryScheduler.shutdownNow();
     }
 }

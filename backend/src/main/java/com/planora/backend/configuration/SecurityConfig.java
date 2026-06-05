@@ -50,6 +50,7 @@ public class SecurityConfig {
             "/api/github/webhooks",   // GitHub webhook deliveries carry no JWT
             "/ws/**",
             "/ws-native/**",
+            "/yjs/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html"

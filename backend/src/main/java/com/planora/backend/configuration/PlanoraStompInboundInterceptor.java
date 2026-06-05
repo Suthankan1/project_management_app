@@ -75,7 +75,7 @@ public class PlanoraStompInboundInterceptor implements ChannelInterceptor {
             }
 
             String token = extractBearerToken(auth);
-            String identity = jwtService.extractUserName(token);
+            String identity = jwtService.validateAccessTokenAndGetSubject(token);
             User user = userCacheService.resolveUserByEmailOrUsername(identity);
             if (user == null || user.getUsername() == null || user.getUsername().isBlank()) {
                 throw new MessagingException("User not found for provided token");
