@@ -18,3 +18,4 @@ frontend\mobile\.expo
 # Logs
 *.log
 **/*.log
+artifacts/api-contracts/*.generated.*
