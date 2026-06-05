@@ -4,8 +4,8 @@ import React, { useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { X, Calendar, User, Plus } from 'lucide-react';
-import { AxiosError } from 'axios';
 import { useProjectAssigneeOptions } from '@/hooks/projects/useProjectAssigneeOptions';
+import { normalizeApiError } from '@/lib/api-error';
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -74,8 +74,7 @@ export default function CreateTaskModal({
       setShowDatePicker(false);
       onClose();
     } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      setSubmitError(axiosErr?.response?.data?.message || 'Failed to create task.');
+      setSubmitError(normalizeApiError(err, 'Failed to create task.'));
       console.error('Task creation error:', err);
     }
   };

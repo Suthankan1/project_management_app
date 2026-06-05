@@ -1,5 +1,6 @@
 import api from '@/lib/axios';
-import axios, { AxiosError } from 'axios';
+import axios, { type AxiosError } from 'axios';
+import { getApiErrorStatus, normalizeApiError } from '@/lib/api-error';
 
 export type DocumentStatus = 'ACTIVE' | 'SOFT_DELETED';
 
@@ -100,40 +101,12 @@ function inferContentType(file: File): string {
     return EXTENSION_MIME_MAP[extension] || 'application/octet-stream';
 }
 
-function getResponseData(error: unknown): { message?: string; errorCode?: string } | string | undefined {
-    return (error as { response?: { data?: { message?: string; errorCode?: string } | string } })?.response?.data;
-}
-
-function getResponseStatus(error: unknown): number | undefined {
-    return (error as { response?: { status?: number } })?.response?.status;
-}
-
-function extractErrorMessage(error: unknown, fallback: string): string {
-    const messageFromResponse = getResponseData(error);
-    if (typeof messageFromResponse === 'string' && messageFromResponse.trim()) {
-        return messageFromResponse;
-    }
-
-    if (typeof messageFromResponse === 'object' && messageFromResponse !== null) {
-        const message = (messageFromResponse as { message?: string }).message;
-        if (message && message.trim()) {
-            return message;
-        }
-    }
-
-    const message = (error as { message?: string })?.message;
-    if (message && message.trim()) {
-        return message;
-    }
-
-    return fallback;
-}
-
 function toDmsError(error: unknown, fallback: string): DmsError {
-    const status = getResponseStatus(error);
-    const data = getResponseData(error);
+    const status = getApiErrorStatus(error);
+    const data = (error as { response?: { data?: { errorCode?: string } }; data?: { errorCode?: string } })?.response?.data
+        ?? (error as { data?: { errorCode?: string } })?.data;
     const errorCode = typeof data === 'object' && data !== null ? data.errorCode : undefined;
-    const message = extractErrorMessage(error, fallback);
+    const message = normalizeApiError(error, fallback);
 
     if (status === 403 || errorCode === 'FORBIDDEN') {
         return new DmsError('PERMISSION_DENIED', message || 'You do not have permission to perform this document action.', status);
