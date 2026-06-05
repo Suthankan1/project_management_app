@@ -31,6 +31,9 @@ export async function fetchTasksByProject(
       page: 0,
       size: 500,
     };
+    if (filters?.archived !== undefined) {
+      params.archived = filters.archived;
+    }
     const response = await tasksApi.listByProject(projectId, params);
     return response.content || [];
   } catch (error) {

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { CalendarDays, ChevronDown, Minus, MoreHorizontal, Plus, Lock, RefreshCw } from 'lucide-react';
+import { Archive, CalendarDays, ChevronDown, Minus, MoreHorizontal, Plus, Lock, RefreshCw, RotateCcw } from 'lucide-react';
 import { hexToLabelStyle } from '@/components/shared/LabelPicker';
 import { AvatarStack } from '@/components/ui/Avatar';
 import { tasksApi } from '@/services/tasks-contract';
@@ -16,6 +16,8 @@ const TaskRow = React.memo(function TaskRow({
   onOpenModal,
   onStatusChange,
   onDelete,
+  onArchive,
+  onRestore,
   onTaskUpdated,
   members,
   availableLabels,
@@ -27,11 +29,15 @@ const TaskRow = React.memo(function TaskRow({
   selected = false,
   onToggleSelect,
   projectStatuses,
+  canModifyTasks = true,
+  showArchived = false,
 }: {
   task: Task;
   onOpenModal: (id: number) => void;
   onStatusChange: (id: number, status: string) => void;
   onDelete: (id: number) => void;
+  onArchive: (id: number) => void;
+  onRestore: (id: number) => void;
   onTaskUpdated?: (taskId: number, updates: Partial<Task>) => void;
   members: Array<{ id: number; name: string; photoUrl?: string | null }>;
   availableLabels: Label[];
@@ -43,6 +49,8 @@ const TaskRow = React.memo(function TaskRow({
   selected?: boolean;
   onToggleSelect?: (taskId: number) => void;
   projectStatuses?: Array<{ name: string; status: string; color: string }>;
+  canModifyTasks?: boolean;
+  showArchived?: boolean;
 }) {
   const [statusOpen, setStatusOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
@@ -243,6 +251,11 @@ const TaskRow = React.memo(function TaskRow({
         {isBlocked && (
           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-500 shrink-0">
             <Lock size={9} className="flex-shrink-0" /> Blocked
+          </span>
+        )}
+        {task.archived && (
+          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-cu-bg-tertiary text-cu-text-secondary shrink-0">
+            <Archive size={9} className="flex-shrink-0" /> Archived
           </span>
         )}
       </div>
@@ -471,8 +484,30 @@ const TaskRow = React.memo(function TaskRow({
               Edit
             </button>
             <button
+              onClick={() => {
+                setMenuOpen(false);
+                if (showArchived) {
+                  if (window.confirm(`Restore "${task.title}" to active tasks?`)) onRestore(task.id);
+                } else if (window.confirm(`Archive "${task.title}"? You can restore it from Archived Tasks.`)) {
+                  onArchive(task.id);
+                }
+              }}
+              disabled={!canModifyTasks}
+              title={!canModifyTasks ? 'Viewers cannot archive or restore tasks' : showArchived ? 'Restore task' : 'Archive task'}
+              className={`w-full text-left px-3 py-1.5 text-[12px] transition-colors flex items-center gap-2 ${
+                canModifyTasks ? 'text-cu-text-primary hover:bg-cu-hover' : 'text-cu-text-muted cursor-not-allowed'
+              }`}
+            >
+              {showArchived ? <RotateCcw size={12} /> : <Archive size={12} />}
+              {showArchived ? 'Restore' : 'Archive'}
+            </button>
+            <button
               onClick={() => { setMenuOpen(false); onDelete(task.id); }}
-              className="w-full text-left px-3 py-1.5 text-[12px] text-cu-danger hover:bg-cu-danger/10 transition-colors"
+              disabled={!canModifyTasks}
+              title={!canModifyTasks ? 'Viewers cannot delete tasks' : 'Delete task'}
+              className={`w-full text-left px-3 py-1.5 text-[12px] transition-colors ${
+                canModifyTasks ? 'text-cu-danger hover:bg-cu-danger/10' : 'text-cu-text-muted cursor-not-allowed'
+              }`}
             >
               Delete
             </button>

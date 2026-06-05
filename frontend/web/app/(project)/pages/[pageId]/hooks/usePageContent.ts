@@ -71,7 +71,7 @@ export function usePageContent(pageId: string, projectId: string | null) {
         };
 
         void fetchPageDetail();
-    }, [pageId, isDraft, searchParams]);
+    }, [pageId, projectId, isDraft, searchParams]);
 
     return {
         selectedPage, setSelectedPage,

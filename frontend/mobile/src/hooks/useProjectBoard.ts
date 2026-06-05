@@ -145,6 +145,8 @@ export function useProjectBoard(projectId: number) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersError, setMembersError] = useState<string | null>(null);
 
   const [isOnline, setIsOnline] = useState(offlineSyncManager.getOnlineStatus());
   const [isStale, setIsStale] = useState(true);
@@ -178,6 +180,41 @@ export function useProjectBoard(projectId: number) {
     })();
   }, [projectId, CACHE_KEY]);
 
+  const parseMembers = useCallback((membersData: unknown): BoardMember[] => {
+    const rawMembers = Array.isArray(membersData) ? membersData : [];
+
+    return rawMembers.map((member: {
+      id?: number;
+      userId?: number;
+      role?: string | null;
+      user?: { userId?: number; fullName?: string | null; username?: string | null };
+      name?: string | null;
+    }) => {
+      const userId = member.user?.userId ?? member.userId ?? member.id ?? 0;
+      const name = member.name || member.user?.fullName || member.user?.username || `Member ${userId}`;
+      return {
+        id: member.id ?? userId,
+        userId,
+        name,
+        role: member.role ?? null,
+      };
+    }).filter((member: BoardMember) => member.userId > 0);
+  }, []);
+
+  const fetchMembers = useCallback(async (force = false) => {
+    if (!projectId) return;
+    setMembersLoading(true);
+    setMembersError(null);
+    try {
+      const membersData = await projectService.getMembersCached(projectId, { force });
+      setMembers(parseMembers(membersData));
+    } catch {
+      setMembersError('Unable to load project members. Assignee options may be unavailable.');
+    } finally {
+      setMembersLoading(false);
+    }
+  }, [parseMembers, projectId]);
+
   const fetchBoard = useCallback(async (background = false) => {
     if (!projectId) return;
 
@@ -189,37 +226,26 @@ export function useProjectBoard(projectId: number) {
     setError(null);
 
     try {
-      const [boardData, tasksData, membersData] = await Promise.all([
+      setMembersLoading(true);
+      setMembersError(null);
+
+      const [boardData, tasksData, membersResult] = await Promise.all([
         kanbanService.getBoard(projectId),
         taskService.listByProject(projectId),
-        projectService.getMembers(projectId).catch(() => []),
+        projectService.getMembersCached(projectId)
+          .then((data) => ({ ok: true as const, data }))
+          .catch(() => ({ ok: false as const, data: [] as unknown[] })),
       ]);
 
       const rawBoard = boardData as KanbanBoardData | null;
       const normalizedBoard = rawBoard ? { ...rawBoard, columns: normalizeColumns(rawBoard.columns) } : null;
       const fetchedTasks = Array.isArray(tasksData) ? tasksData : [];
-      const rawMembers = Array.isArray(membersData) ? membersData : [];
-
-      const parsedMembers = rawMembers.map((member: {
-        id?: number;
-        userId?: number;
-        role?: string | null;
-        user?: { userId?: number; fullName?: string | null; username?: string | null };
-        name?: string | null;
-      }) => {
-        const userId = member.user?.userId ?? member.userId ?? member.id ?? 0;
-        const name = member.name || member.user?.fullName || member.user?.username || `Member ${userId}`;
-        return {
-          id: member.id ?? userId,
-          userId,
-          name,
-          role: member.role ?? null,
-        };
-      }).filter((member: BoardMember) => member.userId > 0);
+      const parsedMembers = parseMembers(membersResult.data);
 
       setBoard(normalizedBoard);
       setRawTasks(fetchedTasks);
       setMembers(parsedMembers);
+      setMembersError(membersResult.ok ? null : 'Unable to load project members. Assignee options may be unavailable.');
       setIsStale(false);
 
       // Save to cache
@@ -236,8 +262,9 @@ export function useProjectBoard(projectId: number) {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setMembersLoading(false);
     }
-  }, [projectId, CACHE_KEY]);
+  }, [projectId, CACHE_KEY, parseMembers]);
 
   useEffect(() => {
     void fetchBoard(false);
@@ -258,6 +285,7 @@ export function useProjectBoard(projectId: number) {
   }, [fetchBoard]);
 
   const refresh = useCallback(() => fetchBoard(true), [fetchBoard]);
+  const retryMembers = useCallback(() => fetchMembers(true), [fetchMembers]);
 
   // status patch
   const moveTask = useCallback(async (task: BoardTask, status: string) => {
@@ -514,10 +542,13 @@ export function useProjectBoard(projectId: number) {
     columns,
     tasks,
     members,
+    membersLoading,
+    membersError,
     loading,
     refreshing,
     error,
     refresh,
+    retryMembers,
     moveTask,
     createTask,
     deleteTask,

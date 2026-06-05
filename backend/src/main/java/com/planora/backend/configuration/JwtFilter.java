@@ -42,6 +42,7 @@ public class JwtFilter extends OncePerRequestFilter {
             "/api/auth/refresh",
             "/ws/**",
             "/ws-native/**",
+            "/yjs/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html"

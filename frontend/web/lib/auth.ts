@@ -139,7 +139,7 @@ export function saveToken(token: string): void {
     }
 }
 
-export function saveRefreshToken(token: string): void {
+export function saveRefreshToken(_token: string): void {
     if (typeof window !== 'undefined') {
         localStorage.removeItem('refreshToken');
         sessionStorage.removeItem('refreshToken');

@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { X, Calendar, User, Plus } from 'lucide-react';
-import { projectsApi } from '@/services/api-contract';
-import { AxiosError } from 'axios';
+import { useProjectAssigneeOptions } from '@/hooks/projects/useProjectAssigneeOptions';
+import { normalizeApiError } from '@/lib/api-error';
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -16,33 +16,6 @@ interface CreateTaskModalProps {
   sprintId?: number;
   loading?: boolean;
 }
-
-interface TeamMemberOption {
-  id: number;
-  name?: string;
-  username?: string;
-  fullName?: string;
-  user?: {
-    fullName?: string;
-    username?: string;
-  };
-}
-
-const getNestedTeamId = (team: unknown): number | undefined => {
-  if (!team || typeof team !== 'object' || !('id' in team)) return undefined;
-  const id = (team as { id?: unknown }).id;
-  return typeof id === 'number' ? id : undefined;
-};
-
-const getMemberArray = (payload: unknown): TeamMemberOption[] => {
-  if (Array.isArray(payload)) return payload as TeamMemberOption[];
-  if (!payload || typeof payload !== 'object') return [];
-  const record = payload as Record<string, unknown>;
-  if (Array.isArray(record.members)) return record.members as TeamMemberOption[];
-  if (Array.isArray(record.data)) return record.data as TeamMemberOption[];
-  if (Array.isArray(record.content)) return record.content as TeamMemberOption[];
-  return [];
-};
 
 export default function CreateTaskModal({
   isOpen,
@@ -57,11 +30,15 @@ export default function CreateTaskModal({
   const [titleLength, setTitleLength] = useState(0);
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [assignee, setAssignee] = useState<number | ''>('');
-  const [teamMembers, setTeamMembers] = useState<{ id: number; name: string }[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const {
+    members: teamMembers,
+    loadingMembers,
+    membersError,
+    retryMembers,
+  } = useProjectAssigneeOptions(isOpen ? projectId : null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,38 +74,10 @@ export default function CreateTaskModal({
       setShowDatePicker(false);
       onClose();
     } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      setSubmitError(axiosErr?.response?.data?.message || 'Failed to create task.');
+      setSubmitError(normalizeApiError(err, 'Failed to create task.'));
       console.error('Task creation error:', err);
     }
   };
-
-  useEffect(() => {
-    if (!isOpen || !projectId) return;
-
-    const loadMembers = async () => {
-      setLoadingMembers(true);
-      try {
-        const project = await projectsApi.get(projectId);
-        const teamId = project.teamId ?? getNestedTeamId(project.team);
-        if (teamId) {
-          const payload = await projectsApi.getTeamMembers(teamId);
-          const rawMembers = getMemberArray(payload);
-
-          setTeamMembers(rawMembers.map((m) => ({
-              id: m.id,
-              name: m.name ?? m.username ?? m.fullName ?? m.user?.fullName ?? m.user?.username ?? 'Unknown'
-          })));
-        }
-      } catch (err) {
-        console.error('Failed to load team members:', err);
-      } finally {
-        setLoadingMembers(false);
-      }
-    };
-
-    loadMembers();
-  }, [isOpen, projectId]);
 
   if (!isOpen) return null;
 
@@ -206,9 +155,24 @@ export default function CreateTaskModal({
                 className="w-full appearance-none rounded-xl border border-cu-border bg-cu-bg-secondary px-4 py-3 text-sm text-cu-text-secondary transition-all focus:outline-none focus:ring-2 focus:ring-cu-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={loadingMembers}
             >
-                <option value="">Select Assignee (optional)</option>
+                <option value="">{loadingMembers ? 'Loading assignees...' : 'Select Assignee (optional)'}</option>
                 {teamMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
+            {loadingMembers && (
+              <div className="h-2 w-32 animate-pulse rounded-full bg-cu-border" aria-label="Loading assignees" />
+            )}
+            {membersError && (
+              <div className="rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-500">
+                <p className="font-semibold">{membersError}</p>
+                <button
+                  type="button"
+                  onClick={() => void retryMembers()}
+                  className="mt-2 font-bold text-red-600 underline underline-offset-2"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
 
           {submitError && <div className="rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-500">{submitError}</div>}

@@ -16,6 +16,9 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.net.URI;
+import java.time.Instant;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -57,6 +60,19 @@ class YjsWebSocketHandlerTest {
     }
 
     @Test
+    void closesConnectionWhenTokenIsOnlyInQueryString() throws Exception {
+        when(session.getUri()).thenReturn(URI.create("ws://localhost/yjs/page-42?token=leaky-token"));
+        when(session.getHandshakeHeaders()).thenReturn(new HttpHeaders());
+
+        newHandler().afterConnectionEstablished(session);
+
+        ArgumentCaptor<CloseStatus> closeStatusCaptor = ArgumentCaptor.forClass(CloseStatus.class);
+        verify(session).close(closeStatusCaptor.capture());
+        assertEquals(4401, closeStatusCaptor.getValue().getCode());
+        verifyNoInteractions(jwtService);
+    }
+
+    @Test
     void closesConnectionWhenUserHasNoProjectAccess() throws Exception {
         when(session.getUri()).thenReturn(URI.create("ws://localhost/yjs/page-42"));
 
@@ -71,7 +87,9 @@ class YjsWebSocketHandlerTest {
         page.setId(42L);
         page.setProjectId(123L);
 
-        when(jwtService.extractUserName("valid-token")).thenReturn("alice@example.com");
+        when(jwtService.validateAccessTokenAndGetSubject("valid-token")).thenReturn("alice@example.com");
+        when(jwtService.extractExpiration("valid-token")).thenReturn(Date.from(Instant.now().plusSeconds(60)));
+        when(session.getAttributes()).thenReturn(new HashMap<>());
         when(userCacheService.resolveUserByEmailOrUsername("alice@example.com")).thenReturn(user);
         when(projectPageRepository.findById(42L)).thenReturn(Optional.of(page));
         when(projectMembershipService.isProjectMember(123L, 9L)).thenReturn(false);
@@ -98,7 +116,9 @@ class YjsWebSocketHandlerTest {
         page.setId(42L);
         page.setProjectId(123L);
 
-        when(jwtService.extractUserName("valid-token")).thenReturn("alice@example.com");
+        when(jwtService.validateAccessTokenAndGetSubject("valid-token")).thenReturn("alice@example.com");
+        when(jwtService.extractExpiration("valid-token")).thenReturn(Date.from(Instant.now().plusSeconds(60)));
+        when(session.getAttributes()).thenReturn(new HashMap<>());
         when(userCacheService.resolveUserByEmailOrUsername("alice@example.com")).thenReturn(user);
         when(projectPageRepository.findById(42L)).thenReturn(Optional.of(page));
         when(projectMembershipService.isProjectMember(123L, 9L)).thenReturn(true);
@@ -106,5 +126,50 @@ class YjsWebSocketHandlerTest {
         newHandler().afterConnectionEstablished(session);
 
         verify(session, never()).close(any(CloseStatus.class));
+    }
+
+    @Test
+    void allowsConnectionWithSecWebSocketProtocolToken() throws Exception {
+        when(session.getUri()).thenReturn(URI.create("ws://localhost/yjs/page-42"));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Sec-WebSocket-Protocol", "planora-yjs, planora.jwt.valid-token");
+        when(session.getHandshakeHeaders()).thenReturn(headers);
+
+        User user = new User();
+        user.setUserId(9L);
+
+        ProjectPage page = new ProjectPage();
+        page.setId(42L);
+        page.setProjectId(123L);
+
+        when(jwtService.validateAccessTokenAndGetSubject("valid-token")).thenReturn("alice@example.com");
+        when(jwtService.extractExpiration("valid-token")).thenReturn(Date.from(Instant.now().plusSeconds(60)));
+        when(session.getAttributes()).thenReturn(new HashMap<>());
+        when(userCacheService.resolveUserByEmailOrUsername("alice@example.com")).thenReturn(user);
+        when(projectPageRepository.findById(42L)).thenReturn(Optional.of(page));
+        when(projectMembershipService.isProjectMember(123L, 9L)).thenReturn(true);
+
+        newHandler().afterConnectionEstablished(session);
+
+        verify(session, never()).close(any(CloseStatus.class));
+    }
+
+    @Test
+    void closesConnectionWhenAccessTokenIsExpired() throws Exception {
+        when(session.getUri()).thenReturn(URI.create("ws://localhost/yjs/page-42"));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Sec-WebSocket-Protocol", "planora-yjs, planora.jwt.expired-token");
+        when(session.getHandshakeHeaders()).thenReturn(headers);
+
+        when(jwtService.validateAccessTokenAndGetSubject("expired-token"))
+                .thenThrow(new io.jsonwebtoken.JwtException("Token expired"));
+
+        newHandler().afterConnectionEstablished(session);
+
+        ArgumentCaptor<CloseStatus> closeStatusCaptor = ArgumentCaptor.forClass(CloseStatus.class);
+        verify(session).close(closeStatusCaptor.capture());
+        assertEquals(4401, closeStatusCaptor.getValue().getCode());
     }
 }

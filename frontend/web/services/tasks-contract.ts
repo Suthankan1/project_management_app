@@ -1,6 +1,7 @@
 import api from '@/lib/axios';
 import { formatLocalDate } from './contract-common';
 import type { PageResponse } from './contract-common';
+import type { components } from '@api-contracts/types';
 import type {
   Sprint,
   BurndownResponse,
@@ -10,6 +11,16 @@ import type {
   Subtask,
   Label,
 } from '@/types';
+
+type WithNullableTaskFields<T> = Omit<T, 'startDate' | 'dueDate' | 'sprintId' | 'milestoneId' | 'assigneeId'> & {
+  startDate?: string | null;
+  dueDate?: string | null;
+  sprintId?: number | null;
+  milestoneId?: number | null;
+  assigneeId?: number | null;
+};
+
+type RequireKeys<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
 
 export interface TaskCommentDto {
   id: number;
@@ -30,6 +41,7 @@ export interface TaskListQueryParams {
   size?: number;
   sortBy?: TaskSortField;
   sortDir?: TaskSortDirection;
+  archived?: boolean;
 }
 
 export interface TaskListAllQueryParams {
@@ -43,27 +55,10 @@ export interface TaskListAllQueryParams {
 
 // ── Strongly-typed request DTOs (mirrors backend patch DTOs) ────────────────
 
-/** PATCH /api/tasks/{taskId}/assignees */
-export interface UpdateAssigneesRequest {
-  /** Complete replacement list of assignee user IDs. Empty array clears all. */
-  assigneeIds: number[];
-}
-
-/** PATCH /api/tasks/bulk/status */
-export interface BulkUpdateStatusRequest {
-  taskIds: number[];
-  status: string;
-}
-
-/** DELETE /api/tasks/bulk */
-export interface BulkDeleteTasksRequest {
-  taskIds: number[];
-}
-
-/** PATCH /api/tasks/{taskId}/priority */
-export interface UpdatePriorityRequest {
-  priority: TaskPriorityValue;
-}
+export type UpdateAssigneesRequest = components['schemas']['UpdateAssigneesRequest'];
+export type BulkUpdateStatusRequest = components['schemas']['BulkUpdateStatusRequest'];
+export type BulkDeleteTasksRequest = components['schemas']['BulkDeleteTasksRequest'];
+export type UpdatePriorityRequest = components['schemas']['UpdatePriorityRequest'];
 
 export type TaskPriorityValue = 'LOW' | 'NORMAL' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
@@ -77,47 +72,16 @@ export const normalizeTaskPriority = (priority?: string): TaskPriorityValue => {
   return 'MEDIUM';
 };
 
-/** PATCH /api/tasks/{taskId}/status */
-export interface UpdateStatusRequest {
-  status: string;
-}
+export type UpdateStatusRequest = components['schemas']['UpdateStatusRequest'];
+export type PatchTaskDatesRequest = WithNullableTaskFields<components['schemas']['PatchTaskDatesRequest']>;
 
-/** PATCH /api/tasks/{taskId}/dates */
-export interface PatchTaskDatesRequest {
-  /** ISO date string (YYYY-MM-DD) or null to clear. Field can be omitted to leave unchanged. */
-  startDate?: string | null;
-  /** ISO date string (YYYY-MM-DD) or null to clear. Field can be omitted to leave unchanged. */
-  dueDate?: string | null;
-}
-
-export interface TaskAttachment {
-  id: number;
-  fileName: string;
-  contentType: string;
-  fileSize: number;
-  downloadUrl: string;
-  uploadedByName: string;
-  createdAt: string;
-}
-
-export interface UploadInitRequest {
-  fileName: string;
-  contentType: string;
-  fileSize: number;
-}
-
-export interface UploadInitResponse {
-  uploadUrl: string;
-  objectKey: string;
-  expiresInSeconds: number;
-}
-
-export interface UploadFinalizeRequest {
-  fileName: string;
-  contentType: string;
-  fileSize: number;
-  objectKey: string;
-}
+export type TaskAttachment = RequireKeys<
+  components['schemas']['TaskAttachmentResponseDTO'],
+  'id' | 'fileName' | 'contentType' | 'fileSize' | 'downloadUrl' | 'uploadedByName' | 'createdAt'
+>;
+export type UploadInitRequest = components['schemas']['TaskAttachmentUploadInitRequestDTO'];
+export type UploadInitResponse = RequireKeys<components['schemas']['TaskAttachmentUploadInitResponseDTO'], 'uploadUrl' | 'objectKey' | 'expiresInSeconds'>;
+export type UploadFinalizeRequest = components['schemas']['TaskAttachmentUploadFinalizeRequestDTO'];
 
 export interface Comment {
   id: number;
@@ -142,23 +106,12 @@ export interface KanbanBoardResponse {
   columns: KanbanColumnConfig[];
 }
 
-export interface SprintboardTask {
-  taskId: number;
-  projectTaskNumber?: number;
-  title: string;
-  storyPoint: number;
-  assigneeName?: string;
-  assigneePhotoUrl?: string;
-  status: string;
-  priority: string;
-  dueDate?: string;
-  updatedAt?: string;
-  attachmentCount?: number;
-  commentCount?: number;
-  labelName?: string;
-  labelColor?: string;
+export type SprintboardTask = RequireKeys<
+  components['schemas']['SprintboardTaskResponseDTO'],
+  'taskId' | 'title' | 'storyPoint' | 'status' | 'priority'
+> & {
   label?: { name: string; color?: string };
-}
+};
 
 export interface SprintboardColumn {
   id: number;
@@ -189,64 +142,9 @@ export interface SprintboardFullResponse extends Sprintboard {
   };
 }
 
-export interface CreateTaskRequest {
-  title: string;
-  projectId: number;
-  description?: string;
-  priority?: TaskPriorityValue;
-  status?: string;
-  storyPoint?: number;
-  startDate?: string | null;
-  dueDate?: string | null;
-  assigneeId?: number;
-  reporterId?: number;
-  assigneeIds?: number[];
-  sprintId?: number | null;
-  KanbanColumnId?: number;
-  parentId?: number;
-  labelIds?: number[];
-  milestoneId?: number | null;
-  recurrenceRule?: string;
-  recurrenceEnd?: string;
-  recurrenceActive?: boolean;
-  customInterval?: number;
-  recurrenceLimit?: number;
-}
-
-export interface UpdateTaskRequest {
-  title?: string;
-  projectId?: number;
-  description?: string;
-  priority?: TaskPriorityValue;
-  status?: string;
-  storyPoint?: number;
-  startDate?: string | null;
-  dueDate?: string | null;
-  assigneeId?: number | null;
-  reporterId?: number;
-  assigneeIds?: number[];
-  sprintId?: number | null;
-  KanbanColumnId?: number;
-  parentId?: number;
-  labelIds?: number[];
-  milestoneId?: number | null;
-  recurrenceRule?: string;
-  recurrenceEnd?: string;
-  recurrenceActive?: boolean;
-  customInterval?: number;
-  recurrenceLimit?: number;
-  archived?: boolean;
-}
-
-/** PATCH /api/tasks/reorder */
-export interface ReorderTasksRequest {
-  /** Required. Must be a positive integer. */
-  projectId: number;
-  /** Optional sprint scope; null means backlog / un-sprinted list. */
-  sprintId: number | null;
-  /** Ordered task IDs reflecting the desired display position. Must not be null (send [] for a no-op). */
-  orderedTaskIds: number[];
-}
+export type CreateTaskRequest = WithNullableTaskFields<components['schemas']['TaskRequestDTO']>;
+export type UpdateTaskRequest = Partial<CreateTaskRequest>;
+export type ReorderTasksRequest = Omit<components['schemas']['ReorderTasksRequest'], 'sprintId'> & { sprintId?: number | null };
 
 export interface SprintStartRequest {
   startDate: string;

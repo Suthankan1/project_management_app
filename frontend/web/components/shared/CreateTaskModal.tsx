@@ -2,15 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { Hash, Plus, User, X } from 'lucide-react';
-import axios from '@/lib/axios';
 import LabelPicker from '@/components/shared/LabelPicker';
 import type { Label } from '@/types';
 import { useProjectStatuses } from '@/hooks/useProjectStatuses';
-
-interface TeamMember {
-  id: number;
-  name: string;
-}
+import { useProjectAssigneeOptions } from '@/hooks/projects/useProjectAssigneeOptions';
 
 export interface CreateTaskData {
   title: string;
@@ -54,47 +49,21 @@ export default function CreateTaskModal({
   const [storyPoint, setStoryPoint] = useState(0);
   const [dueDate, setDueDate] = useState(initialDueDate ?? '');
   const [selectedLabels, setSelectedLabels] = useState<Label[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { statuses } = useProjectStatuses(projectId);
+  const {
+    members: teamMembers,
+    loadingMembers,
+    membersError,
+    retryMembers,
+  } = useProjectAssigneeOptions(isOpen ? projectId : null);
 
   useEffect(() => {
     if (statuses.length > 0 && status === 'TODO') {
       setStatus(statuses[0].status);
     }
   }, [statuses, status]);
-
-  useEffect(() => {
-    if (!isOpen || !projectId) return;
-
-    const loadMembers = async () => {
-      setLoadingMembers(true);
-      try {
-        const projectRes = await axios.get(`/api/projects/${projectId}`);
-        const project = projectRes.data;
-        const teamId = project.teamId ?? project.team?.id;
-        if (teamId) {
-          const membersRes = await axios.get(`/api/teams/${teamId}/members`);
-          const payload = membersRes.data;
-          const rawMembers = Array.isArray(payload) ? payload : [];
-          setTeamMembers(
-            rawMembers.map((m: { id: number; user?: { fullName?: string; username?: string } }) => ({
-              id: m.id,
-              name: m.user?.fullName ?? m.user?.username ?? 'Unknown',
-            }))
-          );
-        }
-      } catch {
-        // non-critical — assignee dropdown will be empty
-      } finally {
-        setLoadingMembers(false);
-      }
-    };
-
-    void loadMembers();
-  }, [isOpen, projectId]);
 
   const resetForm = () => {
     setTitle('');
@@ -252,11 +221,26 @@ export default function CreateTaskModal({
               className="w-full px-4 py-3 bg-cu-bg-secondary border border-cu-border rounded-xl text-sm text-cu-text-secondary focus:ring-2 focus:ring-cu-primary/20 focus:outline-none transition-all appearance-none"
               disabled={loadingMembers}
             >
-              <option value="">Select Assignee (optional)</option>
+              <option value="">{loadingMembers ? 'Loading assignees...' : 'Select Assignee (optional)'}</option>
               {teamMembers.map((m) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
             </select>
+            {loadingMembers && (
+              <div className="h-2 w-32 animate-pulse rounded-full bg-cu-border" aria-label="Loading assignees" />
+            )}
+            {membersError && (
+              <div className="rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-500">
+                <p className="font-semibold">{membersError}</p>
+                <button
+                  type="button"
+                  onClick={() => void retryMembers()}
+                  className="mt-2 font-bold text-red-600 underline underline-offset-2"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Labels */}

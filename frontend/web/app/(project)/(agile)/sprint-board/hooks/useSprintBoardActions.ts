@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
 import { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { AxiosError } from 'axios';
 import { sprintsApi, tasksApi } from '@/services/api-contract';
 import { toast } from '@/components/ui';
+import { normalizeApiError } from '@/lib/api-error';
 import { buildSessionCacheKey, removeSessionCache } from '@/lib/session-cache';
 import {
   bulkDeleteTasks,
@@ -162,8 +162,7 @@ export function useSprintBoardActions({
         : entry));
       forceRefresh();
     } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      toast(axiosErr?.response?.data?.message || 'Failed to create task.', 'error');
+      toast(normalizeApiError(err, 'Failed to create task.'), 'error');
     }
   }, [projectIdStr, activeSprint, selectedIdx, forceRefresh, setAllBoards]);
 
@@ -174,8 +173,7 @@ export function useSprintBoardActions({
         ...entry, columns: entry.columns.map((column) => ({ ...column, tasks: column.tasks.map((task) => task.taskId === taskId ? { ...task, dueDate: dueDate ?? undefined } : task) })),
       }));
     } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      toast(axiosErr?.response?.data?.message || 'Failed to update due date.', 'error');
+      toast(normalizeApiError(err, 'Failed to update due date.'), 'error');
       forceRefresh();
     }
   }, [selectedIdx, forceRefresh, setAllBoards]);
@@ -188,8 +186,7 @@ export function useSprintBoardActions({
         ...entry, columns: entry.columns.map((column) => ({ ...column, tasks: column.tasks.map((task) => task.taskId === taskId ? { ...task, assigneeName: selected?.name, assigneePhotoUrl: selected?.photoUrl ?? undefined } : task) })),
       }));
     } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      toast(axiosErr?.response?.data?.message || 'Failed to update assignee.', 'error');
+      toast(normalizeApiError(err, 'Failed to update assignee.'), 'error');
       forceRefresh();
     }
   }, [selectedIdx, teamMembers, forceRefresh, setAllBoards]);
@@ -202,8 +199,7 @@ export function useSprintBoardActions({
         ...entry, columns: entry.columns.map((column) => ({ ...column, tasks: column.tasks.map((task) => task.taskId === taskId ? { ...task, assigneeName: selected?.name, assigneePhotoUrl: selected?.photoUrl ?? undefined } : task) })),
       }));
     } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      toast(axiosErr?.response?.data?.message || 'Failed to update assignees.', 'error');
+      toast(normalizeApiError(err, 'Failed to update assignees.'), 'error');
       forceRefresh();
     }
   }, [selectedIdx, teamMembers, forceRefresh, setAllBoards]);
@@ -218,8 +214,7 @@ export function useSprintBoardActions({
       setTimeout(() => setSuccessMsg(''), 1800);
       forceRefresh();
     } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      toast(axiosErr?.response?.data?.message || 'Failed to complete sprint.', 'error');
+      toast(normalizeApiError(err, 'Failed to complete sprint.'), 'error');
     } finally { setIsUpdating(false); }
   };
 
@@ -235,8 +230,7 @@ export function useSprintBoardActions({
       setNewColumnName('');
       forceRefresh();
     } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      toast(axiosErr?.response?.data?.message || 'Failed to add column.', 'error');
+      toast(normalizeApiError(err, 'Failed to add column.'), 'error');
     } finally { setIsCreatingColumn(false); }
   };
 

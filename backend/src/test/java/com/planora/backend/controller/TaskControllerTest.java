@@ -97,12 +97,26 @@ class TaskControllerTest {
     @Test
     @WithMockUserPrincipal
     void getTasksByProject_returnsPageOfTasks() throws Exception {
-        when(service.getTasksByProject(eq(10L), any(), any(Pageable.class)))
+        when(service.getTasksByProject(eq(10L), any(), any(Pageable.class), eq(false)))
                 .thenReturn(new PageImpl<>(List.of(sampleTask)));
 
         mockMvc.perform(get("/api/tasks/project/10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].title").value("Implement login"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void getTasksByProject_passesArchivedFilter() throws Exception {
+        sampleTask.setArchived(true);
+        when(service.getTasksByProject(eq(10L), any(), any(Pageable.class), eq(true)))
+                .thenReturn(new PageImpl<>(List.of(sampleTask)));
+
+        mockMvc.perform(get("/api/tasks/project/10").param("archived", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].archived").value(true));
+
+        verify(service).getTasksByProject(eq(10L), any(), any(Pageable.class), eq(true));
     }
 
     @Test
@@ -114,7 +128,7 @@ class TaskControllerTest {
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Invalid sortBy")))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Allowed values")));
 
-        verify(service, never()).getTasksByProject(anyLong(), any(), any(Pageable.class));
+        verify(service, never()).getTasksByProject(anyLong(), any(), any(Pageable.class), any());
     }
 
     @Test
@@ -125,7 +139,7 @@ class TaskControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("Invalid sortDir 'sideways'. Allowed values: asc, desc"));
 
-        verify(service, never()).getTasksByProject(anyLong(), any(), any(Pageable.class));
+        verify(service, never()).getTasksByProject(anyLong(), any(), any(Pageable.class), any());
     }
 
     @Test

@@ -1,68 +1,40 @@
 import api from '@/lib/axios';
-import axios, { AxiosError } from 'axios';
+import axios, { type AxiosError } from 'axios';
+import { getApiErrorStatus, normalizeApiError } from '@/lib/api-error';
+import type { components } from '@api-contracts/types';
 
-export type DocumentStatus = 'ACTIVE' | 'SOFT_DELETED';
+type RequireKeys<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
+type DocumentFolderDto = components['schemas']['DocumentFolderResponseDTO'];
+type DocumentDto = components['schemas']['DocumentResponseDTO'];
+type DocumentVersionDto = components['schemas']['DocumentVersionResponseDTO'];
+type ProjectStorageQuotaDto = components['schemas']['ProjectStorageQuotaResponseDTO'];
 
-export interface DocumentFolder {
-    id: number;
-    name: string;
-    projectId: number;
+export type DocumentStatus = NonNullable<components['schemas']['DocumentResponseDTO']['status']>;
+export type DocumentFolder = Omit<
+    RequireKeys<DocumentFolderDto, 'id' | 'name' | 'projectId' | 'createdById' | 'createdAt' | 'updatedAt'>,
+    'parentFolderId'
+> & {
     parentFolderId: number | null;
-    createdById: number;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface DocumentItem {
-    id: number;
-    name: string;
-    contentType: string;
-    fileSize: number;
-    humanReadableSize?: string;
-    status: DocumentStatus;
-    projectId: number;
+};
+export type DocumentItem = Omit<
+    RequireKeys<
+        DocumentDto,
+        'id' | 'name' | 'contentType' | 'fileSize' | 'status' | 'projectId' | 'latestVersionNumber' | 'uploadedById' | 'uploadedByName' | 'createdAt' | 'updatedAt'
+    >,
+    'folderId' | 'folderName' | 'downloadUrl' | 'deletedAt'
+> & {
     folderId: number | null;
     folderName?: string | null;
-    latestVersionNumber: number;
     downloadUrl: string | null;
-    uploadedById: number;
-    uploadedByName: string;
-    createdAt: string;
-    updatedAt: string;
     deletedAt: string | null;
-}
-
-export interface DocumentVersionItem {
-    id: number;
-    versionNumber: number;
-    contentType: string;
-    fileSize: number;
-    uploadedById: number;
-    uploadedByName: string;
-    uploadedAt: string;
-    downloadUrl: string;
-}
-
-interface UploadInitRequest {
-    fileName: string;
-    contentType: string;
-    fileSize: number;
-    folderId?: number;
-}
-
-interface UploadInitResponse {
-    uploadUrl: string;
-    objectKey: string;
-    expiresInSeconds: number;
-}
-
-interface UploadFinalizeRequest {
-    fileName: string;
-    contentType: string;
-    fileSize: number;
-    objectKey: string;
-    folderId?: number;
-}
+};
+export type DocumentVersionItem = RequireKeys<
+    DocumentVersionDto,
+    'id' | 'versionNumber' | 'contentType' | 'fileSize' | 'uploadedById' | 'uploadedByName' | 'uploadedAt' | 'downloadUrl'
+>;
+type UploadInitRequest = components['schemas']['DocumentUploadInitRequestDTO'];
+type UploadInitResponse = components['schemas']['DocumentUploadInitResponseDTO'];
+type UploadFinalizeRequest = components['schemas']['DocumentUploadFinalizeRequestDTO'];
 
 export type DmsErrorKind = 'PERMISSION_DENIED' | 'QUOTA_EXCEEDED' | 'UPLOAD_FAILED';
 
@@ -100,40 +72,12 @@ function inferContentType(file: File): string {
     return EXTENSION_MIME_MAP[extension] || 'application/octet-stream';
 }
 
-function getResponseData(error: unknown): { message?: string; errorCode?: string } | string | undefined {
-    return (error as { response?: { data?: { message?: string; errorCode?: string } | string } })?.response?.data;
-}
-
-function getResponseStatus(error: unknown): number | undefined {
-    return (error as { response?: { status?: number } })?.response?.status;
-}
-
-function extractErrorMessage(error: unknown, fallback: string): string {
-    const messageFromResponse = getResponseData(error);
-    if (typeof messageFromResponse === 'string' && messageFromResponse.trim()) {
-        return messageFromResponse;
-    }
-
-    if (typeof messageFromResponse === 'object' && messageFromResponse !== null) {
-        const message = (messageFromResponse as { message?: string }).message;
-        if (message && message.trim()) {
-            return message;
-        }
-    }
-
-    const message = (error as { message?: string })?.message;
-    if (message && message.trim()) {
-        return message;
-    }
-
-    return fallback;
-}
-
 function toDmsError(error: unknown, fallback: string): DmsError {
-    const status = getResponseStatus(error);
-    const data = getResponseData(error);
+    const status = getApiErrorStatus(error);
+    const data = (error as { response?: { data?: { errorCode?: string } }; data?: { errorCode?: string } })?.response?.data
+        ?? (error as { data?: { errorCode?: string } })?.data;
     const errorCode = typeof data === 'object' && data !== null ? data.errorCode : undefined;
-    const message = extractErrorMessage(error, fallback);
+    const message = normalizeApiError(error, fallback);
 
     if (status === 403 || errorCode === 'FORBIDDEN') {
         return new DmsError('PERMISSION_DENIED', message || 'You do not have permission to perform this document action.', status);
@@ -159,19 +103,17 @@ function shouldFallbackToBackend(error: unknown): boolean {
     return [408, 429, 500, 502, 503, 504].includes(axiosError.response.status);
 }
 
-export interface FolderPermissionRequest {
-    teamRole: string;
-    permissions: string[];
+function requireUploadInitResponse(response: UploadInitResponse): asserts response is UploadInitResponse & { uploadUrl: string; objectKey: string } {
+    if (!response.uploadUrl || !response.objectKey) {
+        throw new DmsError('UPLOAD_FAILED', 'Upload initialization response was missing storage details.');
+    }
 }
 
-export interface ProjectStorageQuotaResponse {
-    usedBytes: number;
-    quotaBytes: number;
-    maxFileSizeBytes: number;
-    documentCount: number;
-    humanReadableUsed: string;
-    humanReadableQuota: string;
-}
+export type FolderPermissionRequest = components['schemas']['FolderPermissionRequest'];
+export type ProjectStorageQuotaResponse = RequireKeys<
+    ProjectStorageQuotaDto,
+    'usedBytes' | 'quotaBytes' | 'maxFileSizeBytes' | 'documentCount' | 'humanReadableUsed' | 'humanReadableQuota'
+>;
 
 export async function getFolderPermissions(projectId: number, folderId: number): Promise<FolderPermissionRequest[]> {
     const response = await api.get<FolderPermissionRequest[]>(`/api/projects/${projectId}/folders/${folderId}/permissions`);
@@ -218,7 +160,7 @@ export async function getDocumentVersions(projectId: number, documentId: number)
     return response.data;
 }
 
-export async function updateDocumentMetadata(projectId: number, documentId: number, payload: { name?: string; folderId?: number }): Promise<DocumentItem> {
+export async function updateDocumentMetadata(projectId: number, documentId: number, payload: components['schemas']['DocumentMetadataUpdateRequestDTO']): Promise<DocumentItem> {
     const response = await api.patch<DocumentItem>(`/api/projects/${projectId}/documents/${documentId}`, payload);
     return response.data;
 }
@@ -303,6 +245,7 @@ export async function uploadDocument(
         fileSize: file.size,
         folderId,
     });
+    requireUploadInitResponse(initResponse);
 
     try {
         await axios.put(initResponse.uploadUrl, file, {

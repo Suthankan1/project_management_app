@@ -20,11 +20,11 @@ import {
 } from 'lucide-react';
 import { hasConnectedGitHubAccount, getProjectGitHubRepo } from '@/services/githubService';
 import api from '@/lib/axios';
+import { normalizeApiError } from '@/lib/api-error';
 import { CIStatusBadge } from '@/components/ui';
 import SidebarField from './SidebarField';
 import CreateIssueFromTaskModal from '@/components/github/CreateIssueFromTaskModal';
 import type { GitHubIssue } from '@/services/githubService';
-import { AxiosError } from 'axios';
 
 // ── Backend DTO shapes ────────────────────────────────────────────────────────
 
@@ -309,8 +309,7 @@ const TaskGitHubSection: React.FC<TaskGitHubSectionProps> = ({
       setPrs(Array.isArray(prsRes.data) ? prsRes.data : []);
       setCommits(Array.isArray(commitsRes.data) ? commitsRes.data : []);
     } catch (err: unknown) {
-      const axiosError = err as AxiosError<{ message?: string }>;
-      setError(axiosError.response?.data?.message || (err instanceof Error ? err.message : 'Failed to load GitHub data'));
+      setError(normalizeApiError(err, 'Failed to load GitHub data'));
     } finally {
       setLoadingSummary(false);
       setLoadingPrs(false);
@@ -366,8 +365,7 @@ const TaskGitHubSection: React.FC<TaskGitHubSectionProps> = ({
       setBranchSaved(true);
       setTimeout(() => setBranchSaved(false), 2500);
     } catch (err: unknown) {
-      const axiosError = err as AxiosError<{ message?: string }>;
-      setBranchError(axiosError.response?.data?.message || (err instanceof Error ? err.message : 'Failed to save branch name'));
+      setBranchError(normalizeApiError(err, 'Failed to save branch name'));
     } finally {
       setSavingBranch(false);
     }

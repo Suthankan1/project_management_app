@@ -1,72 +1,21 @@
 import api from '../api/axios';
+import type { components } from '@api-contracts/types';
 
-export interface CreateTaskRequest {
-  title: string;
-  projectId: number;
-  description?: string;
-  priority?: 'LOW' | 'NORMAL' | 'MEDIUM' | 'HIGH' | 'URGENT';
-  status?: string;
-  storyPoint?: number;
+type WithNullableTaskFields<T> = Omit<T, 'startDate' | 'dueDate' | 'sprintId' | 'milestoneId' | 'assigneeId'> & {
   startDate?: string | null;
   dueDate?: string | null;
-  assigneeId?: number;
-  reporterId?: number;
-  assigneeIds?: number[];
   sprintId?: number | null;
-  KanbanColumnId?: number;
-  parentId?: number;
-  labelIds?: number[];
   milestoneId?: number | null;
-}
+  assigneeId?: number | null;
+};
 
-export interface UpdateTaskRequest {
-  title?: string;
-  projectId?: number;
-  description?: string;
-  priority?: 'LOW' | 'NORMAL' | 'MEDIUM' | 'HIGH' | 'URGENT';
-  status?: string;
-  storyPoint?: number;
-  startDate?: string | null;
-  dueDate?: string | null;
-  assigneeId?: number;
-  reporterId?: number;
-  assigneeIds?: number[];
-  sprintId?: number | null;
-  KanbanColumnId?: number;
-  parentId?: number;
-  labelIds?: number[];
-  milestoneId?: number | null;
-  recurrenceRule?: string;
-  recurrenceEnd?: string;
-  recurrenceActive?: boolean;
-  customInterval?: number;
-  recurrenceLimit?: number;
-  archived?: boolean;
-}
-
-export interface PatchTaskDatesRequest {
-  startDate?: string | null;
-  dueDate?: string | null;
-}
-
-export interface BulkStatusRequest {
-  taskIds: number[];
-  status: string;
-}
-
-export interface BulkDeleteRequest {
-  taskIds: number[];
-}
-
-export interface AssigneeRequest {
-  assigneeIds: number[];
-}
-
-export interface ReorderTasksRequest {
-  projectId: number;
-  sprintId: number | null;
-  orderedTaskIds: number[];
-}
+export type CreateTaskRequest = WithNullableTaskFields<components['schemas']['TaskRequestDTO']>;
+export type UpdateTaskRequest = Partial<CreateTaskRequest>;
+export type PatchTaskDatesRequest = WithNullableTaskFields<components['schemas']['PatchTaskDatesRequest']>;
+export type BulkStatusRequest = components['schemas']['BulkUpdateStatusRequest'];
+export type BulkDeleteRequest = components['schemas']['BulkDeleteTasksRequest'];
+export type AssigneeRequest = components['schemas']['UpdateAssigneesRequest'];
+export type ReorderTasksRequest = Omit<components['schemas']['ReorderTasksRequest'], 'sprintId'> & { sprintId?: number | null };
 
 export type TaskSortField = 'createdAt' | 'updatedAt' | 'dueDate' | 'priority' | 'status' | 'title' | 'projectTaskNumber';
 export type TaskSortDirection = 'asc' | 'desc';

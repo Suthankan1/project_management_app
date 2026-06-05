@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { AlertCircle, Plus, RefreshCw, Search } from 'lucide-react';
+import { AlertCircle, Archive, Plus, RefreshCw, Search } from 'lucide-react';
 import TaskCardModal from '@/app/taskcard/TaskCardModal';
 import CreateTaskModal from '@/components/shared/CreateTaskModal';
 import EmptyState from '@/components/shared/EmptyState';
@@ -43,6 +43,9 @@ export default function ListPage() {
     handleDelete,
     handleAddTask,
     loadTasks,
+    showArchived,
+    setShowArchived,
+    canModifyTasks,
     handleBulkStatusChange,
     handleBulkDelete,
     members,
@@ -52,6 +55,8 @@ export default function ListPage() {
     handleAssigneesChange,
     handleToggleTaskLabel,
     handleMilestoneChange,
+    handleArchive,
+    handleRestore,
   } = useListTasks();
   const { statuses: projectStatuses } = useProjectStatuses(projectId ? Number(projectId) : undefined);
 
@@ -130,7 +135,7 @@ export default function ListPage() {
 
   useEffect(() => {
     setCurrentPage(1); // eslint-disable-line react-hooks/set-state-in-effect
-  }, [filters, groupBy, projectId]);
+  }, [filters, groupBy, projectId, showArchived]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -184,10 +189,33 @@ export default function ListPage() {
           <div>
             <h1 className="text-[20px] sm:text-2xl font-bold text-cu-text-primary">Task List</h1>
             <p className="text-[12px] sm:text-[13px] text-cu-text-secondary mt-0.5">
-              {filteredTasks.length} visible of {sortedTasks.length} task{sortedTasks.length !== 1 ? 's' : ''}
+              {filteredTasks.length} visible of {sortedTasks.length} {showArchived ? 'archived ' : ''}task{sortedTasks.length !== 1 ? 's' : ''}
             </p>
           </div>
           <div className="flex items-center gap-2 ml-auto">
+            <div className="inline-flex rounded-lg border border-cu-border bg-cu-bg p-1 shadow-cu-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowArchived(false);
+                  setSelectedIds(new Set());
+                }}
+                className={`px-3 py-1.5 text-[12px] font-semibold rounded-md transition-colors ${!showArchived ? 'bg-cu-primary text-white' : 'text-cu-text-secondary hover:bg-cu-hover'}`}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowArchived(true);
+                  setSelectedIds(new Set());
+                }}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-md transition-colors ${showArchived ? 'bg-cu-primary text-white' : 'text-cu-text-secondary hover:bg-cu-hover'}`}
+              >
+                <Archive size={13} />
+                Archived
+              </button>
+            </div>
             <div className="flex items-center gap-2 bg-cu-bg border border-cu-border rounded-lg px-3 py-2 shadow-cu-sm">
               <Search size={14} className="text-cu-text-tertiary shrink-0" />
               <input
@@ -200,7 +228,9 @@ export default function ListPage() {
             </div>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-cu-primary text-white text-[13px] font-medium rounded-lg hover:bg-cu-primary-hover transition-colors shrink-0"
+              disabled={showArchived || !canModifyTasks}
+              title={showArchived ? 'Switch to Active to create tasks' : !canModifyTasks ? 'Viewers cannot create tasks' : 'Create task'}
+              className="flex items-center gap-1.5 px-3 py-2 bg-cu-primary text-white text-[13px] font-medium rounded-lg hover:bg-cu-primary-hover transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-cu-primary"
             >
               <Plus size={15} />
               <span className="hidden sm:inline">Create Task</span>
@@ -261,10 +291,10 @@ export default function ListPage() {
             {flatGroupedTasks.length === 0 ? (
               <EmptyState
                 icon={<Search size={24} />}
-                title={filters.search ? 'No tasks match your search' : 'No tasks yet'}
-                subtitle={filters.search ? 'Try a different search term or clear the filters.' : 'Create a task to get started.'}
+                title={showArchived ? 'No archived tasks' : (filters.search ? 'No tasks match your search' : 'No tasks yet')}
+                subtitle={showArchived ? 'Archived tasks will appear here so they can be restored later.' : (filters.search ? 'Try a different search term or clear the filters.' : 'Create a task to get started.')}
                 action={
-                  !filters.search ? (
+                  !showArchived && !filters.search ? (
                     <button
                       type="button"
                       onClick={() => setShowCreateModal(true)}
@@ -293,6 +323,10 @@ export default function ListPage() {
                   onOpenModal={setSelectedTaskId}
                   onStatusChange={handleStatusChange}
                   onDelete={handleDelete}
+                  onArchive={handleArchive}
+                  onRestore={handleRestore}
+                  canModifyTasks={canModifyTasks}
+                  showArchived={showArchived}
                   projectStatuses={projectStatuses}
                 />
               ))
@@ -372,5 +406,3 @@ export default function ListPage() {
     </div>
   );
 }
-
-

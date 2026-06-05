@@ -317,6 +317,7 @@ public class TaskController {
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false, defaultValue = "false") Boolean archived,
             HttpServletRequest servletRequest,
             @AuthenticationPrincipal UserPrincipal currentUser) {
         if (!TaskService.isAllowedTaskSortField(sortBy)) {
@@ -331,7 +332,7 @@ public class TaskController {
                 sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() :
                         Sort.by(sortBy).descending());
         return ResponseEntity.ok(service.getTasksByProject(projectId,
-                currentUser.getUserId(), pageable));
+                currentUser.getUserId(), pageable, archived));
     }
 
     private ResponseEntity<ApiErrorResponse> badTaskSortRequest(String message, HttpServletRequest request) {

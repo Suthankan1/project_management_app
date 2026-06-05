@@ -17,7 +17,7 @@ import com.planora.backend.model.Task;
 
 @Repository
 public interface TaskRepository extends JpaRepository<Task, Long> {
-    Page<Task> findByProjectIdAndArchivedFalse(Long projectId, Pageable pageable);
+    Page<Task> findByProjectIdAndArchived(Long projectId, boolean archived, Pageable pageable);
 
     boolean existsByProjectIdAndGithubIssueNumberAndGithubRepoFullNameIgnoreCase(
             Long projectId, Long githubIssueNumber, String githubRepoFullName);

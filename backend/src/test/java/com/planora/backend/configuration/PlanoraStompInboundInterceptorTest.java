@@ -66,7 +66,7 @@ class PlanoraStompInboundInterceptorTest {
         user.setUserId(10L);
         user.setUsername("Alice");
 
-        when(jwtService.extractUserName("valid-token")).thenReturn("alice@example.com");
+        when(jwtService.validateAccessTokenAndGetSubject("valid-token")).thenReturn("alice@example.com");
         when(userCacheService.resolveUserByEmailOrUsername("alice@example.com")).thenReturn(user);
 
         Message<byte[]> message = buildMutableMessage(accessor);

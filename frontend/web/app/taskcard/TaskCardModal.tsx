@@ -11,6 +11,7 @@ import { getProjectGitHubRepo } from '@/services/githubService';
 import CreateIssueFromTaskModal from '@/components/github/CreateIssueFromTaskModal';
 import { authApi } from '@/services/auth-contract';
 import api from '@/lib/axios';
+import { getApiErrorStatus, normalizeApiError } from '@/lib/api-error';
 import { labelsApi, projectsApi, sprintsApi, tasksApi } from '@/services/api-contract';
 import type { Task } from '@/types';
 
@@ -157,13 +158,12 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
         void loadTaskMeta(response.projectId);
       }
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };
-      if (axiosErr?.response?.status === 404) {
+      if (getApiErrorStatus(err) === 404) {
         localStorage.removeItem(`planora:task:${taskId}`);
         toast('This task no longer exists.', 'error');
         onClose(false);
       } else {
-        setError(axiosErr?.response?.data?.message || 'Failed to fetch task data');
+        setError(normalizeApiError(err, 'Failed to fetch task data'));
         setTaskData(null);
       }
     } finally {
@@ -306,8 +306,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
     } catch (err: unknown) {
       // Revert the optimistic update by re-fetching the server's authoritative state
       await fetchTaskData();
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('Failed to update task: ' + (axiosErr?.response?.data?.message || 'Unknown error'), 'error');
+      toast(`Failed to update task: ${normalizeApiError(err, 'Unknown error')}`, 'error');
     } finally {
       setIsSyncing(false);
     }

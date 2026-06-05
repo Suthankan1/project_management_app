@@ -138,21 +138,43 @@ cp .env.example .env
 
 | Variable | Description | Example |
 |---|---|---|
-| `SPRING_DATASOURCE_URL` | PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/planora_db` |
-| `SPRING_DATASOURCE_USERNAME` | Database username | `titan` |
-| `SPRING_DATASOURCE_PASSWORD` | Database password | `secret` |
+| `SPRING_DATASOURCE_URL` | PostgreSQL JDBC URL. Use `db:5432` only inside Docker Compose. | `jdbc:postgresql://db:5432/planora_db` |
+| `SPRING_DATASOURCE_USERNAME` | Database username | `planora` |
+| `SPRING_DATASOURCE_PASSWORD` | Database password | `change_me_local_db_password` |
+| `POSTGRES_DB` | Local Docker Postgres database name | `planora_db` |
+| `POSTGRES_USER` | Local Docker Postgres user | `planora` |
+| `POSTGRES_PASSWORD` | Local Docker Postgres password | `change_me_local_db_password` |
 | `JWT_SECRET` | HS256 secret key (min 32 chars) | `change-me-in-production` |
 | `MAIL_HOST` | SMTP host | `smtp.gmail.com` |
 | `MAIL_PORT` | SMTP port | `587` |
 | `MAIL_USERNAME` | Sender email address | `you@example.com` |
 | `MAIL_PASSWORD` | SMTP app password | `your-app-password` |
-| `AWS_ACCESS_KEY` | AWS IAM access key | `AKIA...` |
-| `AWS_SECRET_KEY` | AWS IAM secret key | `...` |
+| `AWS_ACCESS_KEY` | AWS IAM access key | `your_aws_access_key` |
+| `AWS_SECRET_KEY` | AWS IAM secret key | `your_aws_secret_key` |
 | `AWS_REGION` | S3 bucket region | `eu-north-1` |
-| `S3_BUCKET_NAME` | DMS bucket name | `planora-dms-storage` |
+| `AWS_PROFILE_PHOTOS_BUCKET` | Profile photo bucket name | `your-profile-photos-bucket` |
+| `AWS_DMS_BUCKET` | Document management bucket name | `your-document-storage-bucket` |
+| `AWS_CHAT_BUCKET` | Chat attachment bucket name | `your-chat-attachments-bucket` |
+| `AWS_TASK_STORAGE_BUCKET` | Task attachment bucket name | `your-task-attachments-bucket` |
 | `CORS_ALLOWED_ORIGINS` | Frontend origin(s) | `http://localhost:3000` |
 
 Additional optional variables are listed in `.env.example`.
+
+For local Docker development, the values in `.env.example` are safe placeholders for configuration shape only. Replace the AWS credentials and bucket names if you need real file upload flows.
+
+For manual local backend runs outside Docker, use your host Postgres address instead of `db`, for example `SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/planora_db`.
+
+For AWS S3 storage, create separate private buckets for profile photos, DMS documents, chat attachments, and task attachments. Set the four bucket environment variables differently in staging and production; the backend reads the bucket names at startup, so no code changes are needed between environments.
+
+Local MinIO is not currently wired into the backend because `S3Config` does not expose an S3 endpoint override or path-style access setting. Use AWS S3 for upload-flow testing until those options are added.
+
+For staging and production, set all required variables in the hosting platform:
+
+| Environment | Required values |
+|---|---|
+| Local Docker | `SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/planora_db`, matching `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `JWT_SECRET`, mail settings, AWS credentials, and the four storage bucket names if uploads are used. |
+| Staging | External PostgreSQL JDBC URL with SSL if required by the provider, staging database credentials, staging JWT secret, staging SMTP credentials, staging AWS credentials, staging-only S3 buckets, and staging `CORS_ALLOWED_ORIGINS`. Do not use `db:5432` outside Docker Compose. |
+| Production | Managed PostgreSQL JDBC URL with SSL, production database credentials, strong production JWT secret, production SMTP credentials, production AWS credentials, production-only S3 buckets, production `CORS_ALLOWED_ORIGINS`, and any provider-specific Flyway settings. Missing production bucket variables fail startup. Do not reuse local or staging bucket names. |
 
 ### 3. Run with Docker Compose
 

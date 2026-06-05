@@ -4,6 +4,8 @@ import { usePageContent } from './hooks/usePageContent';
 import React from 'react';
 import { pagesApi } from '@/services/api-contract';
 
+const mockWebsocketProvider = jest.fn();
+
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(() => ({
     push: jest.fn(),
@@ -17,6 +19,18 @@ jest.mock('next/navigation', () => ({
 
 jest.mock('./hooks/usePageContent', () => ({
   usePageContent: jest.fn(),
+}));
+
+jest.mock('y-websocket', () => ({
+  WebsocketProvider: function (...args: unknown[]) {
+    return mockWebsocketProvider(...args);
+  },
+}));
+
+jest.mock('yjs', () => ({
+  Doc: jest.fn().mockImplementation(() => ({
+    destroy: jest.fn(),
+  })),
 }));
 
 jest.mock('@/lib/auth', () => ({
@@ -60,6 +74,10 @@ describe('usePageEditor Hook', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockWebsocketProvider.mockImplementation(() => ({
+      disconnect: jest.fn(),
+      destroy: jest.fn(),
+    }));
     mockSetSelectedPage = jest.fn();
     mockUpdatePage = jest.fn();
     mockUsePageContent.mockReturnValue({
@@ -80,6 +98,19 @@ describe('usePageEditor Hook', () => {
       deletePage: jest.fn(),
       refetch: jest.fn(),
     });
+  });
+
+  it('connects Yjs without putting access tokens in URL params', async () => {
+    renderHook(() => usePageEditor());
+
+    await waitFor(() => {
+      expect(mockWebsocketProvider).toHaveBeenCalled();
+    });
+
+    const [, roomName, , options] = mockWebsocketProvider.mock.calls[0];
+    expect(roomName).toBe('page-1');
+    expect(options.params).toBeUndefined();
+    expect(options.protocols).toEqual(['planora-yjs', 'planora.jwt.mock-token']);
   });
 
   it('rejects files larger than 1MB', async () => {

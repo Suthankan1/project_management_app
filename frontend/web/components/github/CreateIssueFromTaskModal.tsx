@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, X } from 'lucide-react';
 import api from '@/lib/axios';
+import { normalizeApiError } from '@/lib/api-error';
 import { toast } from '@/components/ui';
 import GitHubMark from '@/components/github/GitHubMark';
 import type { GitHubIssue } from '@/services/githubService';
@@ -97,8 +98,7 @@ export default function CreateIssueFromTaskModal({
       toast(`GitHub issue #${data.number} created`, 'success');
       onClose();
     } catch (requestError) {
-      const response = (requestError as { response?: { data?: { message?: string; error?: string } } }).response;
-      setError(response?.data?.message || response?.data?.error || 'Failed to create GitHub issue');
+      setError(normalizeApiError(requestError, 'Failed to create GitHub issue'));
     } finally {
       setLoading(false);
     }

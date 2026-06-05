@@ -5,6 +5,7 @@ import TaskHeader from './TaskHeader';
 import TaskMainContent from './TaskMainContent';
 import TaskSidebar from './TaskSidebar';
 import api from '@/lib/axios';
+import { normalizeApiError } from '@/lib/api-error';
 import { toast } from '@/components/ui';
 import { getProjectGitHubRepo } from '@/services/githubService';
 import CreateIssueFromTaskModal from '@/components/github/CreateIssueFromTaskModal';
@@ -86,10 +87,9 @@ function TaskPageContent() {
       setTaskData(response.data);
       localStorage.setItem(cacheKey, JSON.stringify({ data: response.data, timestamp: Date.now() }));
       setError(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (!cachedLoaded) {
-        setError(err.response?.data?.message || 'Failed to fetch task data');
+        setError(normalizeApiError(err, 'Failed to fetch task data'));
         setTaskData(null);
       }
     } finally {
@@ -159,10 +159,9 @@ function TaskPageContent() {
       // Invalidate after update so the next page visit fetches fresh data instead of the old snapshot
       localStorage.removeItem(`planora:task:${taskId}`);
       await fetchTaskData();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update task:', err);
-      toast('Failed to update task: ' + (err.response?.data?.message || err.message), 'error');
+      toast(`Failed to update task: ${normalizeApiError(err, 'Unknown error')}`, 'error');
     }
   };
 
