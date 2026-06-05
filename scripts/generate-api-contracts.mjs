@@ -75,6 +75,18 @@ function buildBackendEnv() {
   env.SPRING_DATASOURCE_URL = 'jdbc:h2:mem:openapi;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;NON_KEYWORDS=VALUE';
   env.SPRING_DATASOURCE_USERNAME = 'sa';
   env.SPRING_DATASOURCE_PASSWORD = '';
+  env.JWT_SECRET = 'dGhpcy1pcy1hLXN1cGVyLXNlY3JldC1rZXktMzJieXQ=';
+  env.MAIL_HOST = 'localhost';
+  env.MAIL_PORT = '25';
+  env.MAIL_USERNAME = 'openapi@example.com';
+  env.MAIL_PASSWORD = 'openapi';
+  env.AWS_ACCESS_KEY = 'openapi-access-key';
+  env.AWS_SECRET_KEY = 'openapi-secret-key';
+  env.AWS_REGION = 'eu-north-1';
+  env.AWS_PROFILE_PHOTOS_BUCKET = 'openapi-profile-bucket';
+  env.AWS_DMS_BUCKET = 'openapi-dms-bucket';
+  env.AWS_CHAT_BUCKET = 'openapi-chat-bucket';
+  env.AWS_TASK_STORAGE_BUCKET = 'openapi-task-bucket';
   return env;
 }
 
