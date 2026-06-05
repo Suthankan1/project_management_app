@@ -1,9 +1,12 @@
 import {
+  archiveTask,
   createTask,
   deleteTask,
   fetchTasksByProject,
   fetchAllTasksByProject,
+  getArchivedTasks,
   fetchTeamMembers,
+  unarchiveTask,
   updateTask,
   updateTaskStatus,
 } from './api';
@@ -34,6 +37,33 @@ describe('kanban api', () => {
 
     expect(mockedAxios.get).toHaveBeenCalledWith('/api/tasks/project/12', { params: { page: 0, size: 500 } });
     expect(result).toEqual([{ id: 1, title: 'Task 1' }]);
+  });
+
+  it('fetchTasksByProject requests active tasks by default when asked', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: { content: [{ id: 1, title: 'Active task', archived: false }] } });
+
+    const result = await fetchTasksByProject(12, { archived: false });
+
+    expect(mockedAxios.get).toHaveBeenCalledWith('/api/tasks/project/12', { params: { page: 0, size: 500, archived: false } });
+    expect(result).toEqual([{ id: 1, title: 'Active task', archived: false }]);
+  });
+
+  it('fetches archived tasks and restores them through archive helpers', async () => {
+    mockedAxios.patch
+      .mockResolvedValueOnce({ data: { id: 2, title: 'Archived task', archived: true } })
+      .mockResolvedValueOnce({ data: { id: 2, title: 'Archived task', archived: false } });
+    mockedAxios.get.mockResolvedValueOnce({ data: [{ id: 2, title: 'Archived task', archived: true }] });
+
+    const archived = await archiveTask(2);
+    const list = await getArchivedTasks(12);
+    const restored = await unarchiveTask(2);
+
+    expect(mockedAxios.patch).toHaveBeenNthCalledWith(1, '/api/tasks/2/archive');
+    expect(mockedAxios.get).toHaveBeenCalledWith('/api/tasks/project/12/archived');
+    expect(mockedAxios.patch).toHaveBeenNthCalledWith(2, '/api/tasks/2/unarchive');
+    expect(archived.archived).toBe(true);
+    expect(list).toEqual([{ id: 2, title: 'Archived task', archived: true }]);
+    expect(restored.archived).toBe(false);
   });
 
   it('fetchAllTasksByProject returns task list', async () => {

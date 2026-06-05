@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { fetchTasksByProject } from '@/app/(project)/kanban/api';
+import { archiveTask, fetchTasksByProject, getArchivedTasks, unarchiveTask } from '@/app/(project)/kanban/api';
 import { getMilestones, assignTaskToMilestone } from '@/services/milestone-service';
 import { useTaskWebSocket } from '@/hooks/useTaskWebSocket';
 import type { CreateTaskData } from '@/components/shared/CreateTaskModal';
 import type { Label, MilestoneResponse, Task } from '@/types';
-import { labelsApi, projectsApi, tasksApi } from '@/services/api-contract';
+import { authApi, labelsApi, projectsApi, tasksApi } from '@/services/api-contract';
 import { normalizeTaskPriority } from '@/services/tasks-contract';
 
 const MEMBERS_CACHE_TTL_MS = 1000 * 60 * 30;
@@ -94,8 +94,10 @@ export function useListTasks() {
   const [milestones, setMilestones] = useState<MilestoneResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
-  const cacheKey = projectId ? `planora:tasks:${projectId}` : null;
+  const cacheKey = projectId ? `planora:tasks:${projectId}:${showArchived ? 'archived' : 'active'}` : null;
   const membersCacheKey = projectId ? `planora:membersMap:${projectId}` : null;
 
   // Fetch project members to get profile photo URLs (keyed by userId)
@@ -138,6 +140,7 @@ export function useListTasks() {
 
   const loadTasks = useCallback(async () => {
     if (!projectId || !cacheKey) return;
+    setError(null);
     // Serve stale data instantly
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
@@ -145,11 +148,14 @@ export function useListTasks() {
         setTasks((JSON.parse(cached) as Task[]).map(sanitizeTaskPhoto).map(normalizeAssignees));
         setLoading(false);
       } catch { /* ignore corrupt cache */ }
+    } else {
+      setTasks([]);
+      setLoading(true);
     }
     // Always revalidate in background; load tasks + member photos in parallel
     try {
       const [data, membersMap] = await Promise.all([
-        fetchTasksByProject(projectId),
+        showArchived ? getArchivedTasks(projectId) : fetchTasksByProject(projectId, { archived: false }),
         loadMembersMap(),
       ]);
       const enriched = (data as Task[]).map((t) =>
@@ -164,16 +170,20 @@ export function useListTasks() {
     } finally {
       setLoading(false);
     }
-  }, [projectId, cacheKey, loadMembersMap]);
+  }, [projectId, cacheKey, loadMembersMap, showArchived]);
 
   const loadRowEditDependencies = useCallback(async () => {
     if (!projectId) return;
     try {
-      const [membersRes, labelsRes, milestonesRes] = await Promise.all([
+      const [currentUserRes, membersRes, labelsRes, milestonesRes] = await Promise.all([
+        authApi.getCurrentUser().catch(() => null),
         projectsApi.getMembers(projectId),
         labelsApi.listByProject(projectId),
         getMilestones(projectId),
       ]);
+      const currentUserId = currentUserRes?.userId;
+      const currentMember = (membersRes as Array<{ role?: string; user?: { userId?: number } }>).find((item) => item.user?.userId === currentUserId);
+      setCurrentUserRole(currentMember?.role ?? 'MEMBER');
       const normalizedMembers = (membersRes as Array<{
         id?: number;
         user?: { userId?: number; fullName?: string; username?: string; profilePicUrl?: string | null };
@@ -194,6 +204,7 @@ export function useListTasks() {
       setMembers([]);
       setLabels([]);
       setMilestones([]);
+      setCurrentUserRole(null);
     }
   }, [projectId]);
 
@@ -214,6 +225,15 @@ export function useListTasks() {
         return next;
       });
     } else if (event.type === 'TASK_UPDATED' && event.task) {
+      const incomingArchived = Boolean((event.task as { archived?: boolean }).archived);
+      if (incomingArchived !== showArchived) {
+        setTasks((prev) => {
+          const next = prev.filter((t) => t.id !== event.task!.id);
+          if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
+          return next;
+        });
+        return;
+      }
       // Merge partial fields — no API call needed
       setTasks((prev) => {
         const taskPatch = normalizeTaskPatch(event.task as TaskEventPatch);
@@ -240,7 +260,7 @@ export function useListTasks() {
         });
       }).catch(() => void loadTasks());
     }
-  }, [loadTasks, cacheKey]));
+  }, [loadTasks, cacheKey, showArchived]));
 
   const handleStatusChange = useCallback(async (taskId: number, newStatus: string) => {
     setTasks((prev) => {
@@ -269,6 +289,34 @@ export function useListTasks() {
       void loadTasks();
     }
   }, [loadTasks, cacheKey]);
+
+  const handleArchive = useCallback(async (taskId: number) => {
+    setTasks((prev) => {
+      const next = prev.filter((t) => t.id !== taskId);
+      if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
+      return next;
+    });
+    try {
+      await archiveTask(taskId);
+    } catch {
+      if (cacheKey) localStorage.removeItem(cacheKey);
+      void loadTasks();
+    }
+  }, [cacheKey, loadTasks]);
+
+  const handleRestore = useCallback(async (taskId: number) => {
+    setTasks((prev) => {
+      const next = prev.filter((t) => t.id !== taskId);
+      if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
+      return next;
+    });
+    try {
+      await unarchiveTask(taskId);
+    } catch {
+      if (cacheKey) localStorage.removeItem(cacheKey);
+      void loadTasks();
+    }
+  }, [cacheKey, loadTasks]);
 
   const handleBulkStatusChange = useCallback(async (taskIds: number[], newStatus: string) => {
     if (taskIds.length === 0) return;
@@ -446,8 +494,13 @@ export function useListTasks() {
     labels,
     milestones,
     loadTasks,
+    showArchived,
+    setShowArchived,
+    canModifyTasks: currentUserRole !== 'VIEWER',
     handleStatusChange,
     handleDelete,
+    handleArchive,
+    handleRestore,
     handleAddTask,
     handleBulkStatusChange,
     handleBulkDelete,

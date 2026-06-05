@@ -541,13 +541,19 @@ public class TaskService {
     // ── 5. GET TASKS BY PROJECT (Highly Optimized Fetch) ────────────────────────
     @Transactional(readOnly = true)
     public Page<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId, Pageable pageable) {
+        return getTasksByProject(projectId, currentUserId, pageable, false);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId, Pageable pageable, Boolean archived) {
         validateTaskSort(pageable.getSort());
 
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
         requireMinimumRole(project.getTeam().getId(), currentUserId, null);
 
-        Page<Task> taskPage = taskRepository.findByProjectIdAndArchivedFalse(projectId, pageable);
+        boolean isArchived = archived != null && archived;
+        Page<Task> taskPage = taskRepository.findByProjectIdAndArchived(projectId, isArchived, pageable);
         if (taskPage.isEmpty()) {
             return taskPage.map(t -> mapToDTO(t, java.util.Map.of()));
         }

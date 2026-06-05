@@ -49,6 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.contains;
@@ -266,7 +267,7 @@ class TaskServiceTest {
 
         PageRequest pageable = PageRequest.of(0, 10);
         when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
-        when(taskRepository.findByProjectIdAndArchivedFalse(10L, pageable))
+        when(taskRepository.findByProjectIdAndArchived(10L, false, pageable))
                 .thenReturn(new PageImpl<>(List.of(taskOne, taskTwo), pageable, 2));
         when(taskRepository.findByIdInWithCollections(List.of(71L, 72L))).thenReturn(List.of(taskOne, taskTwo));
         when(taskRepository.findDependencyRowsByTaskIds(List.of(71L, 72L)))
@@ -284,6 +285,26 @@ class TaskServiceTest {
     }
 
     @Test
+    void getTasksByProject_paginated_canLoadArchivedTasks() {
+        Task task = buildTask(71L);
+        task.setArchived(true);
+
+        PageRequest pageable = PageRequest.of(0, 10);
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(taskRepository.findByProjectIdAndArchived(10L, true, pageable))
+                .thenReturn(new PageImpl<>(List.of(task), pageable, 1));
+        when(taskRepository.findByIdInWithCollections(List.of(71L))).thenReturn(List.of(task));
+        when(taskRepository.findDependencyRowsByTaskIds(List.of(71L))).thenReturn(java.util.Collections.emptyList());
+        when(taskRepository.findDependentRowsByTaskIds(List.of(71L))).thenReturn(java.util.Collections.emptyList());
+
+        Page<TaskResponseDTO> result = taskService.getTasksByProject(10L, 500L, pageable, true);
+
+        assertEquals(1, result.getContent().size());
+        assertTrue(result.getContent().getFirst().isArchived());
+        verify(taskRepository).findByProjectIdAndArchived(10L, true, pageable);
+    }
+
+    @Test
     void getTasksByProject_paginated_invalidSortByThrowsBeforeRepositoryLookup() {
         PageRequest pageable = PageRequest.of(0, 10, Sort.by("project.team.owner.passwordHash").ascending());
 
@@ -295,7 +316,7 @@ class TaskServiceTest {
                 "Invalid task sort field 'project.team.owner.passwordHash'. Allowed values: createdAt, updatedAt, dueDate, priority, status, title, projectTaskNumber",
                 exception.getMessage());
         verify(projectRepository, never()).findById(anyLong());
-        verify(taskRepository, never()).findByProjectIdAndArchivedFalse(anyLong(), any(Pageable.class));
+        verify(taskRepository, never()).findByProjectIdAndArchived(anyLong(), any(Boolean.class), any(Pageable.class));
     }
 
     @Test

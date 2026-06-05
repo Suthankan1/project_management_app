@@ -30,6 +30,7 @@ export interface TaskListQueryParams {
   size?: number;
   sortBy?: TaskSortField;
   sortDir?: TaskSortDirection;
+  archived?: boolean;
 }
 
 export interface TaskListAllQueryParams {
