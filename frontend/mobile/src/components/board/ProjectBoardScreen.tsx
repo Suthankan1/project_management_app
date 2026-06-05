@@ -621,13 +621,19 @@ function AssigneePickerModal({
   visible,
   members,
   selectedId,
+  loading,
+  error,
   onClose,
+  onRetry,
   onSelect,
 }: {
   visible: boolean;
   members: BoardMember[];
   selectedId: number | null;
+  loading?: boolean;
+  error?: string | null;
   onClose: () => void;
+  onRetry?: () => void;
   onSelect: (id: number | null) => void;
 }) {
   return (
@@ -651,7 +657,14 @@ function AssigneePickerModal({
             {selectedId === null && <Text style={modal.currentText}>Selected</Text>}
           </TouchableOpacity>
 
-          {members.map((member) => {
+          {loading && (
+            <View style={modal.emptyOption}>
+              <ActivityIndicator color={T.primary} />
+              <Text style={modal.emptyOptionText}>Loading assignees...</Text>
+            </View>
+          )}
+
+          {!loading && members.map((member) => {
             const active = selectedId === member.userId;
             return (
               <TouchableOpacity
@@ -672,7 +685,18 @@ function AssigneePickerModal({
             );
           })}
 
-          {members.length === 0 && (
+          {!loading && !!error && (
+            <View style={modal.errorOption}>
+              <Text style={modal.errorOptionText}>{error}</Text>
+              {!!onRetry && (
+                <TouchableOpacity activeOpacity={0.8} onPress={onRetry} style={modal.retryBtn}>
+                  <Text style={modal.retryText}>Retry</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {!loading && !error && members.length === 0 && (
             <View style={modal.emptyOption}>
               <Text style={modal.emptyOptionText}>No members found</Text>
             </View>
@@ -702,10 +726,13 @@ export default function ProjectBoardScreen({
     columns,
     tasks,
     members,
+    membersLoading,
+    membersError,
     loading,
     refreshing,
     error,
     refresh,
+    retryMembers,
     moveTask,
     createTask,
     deleteTask,
@@ -1272,10 +1299,13 @@ export default function ProjectBoardScreen({
         visible={showAssigneePicker || !!assigneePickerTask}
         members={members}
         selectedId={assigneePickerTask ? (members.find(m => m.name === assigneePickerTask.assigneeName)?.userId ?? null) : newTaskAssigneeId}
+        loading={membersLoading}
+        error={membersError}
         onClose={() => {
           setShowAssigneePicker(false);
           setAssigneePickerTask(null);
         }}
+        onRetry={retryMembers}
         onSelect={async (id) => {
           if (assigneePickerTask) {
             try {
@@ -1324,18 +1354,27 @@ export default function ProjectBoardScreen({
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={0.78}
+                disabled={membersLoading}
                 onPress={() => setShowAssigneePicker(true)}
-                style={modal.formPicker}
+                style={[modal.formPicker, membersLoading && modal.disabled]}
               >
                 <UserIcon active={!!newTaskAssigneeId} />
                 <View style={modal.formPickerTextWrap}>
                   <Text style={modal.formPickerLabel}>Assignee</Text>
                   <Text style={[modal.formPickerValue, selectedNewTaskAssignee && modal.formPickerValueActive]} numberOfLines={1}>
-                    {selectedNewTaskAssignee?.name || 'Unassigned'}
+                    {membersLoading ? 'Loading assignees...' : selectedNewTaskAssignee?.name || 'Unassigned'}
                   </Text>
                 </View>
               </TouchableOpacity>
             </View>
+            {!!membersError && (
+              <View style={modal.inlineError}>
+                <Text style={modal.errorOptionText}>{membersError}</Text>
+                <TouchableOpacity activeOpacity={0.8} onPress={retryMembers} style={modal.retryBtn}>
+                  <Text style={modal.retryText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             <TouchableOpacity activeOpacity={0.85} disabled={submitting || !newTaskTitle.trim()} onPress={submitCreateTask} style={[modal.primaryBtn, (!newTaskTitle.trim() || submitting) && modal.disabled]}>
               {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={modal.primaryText}>Create task</Text>}
             </TouchableOpacity>
@@ -1831,6 +1870,32 @@ const modal = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyOptionText: { fontSize: 13, fontWeight: '800', color: '#94A3B8' },
+  errorOption: {
+    minHeight: 58,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FEF2F2',
+    padding: 12,
+    gap: 8,
+  },
+  inlineError: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FEF2F2',
+    padding: 12,
+    gap: 8,
+  },
+  errorOptionText: { fontSize: 12, fontWeight: '800', color: '#B91C1C' },
+  retryBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  retryText: { fontSize: 12, fontWeight: '900', color: '#FFFFFF' },
   input: {
     minHeight: 48,
     borderRadius: 12,

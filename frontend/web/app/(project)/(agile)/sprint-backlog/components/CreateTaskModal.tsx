@@ -1,18 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, Plus, User, Hash } from 'lucide-react';
-import { projectsApi } from '@/services/api-contract';
-
-interface TeamMember {
-  id: number;
-  name: string;
-}
-
-interface TeamMemberPayload {
-  id: number;
-  user?: { fullName?: string; username?: string };
-}
+import { useProjectAssigneeOptions } from '@/hooks/projects/useProjectAssigneeOptions';
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -46,39 +36,14 @@ export default function CreateTaskModal({
   const [priority, setPriority] = useState('MEDIUM');
   const [assignee, setAssignee] = useState<number | ''>('');
   const [storyPoint, setStoryPoint] = useState(0);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen || !projectId) return;
-
-    const loadMembers = async () => {
-      setLoadingMembers(true);
-      try {
-        const project = await projectsApi.get(projectId);
-        const team = project.team as { id?: number } | undefined;
-        const teamId = project.teamId ?? team?.id;
-        if (teamId) {
-          const payload = await projectsApi.getTeamMembers(teamId);
-          const rawMembers = Array.isArray(payload) ? payload : [];
-          setTeamMembers(
-            rawMembers.map((m: TeamMemberPayload) => ({
-              id: m.id,
-              name: m.user?.fullName ?? m.user?.username ?? 'Unknown',
-            }))
-          );
-        }
-      } catch {
-        // non-critical — assignee dropdown will be empty
-      } finally {
-        setLoadingMembers(false);
-      }
-    };
-
-    loadMembers();
-  }, [isOpen, projectId]);
+  const {
+    members: teamMembers,
+    loadingMembers,
+    membersError,
+    retryMembers,
+  } = useProjectAssigneeOptions(isOpen ? projectId : null);
 
   const resetForm = () => {
     setTitle('');
@@ -200,11 +165,26 @@ export default function CreateTaskModal({
               className="w-full px-4 py-3 bg-cu-bg-secondary border border-cu-border rounded-xl text-sm text-cu-text-primary focus:ring-2 focus:ring-cu-primary/20 focus:border-cu-primary focus:outline-none transition-all appearance-none"
               disabled={loadingMembers}
             >
-              <option value="">Select Assignee (optional)</option>
+              <option value="">{loadingMembers ? 'Loading assignees...' : 'Select Assignee (optional)'}</option>
               {teamMembers.map((m) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
             </select>
+            {loadingMembers && (
+              <div className="h-2 w-32 animate-pulse rounded-full bg-cu-border" aria-label="Loading assignees" />
+            )}
+            {membersError && (
+              <div className="rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-500">
+                <p className="font-semibold">{membersError}</p>
+                <button
+                  type="button"
+                  onClick={() => void retryMembers()}
+                  className="mt-2 font-bold text-red-600 underline underline-offset-2"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Actions */}
