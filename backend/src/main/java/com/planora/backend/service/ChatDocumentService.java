@@ -24,7 +24,7 @@ public class ChatDocumentService {
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
 
-    @Value("${aws.s3.chat-bucket:local-planora-chat-bucket}")
+    @Value("${aws.s3.chat-bucket}")
     private String chatBucket;
 
     // Short-lived URLs limit accidental long-term sharing while keeping UX smooth.
@@ -65,7 +65,7 @@ public class ChatDocumentService {
             }
             
             // Support both path-style and virtual-hosted style URLs from different environments.
-            // e.g. /local-planora-chat-bucket/19/... vs /19/...
+            // e.g. /configured-chat-bucket/19/... vs /19/...
             String key = URLDecoder.decode(path, StandardCharsets.UTF_8.name());
             if (key.startsWith(chatBucket + "/")) {
                 key = key.substring(chatBucket.length() + 1);
