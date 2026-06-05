@@ -121,13 +121,6 @@ function LinkEditModal({
   const [draftUrl, setDraftUrl] = useState(initialUrl);
   const [urlValidationError, setUrlValidationError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (open) {
-      setDraftUrl(initialUrl);
-      setUrlValidationError(null);
-    }
-  }, [initialUrl, open]);
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedUrl = draftUrl.trim();
@@ -528,14 +521,16 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
         </div>
       </div>
 
-      <LinkEditModal
-        open={isLinkModalOpen}
-        onOpenChange={setIsLinkModalOpen}
-        initialUrl={linkInitialUrl}
-        hasExistingLink={hasExistingLink}
-        onApply={applyLink}
-        onRemove={removeLink}
-      />
+      {isLinkModalOpen && (
+        <LinkEditModal
+          open={isLinkModalOpen}
+          onOpenChange={setIsLinkModalOpen}
+          initialUrl={linkInitialUrl}
+          hasExistingLink={hasExistingLink}
+          onApply={applyLink}
+          onRemove={removeLink}
+        />
+      )}
     </div>
   );
 }

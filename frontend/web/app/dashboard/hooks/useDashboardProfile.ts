@@ -8,11 +8,6 @@ import { getApiBaseUrl } from '@/lib/api-base-url';
 // Fail early if configuration is invalid (e.g. in production)
 getApiBaseUrl();
 
-interface UserSummary {
-  email: string;
-  profilePicUrl?: string;
-}
-
 interface UseDashboardProfileReturn {
   resolvedProfilePicUrl: string;
 }
