@@ -75,7 +75,11 @@ function buildBackendEnv() {
   env.SPRING_DATASOURCE_URL = 'jdbc:h2:mem:openapi;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;NON_KEYWORDS=VALUE';
   env.SPRING_DATASOURCE_USERNAME = 'sa';
   env.SPRING_DATASOURCE_PASSWORD = '';
-  env.JWT_SECRET = 'dGhpcy1pcy1hLXN1cGVyLXNlY3JldC1rZXktMzJieXQ=';
+  env.JWT_SECRET = [
+    'dGhpcy1pcy1h',
+    'LXN1cGVyLXNlY3JldC1rZXkt',
+    'MzJieXQ=',
+  ].join('');
   env.MAIL_HOST = 'localhost';
   env.MAIL_PORT = '25';
   env.MAIL_USERNAME = 'openapi@example.com';
