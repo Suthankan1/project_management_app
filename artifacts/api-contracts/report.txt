@@ -82,13 +82,13 @@ Backend endpoints with no frontend/mobile usage: 48
 - backend/src/main/java/com/planora/backend/controller/TeamMemberController.java:31 POST /api/teams/:teamId/members/:userId
 - backend/src/main/java/com/planora/backend/controller/TeamMemberController.java:94 PUT /api/teams/:teamId/members/:userId/role
 - backend/src/main/java/com/planora/backend/controller/TeamMemberController.java:108 DELETE /api/teams/:teamId/members/:userId
-- backend/src/main/java/com/planora/backend/controller/UserController.java:86 POST /api/auth/resend-otp
-- backend/src/main/java/com/planora/backend/controller/UserController.java:163 GET /api/auth/users/:userId/photo
-- backend/src/main/java/com/planora/backend/controller/UserController.java:178 GET /api/auth/try
-- backend/src/main/java/com/planora/backend/controller/UserController.java:183 GET /api/auth/me
+- backend/src/main/java/com/planora/backend/controller/UserController.java:88 POST /api/auth/resend-otp
+- backend/src/main/java/com/planora/backend/controller/UserController.java:173 GET /api/auth/users/:userId/photo
+- backend/src/main/java/com/planora/backend/controller/UserController.java:184 GET /api/auth/try
+- backend/src/main/java/com/planora/backend/controller/UserController.java:189 GET /api/auth/me
 
 Summary
 - Blocking critical issues: 11
-- Allowed blocking critical issues: 11
+- Allowed blocking critical issues: 0
 - Likely parser misses: 0
 - Informational backend-only routes: 48

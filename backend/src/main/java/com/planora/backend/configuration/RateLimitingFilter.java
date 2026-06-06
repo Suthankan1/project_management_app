@@ -25,6 +25,8 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.ByteArrayInputStream;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.web.util.matcher.IpAddressMatcher;
 
 /**
  * In-memory, per-IP rate limiter for sensitive auth endpoints.
@@ -54,8 +56,22 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             .recordStats()
             .build();
 
+    private final java.util.List<IpAddressMatcher> trustedProxyMatchers;
+
     public RateLimitingFilter() {
+        this("127.0.0.1,::1");
+    }
+
+    public RateLimitingFilter(@Value("${app.security.trusted-proxies:127.0.0.1,::1}") String trustedProxiesProperty) {
         log.warn("Eviction count at startup: {}", buckets.stats().evictionCount());
+        String properties = (trustedProxiesProperty == null || trustedProxiesProperty.isBlank())
+                ? "127.0.0.1,::1"
+                : trustedProxiesProperty;
+        this.trustedProxyMatchers = java.util.Arrays.stream(properties.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(IpAddressMatcher::new)
+                .toList();
     }
 
     @Override
@@ -161,12 +177,51 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         return "POST".equalsIgnoreCase(request.getMethod()) && "/api/auth/reset".equals(request.getServletPath());
     }
 
-    private String resolveClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            return xForwardedFor.split(",")[0].trim();
+    private HttpServletRequest unwrapRequest(HttpServletRequest request) {
+        jakarta.servlet.ServletRequest current = request;
+        while (current instanceof HttpServletRequestWrapper) {
+            current = ((HttpServletRequestWrapper) current).getRequest();
         }
-        return request.getRemoteAddr();
+        return (HttpServletRequest) current;
+    }
+
+    private boolean isTrustedProxy(String ip) {
+        if (ip == null || ip.isBlank()) {
+            return false;
+        }
+        for (IpAddressMatcher matcher : trustedProxyMatchers) {
+            if (matcher.matches(ip)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        HttpServletRequest rawRequest = unwrapRequest(request);
+        String immediatePeer = rawRequest.getRemoteAddr();
+
+        if (isTrustedProxy(immediatePeer)) {
+            String xForwardedFor = rawRequest.getHeader("X-Forwarded-For");
+            if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+                String[] parts = xForwardedFor.split(",");
+                for (int i = parts.length - 1; i >= 0; i--) {
+                    String ip = parts[i].trim();
+                    if (!ip.isEmpty() && !isTrustedProxy(ip)) {
+                        return ip;
+                    }
+                }
+                if (parts.length > 0) {
+                    String leftmost = parts[0].trim();
+                    if (!leftmost.isEmpty()) {
+                        return leftmost;
+                    }
+                }
+            }
+            return request.getRemoteAddr();
+        }
+
+        return immediatePeer;
     }
 
     private static class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
