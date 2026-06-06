@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   output: 'standalone',
   turbopack: {
-    root: path.resolve(__dirname),
+    root: path.resolve(__dirname, '../..'),
   },
   async rewrites() {
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:8080';
@@ -42,6 +42,33 @@ const nextConfig = {
       proxy('search'),
       proxy('github'),
       proxy('portfolios'),
+      proxy('dashboard'),
+    ];
+  },
+  async headers() {
+    const cspHeader = `
+      default-src 'self';
+      script-src 'self' 'unsafe-eval' 'unsafe-inline';
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: blob: http: https:;
+      connect-src 'self' ws: wss: http: https:;
+      font-src 'self' data:;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      frame-ancestors 'none';
+    `.replace(/\s{2,}/g, ' ').trim();
+
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: cspHeader,
+          },
+        ],
+      },
     ];
   },
   images: {

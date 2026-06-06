@@ -191,4 +191,17 @@ class GitHubControllerTest {
                 .andExpect(jsonPath("$[0].sha").value("abc123"))
                 .andExpect(jsonPath("$[0].github_access_token").doesNotExist());
     }
+
+    @Test
+    void getRepositories_returns503WhenIntegrationDisabled() throws Exception {
+        doThrow(new com.planora.backend.exception.GithubIntegrationDisabledException("GitHub integration is disabled"))
+                .when(githubTokenService).validateGithubIntegration();
+
+        mockMvc.perform(get("/api/github/repositories")
+                        .with(user(principal))
+                        .with(csrf()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.errorCode").value("INTEGRATION_DISABLED"))
+                .andExpect(jsonPath("$.message").value("GitHub integration is disabled"));
+    }
 }

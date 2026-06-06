@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
+import { buildCreateProjectRequest, createProject as createProjectBuilder, type CreateProjectRequest } from '@planora/contracts';
 
 export type ProjectType = 'AGILE' | 'KANBAN';
 export type TeamOption = 'NEW' | 'EXISTING';
@@ -127,7 +128,7 @@ export function useProjectSetup(projectType: ProjectType) {
 
     setLoading(true);
     try {
-      const res = await api.post('/api/projects', {
+      const request: CreateProjectRequest = buildCreateProjectRequest({
         name: projectName,
         projectKey,
         description,
@@ -135,6 +136,7 @@ export function useProjectSetup(projectType: ProjectType) {
         teamName,
         type: projectType,
       });
+      const res = await createProjectBuilder(api, request);
       return { projectId: res.data.id, teamIsNew: teamOption === 'NEW' };
     } catch (err: any) {
       if (err?.response?.status === 409) {

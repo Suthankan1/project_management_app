@@ -1,5 +1,9 @@
 import api from '../api/axios';
 import type { components } from '@api-contracts/types';
+import {
+  updateTaskStatus as updateTaskStatusBuilder,
+  updateTaskDates as updateTaskDatesBuilder,
+} from '@planora/contracts';
 
 type WithNullableTaskFields<T> = Omit<T, 'startDate' | 'dueDate' | 'sprintId' | 'milestoneId' | 'assigneeId'> & {
   startDate?: string | null;
@@ -76,10 +80,10 @@ export const taskService = {
     api.get(`/api/tasks/project/${projectId}/archived`).then(r => r.data),
 
   updateStatus: (taskId: number | string, status: string): Promise<any> =>
-    api.patch(`/api/tasks/${taskId}/status`, { status }).then(r => r.data),
+    updateTaskStatusBuilder(api, taskId, { status }).then(r => r.data),
 
   updateDates: (taskId: number | string, payload: PatchTaskDatesRequest): Promise<void> =>
-    api.patch(`/api/tasks/${taskId}/dates`, { startDate: payload.startDate, dueDate: payload.dueDate }).then(() => undefined),
+    updateTaskDatesBuilder(api, taskId, payload).then(() => undefined),
 
   bulkUpdateStatus: (payload: BulkStatusRequest): Promise<void> =>
     api.patch('/api/tasks/bulk/status', payload).then(() => undefined),

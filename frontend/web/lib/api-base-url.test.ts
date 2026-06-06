@@ -23,17 +23,17 @@ describe('getApiBaseUrl', () => {
     expect(getApiBaseUrl()).toBe('http://localhost:8080');
   });
 
-  it('throws in production when NEXT_PUBLIC_API_BASE_URL is missing', () => {
+  it('returns empty string in production when NEXT_PUBLIC_API_BASE_URL is missing', () => {
     Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', configurable: true });
     delete process.env.NEXT_PHASE;
     delete process.env.NEXT_PUBLIC_API_BASE_URL;
-    expect(() => getApiBaseUrl()).toThrow('NEXT_PUBLIC_API_BASE_URL environment variable is missing.');
+    expect(getApiBaseUrl()).toBe('');
   });
 
-  it('returns localhost fallback during Next production build when NEXT_PUBLIC_API_BASE_URL is missing', () => {
+  it('returns empty string during Next production build when NEXT_PUBLIC_API_BASE_URL is missing', () => {
     Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', configurable: true });
     process.env.NEXT_PHASE = 'phase-production-build';
     delete process.env.NEXT_PUBLIC_API_BASE_URL;
-    expect(getApiBaseUrl()).toBe('http://localhost:8080');
+    expect(getApiBaseUrl()).toBe('');
   });
 });

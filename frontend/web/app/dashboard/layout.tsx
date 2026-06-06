@@ -26,6 +26,7 @@ export default function DashboardLayout({
                 event.key === 'token'
                 || event.key === 'planora:access_token'
                 || event.key === 'planora:refresh_token'
+                || event.key === 'planora:has_refresh_token'
                 || event.key === 'rememberMe'
                 || event.key === null
             ) {

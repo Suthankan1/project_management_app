@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.tika.Tika;
 import org.slf4j.Logger;
@@ -85,9 +84,9 @@ public class UserService {
             .expireAfterWrite(Duration.ofMinutes(20))
             .build();
 
-    private final Cache<String, Instant> forgotPasswordRateLimitCache = Caffeine.newBuilder()
-            .expireAfterWrite(Duration.ofMinutes(1))
-            .build();
+    // Note: OTP-issuance rate limiting (forgot / resend / resend-otp) is enforced upstream by
+    // RateLimitingFilter, which uses a Redis-backed IP+email keyed counter shared across all
+    // application instances. No per-service cache is needed here.
 
     private record LoginAttemptRecord(int failedAttempts, Instant lockedUntil) {
         boolean isLocked(Instant now) {
@@ -360,6 +359,21 @@ public class UserService {
         tokenRepository.save(jtiRecord);
     }
 
+    @Transactional
+    public void revokeRefreshToken(String email) {
+        if (email == null || email.isBlank()) {
+            return;
+        }
+
+        userRepository.findFirstByEmailIgnoreCase(email).ifPresent(user -> {
+            VerificationToken existing = tokenRepository.findByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN);
+            if (existing != null) {
+                tokenRepository.delete(existing);
+                tokenRepository.flush();
+            }
+        });
+    }
+
     // Generates and dispatches a new OTP for account verification.
     @Transactional
     public String resendOtp(String email) {
@@ -398,19 +412,16 @@ public class UserService {
         return "New OTP send to your email.";
     }
 
-    // Initiate the forgotten password flow.
+    /**
+     * Initiates the forgotten-password flow.
+     *
+     * <p>Rate limiting for this endpoint (5 requests / 10 minutes per IP+email) is enforced
+     * upstream by {@code RateLimitingFilter} before this method is ever reached. No
+     * additional throttle gate is needed here.
+     */
     @Transactional
     public String forgotPassword(String email) {
-        // Rate limiting check
         String lowerEmail = email.toLowerCase();
-        Instant lastRequest = forgotPasswordRateLimitCache.getIfPresent(lowerEmail);
-        if (lastRequest != null && Duration.between(lastRequest, Instant.now()).getSeconds() < 60) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.TOO_MANY_REQUESTS,
-                    "Too many requests. Please wait before requesting another OTP."
-            );
-        }
-        forgotPasswordRateLimitCache.put(lowerEmail, Instant.now());
 
         // Step 1. Attempt to fetch the user.
         User user = userRepository.findByEmail(lowerEmail);
@@ -479,7 +490,11 @@ public class UserService {
         // Step 5. Check if the provided OTP matches the stored token hash.
         String hashedInputToken = hashToken(token);
         if (!verificationToken.getToken().equals(hashedInputToken)) {
-            verificationToken.setAttempts(verificationToken.getAttempts() + 1);
+            int newAttempts = verificationToken.getAttempts() + 1;
+            verificationToken.setAttempts(newAttempts);
+            if (newAttempts >= 5) {
+                verificationToken.setUsed(true);
+            }
             tokenRepository.save(verificationToken);
             return false;
         }

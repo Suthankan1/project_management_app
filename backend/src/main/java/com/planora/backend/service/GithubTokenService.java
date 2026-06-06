@@ -24,7 +24,33 @@ public class GithubTokenService {
     @Value("${github.token.encryption.key:}")
     private String encryptionKey;
 
+    @Value("${github.sync.enabled:true}")
+    private boolean githubSyncEnabled;
+
+    public void validateGithubIntegration() {
+        if (!githubSyncEnabled) {
+            throw new com.planora.backend.exception.GithubIntegrationDisabledException("GitHub integration is disabled");
+        }
+        if (encryptionKey == null || encryptionKey.isBlank()) {
+            throw new com.planora.backend.exception.GithubIntegrationDisabledException("GitHub integration is disabled: encryption key is missing");
+        }
+        byte[] decoded;
+        try {
+            decoded = java.util.Base64.getDecoder().decode(encryptionKey.getBytes());
+        } catch (IllegalArgumentException e) {
+            try {
+                decoded = java.util.Base64.getUrlDecoder().decode(encryptionKey.getBytes());
+            } catch (IllegalArgumentException ex) {
+                throw new com.planora.backend.exception.GithubIntegrationDisabledException("GitHub integration is disabled: encryption key is not valid Base64");
+            }
+        }
+        if (decoded.length != 32) {
+            throw new com.planora.backend.exception.GithubIntegrationDisabledException("GitHub integration is disabled: encryption key must decode to exactly 32 bytes");
+        }
+    }
+
     public String resolveToken(GithubIntegration integration) {
+        validateGithubIntegration();
         if (integration != null && StringUtils.hasText(integration.getEncryptedAccessToken())) {
             return decryptToken(integration.getEncryptedAccessToken());
         }
@@ -46,6 +72,7 @@ public class GithubTokenService {
 
     @Transactional
     public void saveToken(Long userId, String token) {
+        validateGithubIntegration();
         if (!StringUtils.hasText(encryptionKey)) {
             throw new IllegalStateException("GITHUB_TOKEN_ENCRYPTION_KEY is not configured");
         }
@@ -62,6 +89,7 @@ public class GithubTokenService {
 
     @Transactional(readOnly = true)
     public String getToken(Long userId) {
+        validateGithubIntegration();
         if (!StringUtils.hasText(encryptionKey)) {
             throw new IllegalStateException("GITHUB_TOKEN_ENCRYPTION_KEY is not configured");
         }
@@ -80,6 +108,7 @@ public class GithubTokenService {
 
     @Transactional
     public void clearToken(Long userId) {
+        validateGithubIntegration();
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
         user.setGithubAccessToken(null);
@@ -87,6 +116,7 @@ public class GithubTokenService {
     }
 
     public String encryptToken(String token) {
+        validateGithubIntegration();
         if (!StringUtils.hasText(encryptionKey)) {
             throw new IllegalStateException("GITHUB_TOKEN_ENCRYPTION_KEY is not configured");
         }
@@ -98,6 +128,7 @@ public class GithubTokenService {
     }
 
     public String decryptToken(String encryptedToken) {
+        validateGithubIntegration();
         if (!StringUtils.hasText(encryptionKey)) {
             throw new IllegalStateException("GITHUB_TOKEN_ENCRYPTION_KEY is not configured");
         }

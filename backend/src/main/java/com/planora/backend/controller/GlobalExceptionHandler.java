@@ -7,6 +7,7 @@ import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.GithubAuthenticationException;
 import com.planora.backend.exception.GithubIssueValidationException;
 import com.planora.backend.exception.GithubRateLimitException;
+import com.planora.backend.exception.GithubIntegrationDisabledException;
 import com.planora.backend.exception.GithubRepositoryNotFoundException;
 import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.exception.StorageQuotaExceededException;
@@ -34,7 +35,7 @@ import org.springframework.web.context.request.async.AsyncRequestNotUsableExcept
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleResourceNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
@@ -59,6 +60,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(GithubRepositoryNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleGithubRepositoryNotFound(GithubRepositoryNotFoundException ex, HttpServletRequest request) {
         return buildError(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(GithubIntegrationDisabledException.class)
+    public ResponseEntity<ApiErrorResponse> handleGithubIntegrationDisabled(GithubIntegrationDisabledException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.SERVICE_UNAVAILABLE, "INTEGRATION_DISABLED", ex.getMessage(), request);
     }
 
     @ExceptionHandler(GithubIssueValidationException.class)
@@ -129,8 +135,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiErrorResponse> handleRuntime(RuntimeException ex, HttpServletRequest request) {
-        log.error("Internal Server Error (RuntimeException): ", ex);
-        return buildError(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", ex.getMessage(), request);
+        logger.error("Unhandled runtime exception", ex);
+        return buildError(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "An unexpected error occurred", request);
     }
 
     @ExceptionHandler(AsyncRequestNotUsableException.class)
@@ -145,7 +151,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleGeneric(Exception ex, HttpServletRequest request) {
-        log.error("Unhandled Exception: ", ex);
+        logger.error("Unhandled Exception: ", ex);
         return buildError(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "An unexpected error occurred", request);
     }
 

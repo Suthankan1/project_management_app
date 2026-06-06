@@ -12,9 +12,14 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final PlanoraStompInboundInterceptor planoraStompInboundInterceptor;
+    private final PlanoraStompErrorHandler planoraStompErrorHandler;
 
-    public WebSocketConfig(PlanoraStompInboundInterceptor planoraStompInboundInterceptor) {
+    public WebSocketConfig(
+            PlanoraStompInboundInterceptor planoraStompInboundInterceptor,
+            PlanoraStompErrorHandler planoraStompErrorHandler
+    ) {
         this.planoraStompInboundInterceptor = planoraStompInboundInterceptor;
+        this.planoraStompErrorHandler = planoraStompErrorHandler;
     }
 
     @Override
@@ -25,6 +30,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
         registry.addEndpoint("/ws-native")
                 .setAllowedOriginPatterns("*");
+
+        registry.setErrorHandler(planoraStompErrorHandler);
     }
 
     @Override

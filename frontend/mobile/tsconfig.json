@@ -6,7 +6,9 @@
     "paths": {
       "@/*": ["./*"],
       "@/src/*": ["./src/*"],
-      "@api-contracts/*": ["../api-contracts/*"]
+      "@api-contracts/*": ["../api-contracts/*"],
+      "@planora/contracts": ["../api-contracts/index.ts"],
+      "@planora/contracts/*": ["../api-contracts/*"]
     }
   },
   "include": [

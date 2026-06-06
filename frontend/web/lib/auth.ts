@@ -46,13 +46,34 @@ export function getRememberMe(): boolean {
     return localStorage.getItem('rememberMe') === 'true';
 }
 
-/** Always use localStorage so auth tokens are shared across browser tabs.
- *  sessionStorage is tab-isolated, which causes new tabs to redirect to login.
- *  Both localStorage and sessionStorage are JS-accessible, so there is no
- *  meaningful security difference — HTTP-only cookies would be needed for that.
- *  The rememberMe flag is kept for UX preference tracking only. */
-function tokenStorage(): Storage {
-    return localStorage;
+/**
+ * ARCHITECTURE DECISION RECORD (ADR): Token Storage Strategy
+ * 
+ * - Refresh Token: Stored in a secure, HttpOnly cookie on the backend.
+ * - Access Token: Stored in an in-memory module variable (`memoryToken`) to close the XSS
+ *   vulnerability storage exposure window. The token is lost on page reload and re-minted
+ *   via the HttpOnly refresh token cookie on app boot or tab load.
+ * - localStorage: Kept only for the non-sensitive 'planora:has_refresh_token' flag to
+ *   signal the existence of an active backend session for silent refresh.
+ */
+let memoryToken: string | null = null;
+
+function getOrMigrateToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    if (!memoryToken) {
+        const legacyToken = localStorage.getItem(TOKEN_KEY)
+            || localStorage.getItem('token')
+            || sessionStorage.getItem(TOKEN_KEY)
+            || sessionStorage.getItem('token');
+        if (legacyToken) {
+            memoryToken = legacyToken;
+            localStorage.removeItem('planora:access_token');
+            localStorage.removeItem('token');
+            sessionStorage.removeItem('planora:access_token');
+            sessionStorage.removeItem('token');
+        }
+    }
+    return memoryToken;
 }
 
 // Token helpers
@@ -60,8 +81,7 @@ function tokenStorage(): Storage {
 export function getUserFromToken(): User | null {
     if (typeof window === 'undefined') return null;
 
-    const token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem('token')
-        || sessionStorage.getItem(TOKEN_KEY) || sessionStorage.getItem('token');
+    const token = getOrMigrateToken();
     if (!token) return null;
 
     try {
@@ -133,7 +153,7 @@ export function saveToken(token: string): void {
         sessionStorage.removeItem('token');
         localStorage.removeItem(TOKEN_KEY);
         sessionStorage.removeItem(TOKEN_KEY);
-        tokenStorage().setItem(TOKEN_KEY, token);
+        memoryToken = token;
         initializeSessionCacheForCurrentAuth(token);
         emitAuthTokenChanged();
     }
@@ -156,6 +176,7 @@ export function getRefreshToken(): string | null {
 
 export function clearTokens(): void {
     if (typeof window !== 'undefined') {
+        memoryToken = null;
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem(TOKEN_KEY);
@@ -193,8 +214,7 @@ export function clearTokens(): void {
 export function getValidToken(): string | null {
     if (typeof window === 'undefined') return null;
     if (getUserFromToken()) {
-        return localStorage.getItem(TOKEN_KEY) || localStorage.getItem('token')
-            || sessionStorage.getItem(TOKEN_KEY) || sessionStorage.getItem('token');
+        return memoryToken;
     }
     return null;
 }

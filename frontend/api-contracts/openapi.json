@@ -5237,6 +5237,16 @@
     "/api/auth/logout": {
       "post": {
         "operationId": "logout",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "planora_refresh_token",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -5256,6 +5266,7 @@
     },
     "/api/auth/me": {
       "get": {
+        "deprecated": true,
         "operationId": "getCurrentUser_1",
         "responses": {
           "200": {
@@ -5443,26 +5454,6 @@
               "*/*": {
                 "schema": {
                   "type": "object"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "user-controller"
-        ]
-      }
-    },
-    "/api/auth/try": {
-      "get": {
-        "operationId": "myTry",
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "string"
                 }
               }
             },

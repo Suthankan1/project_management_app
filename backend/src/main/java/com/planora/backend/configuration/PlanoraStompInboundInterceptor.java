@@ -23,6 +23,8 @@ import com.planora.backend.service.JWTService;
 import com.planora.backend.service.ProjectMembershipService;
 import com.planora.backend.service.UserCacheService;
 
+import com.planora.backend.exception.StompAuthException;
+
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 
@@ -33,8 +35,10 @@ public class PlanoraStompInboundInterceptor implements ChannelInterceptor {
     private static final Pattern PROJECT_TOPIC_PATTERN = Pattern.compile("^/topic/project/(\\d+)(?:/.*)?$");
     private static final Pattern PROJECTS_TOPIC_PATTERN = Pattern.compile("^/topic/projects/(\\d+)(?:/.*)?$");
     private static final Pattern USER_PROJECT_QUEUE_PATTERN = Pattern.compile("^/user/queue/project/(\\d+)(?:/.*)?$");
-        private static final Pattern USER_NOTIFICATION_DESTINATION_PATTERN =
+    private static final Pattern USER_NOTIFICATION_DESTINATION_PATTERN =
             Pattern.compile("^/user/([^/]+)/queue/notifications(?:-badge)?$");
+    /** Matches STOMP SEND frames routed through the /app prefix, e.g. /app/project/42/chat.sendMessage */
+    private static final Pattern SEND_APP_PROJECT_PATTERN = Pattern.compile("^/app/project/(\\d+)(?:/.*)?$");
 
     private final JWTService jwtService;
     private final UserCacheService userCacheService;
@@ -62,6 +66,8 @@ public class PlanoraStompInboundInterceptor implements ChannelInterceptor {
             authenticateConnect(accessor);
         } else if (StompCommand.SUBSCRIBE.equals(command)) {
             authorizeSubscribe(accessor);
+        } else if (StompCommand.SEND.equals(command)) {
+            authorizeSend(accessor);
         }
 
         return message;
@@ -71,14 +77,14 @@ public class PlanoraStompInboundInterceptor implements ChannelInterceptor {
         try {
             String auth = accessor.getFirstNativeHeader("Authorization");
             if (auth == null || auth.isBlank()) {
-                throw new MessagingException("Missing Authorization header");
+                throw new StompAuthException("Missing Authorization header", "AUTH_INVALID");
             }
 
             String token = extractBearerToken(auth);
             String identity = jwtService.validateAccessTokenAndGetSubject(token);
             User user = userCacheService.resolveUserByEmailOrUsername(identity);
             if (user == null || user.getUsername() == null || user.getUsername().isBlank()) {
-                throw new MessagingException("User not found for provided token");
+                throw new StompAuthException("User not found for provided token", "AUTH_INVALID");
             }
 
             String normalizedUsername = user.getUsername().toLowerCase();
@@ -91,9 +97,9 @@ public class PlanoraStompInboundInterceptor implements ChannelInterceptor {
             }
             sessionAttributes.put("username", normalizedUsername);
         } catch (ExpiredJwtException e) {
-            throw new MessagingException("JWT expired", e);
+            throw new StompAuthException("JWT expired", "AUTH_EXPIRED", e);
         } catch (JwtException | IllegalArgumentException e) {
-            throw new MessagingException("Invalid JWT", e);
+            throw new StompAuthException("Invalid JWT", "AUTH_INVALID", e);
         }
     }
 
@@ -124,6 +130,39 @@ public class PlanoraStompInboundInterceptor implements ChannelInterceptor {
             log.warn("[WebSocket] Blocked unauthorized subscription. user={} destination={}",
                     principal.getName(), destination);
             throw new AccessDeniedException("Forbidden project subscription");
+        }
+    }
+
+    /**
+     * Transport-layer guard for STOMP SEND frames targeting {@code /app/project/{id}/...}.
+     * Mirrors {@link #authorizeSubscribe} so that every inbound application message is
+     * membership-checked before it reaches any {@code @MessageMapping} handler.
+     */
+    private void authorizeSend(StompHeaderAccessor accessor) {
+        String destination = accessor.getDestination();
+        if (destination == null || destination.isBlank()) {
+            return;
+        }
+
+        Matcher matcher = SEND_APP_PROJECT_PATTERN.matcher(destination);
+        if (!matcher.matches()) {
+            // Not a project-scoped application destination; no membership check needed.
+            return;
+        }
+
+        Long projectId = Long.valueOf(matcher.group(1));
+
+        Principal principal = requireAuthenticatedPrincipal(accessor);
+        User user = userCacheService.resolveUserByEmailOrUsername(principal.getName());
+        if (user == null || user.getUserId() == null) {
+            throw new AccessDeniedException("Unknown WebSocket user");
+        }
+
+        boolean allowed = projectMembershipService.isProjectMember(projectId, user.getUserId());
+        if (!allowed) {
+            log.warn("[WebSocket] Blocked unauthorized SEND. user={} destination={}",
+                    principal.getName(), destination);
+            throw new AccessDeniedException("Forbidden project SEND");
         }
     }
 

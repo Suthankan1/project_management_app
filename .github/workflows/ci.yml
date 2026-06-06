@@ -49,7 +49,9 @@ jobs:
             - 'backend/**'
             - 'frontend/web/**'
             - 'frontend/mobile/**'
+            - 'frontend/api-contracts/**'
             - 'scripts/check-api-contracts.mjs'
+            - 'scripts/generate-api-contracts.mjs'
             - '.github/workflows/ci.yml'
 
 
@@ -197,7 +199,7 @@ jobs:
     if: ${{ always() && !cancelled() && (github.event_name == 'workflow_dispatch' || needs.changes.outputs.contracts == 'true') && (needs.backend-build.result == 'success' || needs.backend-build.result == 'skipped') && (needs.frontend-build.result == 'success' || needs.frontend-build.result == 'skipped') && (needs.mobile-build.result == 'success' || needs.mobile-build.result == 'skipped') }}
     runs-on: ubuntu-latest
     env:
-      API_CONTRACT_MAX_CRITICAL_ISSUES: 11
+      API_CONTRACT_MAX_CRITICAL_ISSUES: 0
 
     steps:
     - name: Checkout Repository
@@ -225,14 +227,14 @@ jobs:
       run: node scripts/generate-api-contracts.mjs --check
 
     - name: Validate API Route Contracts
-      run: node scripts/check-api-contracts.mjs --report api-contract-report.txt
+      run: node scripts/check-api-contracts.mjs --report artifacts/api-contracts/report.txt
 
     - name: Upload API Contract Report
       if: ${{ failure() }}
       uses: actions/upload-artifact@v4
       with:
         name: api-contract-report
-        path: api-contract-report.txt
+        path: artifacts/api-contracts/report.txt
 
   mobile-build:
     name: Build Mobile

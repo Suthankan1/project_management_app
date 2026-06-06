@@ -12,6 +12,7 @@ import com.planora.backend.dto.OtpRequest;
 import com.planora.backend.dto.ResetPasswordRequest;
 import com.planora.backend.dto.VerifyRequest;
 import com.planora.backend.model.User;
+import com.planora.backend.service.JWTService;
 import com.planora.backend.service.UserService;
 
 import java.util.List;
@@ -32,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 public class UserController {
 
     private final UserService service;
+    private final JWTService jwtService;
 
     //@Valid is used here to fail fast. It catches the bad data (like malformed emails or short passwords)
     //at the controller level before we waste resources hitting the database or service layer.
@@ -61,7 +63,7 @@ public class UserController {
                     .secure(true)
                     .path("/")
                     .maxAge(30 * 24 * 60 * 60) // 30 days
-                    .sameSite("Lax")
+                    .sameSite("None")
                     .build();
             response.setRefreshToken(null);
             return ResponseEntity.ok()
@@ -119,7 +121,7 @@ public class UserController {
                     .secure(true)
                     .path("/")
                     .maxAge(30 * 24 * 60 * 60)
-                    .sameSite("Lax")
+                    .sameSite("None")
                     .build();
             response.setRefreshToken(null);
             return ResponseEntity.ok()
@@ -130,7 +132,19 @@ public class UserController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout() {
+    public ResponseEntity<?> logout(
+            @CookieValue(name = "planora_refresh_token", required = false) String refreshToken) {
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            try {
+                jwtService.validateRefreshToken(refreshToken);
+                String email = jwtService.extractEmail(refreshToken);
+                service.revokeRefreshToken(email);
+            } catch (Exception ignored) {
+                // Logout remains idempotent: always clear the client cookie even if the
+                // submitted refresh token is malformed, expired, or already invalid.
+            }
+        }
+
         ResponseCookie cookie = ResponseCookie.from("planora_refresh_token", "")
                 .httpOnly(true)
                 .secure(true)
@@ -147,12 +161,8 @@ public class UserController {
     // the currently logged-in user appearing in their own dropdowns.
     @GetMapping("/users")
     public ResponseEntity<?> getAllUsers(@RequestParam(required = false) String excludeEmail) {
-        try {
-            List<UserResponseDTO> userList = service.getAllUserDTOs(excludeEmail);
-            return new ResponseEntity<>(userList, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error fetching users: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<UserResponseDTO> userList = service.getAllUserDTOs(excludeEmail);
+        return new ResponseEntity<>(userList, HttpStatus.OK);
     }
 
     /**
@@ -162,24 +172,15 @@ public class UserController {
      */
     @GetMapping("/users/{userId}/photo")
     public ResponseEntity<?> getUserPhoto(@PathVariable Long userId) {
-        try {
-            String presignedUrl = service.generatePresignedUrlForUser(userId);
-            if (presignedUrl == null) {
-                // Return 404 so the frontend knows to gracefully fallback to the default avatar.
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-            return new ResponseEntity<>(Map.of("url", presignedUrl), HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error fetching photo: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        String presignedUrl = service.generatePresignedUrlForUser(userId);
+        if (presignedUrl == null) {
+            // Return 404 so the frontend knows to gracefully fallback to the default avatar.
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
+        return new ResponseEntity<>(Map.of("url", presignedUrl), HttpStatus.OK);
     }
 
-    // Testing endpoint
-    @GetMapping("/try")
-    public String myTry() {
-        return "Try - Running Successfully";
-    }
-
+    @Deprecated
     @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser(Authentication authentication) {
         // While Spring security usually blocks unauthenticated traffic before it hits the controller,
@@ -188,12 +189,8 @@ public class UserController {
         if (authentication == null || !authentication.isAuthenticated()) {
             return new ResponseEntity<>("User is not authenticated", HttpStatus.UNAUTHORIZED);
         }
-        try {
-            UserResponseDTO dto = service.getCurrentUserDTO(authentication.getName());
-            return new ResponseEntity<>(dto, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Failed to fetch current user: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        UserResponseDTO dto = service.getCurrentUserDTO(authentication.getName());
+        return new ResponseEntity<>(dto, HttpStatus.OK);
     }
 
 }

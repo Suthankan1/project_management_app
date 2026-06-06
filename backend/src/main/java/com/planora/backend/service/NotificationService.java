@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -50,6 +50,9 @@ public class NotificationService {
     private final SimpMessagingTemplate messagingTemplate;
 
     private final StringRedisTemplate stringRedisTemplate;
+
+    @Value("${notifications.cache.redis.enabled:true}")
+    private boolean notificationRedisCacheEnabled = true;
 
     private final NotificationPreferenceService notificationPreferenceService;
 
@@ -238,14 +241,16 @@ public class NotificationService {
 
     // Gets the total count of unread notifications for a user.
     public long getUnreadCount(Long userId) {
-        String cacheKey = unreadCountCacheKey(userId);
-        try {
-            String cached = stringRedisTemplate.opsForValue().get(cacheKey);
-            if (cached != null) {
-                return Long.parseLong(cached);
+        if (notificationRedisCacheEnabled) {
+            String cacheKey = unreadCountCacheKey(userId);
+            try {
+                String cached = stringRedisTemplate.opsForValue().get(cacheKey);
+                if (cached != null) {
+                    return Long.parseLong(cached);
+                }
+            } catch (RuntimeException ex) {
+                // Redis is a cache, not a source of truth. Fall back to the database.
             }
-        } catch (RuntimeException ex) {
-            // Redis is a cache, not a source of truth. Fall back to the database.
         }
 
         long count = notificationRepository.countByRecipientUserIdAndIsReadFalse(userId);
@@ -309,6 +314,9 @@ public class NotificationService {
     }
 
     private void evictUnreadCountCache(Long userId) {
+        if (!notificationRedisCacheEnabled) {
+            return;
+        }
         try {
             stringRedisTemplate.delete(unreadCountCacheKey(userId));
         } catch (RuntimeException ex) {
@@ -317,6 +325,9 @@ public class NotificationService {
     }
 
     private void cacheUnreadCount(Long userId, long unreadCount) {
+        if (!notificationRedisCacheEnabled) {
+            return;
+        }
         try {
             stringRedisTemplate.opsForValue().set(unreadCountCacheKey(userId), Long.toString(unreadCount), UNREAD_COUNT_TTL);
         } catch (RuntimeException ex) {

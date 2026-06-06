@@ -21,6 +21,7 @@ import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.planora.backend.model.User;
+import com.planora.backend.exception.StompAuthException;
 import com.planora.backend.service.JWTService;
 import com.planora.backend.service.ProjectMembershipService;
 import com.planora.backend.service.UserCacheService;
@@ -53,8 +54,39 @@ class PlanoraStompInboundInterceptorTest {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
         Message<byte[]> message = buildMutableMessage(accessor);
 
-        MessagingException ex = assertThrows(MessagingException.class, () -> interceptor.preSend(message, messageChannel));
+        StompAuthException ex = assertThrows(StompAuthException.class, () -> interceptor.preSend(message, messageChannel));
         assertNotNull(ex.getMessage());
+        assertEquals("AUTH_INVALID", ex.getErrorCode());
+    }
+
+    @Test
+    void connectRejectsExpiredJwt() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+        accessor.setNativeHeader("Authorization", "Bearer expired-token");
+
+        when(jwtService.validateAccessTokenAndGetSubject("expired-token"))
+                .thenThrow(new io.jsonwebtoken.ExpiredJwtException(null, null, "Expired"));
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        StompAuthException ex = assertThrows(StompAuthException.class, () -> interceptor.preSend(message, messageChannel));
+        assertNotNull(ex.getMessage());
+        assertEquals("AUTH_EXPIRED", ex.getErrorCode());
+    }
+
+    @Test
+    void connectRejectsInvalidJwt() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+        accessor.setNativeHeader("Authorization", "Bearer invalid-token");
+
+        when(jwtService.validateAccessTokenAndGetSubject("invalid-token"))
+                .thenThrow(new io.jsonwebtoken.SignatureException("Invalid signature"));
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        StompAuthException ex = assertThrows(StompAuthException.class, () -> interceptor.preSend(message, messageChannel));
+        assertNotNull(ex.getMessage());
+        assertEquals("AUTH_INVALID", ex.getErrorCode());
     }
 
     @Test
@@ -184,6 +216,69 @@ class PlanoraStompInboundInterceptorTest {
 
         Message<byte[]> message = buildMutableMessage(accessor);
 
+        assertDoesNotThrow(() -> interceptor.preSend(message, messageChannel));
+    }
+
+    // ── SEND branch tests ──────────────────────────────────────────────────────
+
+    @Test
+    void sendRejectsProjectDestinationWhenUserIsNotMember() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+        accessor.setDestination("/app/project/99/chat.sendMessage");
+        accessor.setUser(new StompPrincipal("alice"));
+
+        User user = new User();
+        user.setUserId(23L);
+
+        when(userCacheService.resolveUserByEmailOrUsername("alice")).thenReturn(user);
+        when(projectMembershipService.isProjectMember(99L, 23L)).thenReturn(false);
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> interceptor.preSend(message, messageChannel));
+        assertNotNull(ex.getMessage());
+    }
+
+    @Test
+    void sendRejectsProjectDestinationWithoutPrincipal() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+        accessor.setDestination("/app/project/99/chat.sendMessage");
+        // No principal set — simulates an unauthenticated SEND
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> interceptor.preSend(message, messageChannel));
+        assertNotNull(ex.getMessage());
+    }
+
+    @Test
+    void sendAllowsProjectDestinationWhenUserIsMember() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+        accessor.setDestination("/app/project/42/chat.sendMessage");
+        accessor.setUser(new StompPrincipal("alice"));
+
+        User user = new User();
+        user.setUserId(55L);
+
+        when(userCacheService.resolveUserByEmailOrUsername("alice")).thenReturn(user);
+        when(projectMembershipService.isProjectMember(42L, 55L)).thenReturn(true);
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        assertDoesNotThrow(() -> interceptor.preSend(message, messageChannel));
+    }
+
+    @Test
+    void sendPassesThroughNonProjectDestinations() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+        accessor.setDestination("/app/notifications/ack");
+        accessor.setUser(new StompPrincipal("alice"));
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        // No membership mocks needed — non-project destinations are not checked.
         assertDoesNotThrow(() -> interceptor.preSend(message, messageChannel));
     }
 }

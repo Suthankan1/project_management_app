@@ -1,4 +1,5 @@
 import api from '@/lib/axios';
+import { postTelemetry as postTelemetryBuilder, createRoom as createRoomBuilder } from '@planora/contracts';
 import type {
   ChatMessage,
   ChatReactionSummary,
@@ -162,7 +163,7 @@ export const chatApi = {
     return data;
   },
   postTelemetry: async (projectId: number | string, payload: { action: string; target: string; details?: string }): Promise<void> => {
-    await api.post(`/api/projects/${projectId}/chat/telemetry`, payload);
+    await postTelemetryBuilder(api, projectId, payload);
   },
   getFeatureFlags: async (projectId: number | string): Promise<ChatFeatureFlags> => {
     const { data } = await api.get(`/api/projects/${projectId}/chat/features`);
@@ -239,7 +240,7 @@ export const chatApi = {
     return data;
   },
   createRoom: async (projectId: number | string, payload: { name: string; members: string[] }): Promise<ChatRoom> => {
-    const { data } = await api.post(`/api/projects/${projectId}/chat/rooms`, payload);
+    const { data } = await createRoomBuilder(api, projectId, payload);
     return data;
   },
   deleteRoom: async (projectId: number | string, roomId: number): Promise<void> => {

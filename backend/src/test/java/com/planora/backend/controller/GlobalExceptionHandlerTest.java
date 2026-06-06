@@ -91,4 +91,21 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.message").value("Conflict occurred"))
                 .andExpect(jsonPath("$.path").value("/api/auth/register"));
     }
+
+    @Test
+    @WithMockUserPrincipal
+    void whenRuntimeException_thenReturnStandardShapeAndOpaqueMessage() throws Exception {
+        when(userService.register(any())).thenThrow(new RuntimeException("Sensitive database or internal error details"));
+
+        mockMvc.perform(post("/api/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(VALID_USER_JSON))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.errorCode").value("INTERNAL_SERVER_ERROR"))
+                .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
+                .andExpect(jsonPath("$.path").value("/api/auth/register"));
+    }
 }
