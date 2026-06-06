@@ -7,6 +7,7 @@ import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.GithubAuthenticationException;
 import com.planora.backend.exception.GithubIssueValidationException;
 import com.planora.backend.exception.GithubRateLimitException;
+import com.planora.backend.exception.GithubIntegrationDisabledException;
 import com.planora.backend.exception.GithubRepositoryNotFoundException;
 import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.exception.StorageQuotaExceededException;
@@ -59,6 +60,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(GithubRepositoryNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleGithubRepositoryNotFound(GithubRepositoryNotFoundException ex, HttpServletRequest request) {
         return buildError(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(GithubIntegrationDisabledException.class)
+    public ResponseEntity<ApiErrorResponse> handleGithubIntegrationDisabled(GithubIntegrationDisabledException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.SERVICE_UNAVAILABLE, "INTEGRATION_DISABLED", ex.getMessage(), request);
     }
 
     @ExceptionHandler(GithubIssueValidationException.class)

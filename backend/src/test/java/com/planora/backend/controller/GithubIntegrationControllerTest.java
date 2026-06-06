@@ -40,6 +40,9 @@ class GithubIntegrationControllerTest {
     @MockBean
     private UserDetailsService userDetailsService;
 
+    @MockBean
+    private com.planora.backend.service.GithubTokenService githubTokenService;
+
     @Autowired
     private ObjectMapper objectMapper;
 

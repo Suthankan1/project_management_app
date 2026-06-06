@@ -62,6 +62,9 @@ class GithubDataControllerTest {
     private GithubNotificationService githubNotificationService;
 
     @MockitoBean
+    private com.planora.backend.service.GithubTokenService githubTokenService;
+
+    @MockitoBean
     private GithubIntegrationRepository githubIntegrationRepository;
 
     @MockitoBean
