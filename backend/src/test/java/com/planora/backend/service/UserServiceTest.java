@@ -466,6 +466,27 @@ public class UserServiceTest {
     }
 
     @Test
+    void testResetPassword_WrongOtpFiveTimes_InvalidatesToken() {
+        VerificationToken token = new VerificationToken();
+        token.setToken(hashToken("valid-otp"));
+        token.setExpiry(Instant.now().plusSeconds(600));
+        token.setUsed(false);
+        token.setTokenType(VerificationToken.TokenType.PASSWORD_RESET);
+        token.setAttempts(4); // 4 attempts already made
+
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.PASSWORD_RESET)).thenReturn(token);
+
+        boolean result = userService.resetPassword("test@example.com", "wrong-otp", "NewSecure@1");
+
+        assertFalse(result);
+        assertEquals(5, token.getAttempts());
+        assertTrue(token.isUsed());
+        verify(tokenRepository).save(token);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
     void testResetPassword_MaxAttemptsExceeded_ReturnsFalse() {
         VerificationToken token = new VerificationToken();
         token.setToken(hashToken("valid-otp"));

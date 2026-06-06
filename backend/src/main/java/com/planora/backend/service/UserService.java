@@ -494,7 +494,11 @@ public class UserService {
         // Step 5. Check if the provided OTP matches the stored token hash.
         String hashedInputToken = hashToken(token);
         if (!verificationToken.getToken().equals(hashedInputToken)) {
-            verificationToken.setAttempts(verificationToken.getAttempts() + 1);
+            int newAttempts = verificationToken.getAttempts() + 1;
+            verificationToken.setAttempts(newAttempts);
+            if (newAttempts >= 5) {
+                verificationToken.setUsed(true);
+            }
             tokenRepository.save(verificationToken);
             return false;
         }

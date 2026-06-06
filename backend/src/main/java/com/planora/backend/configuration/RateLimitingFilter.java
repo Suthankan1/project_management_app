@@ -19,6 +19,12 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import jakarta.servlet.http.HttpServletRequestWrapper;
+import jakarta.servlet.ServletInputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.ByteArrayInputStream;
+import java.util.Map;
 
 /**
  * In-memory, per-IP rate limiter for sensitive auth endpoints.
@@ -30,6 +36,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     private static final int MAX_REQUESTS_PER_MINUTE = 5;
     private static final int MAX_INVITATIONS_PER_HOUR = 10;
+    private static final int MAX_RESETS_PER_15_MIN = 5;
 
     private static final Pattern PROJECT_INVITE_PATH = Pattern.compile("^/api/projects/(\\d+)/invitations$");
 
@@ -37,7 +44,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             "/api/auth/login",
             "/api/auth/forgot",
             "/api/auth/resend",
-            "/api/auth/resend-otp"
+            "/api/auth/resend-otp",
+            "/api/auth/reset"
     );
 
     private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
@@ -66,8 +74,26 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
         String key;
         Bucket bucket;
+        HttpServletRequest requestToProcess = request;
 
-        if (isProjectInviteRequest(request)) {
+        if (isResetPasswordRequest(request)) {
+            CachedBodyHttpServletRequest wrappedRequest = new CachedBodyHttpServletRequest(request);
+            requestToProcess = wrappedRequest;
+            String email = "unknown";
+            try {
+                byte[] body = wrappedRequest.getCachedBody();
+                if (body != null && body.length > 0) {
+                    Map<String, Object> map = new com.fasterxml.jackson.databind.ObjectMapper().readValue(body, Map.class);
+                    if (map != null && map.get("email") != null) {
+                        email = map.get("email").toString().trim().toLowerCase();
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse email from reset password request body", e);
+            }
+            key = "reset:" + resolveClientIp(wrappedRequest) + ":" + email;
+            bucket = buckets.get(key, k -> newResetBucket());
+        } else if (isProjectInviteRequest(request)) {
             Matcher matcher = PROJECT_INVITE_PATH.matcher(request.getServletPath());
             String projectId = matcher.find() ? matcher.group(1) : "unknown";
             key = "invite-project:" + projectId + ":" + resolveClientIp(request);
@@ -78,14 +104,16 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         }
 
         if (bucket.tryConsume(1)) {
-            filterChain.doFilter(request, response);
+            filterChain.doFilter(requestToProcess, response);
         } else {
             log.warn("Rate limit exceeded for key={}", key);
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType("application/json");
-            String message = isProjectInviteRequest(request)
-                ? "Too many invitations sent, try again in 1 hour"
-                : "Too many requests. Please try again later.";
+            String message = isResetPasswordRequest(request)
+                ? "Too many password reset attempts. Please try again in 15 minutes."
+                : (isProjectInviteRequest(request)
+                    ? "Too many invitations sent, try again in 1 hour"
+                    : "Too many requests. Please try again later.");
             com.planora.backend.dto.ApiErrorResponse errorResponse = new com.planora.backend.dto.ApiErrorResponse(
                 java.time.LocalDateTime.now().toString(),
                 HttpStatus.TOO_MANY_REQUESTS.value(),
@@ -114,11 +142,23 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         return Bucket.builder().addLimit(limit).build();
     }
 
+    private Bucket newResetBucket() {
+        Bandwidth limit = Bandwidth.builder()
+                .capacity(MAX_RESETS_PER_15_MIN)
+                .refillIntervally(MAX_RESETS_PER_15_MIN, Duration.ofMinutes(15))
+                .build();
+        return Bucket.builder().addLimit(limit).build();
+    }
+
     private boolean isProjectInviteRequest(HttpServletRequest request) {
         if (!"POST".equalsIgnoreCase(request.getMethod())) {
             return false;
         }
         return PROJECT_INVITE_PATH.matcher(request.getServletPath()).matches();
+    }
+
+    private boolean isResetPasswordRequest(HttpServletRequest request) {
+        return "POST".equalsIgnoreCase(request.getMethod()) && "/api/auth/reset".equals(request.getServletPath());
     }
 
     private String resolveClientIp(HttpServletRequest request) {
@@ -127,5 +167,57 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             return xForwardedFor.split(",")[0].trim();
         }
         return request.getRemoteAddr();
+    }
+
+    private static class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
+        private final byte[] cachedBody;
+
+        public CachedBodyHttpServletRequest(HttpServletRequest request) throws IOException {
+            super(request);
+            this.cachedBody = request.getInputStream().readAllBytes();
+        }
+
+        public byte[] getCachedBody() {
+            return cachedBody;
+        }
+
+        @Override
+        public ServletInputStream getInputStream() throws IOException {
+            return new CachedBodyServletInputStream(this.cachedBody);
+        }
+
+        @Override
+        public BufferedReader getReader() throws IOException {
+            ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(this.cachedBody);
+            return new BufferedReader(new InputStreamReader(byteArrayInputStream));
+        }
+    }
+
+    private static class CachedBodyServletInputStream extends ServletInputStream {
+        private final ByteArrayInputStream cachedBodyInputStream;
+
+        public CachedBodyServletInputStream(byte[] cachedBody) {
+            this.cachedBodyInputStream = new ByteArrayInputStream(cachedBody);
+        }
+
+        @Override
+        public boolean isFinished() {
+            return cachedBodyInputStream.available() == 0;
+        }
+
+        @Override
+        public boolean isReady() {
+            return true;
+        }
+
+        @Override
+        public void setReadListener(jakarta.servlet.ReadListener readListener) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int read() throws IOException {
+            return cachedBodyInputStream.read();
+        }
     }
 }

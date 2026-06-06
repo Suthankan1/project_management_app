@@ -74,6 +74,32 @@ class RateLimitingTest {
         rateLimitingFilter.doFilterInternal(request, blocked, chain);
         assertEquals(429, blocked.getStatus());
     }
+    @Test
+    void doFilterInternal_blocks6thResetRequestByIpAndEmail() throws Exception {
+        String jsonBody = "{\"email\":\"test-rate-limit@example.com\",\"token\":\"123456\",\"newPassword\":\"NewSecure@1\"}";
+        FilterChain chain = mock(FilterChain.class);
+
+        // Perform 5 allowed requests
+        for (int i = 0; i < 5; i++) {
+            MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/reset");
+            request.setServletPath("/api/auth/reset");
+            request.setRemoteAddr("127.0.0.1");
+            request.setContent(jsonBody.getBytes());
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            rateLimitingFilter.doFilterInternal(request, response, chain);
+            assertEquals(200, response.getStatus());
+        }
+
+        // The 6th request should be rate-limited (429)
+        MockHttpServletRequest request6 = new MockHttpServletRequest("POST", "/api/auth/reset");
+        request6.setServletPath("/api/auth/reset");
+        request6.setRemoteAddr("127.0.0.1");
+        request6.setContent(jsonBody.getBytes());
+        MockHttpServletResponse response6 = new MockHttpServletResponse();
+        rateLimitingFilter.doFilterInternal(request6, response6, chain);
+        assertEquals(429, response6.getStatus());
+        assertTrue(response6.getContentAsString().contains("Too many password reset attempts"));
+    }
 
     @Test
     void resolveClientIp_usesXForwardedForHeader() throws Exception {

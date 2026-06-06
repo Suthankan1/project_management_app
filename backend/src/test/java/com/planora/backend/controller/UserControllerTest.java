@@ -226,7 +226,6 @@ public class UserControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
     }
-
     // Refresh token endpoint returns new tokens on valid refresh token
     @Test
     @WithMockUserPrincipal
