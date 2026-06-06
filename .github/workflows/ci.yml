@@ -197,7 +197,7 @@ jobs:
     if: ${{ always() && !cancelled() && (github.event_name == 'workflow_dispatch' || needs.changes.outputs.contracts == 'true') && (needs.backend-build.result == 'success' || needs.backend-build.result == 'skipped') && (needs.frontend-build.result == 'success' || needs.frontend-build.result == 'skipped') && (needs.mobile-build.result == 'success' || needs.mobile-build.result == 'skipped') }}
     runs-on: ubuntu-latest
     env:
-      API_CONTRACT_MAX_CRITICAL_ISSUES: 11
+      API_CONTRACT_MAX_CRITICAL_ISSUES: 0
 
     steps:
     - name: Checkout Repository

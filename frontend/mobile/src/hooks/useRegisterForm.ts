@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../lib/axios';
+import { register as registerBuilder } from '@planora/contracts';
 import { getValidToken } from '../lib/auth';
 import { EMAIL_REGEX, validatePassword, getPasswordStrength } from '../lib/validation';
 
@@ -56,7 +57,7 @@ export function useRegisterForm() {
     }
 
     try {
-      await api.post('/api/auth/register', {
+      await registerBuilder(api, {
         username,
         fullName,
         email: email.toLowerCase(),

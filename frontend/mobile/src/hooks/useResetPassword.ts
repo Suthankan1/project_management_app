@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import api from '../api/axios';
+import { resetPassword as resetPasswordBuilder } from '@planora/contracts';
 import { validatePassword } from '../lib/validation';
 
 export function useResetPassword() {
@@ -40,7 +41,7 @@ export function useResetPassword() {
 
     setIsLoading(true);
     try {
-      await api.post('/api/auth/reset', { email: email.trim(), token: otp.trim(), newPassword });
+      await resetPasswordBuilder(api, { email: email.trim(), token: otp.trim(), newPassword });
       setNewPassword('');
       setConfirmPassword('');
       setSubmitted(true);

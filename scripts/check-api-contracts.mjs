@@ -14,6 +14,7 @@ const selfTest = args.includes('--self-test');
 const frontendRoots = [
   path.join(repoRoot, 'frontend', 'web'),
   path.join(repoRoot, 'frontend', 'mobile'),
+  path.join(repoRoot, 'frontend', 'api-contracts'),
 ];
 const backendRoot = path.join(repoRoot, 'backend', 'src', 'main', 'java');
 
@@ -30,10 +31,10 @@ if (selfTest) {
 }
 
 async function main() {
-  const frontendFiles = [
-    ...(await walkFiles(frontendRoots[0], isFrontendSourceFile)),
-    ...(await walkFiles(frontendRoots[1], isFrontendSourceFile)),
-  ];
+  const frontendFiles = [];
+  for (const root of frontendRoots) {
+    frontendFiles.push(...(await walkFiles(root, isFrontendSourceFile)));
+  }
   const backendFiles = await walkFiles(backendRoot, (filePath) => filePath.endsWith('Controller.java'));
 
   for (const filePath of frontendFiles) {

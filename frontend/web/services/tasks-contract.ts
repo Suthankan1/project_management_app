@@ -1,5 +1,9 @@
 import api from '@/lib/axios';
 import { formatLocalDate } from './contract-common';
+import {
+  updateTaskStatus as updateTaskStatusBuilder,
+  updateTaskDates as updateTaskDatesBuilder,
+} from '@planora/contracts';
 import type { PageResponse } from './contract-common';
 import type { components } from '@api-contracts/types';
 import type {
@@ -195,7 +199,7 @@ export const tasksApi = {
   },
   updateStatus: async (taskId: number | string, status: string): Promise<Task> => {
     const payload: UpdateStatusRequest = { status };
-    const { data } = await api.patch(`/api/tasks/${taskId}/status`, payload);
+    const { data } = await updateTaskStatusBuilder(api, taskId, payload);
     return data;
   },
   updatePriority: async (taskId: number | string, priority: UpdatePriorityRequest['priority']): Promise<Task> => {
@@ -204,11 +208,7 @@ export const tasksApi = {
     return data;
   },
   updateDates: async (taskId: number | string, payload: PatchTaskDatesRequest): Promise<void> => {
-    const body: PatchTaskDatesRequest = {
-      ...(payload.startDate !== undefined && { startDate: payload.startDate == null ? payload.startDate : formatLocalDate(payload.startDate) }),
-      ...(payload.dueDate !== undefined && { dueDate: payload.dueDate == null ? payload.dueDate : formatLocalDate(payload.dueDate) }),
-    };
-    await api.patch(`/api/tasks/${taskId}/dates`, body);
+    await updateTaskDatesBuilder(api, taskId, payload);
   },
   saveAsTemplate: async (taskId: number | string, payload: { templateName: string }): Promise<void> => {
     await api.post(`/api/tasks/${taskId}/save-as-template`, payload);

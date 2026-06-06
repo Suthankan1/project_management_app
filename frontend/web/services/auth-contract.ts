@@ -1,4 +1,11 @@
 import api from '@/lib/axios';
+import {
+  login as loginBuilder,
+  register as registerBuilder,
+  forgotPassword as forgotPasswordBuilder,
+  resetPassword as resetPasswordBuilder,
+  updateProfile as updateProfileBuilder,
+} from '@planora/contracts';
 
 export interface AuthUserSummary {
   userId?: number;
@@ -35,18 +42,18 @@ export interface PhotoUploadResponse {
 
 export const authApi = {
   login: async (credentials: Record<string, unknown>): Promise<{ accessToken: string; refreshToken: string }> => {
-    const { data } = await api.post('/api/auth/login', credentials);
+    const { data } = await loginBuilder(api, credentials as any);
     return data;
   },
   register: async (payload: Record<string, unknown>): Promise<void> => {
-    await api.post('/api/auth/register', payload);
+    await registerBuilder(api, payload as any);
   },
   forgotPassword: async (payload: { email: string }): Promise<{ message?: string }> => {
-    const { data } = await api.post('/api/auth/forgot', payload);
+    const { data } = await forgotPasswordBuilder(api, payload);
     return data;
   },
   resetPassword: async (payload: Record<string, unknown>): Promise<void> => {
-    await api.post('/api/auth/reset', payload);
+    await resetPasswordBuilder(api, payload as any);
   },
   verifyEmail: async (payload: { email: string; otp: string }): Promise<void> => {
     await api.post('/api/auth/reg/verify', payload);
@@ -64,7 +71,12 @@ export const authApi = {
     return data;
   },
   updateProfile: async (payload: Partial<UserProfileDto>): Promise<UserProfileDto> => {
-    const { data } = await api.put('/api/user/profile/update', payload);
+    const cleanedPayload: any = {};
+    for (const key of Object.keys(payload)) {
+      const val = (payload as any)[key];
+      cleanedPayload[key] = val === null ? undefined : val;
+    }
+    const { data } = await updateProfileBuilder(api, cleanedPayload);
     return data;
   },
   uploadProfilePhoto: async (formData: FormData): Promise<PhotoUploadResponse> => {

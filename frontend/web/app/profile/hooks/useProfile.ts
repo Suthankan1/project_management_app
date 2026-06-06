@@ -5,6 +5,7 @@ import { AxiosError } from 'axios';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/axios';
 import { getUserFromToken } from '@/lib/auth';
+import { updateProfile } from '@planora/contracts';
 
 type UserResponse = {
     userId: number;
@@ -119,16 +120,16 @@ export function useProfile() {
         setSuccessMessage('');
         try {
             setIsSavingName(true);
-            const response = await api.put<UserResponse>('/api/user/profile/update', {
-                fullName: fullName.trim() || null,
-                firstName: firstName.trim() || null,
-                lastName: lastName.trim() || null,
-                contactNumber: contactNumber.trim() || null,
-                countryCode: countryCode.trim() || null,
-                jobTitle: jobTitle.trim() || null,
-                company: company.trim() || null,
-                position: position.trim() || null,
-                bio: bio.trim() || null,
+            const response = await updateProfile(api, {
+                fullName: fullName.trim() || undefined,
+                firstName: firstName.trim() || undefined,
+                lastName: lastName.trim() || undefined,
+                contactNumber: contactNumber.trim() || undefined,
+                countryCode: countryCode.trim() || undefined,
+                jobTitle: jobTitle.trim() || undefined,
+                company: company.trim() || undefined,
+                position: position.trim() || undefined,
+                bio: bio.trim() || undefined,
             });
             const p = response.data;
             setFullName(p.fullName || '');

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
+import { createProject as createProjectBuilder } from '@planora/contracts';
 
 export type ProjectType = 'AGILE' | 'KANBAN';
 export type TeamOption = 'NEW' | 'EXISTING';
@@ -127,7 +128,7 @@ export function useProjectSetup(projectType: ProjectType) {
 
     setLoading(true);
     try {
-      const res = await api.post('/api/projects', {
+      const res = await createProjectBuilder(api, {
         name: projectName,
         projectKey,
         description,
