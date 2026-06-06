@@ -366,4 +366,43 @@ public class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.url").value("https://s3.amazonaws.com/bucket/photo.jpg?Signature=abc"));
     }
+
+    @Test
+    @WithMockUserPrincipal
+    void testGetAllUsers_Exception_Returns500AndStandardShape() throws Exception {
+        when(userService.getAllUserDTOs(any())).thenThrow(new RuntimeException("Database error"));
+
+        mockMvc.perform(get("/api/auth/users").with(csrf()))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.errorCode").value("INTERNAL_SERVER_ERROR"))
+                .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
+                .andExpect(jsonPath("$.path").value("/api/auth/users"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void testGetUserPhoto_Exception_Returns500AndStandardShape() throws Exception {
+        when(userService.generatePresignedUrlForUser(anyLong())).thenThrow(new RuntimeException("AWS configuration issue"));
+
+        mockMvc.perform(get("/api/auth/users/1/photo").with(csrf()))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.errorCode").value("INTERNAL_SERVER_ERROR"))
+                .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
+                .andExpect(jsonPath("$.path").value("/api/auth/users/1/photo"));
+    }
+
+    @Test
+    @WithMockUserPrincipal(email = "test@example.com")
+    void testGetCurrentUser_Exception_Returns500AndStandardShape() throws Exception {
+        when(userService.getCurrentUserDTO(anyString())).thenThrow(new RuntimeException("Some internal failure"));
+
+        mockMvc.perform(get("/api/auth/me").with(csrf()))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.errorCode").value("INTERNAL_SERVER_ERROR"))
+                .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
+                .andExpect(jsonPath("$.path").value("/api/auth/me"));
+    }
 }

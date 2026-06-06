@@ -161,12 +161,8 @@ public class UserController {
     // the currently logged-in user appearing in their own dropdowns.
     @GetMapping("/users")
     public ResponseEntity<?> getAllUsers(@RequestParam(required = false) String excludeEmail) {
-        try {
-            List<UserResponseDTO> userList = service.getAllUserDTOs(excludeEmail);
-            return new ResponseEntity<>(userList, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error fetching users: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<UserResponseDTO> userList = service.getAllUserDTOs(excludeEmail);
+        return new ResponseEntity<>(userList, HttpStatus.OK);
     }
 
     /**
@@ -176,16 +172,12 @@ public class UserController {
      */
     @GetMapping("/users/{userId}/photo")
     public ResponseEntity<?> getUserPhoto(@PathVariable Long userId) {
-        try {
-            String presignedUrl = service.generatePresignedUrlForUser(userId);
-            if (presignedUrl == null) {
-                // Return 404 so the frontend knows to gracefully fallback to the default avatar.
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-            return new ResponseEntity<>(Map.of("url", presignedUrl), HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error fetching photo: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        String presignedUrl = service.generatePresignedUrlForUser(userId);
+        if (presignedUrl == null) {
+            // Return 404 so the frontend knows to gracefully fallback to the default avatar.
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
+        return new ResponseEntity<>(Map.of("url", presignedUrl), HttpStatus.OK);
     }
 
     // Testing endpoint
@@ -202,12 +194,8 @@ public class UserController {
         if (authentication == null || !authentication.isAuthenticated()) {
             return new ResponseEntity<>("User is not authenticated", HttpStatus.UNAUTHORIZED);
         }
-        try {
-            UserResponseDTO dto = service.getCurrentUserDTO(authentication.getName());
-            return new ResponseEntity<>(dto, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Failed to fetch current user: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        UserResponseDTO dto = service.getCurrentUserDTO(authentication.getName());
+        return new ResponseEntity<>(dto, HttpStatus.OK);
     }
 
 }
