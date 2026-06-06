@@ -86,3 +86,53 @@ Compare the migration file in the code against the actual schema applied to the 
 
 * **Option C: Perform a Controlled Manual Repair**
   Run `flyway repair` via CLI or temporary environment overrides on a non-production clone first to verify.
+
+---
+
+## 4. Renaming a Migration File After It Has Been Applied (e.g., V35)
+
+Renaming a Flyway versioned migration file **after** it has been applied to a database changes the resolved description and checksum stored in `flyway_schema_history`. Flyway will raise a validation error on the next startup unless the history row is updated to match.
+
+### What Was Done: V35 Rename
+
+`V35__add_github_username_to_users.sql` was renamed to `V35__alter_github_username_length_to_39.sql` to accurately reflect that it runs:
+
+```sql
+ALTER TABLE users ALTER COLUMN github_username TYPE VARCHAR(39);
+```
+
+The old name was misleading — adding the column is V33's responsibility.
+
+### Automatic Repair on Startup (Development / Staging)
+
+`FlywayRepairConfiguration` (see `backend/src/main/java/com/planora/backend/configuration/FlywayRepairConfiguration.java`) runs `flyway.repair()` before every `flyway.migrate()` call when the property `app.flyway.repair-on-startup=true` is set. This is enabled by default in all environments (default value is `true`) and is explicitly set to `true` in `application-dev.properties`.
+
+On the first startup after the rename, Flyway repair will:
+1. Detect that the classpath migration for version `35` now resolves to the description `alter_github_username_length_to_39`.
+2. Update the `description` and `checksum` columns in `flyway_schema_history` for version `35` to match the renamed file.
+3. Proceed with `migrate()` normally — no re-execution of the migration occurs.
+
+No manual action is required in development or staging environments.
+
+### Manual Repair for Production
+
+Production has `app.flyway.repair-on-startup=false` to prevent silent schema drift. To correct the V35 history row after the rename, choose one of:
+
+#### Option A: Flyway CLI Repair (Recommended)
+```bash
+flyway repair \
+  -url="jdbc:postgresql://<host>:<port>/<db>" \
+  -user="<username>" \
+  -password="<password>"
+```
+This updates the `description` and `checksum` for V35 in `flyway_schema_history` without re-running any SQL.
+
+#### Option B: Direct SQL Update
+If you cannot run the Flyway CLI, update the row manually after computing the new checksum from the renamed file:
+```sql
+UPDATE flyway_schema_history
+SET description = 'alter_github_username_length_to_39',
+    checksum    = <new_checksum_reported_by_flyway_error>
+WHERE version = '35';
+```
+The correct checksum value is printed in the startup validation error message. Flyway will accept the migration as-is on the next startup once the row matches.

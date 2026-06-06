@@ -218,4 +218,67 @@ class PlanoraStompInboundInterceptorTest {
 
         assertDoesNotThrow(() -> interceptor.preSend(message, messageChannel));
     }
+
+    // ── SEND branch tests ──────────────────────────────────────────────────────
+
+    @Test
+    void sendRejectsProjectDestinationWhenUserIsNotMember() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+        accessor.setDestination("/app/project/99/chat.sendMessage");
+        accessor.setUser(new StompPrincipal("alice"));
+
+        User user = new User();
+        user.setUserId(23L);
+
+        when(userCacheService.resolveUserByEmailOrUsername("alice")).thenReturn(user);
+        when(projectMembershipService.isProjectMember(99L, 23L)).thenReturn(false);
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> interceptor.preSend(message, messageChannel));
+        assertNotNull(ex.getMessage());
+    }
+
+    @Test
+    void sendRejectsProjectDestinationWithoutPrincipal() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+        accessor.setDestination("/app/project/99/chat.sendMessage");
+        // No principal set — simulates an unauthenticated SEND
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> interceptor.preSend(message, messageChannel));
+        assertNotNull(ex.getMessage());
+    }
+
+    @Test
+    void sendAllowsProjectDestinationWhenUserIsMember() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+        accessor.setDestination("/app/project/42/chat.sendMessage");
+        accessor.setUser(new StompPrincipal("alice"));
+
+        User user = new User();
+        user.setUserId(55L);
+
+        when(userCacheService.resolveUserByEmailOrUsername("alice")).thenReturn(user);
+        when(projectMembershipService.isProjectMember(42L, 55L)).thenReturn(true);
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        assertDoesNotThrow(() -> interceptor.preSend(message, messageChannel));
+    }
+
+    @Test
+    void sendPassesThroughNonProjectDestinations() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+        accessor.setDestination("/app/notifications/ack");
+        accessor.setUser(new StompPrincipal("alice"));
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        // No membership mocks needed — non-project destinations are not checked.
+        assertDoesNotThrow(() -> interceptor.preSend(message, messageChannel));
+    }
 }
