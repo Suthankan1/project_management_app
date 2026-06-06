@@ -59,9 +59,14 @@ export function useTaskWebSocket(
     };
 
     const isAuthError = (error: unknown): boolean => {
+      const headers = (error as { headers?: Record<string, string> })?.headers;
+      const errorCode = headers?.['x-error-code'];
+      if (errorCode === 'AUTH_EXPIRED' || errorCode === 'AUTH_INVALID') {
+        return true;
+      }
       const message = typeof error === 'string'
         ? error
-        : ((error as { headers?: { message?: string } })?.headers?.message || '');
+        : (headers?.message || '');
       const normalized = message.toLowerCase();
       return normalized.includes('auth')
         || normalized.includes('jwt')

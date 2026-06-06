@@ -23,6 +23,8 @@ import com.planora.backend.service.JWTService;
 import com.planora.backend.service.ProjectMembershipService;
 import com.planora.backend.service.UserCacheService;
 
+import com.planora.backend.exception.StompAuthException;
+
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 
@@ -71,14 +73,14 @@ public class PlanoraStompInboundInterceptor implements ChannelInterceptor {
         try {
             String auth = accessor.getFirstNativeHeader("Authorization");
             if (auth == null || auth.isBlank()) {
-                throw new MessagingException("Missing Authorization header");
+                throw new StompAuthException("Missing Authorization header", "AUTH_INVALID");
             }
 
             String token = extractBearerToken(auth);
             String identity = jwtService.validateAccessTokenAndGetSubject(token);
             User user = userCacheService.resolveUserByEmailOrUsername(identity);
             if (user == null || user.getUsername() == null || user.getUsername().isBlank()) {
-                throw new MessagingException("User not found for provided token");
+                throw new StompAuthException("User not found for provided token", "AUTH_INVALID");
             }
 
             String normalizedUsername = user.getUsername().toLowerCase();
@@ -91,9 +93,9 @@ public class PlanoraStompInboundInterceptor implements ChannelInterceptor {
             }
             sessionAttributes.put("username", normalizedUsername);
         } catch (ExpiredJwtException e) {
-            throw new MessagingException("JWT expired", e);
+            throw new StompAuthException("JWT expired", "AUTH_EXPIRED", e);
         } catch (JwtException | IllegalArgumentException e) {
-            throw new MessagingException("Invalid JWT", e);
+            throw new StompAuthException("Invalid JWT", "AUTH_INVALID", e);
         }
     }
 

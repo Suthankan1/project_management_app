@@ -508,12 +508,16 @@ export function useChat(projectId: string) {
             handleMessage(frame);
           } else if (frame.command === 'ERROR') {
             console.error('[Chat] STOMP ERROR', frame.body);
-            const normalizedBody = (frame.body || '').toLowerCase();
-            const isAuthError = normalizedBody.includes('jwt')
-              || normalizedBody.includes('auth')
-              || normalizedBody.includes('token')
-              || normalizedBody.includes('expired')
-              || normalizedBody.includes('invalid');
+            const errorCode = frame.headers?.['x-error-code'];
+            let isAuthError = errorCode === 'AUTH_EXPIRED' || errorCode === 'AUTH_INVALID';
+            if (!isAuthError) {
+              const normalizedBody = (frame.body || '').toLowerCase();
+              isAuthError = normalizedBody.includes('jwt')
+                || normalizedBody.includes('auth')
+                || normalizedBody.includes('token')
+                || normalizedBody.includes('expired')
+                || normalizedBody.includes('invalid');
+            }
 
             if (isAuthError) {
               const refreshedToken = await refreshAccessToken().catch(() => null);

@@ -45,6 +45,32 @@ const nextConfig = {
       proxy('dashboard'),
     ];
   },
+  async headers() {
+    const cspHeader = `
+      default-src 'self';
+      script-src 'self' 'unsafe-eval' 'unsafe-inline';
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: blob: http: https:;
+      connect-src 'self' ws: wss: http: https:;
+      font-src 'self' data:;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      frame-ancestors 'none';
+    `.replace(/\s{2,}/g, ' ').trim();
+
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: cspHeader,
+          },
+        ],
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

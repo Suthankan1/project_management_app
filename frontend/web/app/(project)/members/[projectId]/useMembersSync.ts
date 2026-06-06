@@ -192,11 +192,17 @@ export function useMembersSync(
       (error: unknown) => {
         if (isUnmountedRef.current) return;
 
-        const errorMessage = typeof error === 'string' ? error : ((error as { headers?: { message?: string } })?.headers?.message || '');
-        const isAuthError = errorMessage.toLowerCase().includes('auth') ||
-                           errorMessage.toLowerCase().includes('jwt') ||
-                           errorMessage.toLowerCase().includes('expired') ||
-                           errorMessage.toLowerCase().includes('invalid');
+        const headers = (error as { headers?: Record<string, string> })?.headers;
+        const errorCode = headers?.['x-error-code'];
+        let isAuthError = errorCode === 'AUTH_EXPIRED' || errorCode === 'AUTH_INVALID';
+        const errorMessage = typeof error === 'string' ? error : (headers?.message || '');
+
+        if (!isAuthError) {
+          isAuthError = errorMessage.toLowerCase().includes('auth') ||
+                             errorMessage.toLowerCase().includes('jwt') ||
+                             errorMessage.toLowerCase().includes('expired') ||
+                             errorMessage.toLowerCase().includes('invalid');
+        }
 
         if (isAuthError) {
           console.error('[members-ws] Fatal authentication error:', errorMessage);

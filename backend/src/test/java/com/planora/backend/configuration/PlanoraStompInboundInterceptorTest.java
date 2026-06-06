@@ -21,6 +21,7 @@ import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.planora.backend.model.User;
+import com.planora.backend.exception.StompAuthException;
 import com.planora.backend.service.JWTService;
 import com.planora.backend.service.ProjectMembershipService;
 import com.planora.backend.service.UserCacheService;
@@ -53,8 +54,39 @@ class PlanoraStompInboundInterceptorTest {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
         Message<byte[]> message = buildMutableMessage(accessor);
 
-        MessagingException ex = assertThrows(MessagingException.class, () -> interceptor.preSend(message, messageChannel));
+        StompAuthException ex = assertThrows(StompAuthException.class, () -> interceptor.preSend(message, messageChannel));
         assertNotNull(ex.getMessage());
+        assertEquals("AUTH_INVALID", ex.getErrorCode());
+    }
+
+    @Test
+    void connectRejectsExpiredJwt() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+        accessor.setNativeHeader("Authorization", "Bearer expired-token");
+
+        when(jwtService.validateAccessTokenAndGetSubject("expired-token"))
+                .thenThrow(new io.jsonwebtoken.ExpiredJwtException(null, null, "Expired"));
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        StompAuthException ex = assertThrows(StompAuthException.class, () -> interceptor.preSend(message, messageChannel));
+        assertNotNull(ex.getMessage());
+        assertEquals("AUTH_EXPIRED", ex.getErrorCode());
+    }
+
+    @Test
+    void connectRejectsInvalidJwt() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+        accessor.setNativeHeader("Authorization", "Bearer invalid-token");
+
+        when(jwtService.validateAccessTokenAndGetSubject("invalid-token"))
+                .thenThrow(new io.jsonwebtoken.SignatureException("Invalid signature"));
+
+        Message<byte[]> message = buildMutableMessage(accessor);
+
+        StompAuthException ex = assertThrows(StompAuthException.class, () -> interceptor.preSend(message, messageChannel));
+        assertNotNull(ex.getMessage());
+        assertEquals("AUTH_INVALID", ex.getErrorCode());
     }
 
     @Test

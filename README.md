@@ -299,6 +299,19 @@ project_management_app/
 
 ---
 
+## Security
+
+### Token Storage Strategy
+To mitigate the risk of Cross-Site Scripting (XSS) attacks, the application implements a hardened token storage strategy:
+- **Refresh Token**: Stored in a secure, `HttpOnly` cookie set by the backend, ensuring it is inaccessible to JavaScript.
+- **Access Token**: Kept strictly in an in-memory module variable. It is lost on page reload and dynamically re-minted via the `HttpOnly` refresh token cookie during application boot or tab loading.
+- **Session Indicators**: `localStorage` is used only for the non-sensitive `planora:has_refresh_token` flag to indicate to the frontend that an active session exists and it should attempt a silent refresh on startup.
+
+### Content Security Policy (CSP)
+A strict `Content-Security-Policy` header is configured in `next.config.mjs` to reduce XSS reach by limiting script, style, connection, and frame sources.
+
+---
+
 ## Deployment
 
 ### Backend (AWS)

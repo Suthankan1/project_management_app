@@ -60,9 +60,14 @@ export function StompProvider({ token, children }: StompProviderProps) {
     };
 
     const isAuthError = (error: unknown): boolean => {
+      const headers = (error as { headers?: Record<string, string> })?.headers;
+      const errorCode = headers?.['x-error-code'];
+      if (errorCode === 'AUTH_EXPIRED' || errorCode === 'AUTH_INVALID') {
+        return true;
+      }
       const text = typeof error === 'string'
         ? error
-        : ((error as { headers?: { message?: string } })?.headers?.message || '');
+        : (headers?.message || '');
       const normalized = text.toLowerCase();
       return normalized.includes('auth')
         || normalized.includes('jwt')
