@@ -180,12 +180,7 @@ public class UserController {
         return new ResponseEntity<>(Map.of("url", presignedUrl), HttpStatus.OK);
     }
 
-    // Testing endpoint
-    @GetMapping("/try")
-    public String myTry() {
-        return "Try - Running Successfully";
-    }
-
+    @Deprecated
     @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser(Authentication authentication) {
         // While Spring security usually blocks unauthenticated traffic before it hits the controller,

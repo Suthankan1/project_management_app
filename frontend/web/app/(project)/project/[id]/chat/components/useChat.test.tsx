@@ -85,7 +85,7 @@ describe('useChat hook', () => {
   const defaultFetchImplementation = (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString();
 
-    if (url.includes('/api/auth/me')) {
+    if (url.includes('/api/user/me')) {
       return jsonResponse({ username: 'alice' });
     }
 
