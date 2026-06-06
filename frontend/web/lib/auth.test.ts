@@ -57,17 +57,26 @@ describe('auth requestRefreshAccessToken URL handling', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:8080/api/auth/refresh');
   });
 
-  it('throws in production when NEXT_PUBLIC_API_BASE_URL is missing', async () => {
+  it('calls the relative proxy endpoint in production when NEXT_PUBLIC_API_BASE_URL is missing', async () => {
     Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', configurable: true });
     delete process.env.NEXT_PHASE;
     delete process.env.NEXT_PUBLIC_API_BASE_URL;
     saveRefreshToken('mock-refresh-token');
 
-    await expect(refreshAccessToken()).rejects.toThrow('NEXT_PUBLIC_API_BASE_URL environment variable is missing.');
-    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ token: 'new-access-token-prod' }),
+    });
+
+    const token = await refreshAccessToken();
+
+    expect(token).toBe('new-access-token-prod');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/auth/refresh');
   });
 
-  it('falls back to localhost during Next production build when NEXT_PUBLIC_API_BASE_URL is missing', async () => {
+  it('calls the relative proxy endpoint during Next production build when NEXT_PUBLIC_API_BASE_URL is missing', async () => {
     Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', configurable: true });
     process.env.NEXT_PHASE = 'phase-production-build';
     delete process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -83,6 +92,6 @@ describe('auth requestRefreshAccessToken URL handling', () => {
 
     expect(token).toBe('new-access-token-build');
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:8080/api/auth/refresh');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/auth/refresh');
   });
 });

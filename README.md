@@ -160,6 +160,15 @@ cp .env.example .env
 
 Additional optional variables are listed in `.env.example`.
 
+#### Chosen Deployment Model: Same-Origin Proxy
+
+The production environment is configured to use a **Same-Origin Proxy** architecture to eliminate cross-origin request issues, CORS errors, and `SameSite` cookie limitations in the browser. 
+
+In this model:
+- The frontend is deployed to Netlify and proxies all REST API requests (under `/api/*`) server-side to the backend using the `BACKEND_URL` environment variable.
+- Because the browser communicates directly with the same origin, **`NEXT_PUBLIC_API_BASE_URL` is optional** in production and defaults to an empty string `''`. This ensures Axios uses relative URLs (e.g. `/api/auth/...`) instead of hardcoded backend URLs.
+- However, since WebSockets cannot be routed through standard Next.js rewrite rules on Netlify, WebSockets must connect directly to the backend domain. Therefore, **`NEXT_PUBLIC_WS_BASE_URL` is required** in production (e.g. `wss://api.planora.com`) and will trigger a hard-fail runtime exception if missing.
+
 For local Docker development, the values in `.env.example` are safe placeholders for configuration shape only. Replace the AWS credentials and bucket names if you need real file upload flows.
 
 For manual local backend runs outside Docker, use your host Postgres address instead of `db`, for example `SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/planora_db`.
@@ -309,6 +318,7 @@ The frontend is deployed to Netlify via the `netlify.toml` configuration. Set th
 
 - `BACKEND_URL` — the backend's public URL (e.g., `https://api.yourapp.com`)
 - `NEXT_PUBLIC_BACKEND_HOST` — the backend hostname for Next.js image patterns
+- `NEXT_PUBLIC_WS_BASE_URL` — the backend's direct WebSocket absolute URL (e.g., `https://api.yourapp.com`)
 
 ### CI/CD
 
