@@ -12,11 +12,37 @@ const nextConfig = {
   async rewrites() {
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:8080';
 
+    const proxy = (path) => ({
+      source: `/api/${path}/:path*`,
+      destination: `${backendUrl}/api/${path}/:path*`,
+    });
     return [
-      {
-        source: '/api/:path*',
-        destination: `${backendUrl}/api/:path*`,
-      },
+      proxy('auth'),
+      proxy('projects'),
+      proxy('tasks'),
+      proxy('sprints'),
+      proxy('sprintboards'),
+      proxy('burndown'),
+      proxy('calendar'),
+      proxy('kanban'),
+      proxy('kanbans'),
+      proxy('kanban-columns'),
+      proxy('labels'),
+      proxy('users'),
+      proxy('teams'),
+      proxy('notifications'),
+      proxy('chat'),
+      proxy('folders'),
+      proxy('dms'),
+      proxy('milestones'),
+      proxy('user'),
+      proxy('pages'),
+      proxy('scheduled-reports'),
+      proxy('reports'),
+      proxy('search'),
+      proxy('github'),
+      proxy('portfolios'),
+      proxy('dashboard'),
     ];
   },
   images: {

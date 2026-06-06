@@ -1,21 +1,14 @@
 Planora API Contract Check
-Frontend call sites scanned: 382
+Frontend call sites scanned: 389
 Backend routes scanned: 270
 
-Backend endpoints with no frontend/mobile usage: 48
+Backend endpoints with no frontend/mobile usage: 41
 - backend/src/main/java/com/planora/backend/controller/ChatRestController.java:392 GET /api/projects/:projectId/chat/search
 - backend/src/main/java/com/planora/backend/controller/ChatRestController.java:423 GET /api/projects/:projectId/chat/webhooks
 - backend/src/main/java/com/planora/backend/controller/ChatRestController.java:438 POST /api/projects/:projectId/chat/webhooks
 - backend/src/main/java/com/planora/backend/controller/ChatRestController.java:452 DELETE /api/projects/:projectId/chat/webhooks/:webhookId
 - backend/src/main/java/com/planora/backend/controller/ChatRestController.java:466 POST /api/projects/:projectId/chat/webhooks/test
 - backend/src/main/java/com/planora/backend/controller/ChatRestController.java:661 PATCH /api/projects/:projectId/chat/rooms/:roomId/members/:memberUserId/role
-- backend/src/main/java/com/planora/backend/controller/DashboardController.java:40 GET /api/dashboard/recent
-- backend/src/main/java/com/planora/backend/controller/DashboardController.java:49 GET /api/dashboard/favorites
-- backend/src/main/java/com/planora/backend/controller/DashboardController.java:59 GET /api/dashboard/table/worked-on
-- backend/src/main/java/com/planora/backend/controller/DashboardController.java:67 GET /api/dashboard/table/viewed
-- backend/src/main/java/com/planora/backend/controller/DashboardController.java:75 GET /api/dashboard/table/assigned
-- backend/src/main/java/com/planora/backend/controller/DashboardController.java:83 GET /api/dashboard/table/favorites
-- backend/src/main/java/com/planora/backend/controller/DashboardController.java:91 GET /api/dashboard/table/boards
 - backend/src/main/java/com/planora/backend/controller/DocumentController.java:91 POST /api/projects/:projectId/documents/:documentId/versions/upload/init
 - backend/src/main/java/com/planora/backend/controller/DocumentController.java:106 POST /api/projects/:projectId/documents/:documentId/versions/upload/finalize
 - backend/src/main/java/com/planora/backend/controller/GitHubWebhookController.java:70 POST /api/github/webhook
@@ -56,4 +49,4 @@ Summary
 - Blocking critical issues: 0
 - Allowed blocking critical issues: 0
 - Likely parser misses: 0
-- Informational backend-only routes: 48
+- Informational backend-only routes: 41

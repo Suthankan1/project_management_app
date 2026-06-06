@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import useSWR from 'swr';
-import { projectsApi, sprintboardsApi, tasksApi } from '@/services/api-contract';
+import {
+  fetchRecentBoards,
+  fetchTableFavorites,
+  fetchAssignedTasks,
+  fetchWorkedOnTasks,
+  fetchViewedTasks,
+} from '@/services/dashboard-service';
 import {
   DashboardItem,
   mapBoardToDashboard,
@@ -27,30 +33,24 @@ interface UseDashboardDataReturn {
 async function fetchTabData(activeTab: string): Promise<DashboardItem[]> {
   switch (activeTab) {
     case 'boards': {
-      const res = await sprintboardsApi.getRecent(20);
+      const res = await fetchRecentBoards();
       return (res as RawBoard[]).map(mapBoardToDashboard);
     }
     case 'favorites': {
-      const res = await projectsApi.getFavorites();
+      const res = await fetchTableFavorites();
       return (res as RawProject[]).map(mapProjectToDashboard);
     }
     case 'assigned-to-me': {
-      const res = await tasksApi.getAssigned();
+      const res = await fetchAssignedTasks();
       return (res as RawTask[]).map(mapTaskToDashboard);
     }
     case 'worked-on': {
-      const res = await tasksApi.getWorkedOn();
+      const res = await fetchWorkedOnTasks();
       return (res as RawTask[]).map(mapTaskToDashboard);
     }
     case 'viewed': {
-      const [pRes, tRes] = await Promise.all([
-        projectsApi.getRecent(20).catch(() => []),
-        tasksApi.getRecent({ limit: 20 }).catch(() => []),
-      ]);
-      return [
-        ...(pRes as RawProject[]).map(mapProjectToDashboard),
-        ...(tRes as RawTask[]).map(mapTaskToDashboard),
-      ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      const res = await fetchViewedTasks();
+      return (res as RawTask[]).map(mapTaskToDashboard);
     }
     default:
       return [];
@@ -66,7 +66,7 @@ export function useDashboardData({
   // ── Assigned count (independent fetch, always runs when prop exists) ─────────
   const { data: assignedData } = useSWR(
     setDashboardAssignedCount ? 'dashboard:assigned-tasks' : null,
-    () => tasksApi.getAssigned({ limit: 100 }) as Promise<RawTask[]>,
+    () => fetchAssignedTasks() as Promise<RawTask[]>,
     { revalidateOnFocus: false, dedupingInterval: 60_000 },
   );
 

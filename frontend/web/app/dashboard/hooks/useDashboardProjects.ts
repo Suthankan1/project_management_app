@@ -9,6 +9,7 @@ import {
   setSessionCache,
 } from '@/lib/session-cache';
 import { projectsApi } from '@/services/api-contract';
+import { fetchRecentProjects, fetchFavoriteProjects } from '@/services/dashboard-service';
 import type { ProjectSummary as ApiProjectSummary } from '@/services/projects-contract';
 
 // Data will stay fresh in cache for 2 minutes
@@ -63,8 +64,8 @@ export function useDashboardProjects(): UseDashboardProjectsReturn {
       try {
         // Fetch both recent and favorite projects in parallel
         const [recent, favorites] = await Promise.all([
-          projectsApi.getRecent(),
-          projectsApi.getFavorites(),
+          fetchRecentProjects(5),
+          fetchFavoriteProjects(),
         ]);
 
         // Collect unique project IDs across both lists
