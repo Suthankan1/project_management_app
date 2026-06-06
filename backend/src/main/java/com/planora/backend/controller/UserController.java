@@ -12,6 +12,7 @@ import com.planora.backend.dto.OtpRequest;
 import com.planora.backend.dto.ResetPasswordRequest;
 import com.planora.backend.dto.VerifyRequest;
 import com.planora.backend.model.User;
+import com.planora.backend.service.JWTService;
 import com.planora.backend.service.UserService;
 
 import java.util.List;
@@ -32,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 public class UserController {
 
     private final UserService service;
+    private final JWTService jwtService;
 
     //@Valid is used here to fail fast. It catches the bad data (like malformed emails or short passwords)
     //at the controller level before we waste resources hitting the database or service layer.
@@ -61,7 +63,7 @@ public class UserController {
                     .secure(true)
                     .path("/")
                     .maxAge(30 * 24 * 60 * 60) // 30 days
-                    .sameSite("Lax")
+                    .sameSite("None")
                     .build();
             response.setRefreshToken(null);
             return ResponseEntity.ok()
@@ -119,7 +121,7 @@ public class UserController {
                     .secure(true)
                     .path("/")
                     .maxAge(30 * 24 * 60 * 60)
-                    .sameSite("Lax")
+                    .sameSite("None")
                     .build();
             response.setRefreshToken(null);
             return ResponseEntity.ok()
@@ -130,7 +132,19 @@ public class UserController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout() {
+    public ResponseEntity<?> logout(
+            @CookieValue(name = "planora_refresh_token", required = false) String refreshToken) {
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            try {
+                jwtService.validateRefreshToken(refreshToken);
+                String email = jwtService.extractEmail(refreshToken);
+                service.revokeRefreshToken(email);
+            } catch (Exception ignored) {
+                // Logout remains idempotent: always clear the client cookie even if the
+                // submitted refresh token is malformed, expired, or already invalid.
+            }
+        }
+
         ResponseCookie cookie = ResponseCookie.from("planora_refresh_token", "")
                 .httpOnly(true)
                 .secure(true)

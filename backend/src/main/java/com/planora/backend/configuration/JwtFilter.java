@@ -23,7 +23,6 @@ import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
@@ -31,22 +30,8 @@ public class JwtFilter extends OncePerRequestFilter {
     private final JWTService jwtService;
     private final UserDetailsService userDetailsService;
     private static final Logger logger = LoggerFactory.getLogger(JwtFilter.class);
-        private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
-        private static final List<String> PUBLIC_ENDPOINTS = List.of(
-            "/api/auth/register",
-            "/api/auth/reg/verify",
-            "/api/auth/login",
-            "/api/auth/resend",
-            "/api/auth/forgot",
-            "/api/auth/reset",
-            "/api/auth/refresh",
-            "/ws/**",
-            "/ws-native/**",
-            "/yjs/**",
-            "/v3/api-docs/**",
-            "/swagger-ui/**",
-            "/swagger-ui.html"
-        );
+    private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
+    // Single source of truth — see PublicEndpoints for the canonical list.
 
     public JwtFilter(JWTService jwtService,UserDetailsService userDetailsService) {
         this.jwtService = jwtService;
@@ -60,7 +45,11 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         String path = request.getServletPath();
-        return PUBLIC_ENDPOINTS.stream().anyMatch(pattern -> PATH_MATCHER.match(pattern, path));
+        if (path == null || path.isBlank()) {
+            path = request.getRequestURI();
+        }
+        String requestPath = path;
+        return PublicEndpoints.PATTERNS.stream().anyMatch(pattern -> PATH_MATCHER.match(pattern, requestPath));
     }
 
 

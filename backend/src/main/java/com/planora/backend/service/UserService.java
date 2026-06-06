@@ -360,6 +360,21 @@ public class UserService {
         tokenRepository.save(jtiRecord);
     }
 
+    @Transactional
+    public void revokeRefreshToken(String email) {
+        if (email == null || email.isBlank()) {
+            return;
+        }
+
+        userRepository.findFirstByEmailIgnoreCase(email).ifPresent(user -> {
+            VerificationToken existing = tokenRepository.findByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN);
+            if (existing != null) {
+                tokenRepository.delete(existing);
+                tokenRepository.flush();
+            }
+        });
+    }
+
     // Generates and dispatches a new OTP for account verification.
     @Transactional
     public String resendOtp(String email) {

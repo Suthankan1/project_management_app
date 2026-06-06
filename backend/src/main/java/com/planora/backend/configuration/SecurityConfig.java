@@ -37,24 +37,7 @@ public class SecurityConfig {
     @Value("${cors.allowed-origins:http://localhost:3000}")
     private String corsAllowedOrigins;
 
-    private static final List<String> PUBLIC_ENDPOINTS = List.of(
-            "/api/auth/register",
-            "/api/auth/reg/verify",
-            "/api/auth/login",
-            "/api/auth/logout",
-            "/api/auth/resend",
-            "/api/auth/forgot",
-            "/api/auth/reset",
-            "/api/auth/refresh",
-            "/api/github/webhook",    // GitHub webhook deliveries carry no JWT
-            "/api/github/webhooks",   // GitHub webhook deliveries carry no JWT
-            "/ws/**",
-            "/ws-native/**",
-            "/yjs/**",
-            "/v3/api-docs/**",
-            "/swagger-ui/**",
-            "/swagger-ui.html"
-        );
+    // Single source of truth — see PublicEndpoints for the canonical list.
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -63,7 +46,7 @@ public class SecurityConfig {
             })
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(request -> request
-                .requestMatchers(PUBLIC_ENDPOINTS.toArray(new String[0]))
+                .requestMatchers(PublicEndpoints.PATTERNS.toArray(new String[0]))
                         .permitAll()
                 .requestMatchers("/api/github/issues/**")
                         .authenticated()

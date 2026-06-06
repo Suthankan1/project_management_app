@@ -560,6 +560,35 @@ public class UserServiceTest {
     }
 
     @Test
+    void testRevokeRefreshToken_DeletesStoredRefreshToken() {
+        VerificationToken storedToken = new VerificationToken();
+        storedToken.setUser(testUser);
+        storedToken.setToken("refresh-jti");
+        storedToken.setExpiry(Instant.now().plusSeconds(600));
+        storedToken.setUsed(false);
+        storedToken.setTokenType(VerificationToken.TokenType.REFRESH_TOKEN);
+
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.REFRESH_TOKEN)).thenReturn(storedToken);
+
+        userService.revokeRefreshToken("test@example.com");
+
+        verify(tokenRepository).delete(storedToken);
+        verify(tokenRepository).flush();
+    }
+
+    @Test
+    void testRevokeRefreshToken_NoStoredRefreshToken_DoesNothing() {
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
+        when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.REFRESH_TOKEN)).thenReturn(null);
+
+        userService.revokeRefreshToken("test@example.com");
+
+        verify(tokenRepository, never()).delete(any());
+        verify(tokenRepository, never()).flush();
+    }
+
+    @Test
     void testGetUserByEmail_ValidEmail_ReturnsUser() {
         when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
 
