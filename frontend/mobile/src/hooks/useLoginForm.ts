@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import api from '../lib/axios';
-import { login as loginBuilder } from '@planora/contracts';
+import { buildLoginRequest, login as loginBuilder, type LoginRequest } from '@planora/contracts';
 import { getValidToken, saveRefreshToken, saveToken, setRememberMe } from '../lib/auth';
 import { EMAIL_REGEX } from '../lib/validation';
 import { registerForPushNotifications } from '../lib/pushNotifications';
@@ -37,10 +37,11 @@ export function useLoginForm() {
     }
 
     try {
-      const response = await loginBuilder(api, {
+      const request: LoginRequest = buildLoginRequest({
         email: email.toLowerCase(),
         password,
       });
+      const response = await loginBuilder(api, request);
 
       if (response.data.success) {
         await setRememberMe(remember);
@@ -100,4 +101,3 @@ export function useLoginForm() {
     handleLogin,
   };
 }
-

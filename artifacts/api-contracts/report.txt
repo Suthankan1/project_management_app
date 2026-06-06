@@ -1,8 +1,8 @@
 Planora API Contract Check
-Frontend call sites scanned: 389
-Backend routes scanned: 270
+Frontend call sites scanned: 387
+Backend routes scanned: 269
 
-Backend endpoints with no frontend/mobile usage: 41
+Backend endpoints with no frontend/mobile usage: 40
 - backend/src/main/java/com/planora/backend/controller/ChatRestController.java:392 GET /api/projects/:projectId/chat/search
 - backend/src/main/java/com/planora/backend/controller/ChatRestController.java:423 GET /api/projects/:projectId/chat/webhooks
 - backend/src/main/java/com/planora/backend/controller/ChatRestController.java:438 POST /api/projects/:projectId/chat/webhooks
@@ -42,11 +42,10 @@ Backend endpoints with no frontend/mobile usage: 41
 - backend/src/main/java/com/planora/backend/controller/TeamMemberController.java:108 DELETE /api/teams/:teamId/members/:userId
 - backend/src/main/java/com/planora/backend/controller/UserController.java:88 POST /api/auth/resend-otp
 - backend/src/main/java/com/planora/backend/controller/UserController.java:173 GET /api/auth/users/:userId/photo
-- backend/src/main/java/com/planora/backend/controller/UserController.java:184 GET /api/auth/try
-- backend/src/main/java/com/planora/backend/controller/UserController.java:189 GET /api/auth/me
+- backend/src/main/java/com/planora/backend/controller/UserController.java:184 GET /api/auth/me
 
 Summary
 - Blocking critical issues: 0
 - Allowed blocking critical issues: 0
 - Likely parser misses: 0
-- Informational backend-only routes: 41
+- Informational backend-only routes: 40

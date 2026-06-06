@@ -24,24 +24,56 @@ export interface Requester {
   delete<T = any>(url: string, config?: any): Promise<{ data: T }>;
 }
 
+export const buildLoginRequest = (payload: LoginRequest): LoginRequest => ({
+  email: payload.email,
+  password: payload.password,
+  ...(payload.username !== undefined && { username: payload.username }),
+});
+
+export const buildRegisterRequest = (payload: RegisterRequest): RegisterRequest => ({
+  username: payload.username,
+  fullName: payload.fullName,
+  email: payload.email,
+  password: payload.password,
+});
+
+export const buildForgotPasswordRequest = (payload: ForgotPasswordRequest): ForgotPasswordRequest => ({
+  email: payload.email,
+});
+
+export const buildResetPasswordRequest = (payload: ResetPasswordRequest): ResetPasswordRequest => ({
+  email: payload.email,
+  token: payload.token,
+  newPassword: payload.newPassword,
+});
+
+export const buildCreateProjectRequest = (payload: CreateProjectRequest): CreateProjectRequest => ({
+  name: payload.name,
+  projectKey: payload.projectKey,
+  description: payload.description,
+  teamOption: payload.teamOption,
+  teamName: payload.teamName,
+  type: payload.type,
+});
+
 export const updateProfile = (api: Requester, payload: UpdateProfileRequest) => {
   return api.put('/api/user/profile/update', payload);
 };
 
 export const login = (api: Requester, credentials: LoginRequest) => {
-  return api.post('/api/auth/login', credentials);
+  return api.post('/api/auth/login', buildLoginRequest(credentials));
 };
 
 export const register = (api: Requester, payload: RegisterRequest) => {
-  return api.post('/api/auth/register', payload);
+  return api.post('/api/auth/register', buildRegisterRequest(payload));
 };
 
 export const forgotPassword = (api: Requester, payload: ForgotPasswordRequest) => {
-  return api.post('/api/auth/forgot', payload);
+  return api.post('/api/auth/forgot', buildForgotPasswordRequest(payload));
 };
 
 export const resetPassword = (api: Requester, payload: ResetPasswordRequest) => {
-  return api.post('/api/auth/reset', payload);
+  return api.post('/api/auth/reset', buildResetPasswordRequest(payload));
 };
 
 export const postTelemetry = (api: Requester, projectId: number | string, payload: { action: string; target: string; details?: string }) => {
@@ -58,7 +90,7 @@ export const createRoom = (api: Requester, projectId: number | string, payload: 
 };
 
 export const createProject = (api: Requester, payload: CreateProjectRequest) => {
-  return api.post('/api/projects', payload);
+  return api.post('/api/projects', buildCreateProjectRequest(payload));
 };
 
 export const updateTaskStatus = (api: Requester, taskId: number | string, payload: UpdateStatusRequest) => {

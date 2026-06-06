@@ -1158,7 +1158,7 @@ function buildReport({
   }
 
   if (duplicateReports.length) {
-    lines.push(`Duplicate frontend endpoint payloads: ${duplicateReports.length}`);
+    lines.push(`Duplicate divergent frontend endpoint payloads: ${duplicateReports.length}`);
     for (const report of duplicateReports.slice(0, 20)) {
       lines.push(`- ${report.method} ${report.route}`);
       for (const variant of report.variants) {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import api from '../lib/axios';
-import { forgotPassword as forgotPasswordBuilder } from '@planora/contracts';
+import { buildForgotPasswordRequest, forgotPassword as forgotPasswordBuilder, type ForgotPasswordRequest } from '@planora/contracts';
 import { EMAIL_REGEX } from '../lib/validation';
 
 export function useForgotPassword() {
@@ -43,7 +43,8 @@ export function useForgotPassword() {
 
     setIsLoading(true);
     try {
-      await forgotPasswordBuilder(api, { email: email.toLowerCase() });
+      const request: ForgotPasswordRequest = buildForgotPasswordRequest({ email: email.toLowerCase() });
+      await forgotPasswordBuilder(api, request);
       setSubmitted(true);
       startCountdown();
     } catch (err: unknown) {

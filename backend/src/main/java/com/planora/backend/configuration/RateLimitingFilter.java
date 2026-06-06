@@ -1,45 +1,71 @@
 package com.planora.backend.configuration;
 
-import io.github.bucket4j.Bandwidth;
-import io.github.bucket4j.Bucket;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.ServletInputStream;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.ByteArrayInputStream;
-import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * In-memory, per-IP rate limiter for sensitive auth endpoints.
- * Allows at most 5 requests per minute per IP on the configured paths.
+ * Centralized, multi-instance-safe rate limiter for sensitive auth endpoints.
+ *
+ * <p><strong>Throttle policy (single authority — no service-layer duplication):</strong>
+ * <ul>
+ *   <li>{@code /api/auth/forgot}, {@code /api/auth/resend}, {@code /api/auth/resend-otp} —
+ *       5 requests / 10 minutes, keyed on <em>IP + email</em> (OTP-issuance bucket).</li>
+ *   <li>{@code /api/auth/reset} — 5 requests / 15 minutes, keyed on <em>IP + email</em>.</li>
+ *   <li>{@code /api/projects/{id}/invitations} — 10 requests / hour, keyed on <em>projectId + IP</em>.</li>
+ *   <li>All other rate-limited auth paths — 5 requests / minute, keyed on <em>IP + path</em>.</li>
+ * </ul>
+ *
+ * <p><strong>Backend:</strong> Redis INCR + EXPIRE (via {@link StringRedisTemplate}) so counters are
+ * shared across all application instances. If Redis is unavailable the filter <em>fails open</em>
+ * (the request is allowed through) and logs a warning — identical to the graceful-degradation
+ * strategy used by {@code NotificationService}.
  */
 @Component
 @Slf4j
 public class RateLimitingFilter extends OncePerRequestFilter {
 
-    private static final int MAX_REQUESTS_PER_MINUTE = 5;
+    // -------------------------------------------------------------------------
+    // Limits
+    // -------------------------------------------------------------------------
+    private static final int MAX_REQUESTS_PER_MINUTE  = 5;
     private static final int MAX_INVITATIONS_PER_HOUR = 10;
-    private static final int MAX_RESETS_PER_15_MIN = 5;
+    private static final int MAX_RESETS_PER_15_MIN    = 5;
+    /** OTP-issuance endpoints: forgot / resend / resend-otp */
+    private static final int MAX_OTP_PER_10_MIN       = 5;
 
+    // -------------------------------------------------------------------------
+    // TTLs matching the limits above
+    // -------------------------------------------------------------------------
+    private static final Duration TTL_GENERIC     = Duration.ofMinutes(1);
+    private static final Duration TTL_INVITATION  = Duration.ofHours(1);
+    private static final Duration TTL_RESET       = Duration.ofMinutes(15);
+    private static final Duration TTL_OTP         = Duration.ofMinutes(10);
+
+    // -------------------------------------------------------------------------
+    // Path matching
+    // -------------------------------------------------------------------------
     private static final Pattern PROJECT_INVITE_PATH = Pattern.compile("^/api/projects/(\\d+)/invitations$");
 
     private static final List<String> RATE_LIMITED_PATHS = List.of(
@@ -50,20 +76,36 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             "/api/auth/reset"
     );
 
-    private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
-            .expireAfterAccess(2, TimeUnit.MINUTES)
-            .maximumSize(50_000)
-            .recordStats()
-            .build();
+    /** Paths whose bodies must be parsed for an {@code email} field. */
+    private static final List<String> OTP_PATHS = List.of(
+            "/api/auth/forgot",
+            "/api/auth/resend",
+            "/api/auth/resend-otp"
+    );
 
-    private final java.util.List<IpAddressMatcher> trustedProxyMatchers;
+    // -------------------------------------------------------------------------
+    // Dependencies
+    // -------------------------------------------------------------------------
+
+    /**
+     * Optional to remain unit-testable without a running Redis server.
+     * When null the filter falls back to fail-open behaviour.
+     */
+    @Autowired(required = false)
+    private StringRedisTemplate stringRedisTemplate;
+
+    private final List<IpAddressMatcher> trustedProxyMatchers;
+
+    // -------------------------------------------------------------------------
+    // Constructors
+    // -------------------------------------------------------------------------
 
     public RateLimitingFilter() {
         this("127.0.0.1,::1");
     }
 
-    public RateLimitingFilter(@Value("${app.security.trusted-proxies:127.0.0.1,::1}") String trustedProxiesProperty) {
-        log.warn("Eviction count at startup: {}", buckets.stats().evictionCount());
+    public RateLimitingFilter(
+            @Value("${app.security.trusted-proxies:127.0.0.1,::1}") String trustedProxiesProperty) {
         String properties = (trustedProxiesProperty == null || trustedProxiesProperty.isBlank())
                 ? "127.0.0.1,::1"
                 : trustedProxiesProperty;
@@ -73,6 +115,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
                 .map(IpAddressMatcher::new)
                 .toList();
     }
+
+    // -------------------------------------------------------------------------
+    // Filter logic
+    // -------------------------------------------------------------------------
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -88,82 +134,127 @@ public class RateLimitingFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        String key;
-        Bucket bucket;
+        String rateLimitKey;
+        int limit;
         HttpServletRequest requestToProcess = request;
 
         if (isResetPasswordRequest(request)) {
-            CachedBodyHttpServletRequest wrappedRequest = new CachedBodyHttpServletRequest(request);
-            requestToProcess = wrappedRequest;
-            String email = "unknown";
-            try {
-                byte[] body = wrappedRequest.getCachedBody();
-                if (body != null && body.length > 0) {
-                    Map<String, Object> map = new com.fasterxml.jackson.databind.ObjectMapper().readValue(body, Map.class);
-                    if (map != null && map.get("email") != null) {
-                        email = map.get("email").toString().trim().toLowerCase();
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("Failed to parse email from reset password request body", e);
+            // -----------------------------------------------------------------
+            // /api/auth/reset  →  key: reset:{ip}:{email}
+            // -----------------------------------------------------------------
+            CachedBodyHttpServletRequest wrapped = new CachedBodyHttpServletRequest(request);
+            requestToProcess = wrapped;
+            String email = extractEmailFromBody(wrapped.getCachedBody());
+            rateLimitKey = "reset:" + resolveClientIp(wrapped) + ":" + email;
+            limit = MAX_RESETS_PER_15_MIN;
+
+            if (isRateLimited(rateLimitKey, limit, TTL_RESET)) {
+                rejectWithTooManyRequests(response, request,
+                        "Too many password reset attempts. Please try again in 15 minutes.");
+                return;
             }
-            key = "reset:" + resolveClientIp(wrappedRequest) + ":" + email;
-            bucket = buckets.get(key, k -> newResetBucket());
+
+        } else if (isOtpRequest(request)) {
+            // -----------------------------------------------------------------
+            // /api/auth/forgot|resend|resend-otp  →  key: otp:{ip}:{email}
+            // -----------------------------------------------------------------
+            CachedBodyHttpServletRequest wrapped = new CachedBodyHttpServletRequest(request);
+            requestToProcess = wrapped;
+            String email = extractEmailFromBody(wrapped.getCachedBody());
+            rateLimitKey = "otp:" + resolveClientIp(wrapped) + ":" + email;
+            limit = MAX_OTP_PER_10_MIN;
+
+            if (isRateLimited(rateLimitKey, limit, TTL_OTP)) {
+                rejectWithTooManyRequests(response, request,
+                        "Too many OTP requests. Please try again in 10 minutes.");
+                return;
+            }
+
         } else if (isProjectInviteRequest(request)) {
-            Matcher matcher = PROJECT_INVITE_PATH.matcher(request.getServletPath());
-            String projectId = matcher.find() ? matcher.group(1) : "unknown";
-            key = "invite-project:" + projectId + ":" + resolveClientIp(request);
-            bucket = buckets.get(key, k -> newInvitationBucket());
+            // -----------------------------------------------------------------
+            // /api/projects/{id}/invitations  →  key: invite:{projectId}:{ip}
+            // -----------------------------------------------------------------
+            Matcher m = PROJECT_INVITE_PATH.matcher(request.getServletPath());
+            String projectId = m.find() ? m.group(1) : "unknown";
+            rateLimitKey = "invite:" + projectId + ":" + resolveClientIp(request);
+            limit = MAX_INVITATIONS_PER_HOUR;
+
+            if (isRateLimited(rateLimitKey, limit, TTL_INVITATION)) {
+                rejectWithTooManyRequests(response, request,
+                        "Too many invitations sent, try again in 1 hour");
+                return;
+            }
+
         } else {
-            key = resolveClientIp(request) + ":" + request.getServletPath();
-            bucket = buckets.get(key, k -> newBucket());
+            // -----------------------------------------------------------------
+            // Generic auth paths  →  key: auth:{ip}:{path}
+            // -----------------------------------------------------------------
+            rateLimitKey = "auth:" + resolveClientIp(request) + ":" + request.getServletPath();
+            limit = MAX_REQUESTS_PER_MINUTE;
+
+            if (isRateLimited(rateLimitKey, limit, TTL_GENERIC)) {
+                rejectWithTooManyRequests(response, request,
+                        "Too many requests. Please try again later.");
+                return;
+            }
         }
 
-        if (bucket.tryConsume(1)) {
-            filterChain.doFilter(requestToProcess, response);
-        } else {
-            log.warn("Rate limit exceeded for key={}", key);
-            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-            response.setContentType("application/json");
-            String message = isResetPasswordRequest(request)
-                ? "Too many password reset attempts. Please try again in 15 minutes."
-                : (isProjectInviteRequest(request)
-                    ? "Too many invitations sent, try again in 1 hour"
-                    : "Too many requests. Please try again later.");
-            com.planora.backend.dto.ApiErrorResponse errorResponse = new com.planora.backend.dto.ApiErrorResponse(
-                java.time.LocalDateTime.now().toString(),
-                HttpStatus.TOO_MANY_REQUESTS.value(),
-                "RATE_LIMIT",
-                message,
-                request.getRequestURI(),
-                null
-            );
-            response.getWriter().write(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(errorResponse));
+        filterChain.doFilter(requestToProcess, response);
+    }
+
+    // -------------------------------------------------------------------------
+    // Redis counter helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Atomically increments the counter for {@code key} and sets its TTL on the first
+     * increment. Returns {@code true} when the counter has exceeded {@code limit},
+     * meaning the request should be rejected.
+     *
+     * <p>Fails open (returns {@code false}) when Redis is unavailable, logging a warning.
+     */
+    boolean isRateLimited(String key, int limit, Duration ttl) {
+        if (stringRedisTemplate == null) {
+            // No Redis wired (e.g. unit-test context without a mock) — allow through.
+            log.warn("StringRedisTemplate not available; rate-limit check skipped for key={}", key);
+            return false;
+        }
+        try {
+            Long count = stringRedisTemplate.opsForValue().increment(key);
+            if (count == null) {
+                log.warn("Redis INCR returned null for key={}; allowing request", key);
+                return false;
+            }
+            if (count == 1L) {
+                // First increment — set expiry so the key self-cleans after the window.
+                stringRedisTemplate.expire(key, ttl);
+            }
+            if (count > limit) {
+                log.warn("Rate limit exceeded: key={} count={} limit={}", key, count, limit);
+                return true;
+            }
+            return false;
+        } catch (RuntimeException ex) {
+            // Redis is unavailable — fail open, matching NotificationService convention.
+            log.warn("Redis unavailable during rate-limit check for key={}; allowing request: {}", key, ex.getMessage());
+            return false;
         }
     }
 
-    private Bucket newBucket() {
-        Bandwidth limit = Bandwidth.builder()
-                .capacity(MAX_REQUESTS_PER_MINUTE)
-                .refillIntervally(MAX_REQUESTS_PER_MINUTE, Duration.ofMinutes(1))
-                .build();
-        return Bucket.builder().addLimit(limit).build();
+    // -------------------------------------------------------------------------
+    // Request classification helpers
+    // -------------------------------------------------------------------------
+
+    private boolean isResetPasswordRequest(HttpServletRequest request) {
+        return "POST".equalsIgnoreCase(request.getMethod())
+                && "/api/auth/reset".equals(request.getServletPath());
     }
 
-    private Bucket newInvitationBucket() {
-        Bandwidth limit = Bandwidth.builder()
-                .capacity(MAX_INVITATIONS_PER_HOUR)
-                .refillIntervally(MAX_INVITATIONS_PER_HOUR, Duration.ofHours(1))
-                .build();
-        return Bucket.builder().addLimit(limit).build();
-    }
-
-    private Bucket newResetBucket() {
-        Bandwidth limit = Bandwidth.builder()
-                .capacity(MAX_RESETS_PER_15_MIN)
-                .refillIntervally(MAX_RESETS_PER_15_MIN, Duration.ofMinutes(15))
-                .build();
-        return Bucket.builder().addLimit(limit).build();
+    private boolean isOtpRequest(HttpServletRequest request) {
+        if (!"POST".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        return OTP_PATHS.contains(request.getServletPath());
     }
 
     private boolean isProjectInviteRequest(HttpServletRequest request) {
@@ -173,29 +264,56 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         return PROJECT_INVITE_PATH.matcher(request.getServletPath()).matches();
     }
 
-    private boolean isResetPasswordRequest(HttpServletRequest request) {
-        return "POST".equalsIgnoreCase(request.getMethod()) && "/api/auth/reset".equals(request.getServletPath());
-    }
+    // -------------------------------------------------------------------------
+    // Body parsing helpers
+    // -------------------------------------------------------------------------
 
-    private HttpServletRequest unwrapRequest(HttpServletRequest request) {
-        jakarta.servlet.ServletRequest current = request;
-        while (current instanceof HttpServletRequestWrapper) {
-            current = ((HttpServletRequestWrapper) current).getRequest();
+    /**
+     * Extracts the {@code email} field from a JSON request body.
+     * Returns {@code "unknown"} if the body cannot be parsed or the field is absent.
+     */
+    private String extractEmailFromBody(byte[] body) {
+        if (body == null || body.length == 0) {
+            return "unknown";
         }
-        return (HttpServletRequest) current;
-    }
-
-    private boolean isTrustedProxy(String ip) {
-        if (ip == null || ip.isBlank()) {
-            return false;
-        }
-        for (IpAddressMatcher matcher : trustedProxyMatchers) {
-            if (matcher.matches(ip)) {
-                return true;
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(body, Map.class);
+            if (map != null && map.get("email") != null) {
+                return map.get("email").toString().trim().toLowerCase();
             }
+        } catch (Exception e) {
+            log.warn("Failed to parse email from request body for rate-limit keying", e);
         }
-        return false;
+        return "unknown";
     }
+
+    // -------------------------------------------------------------------------
+    // Response helper
+    // -------------------------------------------------------------------------
+
+    private void rejectWithTooManyRequests(HttpServletResponse response,
+                                           HttpServletRequest request,
+                                           String message) throws IOException {
+        log.warn("Rate limit exceeded: uri={}", request.getRequestURI());
+        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+        response.setContentType("application/json");
+        com.planora.backend.dto.ApiErrorResponse errorResponse = new com.planora.backend.dto.ApiErrorResponse(
+                java.time.LocalDateTime.now().toString(),
+                HttpStatus.TOO_MANY_REQUESTS.value(),
+                "RATE_LIMIT",
+                message,
+                request.getRequestURI(),
+                null
+        );
+        response.getWriter().write(
+                new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(errorResponse));
+    }
+
+    // -------------------------------------------------------------------------
+    // IP resolution
+    // -------------------------------------------------------------------------
 
     private String resolveClientIp(HttpServletRequest request) {
         HttpServletRequest rawRequest = unwrapRequest(request);
@@ -224,7 +342,31 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         return immediatePeer;
     }
 
-    private static class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
+    private HttpServletRequest unwrapRequest(HttpServletRequest request) {
+        jakarta.servlet.ServletRequest current = request;
+        while (current instanceof HttpServletRequestWrapper) {
+            current = ((HttpServletRequestWrapper) current).getRequest();
+        }
+        return (HttpServletRequest) current;
+    }
+
+    private boolean isTrustedProxy(String ip) {
+        if (ip == null || ip.isBlank()) {
+            return false;
+        }
+        for (IpAddressMatcher matcher : trustedProxyMatchers) {
+            if (matcher.matches(ip)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Inner classes — body caching (unchanged)
+    // -------------------------------------------------------------------------
+
+    static class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
         private final byte[] cachedBody;
 
         public CachedBodyHttpServletRequest(HttpServletRequest request) throws IOException {
@@ -243,8 +385,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
         @Override
         public BufferedReader getReader() throws IOException {
-            ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(this.cachedBody);
-            return new BufferedReader(new InputStreamReader(byteArrayInputStream));
+            return new BufferedReader(new InputStreamReader(new ByteArrayInputStream(this.cachedBody)));
         }
     }
 

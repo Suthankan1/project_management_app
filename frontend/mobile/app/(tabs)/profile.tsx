@@ -14,6 +14,14 @@ import api from '@/src/api/axios';
 import PasswordInput from '@/src/components/ui/PasswordInput';
 import { validatePassword, getPasswordStrength } from '@/src/lib/validation';
 import PasswordStrengthBar from '@/src/components/ui/PasswordStrengthBar';
+import {
+  buildForgotPasswordRequest,
+  buildResetPasswordRequest,
+  forgotPassword as forgotPasswordBuilder,
+  resetPassword as resetPasswordBuilder,
+  type ForgotPasswordRequest,
+  type ResetPasswordRequest,
+} from '@planora/contracts';
 
 // ─── Types (mirrors web useProfileData.ts UserResponse exactly) ───────────────
 
@@ -159,7 +167,8 @@ function ChangePasswordSection({ email }: { email: string }) {
   const sendOtp = async () => {
     setSending(true);
     try {
-      await api.post('/api/auth/forgot', { email });
+      const request: ForgotPasswordRequest = buildForgotPasswordRequest({ email });
+      await forgotPasswordBuilder(api, request);
       setStep('sent');
       showMsg('Reset code sent to your email.');
     } catch { showMsg('Failed to send reset code.', true); }
@@ -176,7 +185,8 @@ function ChangePasswordSection({ email }: { email: string }) {
     
     setResetting(true);
     try {
-      await api.post('/api/auth/reset', { email, token: otp.trim(), newPassword: newPw });
+      const request: ResetPasswordRequest = buildResetPasswordRequest({ email, token: otp.trim(), newPassword: newPw });
+      await resetPasswordBuilder(api, request);
       setStep('done');
       showMsg('Password changed successfully!');
       setOtp('');
