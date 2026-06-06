@@ -1,3 +1,5 @@
+import { getApiBaseUrl } from './api-base-url';
+
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1'])
 
 function isLocalHostname(hostname: string): boolean {
@@ -12,8 +14,8 @@ function isLocalHostname(hostname: string): boolean {
  * If the variable is missing in production runtime, it throws a hard-fail runtime error.
  * 
  * In development or during Next build phase, if NEXT_PUBLIC_WS_BASE_URL is missing,
- * it falls back to the backend URL passed in (or 'http://localhost:8080' if empty),
- * converting it to a local 'ws://' endpoint.
+ * it falls back to the backend URL passed in, then the shared API base URL,
+ * converting it to a local 'ws://' endpoint when appropriate.
  */
 export function resolveWebSocketBaseUrl(backendUrl: string): string {
   let wsUrl = process.env.NEXT_PUBLIC_WS_BASE_URL;
@@ -26,8 +28,7 @@ export function resolveWebSocketBaseUrl(backendUrl: string): string {
       throw new Error('NEXT_PUBLIC_WS_BASE_URL environment variable is missing.');
     }
     
-    // In development or during production build phase, fallback to backendUrl or localhost
-    wsUrl = backendUrl || 'http://localhost:8080';
+    wsUrl = backendUrl || getApiBaseUrl();
   }
 
   const rawUrl = wsUrl.trim();

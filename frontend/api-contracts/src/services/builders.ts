@@ -1,10 +1,10 @@
 import type { operations } from '../../types';
 import { formatLocalDate } from '../utils/date';
 
-export type LoginRequest = Omit<operations['login']['requestBody']['content']['application/json'], 'username'> & { username?: string };
-export type RegisterRequest = operations['register']['requestBody']['content']['application/json'];
+export type LoginRequest = Omit<operations['login']['requestBody']['content']['application/json'], 'email' | 'username'> & { email?: string; username?: string };
+export type RegisterRequest = Omit<operations['register']['requestBody']['content']['application/json'], 'username' | 'fullName'> & { username?: string; fullName?: string };
 export type ForgotPasswordRequest = operations['forgotPassword']['requestBody']['content']['application/json'];
-export type ResetPasswordRequest = operations['resetPassword']['requestBody']['content']['application/json'];
+export type ResetPasswordRequest = Partial<operations['resetPassword']['requestBody']['content']['application/json']>;
 export type UpdateProfileRequest = operations['updateProfile']['requestBody']['content']['application/json'];
 export type IngestTelemetryRequest = operations['ingestTelemetry']['requestBody']['content']['application/json'];
 export type CreateRoomRequest = operations['createRoom']['requestBody']['content']['application/json'];
@@ -25,16 +25,16 @@ export interface Requester {
 }
 
 export const buildLoginRequest = (payload: LoginRequest): LoginRequest => ({
-  email: payload.email,
   password: payload.password,
+  ...(payload.email !== undefined && { email: payload.email }),
   ...(payload.username !== undefined && { username: payload.username }),
 });
 
 export const buildRegisterRequest = (payload: RegisterRequest): RegisterRequest => ({
-  username: payload.username,
-  fullName: payload.fullName,
   email: payload.email,
   password: payload.password,
+  ...(payload.username !== undefined && { username: payload.username }),
+  ...(payload.fullName !== undefined && { fullName: payload.fullName }),
 });
 
 export const buildForgotPasswordRequest = (payload: ForgotPasswordRequest): ForgotPasswordRequest => ({
@@ -42,9 +42,9 @@ export const buildForgotPasswordRequest = (payload: ForgotPasswordRequest): Forg
 });
 
 export const buildResetPasswordRequest = (payload: ResetPasswordRequest): ResetPasswordRequest => ({
-  email: payload.email,
-  token: payload.token,
-  newPassword: payload.newPassword,
+  ...(payload.email !== undefined && { email: payload.email }),
+  ...(payload.token !== undefined && { token: payload.token }),
+  ...(payload.newPassword !== undefined && { newPassword: payload.newPassword }),
 });
 
 export const buildCreateProjectRequest = (payload: CreateProjectRequest): CreateProjectRequest => ({

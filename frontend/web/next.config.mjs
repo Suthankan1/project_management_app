@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   output: 'standalone',
   turbopack: {
-    root: path.resolve(__dirname),
+    root: path.resolve(__dirname, '../..'),
   },
   async rewrites() {
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:8080';

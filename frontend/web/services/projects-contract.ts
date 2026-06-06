@@ -1,5 +1,6 @@
 import api from '@/lib/axios';
 import { createProject as createProjectBuilder } from '@planora/contracts';
+import type { CreateProjectRequest } from '@planora/contracts';
 import type { ProjectMetrics } from '@/types';
 
 export interface ProjectCustomFieldDto {
@@ -154,8 +155,8 @@ export const projectsApi = {
     const { data } = await api.get(`/api/teams/check-name?name=${encodeURIComponent(name)}`);
     return data;
   },
-  create: async (payload: Record<string, unknown>): Promise<ProjectSummary> => {
-    const { data } = await createProjectBuilder(api, payload as any);
+  create: async (payload: CreateProjectRequest): Promise<ProjectSummary> => {
+    const { data } = await createProjectBuilder(api, payload);
     return data;
   },
   getCustomFields: async (projectId: number | string): Promise<ProjectCustomFieldDto[]> => {

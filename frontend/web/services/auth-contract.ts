@@ -6,6 +6,7 @@ import {
   resetPassword as resetPasswordBuilder,
   updateProfile as updateProfileBuilder,
 } from '@planora/contracts';
+import type { LoginRequest, RegisterRequest, ResetPasswordRequest, UpdateProfileRequest } from '@planora/contracts';
 
 export interface AuthUserSummary {
   userId?: number;
@@ -41,19 +42,19 @@ export interface PhotoUploadResponse {
 }
 
 export const authApi = {
-  login: async (credentials: Record<string, unknown>): Promise<{ accessToken: string; refreshToken: string }> => {
-    const { data } = await loginBuilder(api, credentials as any);
+  login: async (credentials: LoginRequest): Promise<{ accessToken: string; refreshToken: string }> => {
+    const { data } = await loginBuilder(api, credentials);
     return data;
   },
-  register: async (payload: Record<string, unknown>): Promise<void> => {
-    await registerBuilder(api, payload as any);
+  register: async (payload: RegisterRequest): Promise<void> => {
+    await registerBuilder(api, payload);
   },
   forgotPassword: async (payload: { email: string }): Promise<{ message?: string }> => {
     const { data } = await forgotPasswordBuilder(api, payload);
     return data;
   },
-  resetPassword: async (payload: Record<string, unknown>): Promise<void> => {
-    await resetPasswordBuilder(api, payload as any);
+  resetPassword: async (payload: ResetPasswordRequest): Promise<void> => {
+    await resetPasswordBuilder(api, payload);
   },
   verifyEmail: async (payload: { email: string; otp: string }): Promise<void> => {
     await api.post('/api/auth/reg/verify', payload);
@@ -71,11 +72,9 @@ export const authApi = {
     return data;
   },
   updateProfile: async (payload: Partial<UserProfileDto>): Promise<UserProfileDto> => {
-    const cleanedPayload: any = {};
-    for (const key of Object.keys(payload)) {
-      const val = (payload as any)[key];
-      cleanedPayload[key] = val === null ? undefined : val;
-    }
+    const cleanedPayload = Object.fromEntries(
+      Object.entries(payload).map(([key, val]) => [key, val === null ? undefined : val])
+    ) as UpdateProfileRequest;
     const { data } = await updateProfileBuilder(api, cleanedPayload);
     return data;
   },
