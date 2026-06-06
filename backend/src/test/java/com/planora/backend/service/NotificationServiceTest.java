@@ -28,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.planora.backend.dto.NotificationFeedResponseDTO;
 import com.planora.backend.dto.NotificationResponseDTO;
@@ -261,6 +262,21 @@ class NotificationServiceTest {
         assertFalse(feed.getNotifications().get(0).isRead());
         assertTrue(feed.getNotifications().get(1).isRead());
         assertEquals(1L, feed.getUnreadCount());
+    }
+
+    @Test
+    void getUnreadCount_whenRedisCacheDisabled_readsDatabaseWithoutRedisAccess() {
+        ReflectionTestUtils.setField(notificationService, "notificationRedisCacheEnabled", false);
+        when(notificationRepository.countByRecipientUserIdAndIsReadFalse(15L)).thenReturn(7L);
+
+        long unreadCount = notificationService.getUnreadCount(15L);
+
+        assertEquals(7L, unreadCount);
+        verify(notificationRepository).countByRecipientUserIdAndIsReadFalse(15L);
+        verify(stringRedisTemplate, never()).opsForValue();
+        verify(stringRedisTemplate, never()).delete(anyString());
+        verify(valueOperations, never()).get(anyString());
+        verify(valueOperations, never()).set(anyString(), anyString(), any());
     }
 
     @Test

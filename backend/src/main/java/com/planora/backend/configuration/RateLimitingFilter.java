@@ -216,7 +216,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     boolean isRateLimited(String key, int limit, Duration ttl) {
         if (stringRedisTemplate == null) {
             // No Redis wired (e.g. unit-test context without a mock) — allow through.
-            log.warn("StringRedisTemplate not available; rate-limit check skipped for key={}", key);
+            log.debug("StringRedisTemplate not available; rate-limit check skipped for key={}", key);
             return false;
         }
         try {
