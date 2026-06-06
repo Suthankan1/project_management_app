@@ -44,6 +44,8 @@ class GithubIssueImportServiceTest {
     private TeamMembershipLookupService teamMembershipLookupService;
     @Mock
     private GithubIssueConversionService githubIssueConversionService;
+    @Mock
+    private GithubTokenService githubTokenService;
 
     @InjectMocks
     private GithubIssueImportService service;
@@ -78,6 +80,7 @@ class GithubIssueImportServiceTest {
     void importIssues_convertsAndSavesRequestedIssuesAndSkipsImportedIssues() {
         when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
         when(teamMembershipLookupService.getTeamMember(20L, 7L)).thenReturn(member);
+        when(githubTokenService.getToken(7L)).thenReturn("github-token");
         when(githubIssuesSyncService.syncIssues("planora/app", "github-token"))
                 .thenReturn(List.of(issue(1, "open", "First", "body one", "bug", "d73a4a"),
                         issue(2, "closed", "Second", "body two", null, null)));
@@ -126,6 +129,20 @@ class GithubIssueImportServiceTest {
 
         assertThrows(ForbiddenException.class, () -> service.importIssues(request, user));
         verify(githubIssuesSyncService, never()).syncIssues(any(), any());
+    }
+
+    @Test
+    void importIssues_usesRequestTokenForBrowserOauthConnections() {
+        user.setGithubAccessToken(null);
+        request.setIssueNumbers(List.of());
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(teamMembershipLookupService.getTeamMember(20L, 7L)).thenReturn(member);
+        when(githubIssuesSyncService.syncIssues("planora/app", "browser-token"))
+                .thenReturn(List.of());
+
+        service.importIssues(request, user, "browser-token");
+
+        verify(githubIssuesSyncService).syncIssues("planora/app", "browser-token");
     }
 
     private GithubIssueDTO issue(

@@ -1,49 +1,52 @@
 package com.planora.backend.controller;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.List;
-import java.util.Optional;
-import java.time.Instant;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.http.MediaType;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.planora.backend.dto.GithubIssueDTO;
-import com.planora.backend.dto.GithubIssueCreateRequestDTO;
 import com.planora.backend.dto.GithubCommentDTO;
 import com.planora.backend.dto.GithubCommentSyncResponseDTO;
+import com.planora.backend.dto.GithubIssueCreateRequestDTO;
+import com.planora.backend.dto.GithubIssueDTO;
 import com.planora.backend.dto.GithubIssueImportResponseDTO;
 import com.planora.backend.dto.GithubLabelDTO;
 import com.planora.backend.exception.ForbiddenException;
-import com.planora.backend.exception.GithubRateLimitException;
 import com.planora.backend.exception.GithubIssueValidationException;
+import com.planora.backend.exception.GithubRateLimitException;
 import com.planora.backend.exception.GithubRepositoryNotFoundException;
 import com.planora.backend.model.User;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.repository.UserRepository;
-import com.planora.backend.service.GithubIssueImportService;
 import com.planora.backend.service.GithubIssueCommentSyncService;
+import com.planora.backend.service.GithubIssueImportService;
 import com.planora.backend.service.GithubIssuesSyncService;
+import com.planora.backend.service.GithubNotificationService;
+import com.planora.backend.service.GithubTokenService;
 import com.planora.backend.service.JWTService;
+import com.planora.backend.service.TaskService;
 
 @WebMvcTest(GithubIssuesController.class)
+@SuppressWarnings("unused")
 class GithubIssuesControllerTest {
 
     @Autowired
@@ -55,8 +58,14 @@ class GithubIssuesControllerTest {
     @MockitoBean
     private GithubIssuesSyncService githubIssuesSyncService;
 
+        @MockitoBean
+        private GithubNotificationService githubNotificationService;
+
     @MockitoBean
     private GithubIssueImportService githubIssueImportService;
+
+    @MockitoBean
+    private GithubTokenService githubTokenService;
 
     @MockitoBean
     private GithubIssueCommentSyncService githubIssueCommentSyncService;
@@ -70,6 +79,9 @@ class GithubIssuesControllerTest {
     @MockitoBean
     private UserDetailsService userDetailsService;
 
+        @MockitoBean
+        private TaskService taskService;
+
     private User userEntity;
     private UserPrincipal principal;
 
@@ -79,8 +91,10 @@ class GithubIssuesControllerTest {
         userEntity.setUserId(7L);
         userEntity.setUsername("alice");
         userEntity.setEmail("alice@example.com");
+                userEntity.setGithubUsername("octocat");
         userEntity.setGithubAccessToken("github-token");
         principal = new UserPrincipal(userEntity);
+        org.mockito.Mockito.lenient().when(githubTokenService.getToken(7L)).thenReturn("github-token");
     }
 
     @Test
@@ -122,6 +136,7 @@ class GithubIssuesControllerTest {
     void getIssues_returnsUnauthorizedWhenGithubTokenIsMissing() throws Exception {
         userEntity.setGithubAccessToken(" ");
         when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
+        when(githubTokenService.getToken(7L)).thenReturn(null);
 
         mockMvc.perform(get("/api/github/issues")
                         .with(user(principal))
@@ -165,7 +180,9 @@ class GithubIssuesControllerTest {
     @Test
     void importIssues_returnsImportedAndSkippedTaskResults() throws Exception {
         when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
-        when(githubIssueImportService.importIssues(any(), org.mockito.ArgumentMatchers.eq(userEntity)))
+        when(githubIssueImportService.importIssues(
+                any(),
+                org.mockito.ArgumentMatchers.eq(userEntity)))
                 .thenReturn(new GithubIssueImportResponseDTO(List.of(101L, 102L), List.of(3)));
 
         mockMvc.perform(post("/api/github/issues/import")
@@ -223,13 +240,49 @@ class GithubIssuesControllerTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.number").value(34))
-                .andExpect(jsonPath("$.title").value("Fix login"));
+                .andExpect(jsonPath("$.title").value("Fix login"))
+                .andExpect(jsonPath("$.access_token").doesNotExist())
+                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(jsonPath("$.githubAccessToken").doesNotExist());
+
+        verify(githubNotificationService).notifyIssueEvent(
+                "planora/app",
+                34,
+                "Fix login",
+                "opened",
+                "octocat",
+                null,
+                List.of());
+        verify(taskService, never()).linkGithubIssue(any(), any(), any(), any());
+    }
+
+    @Test
+    void createIssue_linksTaskWhenTaskIdIsProvided() throws Exception {
+        GithubIssueDTO createdIssue = new GithubIssueDTO();
+        createdIssue.setNumber(34);
+        createdIssue.setTitle("Fix login");
+        when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
+        when(githubIssuesSyncService.createIssue(any(GithubIssueCreateRequestDTO.class), org.mockito.ArgumentMatchers.eq("github-token")))
+                .thenReturn(createdIssue);
+
+        mockMvc.perform(post("/api/github/issues/create")
+                        .with(user(principal))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"repoFullName":"planora/app","title":"Fix login","taskId":123}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.number").value(34));
+
+        verify(taskService).linkGithubIssue(123L, 34L, "planora/app", 7L);
     }
 
     @Test
     void createIssue_returnsUnauthorizedWhenGithubTokenIsMissing() throws Exception {
         userEntity.setGithubAccessToken(" ");
         when(userRepository.findById(7L)).thenReturn(Optional.of(userEntity));
+        when(githubTokenService.getToken(7L)).thenReturn(null);
 
         mockMvc.perform(post("/api/github/issues/create")
                         .with(user(principal))

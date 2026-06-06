@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /*Repository interface for KanbanColumn persistence.
  Provides specialized queries for board layout and ordering logic.*/
@@ -18,6 +19,8 @@ public interface KanbanColumnRepository extends JpaRepository<KanbanColumn, Long
     /*Retrieves all columns for a specific board, sorted by their 'position' index.
      Used primarily for initial board rendering on the frontend.*/
     List<KanbanColumn> findByKanbanIdOrderByPosition(Long kanbanId);
+
+    Optional<KanbanColumn> findFirstByKanban_ProjectIdAndNameIgnoreCase(Long projectId, String name);
 
     //Efficiently updates only the position of a column.
     //Used during drag-and-drop reordering to minimize database overhead.

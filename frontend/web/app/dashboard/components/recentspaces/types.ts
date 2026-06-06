@@ -3,6 +3,8 @@ export interface ProjectSummary {
   name: string;
   projectKey?: string;
   isFavorite?: boolean;
-  type: 'AGILE' | 'KANBAN' | string;
+  type?: string;
   lastAccessedAt?: string;
+  completedTasks?: number;
+  totalTasks?: number;
 }

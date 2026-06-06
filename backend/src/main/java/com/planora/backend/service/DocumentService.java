@@ -3,6 +3,7 @@ package com.planora.backend.service;
 import com.planora.backend.dto.*;
 import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.ResourceNotFoundException;
+import com.planora.backend.exception.StorageQuotaExceededException;
 import com.planora.backend.model.*;
 import com.planora.backend.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class DocumentService {
     private static final Logger logger = LoggerFactory.getLogger(DocumentService.class);
 
     private static final long MAX_FILE_SIZE_BYTES = 100L * 1024 * 1024;
+    private static final long PROJECT_STORAGE_QUOTA_BYTES = 5L * 1024 * 1024 * 1024;
     private static final long VERSION_MIN_INTERVAL_MINUTES = 5;
     private static final long VERSION_MIN_SIZE_DELTA_BYTES = 512;
 
@@ -67,6 +69,7 @@ public class DocumentService {
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
     private final S3StorageService s3StorageService;
+    private final VirusScanService virusScanService;
 
     @Value("${aws.s3.dms-bucket}")
     private String dmsBucket;
@@ -83,6 +86,7 @@ public class DocumentService {
 
         // Step 2: Sanity check the file metadata before we authorize AWS to accept it.
         validateFileRequest(request.getFileName(), request.getContentType(), request.getFileSize());
+        requireWithinProjectQuota(projectId, request.getFileSize());
 
         // Step 3: Validate the target folder exists and isn't deleted.
         Long folderId = request.getFolderId();
@@ -114,6 +118,9 @@ public class DocumentService {
         // Step 2: Validate the request and ensure the user isn't trying to hijack someone else's object key.
         validateFileRequest(request.getFileName(), request.getContentType(), request.getFileSize());
         validateObjectKeyOwnership(projectId, request.getObjectKey());
+
+        // Virus scan verification
+        virusScanService.scanFile(request.getObjectKey(), request.getFileName());
 
         // Step 3: Crucial check — did the file actually make it to S3?
         // We don't want a database record pointing to a ghost file.
@@ -180,6 +187,7 @@ public class DocumentService {
         String resolvedContentType = resolveContentType(file.getContentType(), fileName);
 
         validateFileRequest(fileName, resolvedContentType, file.getSize());
+        requireWithinProjectQuota(projectId, file.getSize());
 
         if (folderId != null) {
             DocumentFolder folder = resolveFolder(projectId, folderId);
@@ -187,6 +195,9 @@ public class DocumentService {
         }
 
         String objectKey = buildObjectKey(projectId, folderId, fileName);
+
+        // Virus scan verification
+        virusScanService.scanFile(objectKey, fileName);
 
         try {
             // Stream the file bytes to S3
@@ -246,6 +257,10 @@ public class DocumentService {
 
         validateFileRequest(request.getFileName(), request.getContentType(), request.getFileSize());
         validateObjectKeyOwnership(projectId, request.getObjectKey());
+
+        // Virus scan verification
+        virusScanService.scanFile(request.getObjectKey(), request.getFileName());
+
         verifyObjectExists(request.getObjectKey());
 
         // Step 1: Idempotency check. If we already saved this version, don't crash.
@@ -572,6 +587,7 @@ public class DocumentService {
         requireOwnerOrAdmin(member);
 
         DocumentFolder folder = resolveFolder(projectId, folderId);
+        requireFolderPermission(folder.getId(), member, "MANAGE");
         softDeleteFolderRecursive(folder);
     }
 
@@ -581,6 +597,7 @@ public class DocumentService {
         requireOwnerOrAdmin(member);
 
         DocumentFolder folder = resolveFolder(projectId, folderId);
+        requireFolderPermission(folder.getId(), member, "MANAGE");
         User grantedBy = getUser(userId);
 
         if (permissions == null) {
@@ -779,6 +796,14 @@ public class DocumentService {
         s3StorageService.validateFileRequest(fileName, contentType, fileSize, MAX_FILE_SIZE_BYTES, ALLOWED_CONTENT_TYPES);
     }
 
+    private void requireWithinProjectQuota(Long projectId, Long additionalBytes) {
+        long uploadBytes = additionalBytes != null ? additionalBytes : 0L;
+        long usedBytes = documentRepository.sumFileSizeByProjectId(projectId);
+        if (usedBytes + uploadBytes > PROJECT_STORAGE_QUOTA_BYTES) {
+            throw new StorageQuotaExceededException("Project storage quota exceeded. Delete files or contact an admin before uploading more documents.");
+        }
+    }
+
     private String resolveContentType(String contentType, String fileName) {
         return s3StorageService.resolveContentType(contentType, fileName);
     }
@@ -903,6 +928,47 @@ public class DocumentService {
                 .uploadedAt(version.getCreatedAt())
                 .downloadUrl(generateDownloadUrl(version.getObjectKey()))
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public ProjectStorageQuotaResponseDTO getStorageQuota(Long projectId, Long userId) {
+        TeamMember member = getProjectMember(projectId, userId);
+        
+        long usedBytes = documentRepository.sumFileSizeByProjectId(projectId);
+        long quotaBytes = PROJECT_STORAGE_QUOTA_BYTES;
+        long maxFileSizeBytes = MAX_FILE_SIZE_BYTES; // 100 MB
+        long documentCount = documentRepository.countByProjectIdAndStatus(projectId, DocumentStatus.ACTIVE);
+        
+        return ProjectStorageQuotaResponseDTO.builder()
+                .usedBytes(usedBytes)
+                .quotaBytes(quotaBytes)
+                .maxFileSizeBytes(maxFileSizeBytes)
+                .documentCount(documentCount)
+                .humanReadableUsed(formatFileSize(usedBytes))
+                .humanReadableQuota(formatFileSize(quotaBytes))
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<FolderPermissionRequest> getFolderPermissions(Long projectId, Long folderId, Long userId) {
+        TeamMember member = getProjectMember(projectId, userId);
+        DocumentFolder folder = resolveFolder(projectId, folderId);
+        requireFolderPermission(folder.getId(), member, "READ");
+
+        List<DocumentFolderPermission> folderPermissions = folderPermissionRepository.findByFolderId(folderId);
+
+        Map<TeamRole, List<String>> permissionsByRole = folderPermissions.stream()
+                .collect(Collectors.groupingBy(
+                        DocumentFolderPermission::getTeamRole,
+                        Collectors.mapping(DocumentFolderPermission::getPermission, Collectors.toList())
+                ));
+
+        List<FolderPermissionRequest> result = new ArrayList<>();
+        for (TeamRole role : List.of(TeamRole.ADMIN, TeamRole.MEMBER, TeamRole.VIEWER)) {
+            List<String> perms = permissionsByRole.getOrDefault(role, List.of());
+            result.add(new FolderPermissionRequest(role.name(), perms));
+        }
+        return result;
     }
 
     private DocumentFolderResponseDTO mapFolder(DocumentFolder folder) {

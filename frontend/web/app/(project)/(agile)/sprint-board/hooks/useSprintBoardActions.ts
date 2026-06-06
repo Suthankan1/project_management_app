@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
 import { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { AxiosError } from 'axios';
-import axios from '@/lib/axios';
+import { sprintsApi, tasksApi } from '@/services/api-contract';
 import { toast } from '@/components/ui';
+import { normalizeApiError } from '@/lib/api-error';
 import { buildSessionCacheKey, removeSessionCache } from '@/lib/session-cache';
 import {
   bulkDeleteTasks,
@@ -17,6 +17,7 @@ import {
 } from '../api';
 import type { SprintboardTask, SprintboardFullResponse, Sprintboard } from '../types';
 import type { SprintTeamMemberOption } from '../api';
+import type { AvailableDestSprint } from '../components/CompleteSprintModal';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,7 @@ type SprintSummary = { id: number; status: string; sprintName?: string };
 interface UseSprintBoardActionsArgs {
   projectIdStr: string | null;
   allBoards: SprintboardFullResponse[];
+  allActiveSprints: SprintSummary[];
   setAllBoards: React.Dispatch<React.SetStateAction<SprintboardFullResponse[]>>;
   selectedIdx: number;
   activeSprint: SprintSummary | null;
@@ -42,6 +44,8 @@ interface UseSprintBoardActionsArgs {
 
 export function useSprintBoardActions({
   projectIdStr,
+  allBoards,
+  allActiveSprints,
   setAllBoards,
   selectedIdx,
   activeSprint,
@@ -58,10 +62,42 @@ export function useSprintBoardActions({
   const [successMsg, setSuccessMsg] = useState('');
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [sprintIdToComplete, setSprintIdToComplete] = useState<number | null>(null);
+  const [completeDestination, setCompleteDestination] = useState<number | null>(null);
+  const [availableDestSprints, setAvailableDestSprints] = useState<AvailableDestSprint[]>([]);
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
   const [isCreatingColumn, setIsCreatingColumn] = useState(false);
   const [isBulkApplying, setIsBulkApplying] = useState(false);
+
+  // Compute incomplete task count for a given sprint from the boards already loaded
+  const getIncompleteCount = useCallback((sprintId: number): number => {
+    const idx = allActiveSprints.findIndex((s) => s.id === sprintId);
+    const b = allBoards[idx];
+    if (!b) return 0;
+    return b.columns
+      .filter((col) => col.columnStatus !== 'DONE')
+      .reduce((sum, col) => sum + col.tasks.length, 0);
+  }, [allBoards, allActiveSprints]);
+
+  const incompleteCount = sprintIdToComplete != null ? getIncompleteCount(sprintIdToComplete) : 0;
+
+  // Open the complete-sprint modal: pre-select the sprint, default destination to backlog,
+  // and fetch NOT_STARTED sprints for the destination dropdown.
+  const openCompleteModal = useCallback(async (sprintId: number) => {
+    setSprintIdToComplete(sprintId);
+    setCompleteDestination(null); // default: backlog
+    setShowCompleteConfirm(true);
+    if (!projectIdStr) return;
+    try {
+      const res = await sprintsApi.listByProject(projectIdStr);
+      const notStarted = (res as Array<{ id: number; name?: string; sprintName?: string; status: string }>)
+        .filter((s) => s.status === 'NOT_STARTED' && s.id !== sprintId)
+        .map((s) => ({ id: s.id, name: s.sprintName || s.name || `Sprint #${s.id}` }));
+      setAvailableDestSprints(notStarted);
+    } catch {
+      setAvailableDestSprints([]);
+    }
+  }, [projectIdStr]);
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -113,12 +149,12 @@ export function useSprintBoardActions({
   const handleInlineCreateTask = useCallback(async (title: string, status: string) => {
     if (!projectIdStr || !activeSprint) return;
     try {
-      const res = await axios.post('/api/tasks', { title, status, projectId: parseInt(projectIdStr, 10), sprintId: activeSprint.id, storyPoint: 0, priority: 'MEDIUM' });
+      const res = await tasksApi.create({ title, status, projectId: parseInt(projectIdStr, 10), sprintId: activeSprint.id, storyPoint: 0, priority: 'MEDIUM' });
       const newTask: SprintboardTask = {
-        taskId: res.data.id, projectTaskNumber: res.data.projectTaskNumber ?? res.data.id,
-        title: res.data.title, storyPoint: res.data.storyPoint ?? 0, status,
-        priority: res.data.priority ?? 'MEDIUM', assigneeName: res.data.assigneeName,
-        assigneePhotoUrl: res.data.assigneePhotoUrl ?? null, updatedAt: res.data.updatedAt,
+        taskId: res.id, projectTaskNumber: res.projectTaskNumber ?? res.id,
+        title: res.title, storyPoint: res.storyPoint ?? 0, status,
+        priority: res.priority ?? 'MEDIUM', assigneeName: res.assigneeName,
+        assigneePhotoUrl: res.assigneePhotoUrl ?? undefined, updatedAt: res.updatedAt,
         attachmentCount: 0, commentCount: 0,
       };
       setAllBoards((prev) => prev.map((entry, idx) => idx === selectedIdx
@@ -126,8 +162,7 @@ export function useSprintBoardActions({
         : entry));
       forceRefresh();
     } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      toast(axiosErr?.response?.data?.message || 'Failed to create task.', 'error');
+      toast(normalizeApiError(err, 'Failed to create task.'), 'error');
     }
   }, [projectIdStr, activeSprint, selectedIdx, forceRefresh, setAllBoards]);
 
@@ -138,8 +173,7 @@ export function useSprintBoardActions({
         ...entry, columns: entry.columns.map((column) => ({ ...column, tasks: column.tasks.map((task) => task.taskId === taskId ? { ...task, dueDate: dueDate ?? undefined } : task) })),
       }));
     } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      toast(axiosErr?.response?.data?.message || 'Failed to update due date.', 'error');
+      toast(normalizeApiError(err, 'Failed to update due date.'), 'error');
       forceRefresh();
     }
   }, [selectedIdx, forceRefresh, setAllBoards]);
@@ -152,8 +186,7 @@ export function useSprintBoardActions({
         ...entry, columns: entry.columns.map((column) => ({ ...column, tasks: column.tasks.map((task) => task.taskId === taskId ? { ...task, assigneeName: selected?.name, assigneePhotoUrl: selected?.photoUrl ?? undefined } : task) })),
       }));
     } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      toast(axiosErr?.response?.data?.message || 'Failed to update assignee.', 'error');
+      toast(normalizeApiError(err, 'Failed to update assignee.'), 'error');
       forceRefresh();
     }
   }, [selectedIdx, teamMembers, forceRefresh, setAllBoards]);
@@ -166,8 +199,7 @@ export function useSprintBoardActions({
         ...entry, columns: entry.columns.map((column) => ({ ...column, tasks: column.tasks.map((task) => task.taskId === taskId ? { ...task, assigneeName: selected?.name, assigneePhotoUrl: selected?.photoUrl ?? undefined } : task) })),
       }));
     } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      toast(axiosErr?.response?.data?.message || 'Failed to update assignees.', 'error');
+      toast(normalizeApiError(err, 'Failed to update assignees.'), 'error');
       forceRefresh();
     }
   }, [selectedIdx, teamMembers, forceRefresh, setAllBoards]);
@@ -176,14 +208,13 @@ export function useSprintBoardActions({
     if (!sprintIdToComplete) return;
     setIsUpdating(true);
     try {
-      await completeSprint(sprintIdToComplete);
+      await completeSprint(sprintIdToComplete, completeDestination);
       setShowCompleteConfirm(false);
       setSuccessMsg('Sprint completed successfully!');
       setTimeout(() => setSuccessMsg(''), 1800);
       forceRefresh();
     } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      toast(axiosErr?.response?.data?.message || 'Failed to complete sprint.', 'error');
+      toast(normalizeApiError(err, 'Failed to complete sprint.'), 'error');
     } finally { setIsUpdating(false); }
   };
 
@@ -199,8 +230,7 @@ export function useSprintBoardActions({
       setNewColumnName('');
       forceRefresh();
     } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      toast(axiosErr?.response?.data?.message || 'Failed to add column.', 'error');
+      toast(normalizeApiError(err, 'Failed to add column.'), 'error');
     } finally { setIsCreatingColumn(false); }
   };
 
@@ -231,6 +261,10 @@ export function useSprintBoardActions({
     isUpdating, successMsg,
     showCompleteConfirm, setShowCompleteConfirm,
     sprintIdToComplete, setSprintIdToComplete,
+    completeDestination, setCompleteDestination,
+    availableDestSprints,
+    incompleteCount,
+    openCompleteModal,
     isAddingColumn, setIsAddingColumn,
     newColumnName, setNewColumnName,
     isCreatingColumn, isBulkApplying,

@@ -14,8 +14,11 @@ import { ChatTabContent } from '../../src/components/chat/ChatTabContent';
 import ProjectBoardScreen from '../../src/components/board/ProjectBoardScreen';
 import ProjectSprintBoardScreen from '../../src/components/board/ProjectSprintBoardScreen';
 import MobileBacklogScreen from '../../src/components/backlog/MobileBacklogScreen';
-import MobileTimelineScreen from '../../src/components/timeline/MobileTimelineScreen';
 import { useProjectSummary } from '../../src/hooks/useProjectSummary';
+import MobilePagesScreen from '../../src/components/pages/MobilePagesScreen';
+import MobileDocsScreen from '../../src/components/docs/MobileDocsScreen';
+import MobileBurndownScreen from '../../src/components/burndown/MobileBurndownScreen';
+import MobileMembersScreen from '../../src/components/members/MobileMembersScreen';
 
 /** Height of the nav bar = padding top (8) + title row (56) + tab row (48) + padding bottom (12) */
 const NAV_INNER_HEIGHT = 124; // matches ProjectTopNav.tsx exactly
@@ -86,22 +89,56 @@ export default function ProjectRoute() {
     });
   }, [router, numericId, name]);
 
+  const handleGithubPress = useCallback(() => {
+    router.push({
+      pathname: '/github/[projectId]',
+      params: { projectId: numericId, projectName: name ?? '' },
+    });
+  }, [router, numericId, name]);
+
   // ── Content area ────────────────────────────────────────────────────────────
   const renderContent = () => {
     // If a "More" sub-tab is active, render it
     if (activeMoreTab) {
-      if (activeMoreTab === 'timeline') {
+      if (activeMoreTab === 'report') {
         return (
-          <MobileTimelineScreen
+          <ReportScreen
             projectId={numericId}
             projectName={name}
             topOffset={navHeight + 16}
           />
         );
       }
-      if (activeMoreTab === 'report') {
+      if (activeMoreTab === 'pages') {
         return (
-          <ReportScreen
+          <MobilePagesScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight}
+          />
+        );
+      }
+      if (activeMoreTab === 'docs') {
+        return (
+          <MobileDocsScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight}
+          />
+        );
+      }
+      if (activeMoreTab === 'burndown') {
+        return (
+          <MobileBurndownScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight + 16}
+          />
+        );
+      }
+      if (activeMoreTab === 'members') {
+        return (
+          <MobileMembersScreen
             projectId={numericId}
             projectName={name}
             topOffset={navHeight + 16}
@@ -163,14 +200,6 @@ export default function ProjectRoute() {
             topOffset={navHeight + 16}
           />
         );
-      case 'timeline':
-        return (
-          <MobileTimelineScreen
-            projectId={numericId}
-            projectName={name}
-            topOffset={navHeight + 16}
-          />
-        );
       case 'chat':
         return (
           <ChatTabContent projectId={String(numericId)} navHeight={navHeight} />
@@ -195,6 +224,7 @@ export default function ProjectRoute() {
         onMoreTabChange={handleMoreTabChange}
         projectName={name}
         onSettingsPress={handleSettingsPress}
+        onGithubPress={handleGithubPress}
       />
     </View>
   );

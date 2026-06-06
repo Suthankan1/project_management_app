@@ -19,19 +19,19 @@ export default function DateSetterPrompt({ startDate, endDate, onSaveDate }: Dat
   const sprintEndDateRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="flex h-64 flex-col items-center justify-center gap-3 text-[#667085]">
-      <CalendarDays size={32} className="text-[#D0D5DD]" />
+    <div className="flex h-64 flex-col items-center justify-center gap-3 text-cu-text-secondary">
+      <CalendarDays size={32} className="text-cu-text-muted" />
       <p className="text-sm">Start and end dates are required to view the burndown chart.</p>
       <div className="flex items-center gap-3 mt-2">
         <div className="relative flex items-center gap-1">
-          <span className="text-[13px] font-medium text-[#344054]">Start:</span>
+          <span className="text-[13px] font-medium text-cu-text-primary">Start:</span>
           <button
             type="button"
             onClick={() => sprintStartDateRef.current?.showPicker()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#E4E7EC] bg-white px-3 py-1.5 text-[13px] font-medium cursor-pointer hover:border-[#98A2B3] transition-colors shadow-sm"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-cu-border bg-cu-bg px-3 py-1.5 text-[13px] font-medium shadow-cu-sm transition-colors hover:border-cu-primary/40 hover:bg-cu-hover"
           >
-            <CalendarDays size={14} className="text-[#667085]" />
-            <span className={startDate ? 'text-[#344054]' : 'text-[#98A2B3]'}>
+            <CalendarDays size={14} className="text-cu-text-secondary" />
+            <span className={startDate ? 'text-cu-text-primary' : 'text-cu-text-muted'}>
               {formatDate(startDate)}
             </span>
           </button>
@@ -43,16 +43,16 @@ export default function DateSetterPrompt({ startDate, endDate, onSaveDate }: Dat
             className="absolute top-0 left-0 w-0 h-0 opacity-0 pointer-events-none"
           />
         </div>
-        <span className="text-[#98A2B3]">-</span>
+        <span className="text-cu-text-muted">-</span>
         <div className="relative flex items-center gap-1">
-          <span className="text-[13px] font-medium text-[#344054]">End:</span>
+          <span className="text-[13px] font-medium text-cu-text-primary">End:</span>
           <button
             type="button"
             onClick={() => sprintEndDateRef.current?.showPicker()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#E4E7EC] bg-white px-3 py-1.5 text-[13px] font-medium cursor-pointer hover:border-[#98A2B3] transition-colors shadow-sm"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-cu-border bg-cu-bg px-3 py-1.5 text-[13px] font-medium shadow-cu-sm transition-colors hover:border-cu-primary/40 hover:bg-cu-hover"
           >
-            <CalendarDays size={14} className="text-[#667085]" />
-            <span className={endDate ? 'text-[#344054]' : 'text-[#98A2B3]'}>
+            <CalendarDays size={14} className="text-cu-text-secondary" />
+            <span className={endDate ? 'text-cu-text-primary' : 'text-cu-text-muted'}>
               {formatDate(endDate)}
             </span>
           </button>

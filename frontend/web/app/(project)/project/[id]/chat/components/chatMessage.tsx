@@ -12,6 +12,7 @@ import { avatarColor } from '@/hooks/chat/chat-utils';
 interface ChatMessagesProps {
   projectId: string;
   messages: ChatMessage[];
+  targetMessageId?: number | null;
   currentUser: string;
   currentUserAliases: string[];
   userProfilePics?: Record<string, string>;
@@ -85,7 +86,7 @@ function renderMentionContent(content: string, aliasSet: Set<string>): React.Rea
         return (
           <mark
             key={i}
-            className="bg-amber-100 text-amber-800 font-semibold rounded px-0.5 not-italic"
+            className="rounded bg-amber-500/15 px-0.5 font-semibold text-amber-500 not-italic"
             style={{ boxShadow: '0 0 0 1px rgba(251,191,36,0.4)' }}
           >
             {part}
@@ -116,17 +117,17 @@ function TypingIndicator({ user, userProfilePics = {} }: { user: string; userPro
     >
       {userProfilePics?.[user] ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={userProfilePics[user]} alt={user} className="w-7 h-7 rounded-full object-cover shadow-sm flex-shrink-0" />
+        <img src={userProfilePics[user]} alt={user} className="w-7 h-7 rounded-full object-cover shadow-cu-sm flex-shrink-0" />
       ) : (
         <div className={`w-7 h-7 rounded-full bg-gradient-to-br ${avatarColor(user)} flex items-center justify-center text-white text-xs font-semibold flex-shrink-0`}>
           {user.charAt(0).toUpperCase()}
         </div>
       )}
-      <div className="bg-white border border-gray-100 shadow-sm rounded-2xl rounded-bl-sm px-4 py-2.5 flex items-center gap-1">
+      <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm border border-cu-border bg-cu-bg px-4 py-2.5 shadow-cu-sm">
         {[0, 1, 2].map((i) => (
           <span
             key={i}
-            className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block"
+            className="inline-block h-1.5 w-1.5 rounded-full bg-cu-text-muted"
             style={{ animation: `typingBounce 1.4s ease-in-out ${i * 0.2}s infinite` }}
           />
         ))}
@@ -145,6 +146,7 @@ const ClockIcon = () => (
 export const ChatMessages = ({
   projectId,
   messages,
+  targetMessageId,
   currentUser,
   currentUserAliases,
   isPrivateChat,
@@ -163,6 +165,7 @@ export const ChatMessages = ({
   const [loadingFileId, setLoadingFileId] = useState<number | null>(null);
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [messageToDelete, setMessageToDelete] = useState<number | null>(null);
+  const [activeMessageId, setActiveMessageId] = useState<number | null>(null);
   // Track whether the user is scrolled near the bottom so we don't interrupt
   // reading history when new messages arrive.
   const isAtBottomRef = useRef(true);
@@ -222,6 +225,29 @@ export const ChatMessages = ({
     return () => clearTimeout(t);
   }, [visibleMessages.length]);
 
+  useEffect(() => {
+    if (!targetMessageId) {
+      return;
+    }
+    const targetIndex = visibleMessages.findIndex((message) => message.id === targetMessageId);
+    if (targetIndex < 0) {
+      return;
+    }
+
+    const virtualizer = virtualizerRef.current;
+    if (!virtualizer) {
+      return;
+    }
+    virtualizer.scrollToIndex(targetIndex, { align: 'center' });
+  }, [targetMessageId, visibleMessages]);
+
+  useEffect(() => {
+    if (activeMessageId == null) return;
+    if (!visibleMessages.some((message) => message.id === activeMessageId)) {
+      setActiveMessageId(null);
+    }
+  }, [activeMessageId, visibleMessages]);
+
   const handleDocumentClick = async (
     e: React.MouseEvent<HTMLAnchorElement>,
     originalUrl: string,
@@ -245,11 +271,11 @@ export const ChatMessages = ({
   if (visibleMessages.length === 0 && !typingUser) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
-        <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mb-4">
+        <div className="w-16 h-16 rounded-2xl bg-cu-primary/10 text-cu-primary flex items-center justify-center mb-4">
           <span className="text-3xl">💬</span>
         </div>
-        <h3 className="text-[15px] font-semibold text-gray-800 mb-1">No messages yet</h3>
-        <p className="text-[13px] text-gray-400">Be the first to say hello!</p>
+        <h3 className="mb-1 text-[15px] font-semibold text-cu-text-primary">No messages yet</h3>
+        <p className="text-[13px] text-cu-text-muted">Be the first to say hello!</p>
       </div>
     );
   }
@@ -257,6 +283,7 @@ export const ChatMessages = ({
   return (
     <div
       ref={scrollRef}
+      onClick={() => setActiveMessageId(null)}
       className="flex-1 min-h-0 overflow-y-auto px-2 sm:px-4 py-2.5 sm:py-4 space-y-0.5 overscroll-y-contain touch-pan-y"
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
@@ -280,6 +307,7 @@ export const ChatMessages = ({
             const fileDoc = !msg.deleted && isFileDocument(msg.content);
             const isLoadingFile = loadingFileId === msg.id;
             const isMentioned = !isMe && !msg.deleted && !fileDoc && messageIsMentioned(msg.content, aliasSet);
+            const isActiveMessage = !!msg.id && activeMessageId === msg.id;
 
             return (
               <div
@@ -297,23 +325,29 @@ export const ChatMessages = ({
                 {/* Date separator */}
               {showSeparator && (
                 <div className="flex items-center gap-3 my-4">
-                  <div className="flex-1 h-px bg-gray-100" />
-                  <span className="text-[11px] font-semibold text-gray-400 bg-white px-3 py-1 rounded-full border border-gray-100">
+                  <div className="h-px flex-1 bg-cu-border" />
+                  <span className="rounded-full border border-cu-border bg-cu-bg px-3 py-1 text-[11px] font-semibold text-cu-text-muted">
                     {formatDateSeparator(msg.timestamp)}
                   </span>
-                  <div className="flex-1 h-px bg-gray-100" />
+                  <div className="h-px flex-1 bg-cu-border" />
                 </div>
               )}
 
               <div
-                className={`flex items-end ${hasAvatar ? 'gap-2.5' : 'gap-1.5'} group relative ${grouped ? 'mt-0.5' : 'mt-3'} ${isMe ? 'flex-row-reverse' : 'flex-row'} ${isMentioned ? 'pl-1.5 border-l-2 border-amber-400 rounded-l' : ''}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (msg.id) {
+                    setActiveMessageId(msg.id);
+                  }
+                }}
+                className={`flex cursor-pointer items-end ${hasAvatar ? 'gap-2.5' : 'gap-1.5'} relative ${grouped ? 'mt-0.5' : 'mt-3'} ${isMe ? 'flex-row-reverse' : 'flex-row'} ${isMentioned ? 'pl-1.5 border-l-2 border-amber-400 rounded-l' : ''}`}
               >
                 {/* Avatar */}
                 {hasAvatar && (
                   <div className={`relative flex-shrink-0 ${grouped ? 'opacity-0' : 'opacity-100'}`}>
                     {userProfilePics?.[msg.sender] ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={userProfilePics[msg.sender]} alt={msg.sender} className="w-7 h-7 rounded-full object-cover shadow-sm" />
+                      <img src={userProfilePics[msg.sender]} alt={msg.sender} className="w-7 h-7 rounded-full object-cover shadow-cu-sm" />
                     ) : (
                       <div className={`w-7 h-7 rounded-full bg-gradient-to-br ${avatarColor(msg.sender || '')} flex items-center justify-center text-white text-xs font-bold`}>
                         {(msg.sender || '?').charAt(0).toUpperCase()}
@@ -326,39 +360,39 @@ export const ChatMessages = ({
                 <div className={`flex flex-col max-w-[82%] sm:max-w-[74%] ${isMe ? 'items-end' : 'items-start'}`}>
                   {/* Sender name (others, no group) */}
                   {!isMe && !grouped && !isPrivateChat && (
-                    <span className="text-[11.5px] font-semibold text-gray-500 mb-1 ml-1">{msg.sender}</span>
+                    <span className="mb-1 ml-1 text-[11.5px] font-semibold text-cu-text-secondary">{msg.sender}</span>
                   )}
 
                   {/* Pinned badge */}
                   {isPinned && (
-                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5 mb-1.5 flex items-center gap-1">
-                      📌 Pinned
+                    <span className="mb-1.5 flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold text-amber-500">
+                      <Pin size={10} /> Pinned
                     </span>
                   )}
 
                   {/* Bubble + action bar wrapper */}
                   <div className="relative">
                     {/* Hover action bar */}
-                    {!!msg.id && (
-                      <div className={`absolute bottom-full mb-1 ${isMe ? 'right-0' : 'left-0'} opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center gap-1 bg-white border border-gray-100 shadow-lg rounded-xl px-2 py-2`}>
+                    {!!msg.id && isActiveMessage && (
+                      <div className={`absolute bottom-full mb-1 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-1 bg-cu-bg border border-cu-border shadow-cu-lg rounded-xl px-2 py-2`}>
                         {/* Quick reactions */}
                         {QUICK_REACTIONS.map((emoji) => (
                           <button
                             key={emoji}
                             onClick={() => onToggleReaction(msg.id as number, emoji)}
-                            className="w-9 h-9 rounded-lg hover:bg-gray-100 flex items-center justify-center text-sm transition-all hover:scale-110 active:scale-95"
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-sm transition-all hover:scale-110 hover:bg-cu-hover active:scale-95"
                             title={`React ${emoji}`}
                           >
                             {emoji}
                           </button>
                         ))}
 
-                        <div className="w-px h-4 bg-gray-200 mx-0.5" />
+                        <div className="mx-0.5 h-4 w-px bg-cu-border" />
 
                         {/* Thread */}
                         <button
                           onClick={() => onOpenThread(msg)}
-                          className="flex items-center gap-1 px-2 py-1.5 min-h-[36px] rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 text-[11px] font-medium transition-colors"
+                          className="flex min-h-[36px] items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-cu-text-muted transition-colors hover:bg-cu-hover hover:text-cu-text-primary"
                           title="Reply in thread"
                         >
                           <MessageSquare size={12} strokeWidth={2} />
@@ -368,7 +402,7 @@ export const ChatMessages = ({
                         {!!activeRoomId && onPinRoomMessage && (
                           <button
                             onClick={() => onPinRoomMessage(isPinned ? null : (msg.id as number))}
-                            className="w-9 h-9 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors flex items-center justify-center"
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-cu-text-muted transition-colors hover:bg-cu-hover hover:text-cu-text-primary"
                             title={isPinned ? 'Unpin' : 'Pin message'}
                           >
                             {isPinned ? <PinOff size={12} strokeWidth={2} /> : <Pin size={12} strokeWidth={2} />}
@@ -381,7 +415,7 @@ export const ChatMessages = ({
                             {!fileDoc && (
                               <button
                                 onClick={() => setEditingMessage(msg)}
-                                className="w-9 h-9 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-blue-600 transition-colors flex items-center justify-center"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg text-cu-text-muted transition-colors hover:bg-cu-hover hover:text-cu-primary"
                                 title="Edit"
                               >
                                 <Pencil size={12} strokeWidth={2} />
@@ -389,7 +423,7 @@ export const ChatMessages = ({
                             )}
                             <button
                               onClick={() => setMessageToDelete(msg.id as number)}
-                              className="w-9 h-9 rounded-lg hover:bg-red-50 hover:text-red-500 flex items-center justify-center text-gray-500 transition-colors"
+                              className="flex h-9 w-9 items-center justify-center rounded-lg text-cu-text-muted transition-colors hover:bg-red-500/10 hover:text-red-500"
                               title="Delete message"
                             >
                               <Trash2 size={12} strokeWidth={2} />
@@ -401,14 +435,14 @@ export const ChatMessages = ({
 
                     {/* Message bubble */}
                     <div className={`
-                      relative px-4 py-2.5 pr-14 pb-4 text-[13.5px] leading-relaxed shadow-sm
+                      relative px-4 py-2.5 pr-14 pb-4 text-[13.5px] leading-relaxed shadow-cu-sm
                       ${msg.deleted
-                        ? 'bg-gray-100 text-gray-400 italic rounded-2xl'
+                        ? 'bg-cu-bg-secondary text-cu-text-muted italic rounded-2xl'
                         : !msg.id
                           ? 'bg-cu-primary/70 text-white opacity-80 rounded-2xl rounded-br-sm'
                           : isMe
                             ? 'bg-cu-primary text-white rounded-2xl rounded-br-sm'
-                            : 'bg-white border border-gray-100 text-gray-800 rounded-2xl rounded-bl-sm'
+                            : 'bg-cu-bg-secondary border border-cu-border text-cu-text-primary rounded-2xl rounded-bl-sm'
                       }
                     `}>
                       {msg.deleted ? (
@@ -417,14 +451,14 @@ export const ChatMessages = ({
                         <a
                           href={msg.content}
                           onClick={(e) => handleDocumentClick(e, msg.content, msg.id as number)}
-                          className={`flex items-center gap-2 font-medium ${isMe ? 'text-blue-100 hover:text-white' : 'text-blue-600 hover:text-blue-700'}`}
-                          aria-label={isLoadingFile ? 'Opening file…' : 'View File'}
+                          className={`flex items-center gap-2 font-medium ${isMe ? 'text-white/85 hover:text-white' : 'text-cu-primary hover:text-cu-primary-hover'}`}
+                          aria-label={isLoadingFile ? 'Opening file...' : 'View File'}
                         >
                           {isLoadingFile
                             ? <Loader2 size={15} className="animate-spin" />
                             : <FileText size={15} />}
                           <span className="truncate max-w-[180px]">
-                            {isLoadingFile ? 'Opening…' : 'View File'}
+                            {isLoadingFile ? 'Opening...' : 'View File'}
                           </span>
                         </a>
                       ) : (
@@ -435,10 +469,10 @@ export const ChatMessages = ({
 
                       {/* Time + edited inside bubble */}
                       {!msg.deleted && (
-                        <span className={`absolute bottom-1.5 right-3 text-[10px] flex items-center leading-none ${isMe ? 'text-blue-100/80' : 'text-gray-400'}`}>
+                        <span className={`absolute bottom-1.5 right-3 flex items-center text-[10px] leading-none ${isMe ? 'text-white/70' : 'text-cu-text-muted'}`}>
                           {msg.editedAt && <span className="mr-1 italic">edited</span>}
                           {!msg.id ? (
-                            <><ClockIcon /> Sending…</>
+                            <><ClockIcon /> Sending...</>
                           ) : msg.timestamp ? (
                             formatTime(msg.timestamp)
                           ) : null}
@@ -448,7 +482,7 @@ export const ChatMessages = ({
                   </div>
 
                   {/* Reactions row */}
-                  {!!msg.id && !msg.deleted && msgReactions.length > 0 && (
+                  {!!msg.id && isActiveMessage && !msg.deleted && msgReactions.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {msgReactions.map((reaction) => (
                         <button
@@ -456,8 +490,8 @@ export const ChatMessages = ({
                           onClick={() => onToggleReaction(msg.id as number, reaction.emoji)}
                           className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium border transition-all
                             ${reaction.reactedByCurrentUser
-                              ? 'bg-blue-50 border-blue-200 text-blue-700'
-                              : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                              ? 'bg-cu-primary/10 border-cu-primary/25 text-cu-primary'
+                              : 'bg-cu-bg-secondary border-cu-border text-cu-text-secondary hover:border-cu-primary/25 hover:text-cu-text-primary'}`}
                         >
                           <span>{reaction.emoji}</span>
                           <span>{reaction.count}</span>

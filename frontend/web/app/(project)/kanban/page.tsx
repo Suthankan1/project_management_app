@@ -51,12 +51,12 @@ export default function KanbanPage() {
 
   if (!projectId) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="flex items-center justify-center min-h-screen bg-cu-bg">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Missing Project ID</h1>
-          <p className="text-gray-600">
-            Please provide a project ID in the URL: <code className="bg-gray-100 px-2 py-1 rounded">/kanban?projectId=1</code>
+          <AlertCircle className="w-12 h-12 text-cu-danger mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-cu-text-primary mb-2">Missing Project ID</h1>
+          <p className="text-cu-text-secondary">
+            Please provide a project ID in the URL: <code className="bg-cu-bg-tertiary px-2 py-1 rounded">/kanban?projectId=1</code>
           </p>
         </div>
       </div>
@@ -68,26 +68,26 @@ export default function KanbanPage() {
   const progressPercent = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 h-full bg-[#F0F2F5] overflow-hidden">
+    <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(21,93,252,0.16),transparent_30%),radial-gradient(circle_at_top_right,rgba(34,197,94,0.12),transparent_28%),linear-gradient(180deg,var(--cu-bg-secondary),var(--cu-bg-secondary))]">
       {/* Premium Header */}
-      <div className="bg-white border-b border-gray-200/80 px-4 md:px-6 py-3 flex-shrink-0">
+      <div className="border-b border-cu-border bg-[linear-gradient(135deg,rgba(21,93,252,0.12),rgba(99,102,241,0.08)_45%,rgba(34,197,94,0.1))] px-4 md:px-6 py-3 flex-shrink-0">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
               <LayoutGrid size={16} className="text-white" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-base md:text-lg font-bold text-gray-900 tracking-tight">Board</h1>
+              <h1 className="text-base md:text-lg font-bold text-cu-text-primary tracking-tight">Board</h1>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[11px] text-gray-500">{totalTasks} tasks</span>
+                <span className="text-[11px] text-cu-text-tertiary">{totalTasks} tasks</span>
                 {totalTasks > 0 && (
                   <>
-                    <span className="text-gray-300">·</span>
+                    <span className="text-cu-text-muted">&middot;</span>
                     <div className="flex items-center gap-1.5">
-                      <div className="w-16 h-1 rounded-full bg-gray-200 overflow-hidden">
+                      <div className="w-16 h-1 rounded-full bg-cu-bg-tertiary overflow-hidden">
                         <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
                       </div>
-                      <span className="text-[11px] text-gray-500 font-medium">{progressPercent}%</span>
+                      <span className="text-[11px] text-cu-text-tertiary font-medium">{progressPercent}%</span>
                     </div>
                   </>
                 )}
@@ -97,17 +97,17 @@ export default function KanbanPage() {
 
           <div className="flex items-center gap-2">
             {/* Search */}
-            <div className="hidden sm:flex items-center bg-gray-100 rounded-lg px-3 py-1.5 border border-transparent focus-within:border-blue-300 focus-within:bg-white transition-all">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <div className="hidden sm:flex items-center rounded-lg bg-cu-bg/80 px-3 py-1.5 border border-cu-primary/20 focus-within:border-cu-primary focus-within:bg-cu-bg transition-all shadow-sm">
+              <svg className="text-cu-text-muted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
               <input
                 type="text"
                 placeholder="Search tasks..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="bg-transparent border-0 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none ml-2 w-40 md:w-52"
+                className="bg-transparent border-0 text-sm text-cu-text-primary placeholder:text-cu-text-muted focus:outline-none ml-2 w-40 md:w-52"
               />
               {searchTerm && (
-                <button onClick={() => setSearchTerm('')} className="text-gray-400 hover:text-gray-600">
+                <button onClick={() => setSearchTerm('')} className="text-cu-text-muted hover:text-cu-text-secondary">
                   <X size={12} />
                 </button>
               )}
@@ -116,7 +116,7 @@ export default function KanbanPage() {
             {/* Complete Board */}
             <button
               onClick={() => setShowCompleteConfirm(true)}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium hover:bg-emerald-100 transition-colors"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-500/15 to-cyan-500/15 text-emerald-500 border border-emerald-500/30 rounded-lg text-xs font-medium hover:from-emerald-500/20 hover:to-cyan-500/20 transition-colors"
             >
               <CheckCircle2 size={14} />
               Complete All
@@ -126,14 +126,14 @@ export default function KanbanPage() {
 
         {/* Mobile search */}
         <div className="sm:hidden mt-2">
-          <div className="flex items-center bg-gray-100 rounded-lg px-3 py-2 border border-transparent focus-within:border-blue-300 focus-within:bg-white transition-all">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <div className="flex items-center rounded-lg bg-cu-bg/80 px-3 py-2 border border-cu-primary/20 focus-within:border-cu-primary focus-within:bg-cu-bg transition-all shadow-sm">
+            <svg className="text-cu-text-muted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
             <input
               type="text"
               placeholder="Search tasks..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="bg-transparent border-0 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none ml-2 flex-1"
+              className="bg-transparent border-0 text-sm text-cu-text-primary placeholder:text-cu-text-muted focus:outline-none ml-2 flex-1"
             />
           </div>
         </div>
@@ -158,7 +158,7 @@ export default function KanbanPage() {
       {/* Toast Notification */}
       {toastMessage && (
         <div className={`mx-4 md:mx-6 mt-3 flex items-center gap-3 px-4 py-2.5 border rounded-lg transition-all animate-in slide-in-from-top-2 duration-300 ${
-          completeSuccess ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-blue-50 border-blue-200 text-blue-700'
+          completeSuccess ? 'bg-gradient-to-r from-emerald-500/15 to-cyan-500/10 border-emerald-500/30 text-emerald-500' : 'bg-gradient-to-r from-cu-primary/15 to-violet-500/10 border-cu-primary/30 text-cu-primary'
         }`}>
           <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
           <p className="text-sm font-medium">{toastMessage}</p>
@@ -167,12 +167,21 @@ export default function KanbanPage() {
 
       {/* Error */}
       {error && (
-        <div className="mx-4 md:mx-6 mt-3 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold text-sm">Error</p>
-            <p className="text-xs mt-0.5">{error}</p>
+        <div className="mx-4 md:mx-6 mt-3 flex items-start justify-between gap-3 p-4 bg-red-500/10 border border-red-500/25 rounded-lg text-red-500 flex-wrap">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-sm">Error</p>
+              <p className="text-xs mt-0.5">{error}</p>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={() => void forceRefresh()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/20 bg-white/80 px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-white transition-colors"
+          >
+            Retry
+          </button>
         </div>
       )}
 
@@ -183,8 +192,8 @@ export default function KanbanPage() {
         {loading ? (
           <div className="flex items-center justify-center h-80">
             <div className="text-center">
-              <Loader className="w-7 h-7 text-blue-600 animate-spin mx-auto mb-2" />
-              <p className="text-sm text-gray-500">Loading board...</p>
+              <Loader className="w-7 h-7 text-cu-primary animate-spin mx-auto mb-2" />
+              <p className="text-sm text-cu-text-tertiary">Loading board...</p>
             </div>
           </div>
         ) : (
@@ -202,6 +211,7 @@ export default function KanbanPage() {
                         columnId={cfg?.id}
                         color={cfg?.color}
                         wipLimit={cfg?.wipLimit}
+                        updatingTaskId={updatingTaskId}
                         onDeleteTask={handleDeleteTask}
                         onCreateTask={handleAddTask}
                         onEditTask={handleEditTask}
@@ -218,11 +228,11 @@ export default function KanbanPage() {
                   );
                 })}
 
-                {/* Add Column button — ClickUp style */}
+                {/* Add Column button: ClickUp style */}
                 {kanbanId && (
                   <div className="flex-shrink-0 self-start snap-center md:snap-none" style={{ width: '280px' }}>
                     {showAddColumn ? (
-                      <div className="rounded-xl bg-[#F8F9FB] border border-gray-200/60 p-3">
+                      <div className="rounded-xl bg-gradient-to-br from-cu-primary/10 via-violet-500/5 to-emerald-500/10 border border-cu-primary/20 p-3 shadow-cu-sm">
                         <input
                           type="text"
                           value={newColumnName}
@@ -238,19 +248,19 @@ export default function KanbanPage() {
                             }
                           }}
                           placeholder="Column name (e.g. Blocked)..."
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 mb-2"
+                          className="w-full px-3 py-2 border border-cu-border bg-cu-bg text-cu-text-primary placeholder:text-cu-text-muted rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cu-primary/40 mb-2"
                           autoFocus
                         />
                         <div className="flex gap-2">
                           <button
                             onClick={async () => { if (newColumnName.trim()) { await handleAddColumn(newColumnName.trim()); setNewColumnName(''); setShowAddColumn(false); } }}
                             disabled={!newColumnName.trim()}
-                            className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                            className="flex-1 py-1.5 bg-cu-primary text-white rounded-lg text-xs font-medium hover:bg-cu-primary-hover disabled:opacity-40 transition-colors"
                           >
                             Add Column
                           </button>
                           <button onClick={() => { setNewColumnName(''); setShowAddColumn(false); }}
-                            className="flex-1 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs hover:bg-gray-50 transition-colors">
+                            className="flex-1 py-1.5 border border-cu-border text-cu-text-secondary rounded-lg text-xs hover:bg-cu-hover transition-colors">
                             Cancel
                           </button>
                         </div>
@@ -258,7 +268,7 @@ export default function KanbanPage() {
                     ) : (
                       <button
                         onClick={() => setShowAddColumn(true)}
-                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/30 transition-all text-sm font-medium"
+                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-cu-primary/35 bg-gradient-to-br from-cu-primary/5 to-emerald-500/5 text-cu-primary hover:border-cu-primary hover:bg-cu-primary/10 transition-all text-sm font-medium"
                       >
                         <Plus size={16} />
                         Add Column
@@ -272,7 +282,7 @@ export default function KanbanPage() {
 
 
             {updatingTaskId && (
-              <div className="fixed bottom-20 right-4 md:bottom-4 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-xl flex items-center gap-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div className="fixed bottom-20 right-4 md:bottom-4 bg-gradient-to-r from-cu-primary to-indigo-600 text-white border border-white/10 px-4 py-2 rounded-lg shadow-cu-xl flex items-center gap-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
                 <Loader className="w-3.5 h-3.5 animate-spin" />
                 <span className="text-sm">Updating...</span>
               </div>
@@ -284,23 +294,23 @@ export default function KanbanPage() {
       {/* Complete All Tasks Confirmation Dialog */}
       {showCompleteConfirm && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl border border-[#EAECF0] p-6 max-w-sm w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-cu-bg rounded-2xl shadow-cu-xl border border-cu-border p-6 max-w-sm w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
                 <CheckCircle2 size={20} className="text-emerald-600" />
               </div>
               <div>
-                <h3 className="text-[16px] font-bold text-[#101828]">Complete All Tasks</h3>
-                <p className="text-[13px] text-[#475467]">Archive entire board to Done?</p>
+                <h3 className="text-[16px] font-bold text-cu-text-primary">Complete All Tasks</h3>
+                <p className="text-[13px] text-cu-text-secondary">Archive entire board to Done?</p>
               </div>
             </div>
-            <p className="text-[14px] text-[#344054] mb-5 leading-relaxed">
+            <p className="text-[14px] text-cu-text-secondary mb-5 leading-relaxed">
               This will mark all remaining tasks as <span className="font-bold text-emerald-600">Done</span>. This action is definitive but allows you to clear your board quickly.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowCompleteConfirm(false)}
-                className="flex-1 px-4 py-2.5 border border-[#D0D5DD] rounded-xl text-[14px] font-semibold text-[#344054] hover:bg-[#F9FAFB] transition-colors"
+                className="flex-1 px-4 py-2.5 border border-cu-border rounded-xl text-[14px] font-semibold text-cu-text-secondary hover:bg-cu-hover transition-colors"
               >
                 Cancel
               </button>
@@ -309,7 +319,7 @@ export default function KanbanPage() {
                   setShowCompleteConfirm(false);
                   await handleCompleteBoard();
                 }}
-                className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[14px] font-bold transition-colors shadow-lg shadow-emerald-200 flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[14px] font-bold transition-colors shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
               >
                 <CheckCircle2 size={16} />
                 Confirm
@@ -319,10 +329,10 @@ export default function KanbanPage() {
         </div>
       )}
 
-      {/* Floating Action Button — Quick Create (mobile) */}
+      {/* Floating Action Button: Quick Create (mobile) */}
       <button
         onClick={() => handleOpenCreateModal(activeMobileColumn || columnConfigs[0]?.status || 'TODO')}
-        className="md:hidden fixed bottom-20 right-4 z-[105] w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-full shadow-xl flex items-center justify-center hover:shadow-2xl active:scale-95 transition-all"
+        className="md:hidden fixed bottom-20 right-4 z-[105] w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-full shadow-cu-lg flex items-center justify-center hover:shadow-cu-xl active:scale-95 transition-all"
         aria-label="Quick create task"
       >
         <Plus size={24} />

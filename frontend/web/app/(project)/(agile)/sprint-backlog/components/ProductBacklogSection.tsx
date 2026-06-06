@@ -1,15 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ChevronDown,
   ChevronRight,
   CornerDownLeft,
+  GripVertical,
   Rocket,
 } from 'lucide-react';
+import { useTouchDragSort } from './useTouchDragSort';
 import CreateTaskModal, { type CreateTaskData } from '@/components/shared/CreateTaskModal';
 import type { TaskItem } from '@/types';
-import api from '@/lib/axios';
+import { tasksApi, projectsApi } from '@/services/api-contract';
 import { toast } from '@/components/ui';
 import TaskRow from './TaskRow';
 import TaskCardModal from '@/app/taskcard/TaskCardModal';
@@ -68,6 +71,7 @@ export default function ProductBacklogSection({
 }: ProductBacklogSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [showCreateModalInternal, setShowCreateModalInternal] = useState(false);
+  const taskListRef = useRef<HTMLDivElement>(null);
 
   // Sync external modal state with internal state and expand section
   const showCreateModal = externalShowCreateModal ?? showCreateModalInternal;
@@ -95,6 +99,14 @@ export default function ProductBacklogSection({
   const [newTaskTitleLength, setNewTaskTitleLength] = useState(0);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
+  const { activeDragId, touchDropIndex, ghost, draggingTask, getTouchProps } = useTouchDragSort({
+    tasks,
+    containerRef: taskListRef,
+    onDrop: (draggedId, targetIndex) => onDropTask(draggedId, targetIndex),
+  });
+
+  const effectiveDropIndex = activeDragId !== null ? touchDropIndex : dropIndex;
+
   const canDeleteTask = currentUserRole !== 'VIEWER';
 
   const getMemberDisplayName = (member: TeamMemberInfo) => member.user.fullName || member.user.username;
@@ -108,11 +120,12 @@ export default function ProductBacklogSection({
 
     try {
       setLoadingMembers(true);
-      const projectRes = await api.get(`/api/projects/${projectId}`);
-      const teamId = projectRes.data.teamId;
-      const membersRes = await api.get(`/api/teams/${teamId}/members`);
-      const data = membersRes.data;
-      setTeamMembers(Array.isArray(data) ? data : []);
+      const project = await projectsApi.get(projectId);
+      const teamId = project.teamId;
+      if (teamId) {
+        const data = await projectsApi.getTeamMembers(teamId);
+        setTeamMembers(Array.isArray(data) ? (data as TeamMemberInfo[]) : []);
+      }
     } catch {
       if (showError) {
         toast('Failed to load team members.', 'error');
@@ -124,7 +137,7 @@ export default function ProductBacklogSection({
 
   const handleAssignTask = async (taskId: number, userId: number) => {
     try {
-      await api.patch(`/api/tasks/${taskId}/assign/${userId}`);
+      await tasksApi.assignTaskSingle(taskId, userId);
       const member = teamMembers.find((m) => m.user.userId === userId);
       if (member) {
         onAssignTask(taskId, getMemberDisplayName(member), member.user.profilePicUrl || null);
@@ -137,7 +150,7 @@ export default function ProductBacklogSection({
   const handleDeleteTask = async (taskId: number) => {
     if (onDeleteTask) onDeleteTask(taskId);
     try {
-      await api.delete(`/api/tasks/${taskId}`);
+      await tasksApi.delete(taskId);
     } catch {
       // silent — parent state was already updated optimistically
     }
@@ -149,7 +162,7 @@ export default function ProductBacklogSection({
     if (onRenameTask) onRenameTask(taskId, trimmed);
     else {
       try {
-        await api.put(`/api/tasks/${taskId}`, { title: trimmed });
+        await tasksApi.update(taskId, { title: trimmed });
       } catch {
         // silent
       }
@@ -158,7 +171,7 @@ export default function ProductBacklogSection({
 
   const handleAddLabel = async (taskId: number, labelId: number) => {
     try {
-      await api.post(`/api/tasks/${taskId}/label/${labelId}`);
+      await tasksApi.addLabel(taskId, labelId);
       const label = projectLabels.find((l) => l.id === labelId);
       if (label) {
         setLabelCache((prev) => {
@@ -174,7 +187,7 @@ export default function ProductBacklogSection({
 
   const handleRemoveLabel = async (taskId: number, labelId: number) => {
     try {
-      await api.delete(`/api/tasks/${taskId}/label/${labelId}`);
+      await tasksApi.removeLabel(taskId, labelId);
       setLabelCache((prev) => {
         const existing = prev[taskId] ?? tasks.find((t) => t.id === taskId)?.labels ?? [];
         return { ...prev, [taskId]: existing.filter((l) => l.id !== labelId) };
@@ -211,40 +224,38 @@ export default function ProductBacklogSection({
   }, [tasks]);
 
   return (
-    <div className="rounded-xl border border-[#E4E7EC] bg-[#F8F9FB] p-4 sm:p-5 shadow-sm">
-<div className="mb-3 flex min-h-10 flex-wrap items-center justify-between border-b border-[#EAECF0] pb-3 gap-2">
-        {/* Left: collapse toggle + title + task count */}
+    <div className="rounded-xl border border-cu-border bg-cu-bg-secondary p-4 sm:p-5 shadow-cu-sm">
+<div className="mb-3 flex min-h-10 flex-wrap items-center justify-between border-b border-cu-border pb-3 gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
             onClick={() => setIsOpen(!isOpen)}
-            className="flex-shrink-0 text-[#667085] hover:text-[#344054] hover:bg-[#F2F4F7] p-0.5 rounded transition-colors"
+            className="flex-shrink-0 text-cu-text-secondary hover:text-cu-text-primary hover:bg-cu-hover p-0.5 rounded transition-colors"
           >
             {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </button>
-          <span className="text-[14px] font-bold text-[#101828] truncate">Backlog</span>
-          <span className="flex-shrink-0 rounded-full bg-[#F2F4F7] px-2 py-0.5 text-[12px] font-bold text-[#667085]">
+          <span className="text-[14px] font-bold text-cu-text-primary truncate">Backlog</span>
+          <span className="flex-shrink-0 rounded-full bg-cu-bg-tertiary px-2 py-0.5 text-[12px] font-bold text-cu-text-secondary">
             {totals.count}
           </span>
           {totals.total > 0 && (
-            <span className="flex-shrink-0 rounded-full border border-[#EAECF0] bg-white px-2 py-0.5 text-[12px] font-semibold text-[#344054] hidden sm:inline">
+            <span className="flex-shrink-0 rounded-full border border-cu-border bg-cu-bg px-2 py-0.5 text-[12px] font-semibold text-cu-text-primary hidden sm:inline">
               {totals.total} pts
             </span>
           )}
         </div>
 
-        {/* Action buttons */}
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => { setIsOpen(true); setShowCreateTaskBox(true); }}
-            className="flex min-h-[44px] items-center gap-1.5 rounded-lg border border-[#D0D5DD] bg-white px-3 py-1.5 text-[12px] font-bold text-[#344054] hover:bg-[#F9FAFB] shadow-sm transition-all active:scale-95"
+            className="flex min-h-[44px] items-center gap-1.5 rounded-lg border border-cu-border bg-cu-bg px-3 py-1.5 text-[12px] font-bold text-cu-text-primary hover:bg-cu-hover shadow-cu-sm transition-all active:scale-95"
           >
             <span className="text-[14px] leading-none">+</span>
             <span>Task</span>
           </button>
           <button
             onClick={() => onCreateSprint()}
-            className="flex min-h-[44px] items-center gap-1.5 rounded-lg border border-[#175CD3] bg-[#175CD3] px-3 py-1.5 text-[12px] font-bold text-white hover:bg-[#1849A9] shadow-sm transition-all active:scale-95"
+            className="flex min-h-[44px] items-center gap-1.5 rounded-lg border border-cu-primary bg-cu-primary px-3 py-1.5 text-[12px] font-bold text-white hover:bg-cu-primary-hover shadow-cu-sm transition-all active:scale-95"
           >
             <Rocket size={14} />
             <span>Create Sprint</span>
@@ -254,17 +265,17 @@ export default function ProductBacklogSection({
 
       {isOpen && (
         <div>
-          <motion.div layout className="flex flex-col gap-[5px]" onDragOver={(e) => { e.preventDefault(); setDropIndex(tasks.length); }} onDrop={handleDrop}>
+          <motion.div ref={taskListRef} layout className="flex flex-col gap-[5px]" onDragOver={(e) => { e.preventDefault(); setDropIndex(tasks.length); }} onDrop={handleDrop}>
             <AnimatePresence initial={false}>
               {tasks.map((task, index) => (
                 <div key={task.id}>
-                  {dropIndex === index && (
+                  {effectiveDropIndex === index && (
                     <motion.div
                       layout
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 44, opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      className="rounded-lg border-2 border-dashed border-[#155DFC] bg-[#155DFC]/5 mb-[5px]"
+                      className="rounded-lg border-2 border-dashed border-cu-primary bg-cu-primary/5 mb-[5px]"
                     />
                   )}
                   <motion.div
@@ -273,10 +284,13 @@ export default function ProductBacklogSection({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ type: "spring", stiffness: 500, damping: 30, mass: 1 }}
-                    className="rounded-lg overflow-hidden border border-[#EAECF0]"
+                    className="rounded-lg overflow-hidden border border-cu-border"
+                    style={{ opacity: activeDragId === task.id ? 0.25 : 1 }}
                   >
                     <div
+                      data-task-row
                       draggable
+                      {...getTouchProps(task.id)}
                       onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
                         e.dataTransfer.setData('text/plain', String(task.id));
                         (e.target as HTMLElement).style.opacity = '0.5';
@@ -315,16 +329,28 @@ export default function ProductBacklogSection({
                 </div>
               ))}
             </AnimatePresence>
-            {dropIndex === tasks.length && tasks.length > 0 && (
+            {effectiveDropIndex === tasks.length && tasks.length > 0 && (
               <motion.div
                 layout
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 44, opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                className="rounded-lg border-2 border-dashed border-[#155DFC] bg-[#155DFC]/5"
+                className="rounded-lg border-2 border-dashed border-cu-primary bg-cu-primary/5"
               />
             )}
           </motion.div>
+
+          {/* Touch drag ghost */}
+          {ghost && draggingTask && typeof document !== 'undefined' && createPortal(
+            <div
+              style={{ position: 'fixed', top: ghost.y, left: ghost.x, width: ghost.width, pointerEvents: 'none', zIndex: 9999 }}
+              className="flex items-center gap-2 rounded-2xl border border-[#D0D5DD] bg-white px-3 py-2.5 shadow-2xl opacity-95"
+            >
+              <GripVertical size={14} className="flex-shrink-0 text-[#98A2B3]" />
+              <span className="flex-1 min-w-0 truncate text-[14px] font-bold text-[#101828]">{draggingTask.title}</span>
+            </div>,
+            document.body
+          )}
 
 
            {/* ── Inline Create Task ── */}
@@ -338,7 +364,7 @@ export default function ProductBacklogSection({
                 setNewTaskTitleLength(0);
                 setShowCreateTaskBox(false);
               }}
-              className="mt-2 flex items-center gap-3 rounded-lg border-2 border-[#175CD3] bg-white px-3 py-1.5 transition-all duration-200"
+              className="mt-2 flex items-center gap-3 rounded-lg border-2 border-cu-primary bg-cu-bg px-3 py-1.5 transition-all duration-200"
             >
               <div className="flex-1 min-w-0">
                 <input
@@ -354,7 +380,7 @@ export default function ProductBacklogSection({
                   }}
                   placeholder="Task name"
                   autoFocus
-                  className="w-full bg-transparent text-[12px] font-medium text-[#101828] outline-none placeholder-[#98A2B3]"
+                  className="w-full bg-transparent text-[12px] font-medium text-cu-text-primary outline-none placeholder:text-cu-text-tertiary"
                 />
                 {newTaskTitleLength > 200 && (
                   <p className="text-xs text-amber-500 mt-1">
@@ -365,7 +391,7 @@ export default function ProductBacklogSection({
               <button
                 type="submit"
                 disabled={!newTaskTitle.trim()}
-                className="flex h-11 w-11 items-center justify-center shrink-0 rounded-md bg-[#175CD3] text-white hover:bg-[#1849A9] disabled:opacity-50 transition-colors duration-150"
+                className="flex h-11 w-11 items-center justify-center shrink-0 rounded-md bg-cu-primary text-white hover:bg-cu-primary-hover disabled:opacity-50 transition-colors duration-150"
                 title="Create Task"
               >
                 <CornerDownLeft size={14} />

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { GitBranch, Loader2, X } from 'lucide-react';
+import api from '@/lib/axios';
 import { type GitHubIssue } from '@/services/githubService';
 import { IssueStateBadge } from '@/components/github/IssueStateBadge';
 
@@ -15,14 +16,17 @@ interface ImportIssueModalProps {
   onClose: () => void;
 }
 
+interface ImportIssueResponse {
+  imported: number[];
+  skipped: number[];
+}
+
 function formatBodyPreview(body?: string): string {
   if (!body?.trim()) return 'No description provided.';
   return body.trim().replace(/\n{3,}/g, '\n\n');
 }
 
 export function ImportIssueModal({ issue, projectId, repoFullName, onSuccess, onClose }: ImportIssueModalProps) {
-  const [syncComments, setSyncComments] = useState(true);
-  const [mapLabels, setMapLabels] = useState(true);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -44,28 +48,19 @@ export function ImportIssueModal({ issue, projectId, repoFullName, onSuccess, on
     setSuccessMessage(null);
 
     try {
-      const response = await fetch('/api/github/issues/import', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          projectId,
-          repoFullName,
-          issueNumbers: [issue.number],
-        }),
+      const response = await api.post<ImportIssueResponse>('/api/github/issues/import', {
+        projectId,
+        repoFullName,
+        issueNumbers: [issue.number],
       });
 
-      const data = await response.json().catch(() => ({} as { taskId?: number; id?: number; message?: string; error?: string }));
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || 'Failed to import issue');
-      }
-
-      const taskId = data.taskId ?? data.id;
+      const taskId = response.data.imported?.[0];
       if (typeof taskId !== 'number') {
-        throw new Error('Import completed, but no task id was returned.');
+        throw new Error(
+          response.data.skipped?.includes(issue.number)
+            ? 'This issue has already been imported or is no longer available.'
+            : 'The issue could not be imported.',
+        );
       }
 
       setSuccessMessage('Task created!');
@@ -180,37 +175,6 @@ export function ImportIssueModal({ issue, projectId, repoFullName, onSuccess, on
               <p className="mt-1.5 line-clamp-3 text-sm font-outfit leading-relaxed text-slate-600">
                 {bodyPreview}
               </p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-sm font-outfit font-bold text-slate-800">Import options</p>
-            <div className="mt-3 space-y-3">
-              <label className="flex items-start gap-3 rounded-xl border border-slate-200 px-3 py-2.5 hover:bg-slate-50">
-                <input
-                  type="checkbox"
-                  checked={syncComments}
-                  onChange={e => setSyncComments(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                />
-                <div>
-                  <span className="text-sm font-outfit font-semibold text-slate-700">Sync GitHub comments</span>
-                  <p className="text-xs font-outfit text-slate-400">Keep the issue discussion linked to the imported task.</p>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 rounded-xl border border-slate-200 px-3 py-2.5 hover:bg-slate-50">
-                <input
-                  type="checkbox"
-                  checked={mapLabels}
-                  onChange={e => setMapLabels(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                />
-                <div>
-                  <span className="text-sm font-outfit font-semibold text-slate-700">Map GitHub labels to project labels</span>
-                  <p className="text-xs font-outfit text-slate-400">Create or match labels during import when available.</p>
-                </div>
-              </label>
             </div>
           </div>
 

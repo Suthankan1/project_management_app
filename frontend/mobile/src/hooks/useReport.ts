@@ -9,7 +9,8 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import api from '../api/axios';
+import { taskService, sprintService } from '../services/task-service';
+import { projectService } from '../services/project-service';
 import {
   getProjectScheduledReports,
   deleteScheduledReport,
@@ -189,22 +190,20 @@ export function useReport(projectId: number) {
 
     try {
       const [
-        tasksRes, springsRes, metricsRes, projectRes, milestonesRes, membersRes,
+        tasksData, springsData, metricsRes, projectData, milestonesRes, membersData,
       ] = await Promise.all([
-        api.get(`/api/tasks/project/${projectId}`).catch(() => ({ data: [] })),
-        api.get(`/api/sprints/project/${projectId}`).catch(() => ({ data: [] })),
-        api.get(`/api/projects/${projectId}/metrics`).catch(() => ({
-          data: { totalTasks: 0, completedTasks: 0, overdueTasks: 0 },
-        })),
-        api.get(`/api/projects/${projectId}`).catch(() => ({ data: null })),
-        api.get(`/api/projects/${projectId}/milestones`).catch(() => ({ data: [] })),
-        api.get(`/api/projects/${projectId}/members`).catch(() => ({ data: [] })),
+        taskService.listByProject(projectId).catch(() => []),
+        sprintService.listByProject(projectId).catch(() => []),
+        projectService.getMetrics(projectId).catch(() => ({ totalTasks: 0, completedTasks: 0, overdueTasks: 0 })),
+        projectService.get(projectId).catch(() => null),
+        projectService.getMilestones(projectId).catch(() => []),
+        projectService.getMembers(projectId).catch(() => []),
       ]);
 
       if (!isMounted.current) return;
 
-      const rawProject  = projectRes.data;
-      const rawMembers  = (membersRes.data as any[]).map((m: any) => ({
+      const rawProject  = projectData;
+      const rawMembers  = (membersData as any[]).map((m: any) => ({
         id:     m.id,
         userId: m.user?.userId ?? m.userId,
         role:   m.role,
@@ -213,10 +212,10 @@ export function useReport(projectId: number) {
 
       const built = buildReportData(
         rawProject,
-        tasksRes.data      ?? [],
-        springsRes.data    ?? [],
-        metricsRes.data    ?? { totalTasks: 0, completedTasks: 0, overdueTasks: 0 },
-        milestonesRes.data ?? [],
+        tasksData  ?? [],
+        springsData ?? [],
+        metricsRes  ?? { totalTasks: 0, completedTasks: 0, overdueTasks: 0 },
+        milestonesRes ?? [],
         rawMembers,
       );
 

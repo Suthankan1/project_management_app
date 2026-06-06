@@ -9,7 +9,7 @@ interface OtpInputProps {
 export default function OtpInput({ value, onChange, disabled = false }: OtpInputProps) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">
+      <label className="block text-xs font-semibold text-cu-text-muted mb-1.5 ml-1">
         Reset Code (OTP)
       </label>
       <input
@@ -17,7 +17,7 @@ export default function OtpInput({ value, onChange, disabled = false }: OtpInput
         // maxLength mirrors the server-side 6-digit constraint, giving the user instant feedback before any API call
         maxLength={6}
         // tracking-widest + font-mono visually separates the digits to match the familiar authenticator-app pattern
-        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-sm text-center tracking-widest font-mono disabled:bg-gray-100 disabled:cursor-not-allowed"
+        className="w-full px-4 py-3 rounded-xl border border-cu-border bg-cu-bg text-cu-text-primary placeholder:text-cu-text-muted focus:border-cu-primary focus:ring-4 focus:ring-cu-primary/10 outline-none transition-all text-sm text-center tracking-widest font-mono disabled:bg-cu-bg-secondary disabled:cursor-not-allowed"
         placeholder="123456"
         value={value}
         onChange={(e) => onChange(e.target.value)}

@@ -112,8 +112,9 @@ The frontend proxies all `/api/*` calls to the backend (configured in `netlify.t
 
 - **Docker & Docker Compose** — for the quickstart path
 - **Java 21** (Temurin) — for running the backend manually
-- **Node.js 20 / npm** — for running the frontend manually
+- **Node.js 22 / npm** — for running the frontend manually (configured via `.nvmrc` in `frontend/web`)
 - **PostgreSQL** — local instance or a Supabase project
+- **Redis** — required for rate limiting and notification unread-count caching unless notification Redis caching is disabled
 - **AWS account** — S3 buckets for file storage (optional for local dev with stubs)
 - **Gmail account** — for SMTP email sending (optional for local dev)
 
@@ -138,21 +139,57 @@ cp .env.example .env
 
 | Variable | Description | Example |
 |---|---|---|
-| `SPRING_DATASOURCE_URL` | PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/planora_db` |
-| `SPRING_DATASOURCE_USERNAME` | Database username | `titan` |
-| `SPRING_DATASOURCE_PASSWORD` | Database password | `secret` |
+| `SPRING_DATASOURCE_URL` | PostgreSQL JDBC URL. Use `db:5432` only inside Docker Compose. | `jdbc:postgresql://db:5432/planora_db` |
+| `SPRING_DATASOURCE_USERNAME` | Database username | `planora` |
+| `SPRING_DATASOURCE_PASSWORD` | Database password | `change_me_local_db_password` |
+| `POSTGRES_DB` | Local Docker Postgres database name | `planora_db` |
+| `POSTGRES_USER` | Local Docker Postgres user | `planora` |
+| `POSTGRES_PASSWORD` | Local Docker Postgres password | `change_me_local_db_password` |
+| `REDIS_HOST` | Redis host for rate limiting and notification cache. Use `redis` only inside Docker Compose. | `localhost` |
+| `REDIS_PORT` | Redis port | `6379` |
+| `NOTIFICATIONS_CACHE_REDIS_ENABLED` | Enables Redis unread-count caching for notifications. Set to `false` to read notification counts directly from the database. | `true` |
+| `REDIS_CONNECT_TIMEOUT` | Redis connection timeout for fast failure when Redis is unavailable. | `500ms` |
+| `REDIS_TIMEOUT` | Redis command timeout for fast failure when Redis is unavailable. | `500ms` |
 | `JWT_SECRET` | HS256 secret key (min 32 chars) | `change-me-in-production` |
 | `MAIL_HOST` | SMTP host | `smtp.gmail.com` |
 | `MAIL_PORT` | SMTP port | `587` |
 | `MAIL_USERNAME` | Sender email address | `you@example.com` |
 | `MAIL_PASSWORD` | SMTP app password | `your-app-password` |
-| `AWS_ACCESS_KEY` | AWS IAM access key | `AKIA...` |
-| `AWS_SECRET_KEY` | AWS IAM secret key | `...` |
+| `AWS_ACCESS_KEY` | AWS IAM access key | `your_aws_access_key` |
+| `AWS_SECRET_KEY` | AWS IAM secret key | `your_aws_secret_key` |
 | `AWS_REGION` | S3 bucket region | `eu-north-1` |
-| `S3_BUCKET_NAME` | DMS bucket name | `planora-dms-storage` |
+| `AWS_PROFILE_PHOTOS_BUCKET` | Profile photo bucket name | `your-profile-photos-bucket` |
+| `AWS_DMS_BUCKET` | Document management bucket name | `your-document-storage-bucket` |
+| `AWS_CHAT_BUCKET` | Chat attachment bucket name | `your-chat-attachments-bucket` |
+| `AWS_TASK_STORAGE_BUCKET` | Task attachment bucket name | `your-task-attachments-bucket` |
 | `CORS_ALLOWED_ORIGINS` | Frontend origin(s) | `http://localhost:3000` |
 
 Additional optional variables are listed in `.env.example`.
+
+#### Chosen Deployment Model: Same-Origin Proxy
+
+The production environment is configured to use a **Same-Origin Proxy** architecture to eliminate cross-origin request issues, CORS errors, and `SameSite` cookie limitations in the browser. 
+
+In this model:
+- The frontend is deployed to Netlify and proxies all REST API requests (under `/api/*`) server-side to the backend using the `BACKEND_URL` environment variable.
+- Because the browser communicates directly with the same origin, **`NEXT_PUBLIC_API_BASE_URL` is optional** in production and defaults to an empty string `''`. This ensures Axios uses relative URLs (e.g. `/api/auth/...`) instead of hardcoded backend URLs.
+- However, since WebSockets cannot be routed through standard Next.js rewrite rules on Netlify, WebSockets must connect directly to the backend domain. Therefore, **`NEXT_PUBLIC_WS_BASE_URL` is required** in production (e.g. `wss://api.planora.com`) and will trigger a hard-fail runtime exception if missing.
+
+For local Docker development, the values in `.env.example` are safe placeholders for configuration shape only. Replace the AWS credentials and bucket names if you need real file upload flows.
+
+For manual local backend runs outside Docker, use host addresses instead of Docker service names. For example, set `SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/planora_db` and `REDIS_HOST=localhost`. If you do not have Redis running locally, set `NOTIFICATIONS_CACHE_REDIS_ENABLED=false` so notification unread counts go directly to the database; the flag only affects notification caching, and Redis remains the configured dependency for rate limiting.
+
+For AWS S3 storage, create separate private buckets for profile photos, DMS documents, chat attachments, and task attachments. Set the four bucket environment variables differently in staging and production; the backend reads the bucket names at startup, so no code changes are needed between environments.
+
+Local MinIO is not currently wired into the backend because `S3Config` does not expose an S3 endpoint override or path-style access setting. Use AWS S3 for upload-flow testing until those options are added.
+
+For staging and production, set all required variables in the hosting platform:
+
+| Environment | Required values |
+|---|---|
+| Local Docker | `SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/planora_db`, matching `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `JWT_SECRET`, mail settings, AWS credentials, and the four storage bucket names if uploads are used. |
+| Staging | External PostgreSQL JDBC URL with SSL if required by the provider, staging database credentials, staging JWT secret, staging SMTP credentials, staging AWS credentials, staging-only S3 buckets, and staging `CORS_ALLOWED_ORIGINS`. Do not use `db:5432` outside Docker Compose. |
+| Production | Managed PostgreSQL JDBC URL with SSL, production database credentials, production Redis host (`REDIS_HOST`) pointing at a real instance or `NOTIFICATIONS_CACHE_REDIS_ENABLED=false` for notification cache bypass, strong production JWT secret, production SMTP credentials, production AWS credentials, production-only S3 buckets, production `CORS_ALLOWED_ORIGINS`, and any provider-specific Flyway settings. Missing production bucket variables fail startup. Do not reuse local or staging bucket names. |
 
 ### 3. Run with Docker Compose
 
@@ -169,6 +206,8 @@ The backend API will be available at `http://localhost:8080`.
 ### 4. Run Manually
 
 #### Backend
+
+Start PostgreSQL and Redis first. Docker Compose already includes Redis; for manual runs you can use a local Redis server with `REDIS_HOST=localhost`, or set `NOTIFICATIONS_CACHE_REDIS_ENABLED=false` to bypass notification unread-count caching when Redis is not available.
 
 ```bash
 cd backend
@@ -268,6 +307,19 @@ project_management_app/
 
 ---
 
+## Security
+
+### Token Storage Strategy
+To mitigate the risk of Cross-Site Scripting (XSS) attacks, the application implements a hardened token storage strategy:
+- **Refresh Token**: Stored in a secure, `HttpOnly` cookie set by the backend, ensuring it is inaccessible to JavaScript.
+- **Access Token**: Kept strictly in an in-memory module variable. It is lost on page reload and dynamically re-minted via the `HttpOnly` refresh token cookie during application boot or tab loading.
+- **Session Indicators**: `localStorage` is used only for the non-sensitive `planora:has_refresh_token` flag to indicate to the frontend that an active session exists and it should attempt a silent refresh on startup.
+
+### Content Security Policy (CSP)
+A strict `Content-Security-Policy` header is configured in `next.config.mjs` to reduce XSS reach by limiting script, style, connection, and frame sources.
+
+---
+
 ## Deployment
 
 ### Backend (AWS)
@@ -287,6 +339,7 @@ The frontend is deployed to Netlify via the `netlify.toml` configuration. Set th
 
 - `BACKEND_URL` — the backend's public URL (e.g., `https://api.yourapp.com`)
 - `NEXT_PUBLIC_BACKEND_HOST` — the backend hostname for Next.js image patterns
+- `NEXT_PUBLIC_WS_BASE_URL` — the backend's direct WebSocket absolute URL (e.g., `https://api.yourapp.com`)
 
 ### CI/CD
 

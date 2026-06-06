@@ -4,12 +4,16 @@ import { useEffect, useRef, useState } from 'react';
 import TaskHeader from './TaskHeader';
 import TaskMainContent from './TaskMainContent';
 import TaskSidebar from './TaskSidebar';
-import api from '@/lib/axios';
 import { toast } from '@/components/ui';
 import { motion } from 'framer-motion';
 import { useStomp } from '@/ws/stomp-provider';
 import { getProjectGitHubRepo } from '@/services/githubService';
 import CreateIssueFromTaskModal from '@/components/github/CreateIssueFromTaskModal';
+import { authApi } from '@/services/auth-contract';
+import api from '@/lib/axios';
+import { getApiErrorStatus, normalizeApiError } from '@/lib/api-error';
+import { labelsApi, projectsApi, sprintsApi, tasksApi } from '@/services/api-contract';
+import type { Task } from '@/types';
 
 interface MultiAssignee {
   memberId: number;
@@ -41,12 +45,15 @@ interface TaskData {
   assignees?: MultiAssignee[];
   recurrenceRule?: string | null;
   recurrenceEnd?: string | null;
+  customInterval?: number | null;
+  recurrenceLimit?: number | null;
   reporterId?: number | null;
   sprintId?: number | null;
   startDate?: string | null;
   completedAt?: string | null;
   githubIssueNumber?: number | null;
   githubRepoFullName?: string | null;
+  archived?: boolean;
 }
 
 interface ProjectMemberOption {
@@ -70,12 +77,59 @@ interface TaskCardModalProps {
   onClose: (wasModified: boolean) => void;
 }
 
+const toTaskData = (task: Task & {
+  projectName?: string;
+  reporterName?: string;
+  assigneeName?: string;
+  sprintName?: string;
+  githubIssueNumber?: number | null;
+  githubRepoFullName?: string | null;
+}): TaskData => ({
+  id: task.id,
+  title: task.title,
+  description: task.description ?? '',
+  projectId: task.projectId ?? 0,
+  projectName: task.projectName ?? '',
+  status: task.status ?? 'TODO',
+  priority: task.priority ?? 'MEDIUM',
+  storyPoint: task.storyPoint ?? 0,
+  reporterName: task.reporterName ?? '',
+  assigneeName: task.assigneeName ?? '',
+  sprintName: task.sprintName ?? '',
+  milestoneId: task.milestoneId ?? null,
+  milestoneName: task.milestoneName ?? null,
+  labels: task.labels ?? [],
+  createdAt: task.createdAt ?? '',
+  updatedAt: task.updatedAt ?? '',
+  dueDate: task.dueDate ?? null,
+  subtasks: task.subtasks ?? [],
+  dependencies: task.dependencies ?? [],
+  assignees: task.assignees?.map((assignee) => ({
+    memberId: assignee.id,
+    userId: assignee.id,
+    name: assignee.name,
+    photoUrl: assignee.avatar ?? assignee.profilePicUrl ?? null,
+  })),
+  recurrenceRule: task.recurrenceRule ?? null,
+  recurrenceEnd: task.recurrenceEnd ?? null,
+  customInterval: task.customInterval ?? null,
+  recurrenceLimit: task.recurrenceLimit ?? null,
+  reporterId: task.reporterId ?? null,
+  sprintId: task.sprintId ?? null,
+  startDate: task.startDate ?? null,
+  completedAt: task.completedAt ?? null,
+  githubIssueNumber: task.githubIssueNumber ?? null,
+  githubRepoFullName: task.githubRepoFullName ?? null,
+  archived: task.archived ?? false,
+});
+
 export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
   const [taskData, setTaskData] = useState<TaskData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [canEdit, setCanEdit] = useState(true);
   const [canChangeReporter, setCanChangeReporter] = useState(false);
+  const [, setIsSyncing] = useState(false);
   const [projectMembers, setProjectMembers] = useState<ProjectMemberOption[]>([]);
   const [projectLabels, setProjectLabels] = useState<LabelOption[]>([]);
   const [projectSprints, setProjectSprints] = useState<SprintOption[]>([]);
@@ -89,16 +143,29 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
   const fetchTaskData = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/tasks/${taskId}`);
-      setTaskData(response.data);
+      const response = await tasksApi.get(taskId);
+      setTaskData(toTaskData(response as Task & {
+        projectName?: string;
+        reporterName?: string;
+        assigneeName?: string;
+        sprintName?: string;
+        githubIssueNumber?: number | null;
+        githubRepoFullName?: string | null;
+      }));
+      localStorage.setItem(`planora:task:${taskId}`, JSON.stringify({ ...response, timestamp: Date.now() }));
       setError(null);
-      if (response.data?.projectId) {
-        void loadTaskMeta(response.data.projectId);
+      if (response?.projectId) {
+        void loadTaskMeta(response.projectId);
       }
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      setError(axiosErr?.response?.data?.message || 'Failed to fetch task data');
-      setTaskData(null);
+      if (getApiErrorStatus(err) === 404) {
+        localStorage.removeItem(`planora:task:${taskId}`);
+        toast('This task no longer exists.', 'error');
+        onClose(false);
+      } else {
+        setError(normalizeApiError(err, 'Failed to fetch task data'));
+        setTaskData(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -107,15 +174,15 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
   const loadTaskMeta = async (projectId: number) => {
     try {
       const [projectRes, currentUserRes, membersRes, labelsRes, sprintsRes] = await Promise.all([
-        api.get(`/api/projects/${projectId}`),
-        api.get('/api/user/me'),
-        api.get(`/api/projects/${projectId}/members`),
-        api.get(`/api/labels/project/${projectId}`),
-        api.get(`/api/sprints/project/${projectId}`).catch(() => ({ data: [] })),
+        projectsApi.get(projectId),
+        authApi.getCurrentUser(),
+        projectsApi.getMembers(projectId),
+        labelsApi.listByProject(projectId),
+        sprintsApi.listByProject(projectId).catch(() => []),
       ]);
-      const teamId = projectRes.data?.teamId as number | undefined;
-      const currentUserId = currentUserRes.data?.userId as number | undefined;
-      const membersRaw = (membersRes.data || []) as Array<{ id: number; role?: string; user?: { userId: number; username: string } }>;
+      const teamId = projectRes?.teamId as number | undefined;
+      const currentUserId = currentUserRes?.userId as number | undefined;
+      const membersRaw = (membersRes || []) as Array<{ id: number; role?: string; user?: { userId: number; username: string } }>;
       const currentMember = membersRaw.find((member) => member.user?.userId === currentUserId);
       const role = currentMember?.role || 'MEMBER';
       setCanEdit(role !== 'VIEWER');
@@ -129,9 +196,9 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
             name: member.user!.username,
           })),
       );
-      const labelsRaw = (labelsRes.data || []) as Array<{ id: number; name: string }>;
+      const labelsRaw = (labelsRes || []) as Array<{ id: number; name: string }>;
       setProjectLabels(labelsRaw.map((label) => ({ id: label.id, name: label.name })));
-      const sprintsRaw = (sprintsRes.data || []) as Array<{ id: number; name: string; status?: string }>;
+      const sprintsRaw = (sprintsRes || []) as Array<{ id: number; name: string; status?: string }>;
       setProjectSprints(
         sprintsRaw
           .filter((sprint) => sprint.status !== 'COMPLETED')
@@ -155,6 +222,17 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
       } catch { /* ignore */ }
     }
     fetchTaskData();
+    return () => {
+      const cached = localStorage.getItem(`planora:task:${taskId}`);
+      if (cached) {
+        try {
+          const { timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp > 5 * 60_000) {
+            localStorage.removeItem(`planora:task:${taskId}`);
+          }
+        } catch { /* ignore */ }
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
@@ -169,6 +247,10 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
           const event = JSON.parse(msg.body) as { type: string; taskId?: number };
           if (event.type === 'TASK_COMMENT_ADDED' && event.taskId === taskId) {
             commentRefetchRef.current?.();
+          } else if (event.type === 'TASK_DELETED' && event.taskId === taskId) {
+            localStorage.removeItem(`planora:task:${taskId}`);
+            toast.info("This task was deleted by another team member.");
+            onClose(false);
           }
         } catch { /* ignore malformed messages */ }
       },
@@ -203,6 +285,8 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
     milestoneId: number | null;
     recurrenceRule: string | null;
     recurrenceEnd: string | null;
+    customInterval: number | null;
+    recurrenceLimit: number | null;
     reporterId: number | null;
     sprintId: number | null;
     startDate: string | null;
@@ -211,6 +295,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
     if (!taskData) return;
     // Optimistic: apply locally before the API call so the UI reflects the change without latency
     setTaskData((prev) => prev ? { ...prev, ...updates } : prev);
+    setIsSyncing(true);
     try {
       await api.put(`/api/tasks/${taskId}`, updates);
       wasModified.current = true;
@@ -221,8 +306,9 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
     } catch (err: unknown) {
       // Revert the optimistic update by re-fetching the server's authoritative state
       await fetchTaskData();
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('Failed to update task: ' + (axiosErr?.response?.data?.message || 'Unknown error'), 'error');
+      toast(`Failed to update task: ${normalizeApiError(err, 'Unknown error')}`, 'error');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -245,7 +331,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
       githubRepoFullName: taskData.githubRepoFullName ?? projectGitHubRepo?.repoFullName ?? null,
     };
     setTaskData(nextTaskData);
-    localStorage.setItem(`planora:task:${taskId}`, JSON.stringify(nextTaskData));
+    localStorage.setItem(`planora:task:${taskId}`, JSON.stringify({ ...nextTaskData, timestamp: Date.now() }));
     wasModified.current = true;
   };
 
@@ -264,55 +350,55 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
         animate={{ x: 0, boxShadow: '-10px 0 30px rgba(0,0,0,0.1)' }}
         exit={{ x: '100%', boxShadow: '-10px 0 30px rgba(0,0,0,0)' }}
         transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-        className="absolute inset-0 md:inset-y-3 md:left-auto md:right-3 md:w-[980px] md:max-w-[calc(100vw-24px)] max-h-[100dvh] bg-white flex flex-col font-sans overflow-hidden md:shadow-2xl md:rounded-2xl border border-transparent md:border-[#E5E7EB]"
+        className="absolute inset-0 md:inset-y-3 md:left-auto md:right-3 md:w-[980px] md:max-w-[calc(100vw-24px)] max-h-[100dvh] bg-cu-bg flex flex-col font-sans overflow-hidden md:shadow-2xl md:rounded-2xl border border-transparent md:border-cu-border"
         // stopPropagation prevents clicks inside the panel from bubbling to the backdrop and closing the modal
         onClick={(e) => e.stopPropagation()}
       >
         {/* Mobile drag handle */}
         <div className="md:hidden flex justify-center pt-3 pb-1 flex-shrink-0">
-          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+          <div className="w-10 h-1 bg-cu-bg-tertiary rounded-full" />
         </div>
 
         {loading && !taskData && (
           <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden animate-pulse">
-            <div className="flex-1 p-6 border-r border-[#EAECF0] space-y-6">
-              <div className="h-8 w-3/4 rounded-lg bg-[#F2F4F7]" />
+            <div className="flex-1 p-6 border-r border-cu-border space-y-6">
+              <div className="h-8 w-3/4 rounded-lg bg-cu-bg-secondary" />
               <div className="flex gap-2">
-                <div className="h-9 w-20 rounded-xl bg-[#F2F4F7]" />
-                <div className="h-9 w-28 rounded-xl bg-[#F2F4F7]" />
-                <div className="h-9 w-24 rounded-xl bg-[#F2F4F7]" />
+                <div className="h-9 w-20 rounded-xl bg-cu-bg-secondary" />
+                <div className="h-9 w-28 rounded-xl bg-cu-bg-secondary" />
+                <div className="h-9 w-24 rounded-xl bg-cu-bg-secondary" />
               </div>
               <div>
-                <div className="h-3 w-24 rounded bg-[#EAECF0] mb-3" />
-                <div className="h-28 rounded-xl bg-[#F2F4F7]" />
+                <div className="h-3 w-24 rounded bg-cu-bg-tertiary mb-3" />
+                <div className="h-28 rounded-xl bg-cu-bg-secondary" />
               </div>
               <div>
-                <div className="h-3 w-20 rounded bg-[#EAECF0] mb-3" />
+                <div className="h-3 w-20 rounded bg-cu-bg-tertiary mb-3" />
                 <div className="space-y-2">
-                  <div className="h-10 rounded-xl bg-[#F2F4F7]" />
-                  <div className="h-10 rounded-xl bg-[#F2F4F7]" />
+                  <div className="h-10 rounded-xl bg-cu-bg-secondary" />
+                  <div className="h-10 rounded-xl bg-cu-bg-secondary" />
                 </div>
               </div>
             </div>
-            <div className="w-full md:w-80 p-4 bg-[#F7F8FA] space-y-4 flex-shrink-0">
+            <div className="w-full md:w-80 p-4 bg-cu-bg-secondary space-y-4 flex-shrink-0">
               <div className="grid grid-cols-2 md:grid-cols-1 gap-2">
-                <div className="h-10 rounded-xl bg-[#EAECF0]" />
-                <div className="h-10 rounded-xl bg-[#EAECF0]" />
+                <div className="h-10 rounded-xl bg-cu-bg-tertiary" />
+                <div className="h-10 rounded-xl bg-cu-bg-tertiary" />
               </div>
-              <div className="h-52 rounded-xl bg-white border border-[#E5E7EB]" />
-              <div className="h-32 rounded-xl bg-white border border-[#E5E7EB]" />
+              <div className="h-52 rounded-xl bg-cu-bg border border-cu-border" />
+              <div className="h-32 rounded-xl bg-cu-bg border border-cu-border" />
             </div>
           </div>
         )}
 
         {!loading && (error || !taskData) && (
           <div className="flex-1 flex items-center justify-center p-4">
-            <div className="bg-white p-8 rounded-lg max-w-md w-full text-center">
-              <h2 className="text-red-600 font-semibold mb-2">Error Loading Task</h2>
-              <p className="text-gray-600 mb-4">{error || 'Task not found'}</p>
+            <div className="bg-cu-bg p-8 rounded-lg max-w-md w-full text-center border border-cu-border">
+              <h2 className="text-cu-danger font-semibold mb-2">Error Loading Task</h2>
+              <p className="text-cu-text-secondary mb-4">{error || 'Task not found'}</p>
               <button
                 onClick={() => onClose(wasModified.current)}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+                className="bg-cu-primary text-white px-4 py-2 rounded hover:bg-cu-primary-hover transition-colors"
               >
                 Close
               </button>
@@ -326,7 +412,8 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
               project={taskData.projectName}
               taskId={`TASK-${taskData.id}`}
               numericTaskId={taskData.id}
-              onClose={() => onClose(wasModified.current)}
+              archived={taskData.archived}
+              onClose={(wasModifiedFlag) => onClose(wasModifiedFlag || wasModified.current)}
             />
             <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-y-auto md:overflow-hidden">
               <div className="flex flex-1 flex-col min-h-0 md:overflow-y-auto">
@@ -348,6 +435,8 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
                 <TaskSidebar
                   taskId={taskData.id}
                   projectId={taskData.projectId}
+                  taskTitle={taskData.title}
+                  taskDescription={taskData.description}
                   status={taskData.status}
                   assignee={taskData.assigneeName}
                   reporter={taskData.reporterName}
@@ -379,7 +468,9 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
                   onAssigneesChanged={fetchTaskData}
                   recurrenceRule={taskData.recurrenceRule}
                   recurrenceEnd={taskData.recurrenceEnd}
-                  onUpdateRecurrence={(rule, end) => canEdit && updateTask({ recurrenceRule: rule, recurrenceEnd: end })}
+                  customInterval={taskData.customInterval}
+                  recurrenceLimit={taskData.recurrenceLimit}
+                  onUpdateRecurrence={(rule, end, customInterval, recurrenceLimit) => canEdit && updateTask({ recurrenceRule: rule, recurrenceEnd: end, customInterval, recurrenceLimit })}
                   canEdit={canEdit}
                   members={projectMembers}
                   allLabels={projectLabels}
@@ -404,6 +495,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
             {showGitHubIssueModal && projectGitHubRepo && (
               <CreateIssueFromTaskModal
                 open={showGitHubIssueModal}
+                taskId={taskData.id}
                 taskTitle={taskData.title}
                 taskDescription={taskData.description}
                 taskLabels={taskData.labels?.map((label) => label.name) || []}

@@ -9,12 +9,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.tika.Tika;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -71,17 +72,21 @@ public class UserService {
     @Value("${aws.region}")
     private String region;
 
-    /** In-memory presigned URL cache: S3 key → (url, expiry). TTL = 55 min (URLs expire at 60 min). */
-    /* Generating S3 presigned URLs is a CPU-intensive cryptographic operation.
-     * Caching them prevents our server from buckling under load if a user frequently
-     * refreshes the page or fetches lists of users.
-     */
-    private final Map<String, Object[]> presignedUrlCache = new ConcurrentHashMap<>();
-    private static final Duration PRESIGN_TTL = Duration.ofMinutes(55);
+    @Autowired
+    @Lazy
+    private UserService self;
+
+    private UserService getSelf() {
+        return self != null ? self : this;
+    }
 
     private final Cache<String, LoginAttemptRecord> loginAttemptCache = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofMinutes(20))
             .build();
+
+    // Note: OTP-issuance rate limiting (forgot / resend / resend-otp) is enforced upstream by
+    // RateLimitingFilter, which uses a Redis-backed IP+email keyed counter shared across all
+    // application instances. No per-service cache is needed here.
 
     private record LoginAttemptRecord(int failedAttempts, Instant lockedUntil) {
         boolean isLocked(Instant now) {
@@ -354,6 +359,21 @@ public class UserService {
         tokenRepository.save(jtiRecord);
     }
 
+    @Transactional
+    public void revokeRefreshToken(String email) {
+        if (email == null || email.isBlank()) {
+            return;
+        }
+
+        userRepository.findFirstByEmailIgnoreCase(email).ifPresent(user -> {
+            VerificationToken existing = tokenRepository.findByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN);
+            if (existing != null) {
+                tokenRepository.delete(existing);
+                tokenRepository.flush();
+            }
+        });
+    }
+
     // Generates and dispatches a new OTP for account verification.
     @Transactional
     public String resendOtp(String email) {
@@ -392,11 +412,19 @@ public class UserService {
         return "New OTP send to your email.";
     }
 
-    // Initiate the forgotten password flow.
+    /**
+     * Initiates the forgotten-password flow.
+     *
+     * <p>Rate limiting for this endpoint (5 requests / 10 minutes per IP+email) is enforced
+     * upstream by {@code RateLimitingFilter} before this method is ever reached. No
+     * additional throttle gate is needed here.
+     */
     @Transactional
     public String forgotPassword(String email) {
+        String lowerEmail = email.toLowerCase();
+
         // Step 1. Attempt to fetch the user.
-        User user = userRepository.findByEmail(email.toLowerCase());
+        User user = userRepository.findByEmail(lowerEmail);
 
         // Step 2. Security Check: Mask user non-existence.
         if (user == null)
@@ -413,41 +441,70 @@ public class UserService {
         String otp = String.valueOf(new Random().nextInt(900000) + 100000);
         VerificationToken verificationToken = new VerificationToken();
         verificationToken.setUser(user);
-        verificationToken.setToken(otp);
+        verificationToken.setToken(hashToken(otp));
         verificationToken.setTokenType(VerificationToken.TokenType.PASSWORD_RESET);
         verificationToken.setExpiry(Instant.now().plus(Duration.ofMinutes(10)));
         tokenRepository.save(verificationToken);
 
         // Step 5. Dispatch the reset email.
         try {
-            emailService.sendPasswordResetRequest(email.toLowerCase(), otp);
+            emailService.sendPasswordResetRequest(lowerEmail, otp);
         } catch (Exception e) {
             logger.error("Failed to send password reset email to {}: {}", email, e.getMessage());
         }
-        return "Password reset OTP sent successfully.";
+        return "If that email exists, an OTP has been sent.";
     }
 
     /**
-     * Resets the password using the OTP received by email (which is the token stored in VerificationToken).
+     * Resets the password using the OTP received by email.
      * The token must be of type PASSWORD_RESET and must not be expired or already used.
      */
     @Transactional
-    public boolean resetPassword(String token, String newPassword) {
-        // Step 1. Fetch the token directly.
-        VerificationToken verificationToken = tokenRepository.findByToken(token);
-
-        // Step 2. Validate the token state and ensure it's specifically a password reset token.
-        if (verificationToken == null || verificationToken.isUsed() || verificationToken.isExpired()
-                || verificationToken.getTokenType() != VerificationToken.TokenType.PASSWORD_RESET) {
+    public boolean resetPassword(String email, String token, String newPassword) {
+        if (email == null || token == null) {
             return false;
         }
 
-        // Step 3. Retrieve the associated user and update their password using Bcrypt.
-        User user = verificationToken.getUser();
+        // Step 1. Fetch user by email.
+        User user = userRepository.findFirstByEmailIgnoreCase(email.toLowerCase()).orElse(null);
+        if (user == null) {
+            return false;
+        }
+
+        // Step 2. Fetch the active PASSWORD_RESET token for this user.
+        VerificationToken verificationToken = tokenRepository.findByUserAndTokenType(user, VerificationToken.TokenType.PASSWORD_RESET);
+        if (verificationToken == null || verificationToken.getTokenType() != VerificationToken.TokenType.PASSWORD_RESET) {
+            return false;
+        }
+
+        // Step 3. Validate attempts / brute force limit.
+        if (verificationToken.getAttempts() >= 5) {
+            return false;
+        }
+
+        // Step 4. Validate used / expired.
+        if (verificationToken.isUsed() || verificationToken.isExpired()) {
+            return false;
+        }
+
+        // Step 5. Check if the provided OTP matches the stored token hash.
+        String hashedInputToken = hashToken(token);
+        if (!verificationToken.getToken().equals(hashedInputToken)) {
+            int newAttempts = verificationToken.getAttempts() + 1;
+            verificationToken.setAttempts(newAttempts);
+            if (newAttempts >= 5) {
+                verificationToken.setUsed(true);
+            }
+            tokenRepository.save(verificationToken);
+            return false;
+        }
+
+        // Step 6. Update user's password using Bcrypt.
         user.setPassword(encoder.encode(newPassword));
 
-        // Step 4. Burn the token so it cannot be reused and save both entities.
+        // Step 7. Burn the token, set used-at timestamp, and save.
         verificationToken.setUsed(true);
+        verificationToken.setUsedAt(Instant.now());
         userRepository.save(user);
         tokenRepository.save(verificationToken);
         return true;
@@ -462,15 +519,9 @@ public class UserService {
         // Step 1. Fetch the raw list from the database.
         java.util.List<User> allUsers = userRepository.findAll();
 
-        // Step 2. Filter out the specific email if requested.
-        if (excludeEmail != null && !excludeEmail.isEmpty()) {
-            allUsers = allUsers.stream()
-                    .filter(user -> !user.getEmail().equalsIgnoreCase(excludeEmail))
-                    .collect(java.util.stream.Collectors.toList());
-        }
-
-        // Step 3. Transform the remaining entities into clean DTOs.
-        return allUsers.stream()
+        // Step 2. Filter and transform entities in parallel stream.
+        return allUsers.parallelStream()
+                .filter(user -> excludeEmail == null || excludeEmail.isEmpty() || !user.getEmail().equalsIgnoreCase(excludeEmail))
                 .map(this::mapToUserResponseDTO)
                 .collect(java.util.stream.Collectors.toList());
     }
@@ -483,7 +534,7 @@ public class UserService {
     public UserResponseDTO mapToUserResponseDTO(User user) {
         // Step 1. Dynamically generate an S3 presigned URL if they have an avatar key saved.
         String presignedUrl = user.getProfilePicUrl() != null && !user.getProfilePicUrl().isEmpty()
-                ? generatePresignedUrl(user.getProfilePicUrl())
+                ? getSelf().generatePresignedUrl(user.getProfilePicUrl())
                 : null;
 
         // Step 2. Construct the DTO with safe public data.
@@ -503,6 +554,7 @@ public class UserService {
                 user.getCompany(),
                 user.getPosition(),
                 user.getBio(),
+                user.getGithubUsername(),
                 user.isNotifyDueDateReminders()
         );
     }
@@ -522,6 +574,47 @@ public class UserService {
         return mapToUserResponseDTO(updatedUser);
     }
 
+    @Transactional
+    @CachePut(value = "userProfile", key = "#email")
+    public UserResponseDTO updateGithubUsernameAndGetDTO(String email, String githubUsername) {
+        User user = getUserByEmail(email);
+        validateGithubUsernameUniqueness(user, githubUsername);
+        user.setGithubUsername(githubUsername);
+        return mapToUserResponseDTO(userRepository.save(user));
+    }
+
+    @Transactional
+    @CachePut(value = "userProfile", key = "#email")
+    public UserResponseDTO unlinkGithubUsernameAndGetDTO(String email) {
+        User user = getUserByEmail(email);
+        user.setGithubUsername(null);
+        return mapToUserResponseDTO(userRepository.save(user));
+    }
+
+    @Transactional
+    public void logoutAllSessions(String email) {
+        User user = getUserByEmail(email);
+        VerificationToken existing = tokenRepository.findByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN);
+        if (existing != null) {
+            tokenRepository.delete(existing);
+            tokenRepository.flush();
+        }
+    }
+
+    private void validateGithubUsernameUniqueness(User currentUser, String githubUsername) {
+        if (githubUsername == null || githubUsername.isBlank()) {
+            return;
+        }
+
+        List<User> linkedUsers = userRepository.findByGithubUsernameIgnoreCase(githubUsername);
+        boolean conflict = linkedUsers.stream()
+                .anyMatch(otherUser -> !otherUser.getUserId().equals(currentUser.getUserId()));
+
+        if (conflict) {
+            throw new IllegalStateException("GitHub username is already linked to another user");
+        }
+    }
+
     /**
      * Generates a presigned S3 URL for a single user's profile photo on demand.
      * Returns null if the user has no profile picture or does not exist.
@@ -536,7 +629,7 @@ public class UserService {
         }
 
         // Step 3. Pass to the generation method.
-        return generatePresignedUrl(user.getProfilePicUrl());
+        return getSelf().generatePresignedUrl(user.getProfilePicUrl());
     }
 
     /*
@@ -744,30 +837,17 @@ public class UserService {
     /**
      * Generates a presigned S3 URL valid for 60 minutes.
      * Accepts either a raw S3 object key or a legacy full S3 URL for backward compatibility.
-     * Returns null/empty for null/empty input. Results are cached for 55 minutes.
+     * Returns null/empty for null/empty input. Results are cached via Spring Cache (userPhotoUrls).
      */
-    public String generatePresignedUrl(String stored) {
+    @Cacheable(value = "userPhotoUrls", key = "#photoKey", condition = "#photoKey != null", unless = "#result == null")
+    public String generatePresignedUrl(String photoKey) {
         // Step 1. Handle empty states gracefully.
-        if (stored == null || stored.isEmpty()) {
-            return stored;
+        if (photoKey == null || photoKey.isEmpty()) {
+            return photoKey;
         }
 
         // Step 2. Strip any legacy HTTP formatting to isolate just the S3 Key.
-        String key = extractKeyFromStoredValue(stored);
-
-        // Step 3. Query the in-memory ConcurrentHashMap cache.
-        Object[] cached = presignedUrlCache.get(key);
-        if (cached != null) {
-            Instant expiry = (Instant) cached[1];
-
-            // Step 3a. If the cached URL is still valid, return it instantly.
-            if (Instant.now().isBefore(expiry)) {
-                return (String) cached[0];
-            }
-
-            // Step 3b. Cache is expired. Remove it and proceed to generate a new one.
-            presignedUrlCache.remove(key);
-        }
+        String key = extractKeyFromStoredValue(photoKey);
 
         try {
             // Step 4. Build S3 Request targeting the specific object key.
@@ -783,15 +863,29 @@ public class UserService {
                     .build();
 
             // Step 6. Execute generation and convert to string URL.
-            String url = s3Presigner.presignGetObject(presignRequest).url().toString();
-
-            // Step 7. Push to cache. We set the cache expiry to 55 minutes
-            // (5 minutes BEFORE the actual AWS 60-minute expiry) to prevent edge-case race conditions.
-            presignedUrlCache.put(key, new Object[]{url, Instant.now().plus(PRESIGN_TTL)});
-            return url;
+            return s3Presigner.presignGetObject(presignRequest).url().toString();
         } catch (Exception e) {
             logger.error("Failed to generate presigned URL for key={}: {}", key, e.getMessage());
             return null;
+        }
+    }
+
+    private String hashToken(String rawToken) {
+        if (rawToken == null) {
+            return null;
+        }
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(rawToken.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 algorithm not found", e);
         }
     }
 

@@ -1,5 +1,6 @@
 package com.planora.backend.controller;
 
+import com.planora.backend.dto.CompleteSprintRequestDTO;
 import com.planora.backend.dto.SprintCreateRequestDTO;
 import com.planora.backend.dto.SprintResponseDTO;
 import com.planora.backend.dto.StartSprintRequest;
@@ -82,8 +83,10 @@ public class SprintController {
     @PutMapping("/{id}/complete")
     public ResponseEntity<SprintResponseDTO> completeSprint(
             @PathVariable Long id,
+            @RequestBody(required = false) CompleteSprintRequestDTO request,
             @AuthenticationPrincipal UserPrincipal currentUser) {
-        SprintResponseDTO completed = sprintService.completeSprint(id, currentUser.getUserId());
+        Long destination = request != null ? request.moveIncompleteTo() : null;
+        SprintResponseDTO completed = sprintService.completeSprint(id, destination, currentUser.getUserId());
         return new ResponseEntity<>(completed, HttpStatus.OK);
     }
 }

@@ -20,10 +20,13 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -102,7 +105,10 @@ public class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.token").value("mock-access-token"))
-                .andExpect(jsonPath("$.refreshToken").value("mock-refresh-token"));
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().exists("Set-Cookie"))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("planora_refresh_token=mock-refresh-token")))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("SameSite=None")));
     }
 
     // (d) Login with unverified account returns 403 with UNVERIFIED_EMAIL errorCode
@@ -177,9 +183,10 @@ public class UserControllerTest {
     @WithMockUserPrincipal
     void testResetPassword_InvalidToken_Returns401() throws Exception {
         ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setEmail("test@example.com");
         request.setToken("999999");
         request.setNewPassword("NewPassword1!");
-        when(userService.resetPassword(anyString(), anyString())).thenReturn(false);
+        when(userService.resetPassword(anyString(), anyString(), anyString())).thenReturn(false);
 
         mockMvc.perform(post("/api/auth/reset")
                 .with(csrf())
@@ -209,6 +216,7 @@ public class UserControllerTest {
     @WithMockUserPrincipal
     void testResetPassword_WeakNewPassword_Returns400() throws Exception {
         ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setEmail("test@example.com");
         request.setToken("123456");
         request.setNewPassword("weakpass");
 
@@ -218,7 +226,6 @@ public class UserControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
     }
-
     // Refresh token endpoint returns new tokens on valid refresh token
     @Test
     @WithMockUserPrincipal
@@ -231,11 +238,93 @@ public class UserControllerTest {
 
         mockMvc.perform(post("/api/auth/refresh")
                 .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"refreshToken\":\"old-refresh-token\"}"))
+                .cookie(new jakarta.servlet.http.Cookie("planora_refresh_token", "old-refresh-token")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value("new-access-token"))
-                .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"));
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().exists("Set-Cookie"))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("planora_refresh_token=new-refresh-token")))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("SameSite=None")));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void testLogout_ClearsCookie() throws Exception {
+        mockMvc.perform(post("/api/auth/logout")
+                .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(header().exists("Set-Cookie"))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("planora_refresh_token=;")));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void testLogout_WithRefreshCookie_RevokesStoredRefreshToken() throws Exception {
+        when(jwtService.validateRefreshToken("old-refresh-token")).thenReturn("test@example.com");
+        when(jwtService.extractEmail("old-refresh-token")).thenReturn("test@example.com");
+
+        mockMvc.perform(post("/api/auth/logout")
+                .with(csrf())
+                .cookie(new jakarta.servlet.http.Cookie("planora_refresh_token", "old-refresh-token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("planora_refresh_token=;")));
+
+        verify(userService).revokeRefreshToken("test@example.com");
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void testLogout_WithMalformedRefreshCookie_StillClearsCookie() throws Exception {
+        when(jwtService.validateRefreshToken("bad-refresh-token")).thenThrow(new RuntimeException("Invalid token"));
+
+        mockMvc.perform(post("/api/auth/logout")
+                .with(csrf())
+                .cookie(new jakarta.servlet.http.Cookie("planora_refresh_token", "bad-refresh-token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("planora_refresh_token=;")));
+
+        verify(userService, never()).revokeRefreshToken(anyString());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void testLoginLogoutThenRefreshWithOldCookie_Returns401() throws Exception {
+        LoginResponse loginResponse = new LoginResponse();
+        loginResponse.setSuccess(true);
+        loginResponse.setMessage("Login successful");
+        loginResponse.setToken("mock-access-token");
+        loginResponse.setRefreshToken("old-refresh-token");
+        when(userService.loginUser(any())).thenReturn(loginResponse);
+        when(jwtService.validateRefreshToken("old-refresh-token")).thenReturn("test@example.com");
+        when(jwtService.extractEmail("old-refresh-token")).thenReturn("test@example.com");
+        when(userService.refreshTokens("old-refresh-token")).thenReturn(null);
+
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(testUser)))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("planora_refresh_token=old-refresh-token")))
+                .andReturn();
+
+        jakarta.servlet.http.Cookie oldRefreshCookie = new jakarta.servlet.http.Cookie(
+                "planora_refresh_token",
+                loginResult.getResponse().getCookie("planora_refresh_token").getValue());
+
+        mockMvc.perform(post("/api/auth/logout")
+                .with(csrf())
+                .cookie(oldRefreshCookie))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/refresh")
+                .with(csrf())
+                .cookie(oldRefreshCookie))
+                .andExpect(status().isUnauthorized());
+
+        verify(userService).revokeRefreshToken("test@example.com");
     }
 
     @Test
@@ -276,5 +365,44 @@ public class UserControllerTest {
         mockMvc.perform(get("/api/auth/users/1/photo").with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.url").value("https://s3.amazonaws.com/bucket/photo.jpg?Signature=abc"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void testGetAllUsers_Exception_Returns500AndStandardShape() throws Exception {
+        when(userService.getAllUserDTOs(any())).thenThrow(new RuntimeException("Database error"));
+
+        mockMvc.perform(get("/api/auth/users").with(csrf()))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.errorCode").value("INTERNAL_SERVER_ERROR"))
+                .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
+                .andExpect(jsonPath("$.path").value("/api/auth/users"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void testGetUserPhoto_Exception_Returns500AndStandardShape() throws Exception {
+        when(userService.generatePresignedUrlForUser(anyLong())).thenThrow(new RuntimeException("AWS configuration issue"));
+
+        mockMvc.perform(get("/api/auth/users/1/photo").with(csrf()))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.errorCode").value("INTERNAL_SERVER_ERROR"))
+                .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
+                .andExpect(jsonPath("$.path").value("/api/auth/users/1/photo"));
+    }
+
+    @Test
+    @WithMockUserPrincipal(email = "test@example.com")
+    void testGetCurrentUser_Exception_Returns500AndStandardShape() throws Exception {
+        when(userService.getCurrentUserDTO(anyString())).thenThrow(new RuntimeException("Some internal failure"));
+
+        mockMvc.perform(get("/api/auth/me").with(csrf()))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.errorCode").value("INTERNAL_SERVER_ERROR"))
+                .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
+                .andExpect(jsonPath("$.path").value("/api/auth/me"));
     }
 }

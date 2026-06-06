@@ -14,6 +14,10 @@ import lombok.Setter;
 @Setter
 public class ResetPasswordRequest {
 
+    @NotBlank(message = "Email is required")
+    @jakarta.validation.constraints.Email(message = "Email is invalid")
+    private String email;
+
     /** Token from the password-reset link query param. */
     @NotBlank(message = "Token is required")
     @Size(min = 6, max = 256, message = "Token is invalid")

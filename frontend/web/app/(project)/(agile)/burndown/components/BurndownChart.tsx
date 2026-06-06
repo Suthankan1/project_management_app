@@ -16,10 +16,10 @@ interface BurndownChartProps {
 }
 
 const PAD = { top: 32, right: 24, bottom: 56, left: 56 };
-const BLUE = '#175CD3';
-const BLUE_LIGHT = '#EFF8FF';
-const GREY = '#98A2B3';
-const GREY_DASHED = '#D0D5DD';
+const BLUE = 'var(--cu-primary)';
+const BLUE_LIGHT = 'var(--cu-primary-light)';
+const GREY = 'var(--cu-text-muted)';
+const GREY_DASHED = 'var(--cu-border)';
 
 function formatLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
@@ -63,7 +63,7 @@ export default function BurndownChart({ sprintName, dataPoints, totalStoryPoints
 
   if (!dataPoints.length) {
     return (
-      <div className="flex h-64 items-center justify-center rounded-xl bg-[#F8F9FB] text-[#98A2B3] text-sm">
+      <div className="flex h-64 items-center justify-center rounded-xl bg-cu-bg-secondary text-sm text-cu-text-muted">
         No data available for this sprint.
       </div>
     );
@@ -96,19 +96,19 @@ export default function BurndownChart({ sprintName, dataPoints, totalStoryPoints
     <div ref={containerRef} className="w-full select-none">
       {/* Legend */}
       <div className="mb-3 flex items-center justify-between px-1">
-        <h3 className="text-[15px] font-semibold text-[#101828]">{sprintName}</h3>
+        <h3 className="text-[15px] font-semibold text-cu-text-primary">{sprintName}</h3>
         <div className="flex items-center gap-5">
           <div className="flex items-center gap-1.5">
             <svg width="24" height="4">
               <line x1="0" y1="2" x2="24" y2="2" stroke={BLUE} strokeWidth="2.5" strokeLinecap="round" />
             </svg>
-            <span className="text-[12px] text-[#475467]">Actual</span>
+            <span className="text-[12px] text-cu-text-secondary">Actual</span>
           </div>
           <div className="flex items-center gap-1.5">
             <svg width="24" height="4">
               <line x1="0" y1="2" x2="24" y2="2" stroke={GREY_DASHED} strokeWidth="2" strokeDasharray="4 3" strokeLinecap="round" />
             </svg>
-            <span className="text-[12px] text-[#475467]">Ideal</span>
+            <span className="text-[12px] text-cu-text-secondary">Ideal</span>
           </div>
         </div>
       </div>
@@ -255,9 +255,9 @@ export default function BurndownChart({ sprintName, dataPoints, totalStoryPoints
                   <>
                     <line x1={cx} y1={PAD.top} x2={cx} y2={PAD.top + innerH}
                       stroke={BLUE} strokeWidth="1" strokeDasharray="3 2" strokeOpacity="0.4" />
-                    <circle cx={cx} cy={cy} r={5} fill={BLUE} stroke="white" strokeWidth="2" />
+                    <circle cx={cx} cy={cy} r={5} fill={BLUE} stroke="var(--cu-bg)" strokeWidth="2" />
                     <circle cx={xScale(i)} cy={yScale(p.idealPoints)} r={4}
-                      fill={GREY_DASHED} stroke="white" strokeWidth="2" />
+                      fill={GREY_DASHED} stroke="var(--cu-bg)" strokeWidth="2" />
                   </>
                 )}
               </g>
@@ -277,17 +277,17 @@ export default function BurndownChart({ sprintName, dataPoints, totalStoryPoints
           const ty = tooltip.y - PAD.top < th + 14 ? tooltip.y + 12 : tooltip.y - th - 10;
           return (
             <div
-              className="pointer-events-none absolute rounded-lg border border-[#E4E7EC] bg-white px-3 py-2.5 shadow-lg"
+              className="pointer-events-none absolute rounded-lg border border-cu-border bg-cu-bg px-3 py-2.5 shadow-cu-lg"
               style={{ left: tx, top: Math.max(4, ty), width: tw }}
             >
-              <p className="mb-1.5 text-[11px] font-semibold text-[#667085]">{formatLabel(tooltip.point.date)}</p>
+              <p className="mb-1.5 text-[11px] font-semibold text-cu-text-secondary">{formatLabel(tooltip.point.date)}</p>
               <div className="flex items-center justify-between text-[12px]">
-                <span className="text-[#344054]">Remaining</span>
-                <span className="font-bold text-[#175CD3]">{tooltip.point.remainingPoints} pts</span>
+                <span className="text-cu-text-primary">Remaining</span>
+                <span className="font-bold text-cu-primary">{tooltip.point.remainingPoints} pts</span>
               </div>
               <div className="mt-0.5 flex items-center justify-between text-[12px]">
-                <span className="text-[#98A2B3]">Ideal</span>
-                <span className="font-medium text-[#98A2B3]">{tooltip.point.idealPoints} pts</span>
+                <span className="text-cu-text-muted">Ideal</span>
+                <span className="font-medium text-cu-text-muted">{tooltip.point.idealPoints} pts</span>
               </div>
             </div>
           );

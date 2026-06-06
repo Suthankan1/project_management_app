@@ -2,25 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import api from '@/lib/axios';
 import { getUserFromToken, User } from '@/lib/auth';
 import {
   buildSessionCacheKey,
   getSessionCache,
   setSessionCache,
 } from '@/lib/session-cache';
+import { projectsApi } from '@/services/api-contract';
+import { fetchRecentProjects, fetchFavoriteProjects } from '@/services/dashboard-service';
+import type { ProjectSummary as ApiProjectSummary } from '@/services/projects-contract';
 
 // Data will stay fresh in cache for 2 minutes
 const DASHBOARD_PROJECTS_CACHE_TTL = 2 * 60_000;
 
 // Structure for a single project summary
-export interface ProjectSummary {
-  id: number;
-  name: string;
-  projectKey?: string;
-  isFavorite?: boolean;
-  type: 'AGILE' | 'KANBAN' | string;
-}
+export type ProjectSummary = ApiProjectSummary & {
+  completedTasks?: number;
+  totalTasks?: number;
+};
 
 // Return type for this hook
 interface UseDashboardProjectsReturn {
@@ -64,13 +63,37 @@ export function useDashboardProjects(): UseDashboardProjectsReturn {
 
       try {
         // Fetch both recent and favorite projects in parallel
-        const [recentRes, favRes] = await Promise.all([
-          api.get('/api/projects/recent'),
-          api.get('/api/projects/favorites'),
+        const [recent, favorites] = await Promise.all([
+          fetchRecentProjects(5),
+          fetchFavoriteProjects(),
         ]);
+
+        // Collect unique project IDs across both lists
+        const uniqueIds = [...new Set([...recent, ...favorites].map((p) => p.id))];
+
+        // Fetch task completion metrics for all projects in parallel (best-effort)
+        const metricsResults = await Promise.allSettled(
+          uniqueIds.map((id) =>
+            projectsApi.getMetrics(id).then((data) => ({ id, data }))
+          )
+        );
+        const metricsMap = new Map<number, { completedTasks: number; totalTasks: number }>();
+        metricsResults.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            const { id, data } = result.value;
+            metricsMap.set(id, {
+              completedTasks: data.completedTasks ?? 0,
+              totalTasks: data.totalTasks ?? 0,
+            });
+          }
+        });
+
+        const mergeMetrics = (list: ProjectSummary[]): ProjectSummary[] =>
+          list.map((p) => ({ ...p, ...metricsMap.get(p.id) }));
+
         const fresh = {
-          recent: recentRes.data || [],
-          favorites: favRes.data || [],
+          recent: mergeMetrics(recent),
+          favorites: mergeMetrics(favorites),
         };
         setProjects(fresh);
 

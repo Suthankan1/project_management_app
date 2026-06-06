@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import api from '@/lib/axios';
 import { ensureValidToken } from '@/lib/auth';
 import { validatePassword, PASSWORD_REQUIREMENTS } from '@/lib/passwordValidation';
+import { authApi } from '@/services/api-contract';
 
 // Exported so the view component can read human-friendly labels and Tailwind colour classes
 // without duplicating the mapping or adding a prop-drilling chain.
@@ -85,7 +85,7 @@ export function useRegisterForm() {
     }
 
     try {
-      await api.post('/api/auth/register', {
+      await authApi.register({
         username, fullName, email: email.toLowerCase(), password,
       });
       // Stored in localStorage so PendingVerificationBanner can show the email even after a page refresh.

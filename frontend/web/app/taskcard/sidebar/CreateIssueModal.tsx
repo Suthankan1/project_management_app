@@ -3,10 +3,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Check, CircleDot, ExternalLink, Loader2, X } from 'lucide-react';
 import {
-  fetchRepositoriesWithToken,
-  getGitHubToken,
+  fetchRepositories,
+  hasConnectedGitHubAccount,
   getProjectGitHubRepo,
 } from '@/services/githubService';
+import api from '@/lib/axios';
+import { normalizeApiError } from '@/lib/api-error';
+
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -22,12 +25,7 @@ interface RepoOption {
   label: string;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  'http://localhost:8080';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -77,7 +75,7 @@ const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
     setSuccess(null);
 
     const connected  = projectId != null ? getProjectGitHubRepo(projectId) : null;
-    const token      = getGitHubToken();
+    const isConnected = hasConnectedGitHubAccount();
     const connRepo   = connected?.repoFullName ?? '';
 
     setRepoFullName(connRepo);
@@ -86,27 +84,27 @@ const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
       ? [{ value: connected.repoFullName, label: `${connected.repoFullName} (connected)` }]
       : [];
 
-    // No token AND no connected repo → free-text input
-    if (!token && connOption.length === 0) {
+    // No linked GitHub account and no connected repo → free-text input
+    if (!isConnected && connOption.length === 0) {
       setRepoInputMode('text');
       setRepoOptions([]);
       setLoadingRepos(false);
       return;
     }
 
-    // No token but has connected repo → single-option select
-    if (!token) {
+    // No linked GitHub account but has connected repo → single-option select
+    if (!isConnected) {
       setRepoOptions(connOption);
       setRepoInputMode('select');
       setLoadingRepos(false);
       return;
     }
 
-    // Has token → fetch the user's repos from GitHub
+    // Has a linked account → fetch the user's repos through the backend
     let cancelled = false;
     setLoadingRepos(true);
 
-    fetchRepositoriesWithToken(token)
+    fetchRepositories()
       .then(ghRepos => {
         if (cancelled) return;
         const seen  = new Set(connOption.map(o => o.value));
@@ -168,26 +166,16 @@ const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
     setApiError(null);
 
     try {
-      const res = await fetch(`${API_BASE}/api/tasks/${taskId}/github-issue`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          repoFullName: repoFullName.trim(),
-          title: title.trim(),
-          body: body.trim(),
-        }),
+      const response = await api.post<CreatedIssueDTO>(`/api/tasks/${taskId}/github-issue`, {
+        repoFullName: repoFullName.trim(),
+        title: title.trim(),
+        body: body.trim(),
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => null) as { message?: string } | null;
-        throw new Error(data?.message ?? `Failed to create issue (${res.status})`);
-      }
-
-      const created = await res.json() as CreatedIssueDTO;
+      const created = response.data;
       setSuccess({ issueNumber: created.issueNumber, htmlUrl: created.htmlUrl });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : 'Failed to create issue');
+    } catch (err: unknown) {
+      setApiError(normalizeApiError(err, 'Failed to create issue'));
     } finally {
       setSubmitting(false);
     }

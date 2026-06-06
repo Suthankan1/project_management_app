@@ -59,19 +59,19 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
                 {Array.from({ length: 4 }).map((_, i) => (
                     <div
                         key={i}
-                        className="flex flex-col p-5 h-[160px] min-w-[240px] rounded-2xl border border-[#E5E7EB] bg-white shadow-sm shrink-0"
+                        className="flex flex-col p-5 h-[160px] min-w-[240px] rounded-2xl border border-cu-border bg-cu-bg shadow-cu-sm shrink-0"
                     >
                         <div className="flex justify-between items-start mb-3">
                             <div className="flex gap-3 items-center">
-                                <div className="w-8 h-8 rounded-[4px] bg-gray-200 animate-pulse" />
-                                <div className="w-20 h-3 bg-gray-200 rounded animate-pulse" />
+                                <div className="w-8 h-8 rounded-[4px] bg-cu-bg-tertiary animate-pulse" />
+                                <div className="w-20 h-3 bg-cu-bg-tertiary rounded animate-pulse" />
                             </div>
-                            <div className="w-4 h-4 bg-gray-200 rounded animate-pulse" />
+                            <div className="w-4 h-4 bg-cu-bg-tertiary rounded animate-pulse" />
                         </div>
-                        <div className="w-2/3 h-5 bg-gray-200 rounded animate-pulse mt-2 mb-auto" />
-                        <div className="flex justify-between items-center mt-3 pt-3 border-t border-[#F3F4F6]">
-                            <div className="w-12 h-3 bg-gray-200 rounded animate-pulse" />
-                            <div className="w-16 h-3 bg-gray-200 rounded animate-pulse" />
+                        <div className="w-2/3 h-5 bg-cu-bg-tertiary rounded animate-pulse mt-2 mb-auto" />
+                        <div className="flex justify-between items-center mt-3 pt-3 border-t border-cu-border">
+                            <div className="w-12 h-3 bg-cu-bg-tertiary rounded animate-pulse" />
+                            <div className="w-16 h-3 bg-cu-bg-tertiary rounded animate-pulse" />
                         </div>
                     </div>
                 ))}
@@ -82,8 +82,8 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
     // Show empty state if no projects match filters/search
     if (projects.length === 0) {
         return (
-            <div className="w-full py-8 text-center bg-gray-50 rounded border border-dashed border-gray-300">
-                <p className="font-arimo text-[14px] text-[#6A7282]">
+            <div className="w-full py-8 text-center bg-cu-bg-secondary rounded border border-dashed border-cu-border">
+                <p className="font-arimo text-[14px] text-cu-text-secondary">
                     {searchQuery ? `No results for "${searchQuery}"` : 'No spaces found for this tab'}
                 </p>
             </div>
@@ -96,7 +96,7 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
             {showLeftArrow && (
                 <button
                     onClick={() => scroll('left')}
-                    className="md:flex hidden absolute left-[-12px] top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-white border border-gray-200 rounded-full shadow-lg items-center justify-center text-[#101828] hover:bg-[#F3F4F6] transition-all duration-200 hover:scale-110 active:scale-95"
+                    className="md:flex hidden absolute left-[-12px] top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-cu-bg border border-cu-border rounded-full shadow-cu-md items-center justify-center text-cu-text-primary hover:bg-cu-hover transition-all duration-200 hover:scale-110 active:scale-95"
                     aria-label="Scroll left"
                 >
                     <ChevronLeft size={20} strokeWidth={2.5} />
@@ -125,20 +125,22 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
                         type={project.type}
                         isFavorite={project.isFavorite}
                         width="min-w-[240px] max-w-[240px]"
+                        completedTasks={project.completedTasks}
+                        totalTasks={project.totalTasks}
                     />
                 ))}
 
                 {/* Final "View All" card */}
                 <Link
                     href="/spaces"
-                    className="group flex flex-col justify-center items-center min-w-[200px] h-[160px] bg-gray-50/50 hover:bg-white rounded-2xl border border-dashed border-gray-300 hover:border-[#0052CC]/30 hover:shadow-[0_8px_24px_rgba(0,82,204,0.08)] cursor-pointer transition-all duration-300 hover:-translate-y-[2px] shrink-0"
+                    className="group flex flex-col justify-center items-center min-w-[200px] h-[160px] bg-cu-bg-secondary/50 hover:bg-cu-bg rounded-2xl border border-dashed border-cu-border hover:border-cu-primary/30 hover:shadow-[0_8px_24px_rgba(0,82,204,0.08)] cursor-pointer transition-all duration-300 hover:-translate-y-[2px] shrink-0"
                 >
-                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm border border-gray-100 mb-3 group-hover:bg-blue-600 group-hover:border-transparent transition-all duration-300 group-hover:scale-110">
-                        <ArrowRight size={20} strokeWidth={2.5} className="text-[#0052CC] group-hover:text-white" />
+                    <div className="w-10 h-10 rounded-full bg-cu-bg flex items-center justify-center shadow-cu-sm border border-cu-border mb-3 group-hover:bg-cu-primary group-hover:border-transparent transition-all duration-300 group-hover:scale-110">
+                        <ArrowRight size={20} strokeWidth={2.5} className="text-cu-primary group-hover:text-white" />
                     </div>
-                    <span className="font-arimo text-[15px] font-semibold text-[#4B5563] group-hover:text-[#0052CC] transition-colors">View all spaces</span>
+                    <span className="font-arimo text-[15px] font-semibold text-cu-text-secondary group-hover:text-cu-primary transition-colors">View all spaces</span>
                     {projects.length > 5 && (
-                        <span className="font-arimo text-[12px] text-[#9CA3AF] mt-1 font-medium">+{projects.length - 5} more</span>
+                        <span className="font-arimo text-[12px] text-cu-text-muted mt-1 font-medium">+{projects.length - 5} more</span>
                     )}
                 </Link>
             </div>
@@ -147,7 +149,7 @@ export default function RecentSpacesCarousel({ projects, loading, searchQuery }:
             {showRightArrow && (
                 <button
                     onClick={() => scroll('right')}
-                    className="md:flex hidden absolute right-[-12px] top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-white border border-gray-200 rounded-full shadow-lg items-center justify-center text-[#101828] hover:bg-[#F3F4F6] transition-all duration-200 hover:scale-110 active:scale-95"
+                    className="md:flex hidden absolute right-[-12px] top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-cu-bg border border-cu-border rounded-full shadow-cu-md items-center justify-center text-cu-text-primary hover:bg-cu-hover transition-all duration-200 hover:scale-110 active:scale-95"
                     aria-label="Scroll right"
                 >
                     <ChevronRight size={20} strokeWidth={2.5} />

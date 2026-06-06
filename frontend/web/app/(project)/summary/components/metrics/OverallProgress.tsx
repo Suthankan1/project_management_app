@@ -12,10 +12,10 @@ export function OverallProgress({ completedTasks, totalTasks }: { completedTasks
     return (
         <div className="h-full w-full flex items-center justify-between group overflow-hidden relative">
             <div className="flex flex-col h-full justify-center min-w-0 pr-2">
-                <p className="font-arimo text-[14px] text-gray-500 font-medium group-hover:text-[#0052CC] transition-colors truncate mb-1">
+                <p className="font-arimo text-[14px] text-cu-text-secondary font-medium group-hover:text-cu-primary transition-colors truncate mb-1">
                     Overall Progress
                 </p>
-                <span className="font-arimo text-[24px] text-[#0052CC] leading-none font-bold truncate">
+                <span className="font-arimo text-[24px] text-cu-primary leading-none font-bold truncate">
                     {percentage === 100 ? "Completed" : percentage >= 50 ? "On Track" : "At Risk"}
                 </span>
             </div>

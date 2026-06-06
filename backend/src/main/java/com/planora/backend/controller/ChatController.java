@@ -21,6 +21,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.beans.factory.annotation.Qualifier;
 import java.util.concurrent.Executor;
+import lombok.RequiredArgsConstructor;
 
 import com.planora.backend.dto.ChatMessageDTO;
 import com.planora.backend.model.ChatMessage;
@@ -39,6 +40,7 @@ import com.planora.backend.service.ProjectMembershipService;
 import com.planora.backend.service.UserCacheService;
 
 @Controller
+@RequiredArgsConstructor
 public class ChatController {
 
     private static final Pattern MENTION_PATTERN = Pattern.compile("(?<!\\S)@([A-Za-z0-9._-]+)");
@@ -64,51 +66,37 @@ public class ChatController {
                                       String preview) {}
     private record ProjectContext(Long teamId, String projectName) {}
 
-    @Autowired
-    private SimpMessagingTemplate simpMessagingTemplate;
+    private final SimpMessagingTemplate simpMessagingTemplate;
 
-    @Autowired
     @Qualifier("chatTaskExecutor")
-    private Executor chatTaskExecutor;
+    private final Executor chatTaskExecutor;
 
-    @Autowired
-    private ChatService chatService;
+    private final ChatService chatService;
 
-    @Autowired
-    private TeamMemberRepository teamMemberRepository;
+    private final TeamMemberRepository teamMemberRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private ProjectRepository projectRepository;
+    private final ProjectRepository projectRepository;
 
-    @Autowired
-    private UserCacheService userCacheService;
+    private final UserCacheService userCacheService;
 
-    @Autowired
-    private ProjectMembershipService projectMembershipService;
+    private final ProjectMembershipService projectMembershipService;
 
-    @Autowired
-    private ChatRoomRepository chatRoomRepository;
+    private final ChatRoomRepository chatRoomRepository;
 
-    @Autowired
-    private ChatRoomMemberRepository chatRoomMemberRepository;
+    private final ChatRoomMemberRepository chatRoomMemberRepository;
 
-    @Autowired
-    private ChatPresenceService chatPresenceService;
+    private final ChatPresenceService chatPresenceService;
 
-    @Autowired
-    private ChatWebhookService chatWebhookService;
+    private final ChatWebhookService chatWebhookService;
 
-    @Autowired
-    private ChatMessageRepository chatMessageRepository;
+    private final ChatMessageRepository chatMessageRepository;
 
     // ── Added for persistent chat notifications ───────────────────────────────
     // Injects NotificationService so that DMs and @mentions create bell
     // notifications visible in the TopBar, not just transient WebSocket events.
-    @Autowired
-    private NotificationService notificationService;
+    private final NotificationService notificationService;
     // ─────────────────────────────────────────────────────────────────────────
     private final ScheduledExecutorService unreadBadgeScheduler = Executors.newSingleThreadScheduledExecutor();
     // Versioned debounce avoids stale badge broadcasts when many events happen in quick succession.

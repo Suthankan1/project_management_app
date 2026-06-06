@@ -71,6 +71,8 @@ export function ChatMessage({
   const isFile = !isDeleted && isFileUrl(message.content || '');
   const threadCount = (message as any).threadCount ?? message.replyCount ?? 0;
   const hasRead = !!(message as any).read;
+  const isPending = message.syncStatus === 'pending' || message.syncStatus === 'syncing';
+  const isFailed = message.syncStatus === 'failed';
 
   const aliasSet = new Set([
     currentUser.toLowerCase(),
@@ -145,9 +147,17 @@ export function ChatMessage({
         <Text style={[styles.editedLabel, { color: timeColor }]}>(edited) </Text>
       )}
       <Text style={[styles.timeText, { color: timeColor }]}>{formatTime(message.timestamp)}</Text>
-      {isMe && (
+      {isMe && isFailed && (
         <Ionicons
-          name={hasRead ? 'checkmark-done-outline' : 'checkmark-outline'}
+          name="alert-circle-outline"
+          size={12}
+          color={Colors.bannerRedText}
+          style={styles.tickIcon}
+        />
+      )}
+      {isMe && !isFailed && (
+        <Ionicons
+          name={isPending ? 'time-outline' : hasRead ? 'checkmark-done-outline' : 'checkmark-outline'}
           size={12}
           color="rgba(255,255,255,0.7)"
           style={styles.tickIcon}
@@ -189,6 +199,11 @@ export function ChatMessage({
             ]}>
               {renderContent()}
               {renderTimestampRow()}
+              {isFailed && (
+                <Text style={styles.failedText} numberOfLines={2}>
+                  {message.failureReason || 'Failed to send'}
+                </Text>
+              )}
               <View style={isMe ? styles.tailMe : styles.tailOther} />
             </View>
           </TouchableOpacity>
@@ -294,6 +309,12 @@ const styles = StyleSheet.create({
   editedLabel: { fontSize: 9, fontStyle: 'italic' },
   timeText: { fontSize: 10 },
   tickIcon: { marginLeft: 2 },
+  failedText: {
+    marginTop: 4,
+    fontSize: 10,
+    color: Colors.bannerRedText,
+    fontWeight: '600',
+  },
 
   fileCard: {
     flexDirection: 'row',

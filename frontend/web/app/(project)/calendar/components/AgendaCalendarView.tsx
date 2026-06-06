@@ -23,8 +23,8 @@ export default function AgendaCalendarView({ currentDate, events }: AgendaCalend
   const days = Array.from({ length: AGENDA_SPAN_DAYS }, (_, idx) => addDays(start, idx));
 
   return (
-    <div className="rounded-xl border border-[#E4E7EC] bg-white">
-      <div className="border-b border-[#EAECF0] px-4 py-3 text-sm font-semibold text-[#344054]">
+    <div className="rounded-xl border border-cu-primary/15 bg-cu-bg shadow-cu-sm overflow-hidden">
+      <div className="border-b border-cu-primary/15 bg-gradient-to-r from-cu-primary/10 via-violet-500/10 to-emerald-500/10 px-4 py-3 text-sm font-semibold text-cu-text-primary">
         Agenda ({AGENDA_SPAN_DAYS} days)
       </div>
 
@@ -42,8 +42,8 @@ export default function AgendaCalendarView({ currentDate, events }: AgendaCalend
           });
 
           return (
-            <div key={day.toISOString()} className="border-b border-[#F2F4F7] px-4 py-3">
-              <div className="mb-2 text-sm font-semibold text-[#101828]">
+            <div key={day.toISOString()} className="border-b border-cu-border px-4 py-3 odd:bg-cu-bg even:bg-cu-primary/5">
+              <div className="mb-2 text-sm font-semibold text-cu-text-primary">
                 {day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
               </div>
 
@@ -64,7 +64,7 @@ export default function AgendaCalendarView({ currentDate, events }: AgendaCalend
                     );
                   })
                 ) : (
-                  <div className="text-xs text-[#98A2B3]">No events</div>
+                  <div className="text-xs text-cu-text-muted">No events</div>
                 )}
               </div>
             </div>

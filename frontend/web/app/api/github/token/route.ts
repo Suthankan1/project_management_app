@@ -8,25 +8,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No authorization code provided' }, { status: 400 })
   }
 
-  const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID
-  const clientSecret = process.env.GITHUB_CLIENT_SECRET
+  const authHeader = request.headers.get('Authorization')
+  const cookieHeader = request.headers.get('Cookie')
+  const backendUrl = process.env.BACKEND_URL || 'http://localhost:8080'
 
-  if (!clientId || !clientSecret) {
-    return NextResponse.json(
-      { error: 'GitHub OAuth is not configured on this server' },
-      { status: 503 }
-    )
-  }
-
-  const ghResponse = await fetch('https://github.com/login/oauth/access_token', {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
+  try {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
-  })
+    }
+    if (authHeader) {
+      headers['Authorization'] = authHeader
+    }
+    if (cookieHeader) {
+      headers['Cookie'] = cookieHeader
+    }
 
-  const data = await ghResponse.json()
-  return NextResponse.json(data)
+    const res = await fetch(`${backendUrl}/api/github/token`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ code }),
+    })
+
+    const status = res.status
+    const data = await res.json().catch(() => ({}))
+    return NextResponse.json(data, { status })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to proxy token exchange'
+    return NextResponse.json({ error: message }, { status: 502 })
+  }
 }

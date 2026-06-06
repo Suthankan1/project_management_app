@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.planora.backend.dto.UserResponseDTO;
 import com.planora.backend.service.JWTService;
 import com.planora.backend.service.UserService;
+import com.planora.backend.service.UserPushTokenService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -33,6 +34,9 @@ class UserMeControllerTest {
 
     @MockBean
     private UserDetailsService userDetailsService;
+
+    @MockBean
+    private UserPushTokenService pushTokenService;
 
     @Test
     @WithMockUserPrincipal(email = "alice@example.com")

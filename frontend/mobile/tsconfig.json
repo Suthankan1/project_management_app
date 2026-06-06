@@ -5,12 +5,16 @@
     "strict": true,
     "paths": {
       "@/*": ["./*"],
-      "@/src/*": ["./src/*"]
+      "@/src/*": ["./src/*"],
+      "@api-contracts/*": ["../api-contracts/*"],
+      "@planora/contracts": ["../api-contracts/index.ts"],
+      "@planora/contracts/*": ["../api-contracts/*"]
     }
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
+    "../api-contracts/**/*.ts",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
   ]

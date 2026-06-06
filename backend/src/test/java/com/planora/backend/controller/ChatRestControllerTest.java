@@ -36,6 +36,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
@@ -303,8 +304,9 @@ class ChatRestControllerTest {
         savedRoom.setCreatedBy("alice");
         savedRoom.setArchived(false);
 
-        when(chatRoomRepository.save(any(ChatRoom.class))).thenReturn(savedRoom);
-        when(chatRoomMemberRepository.findByChatRoomIdAndUserUserId(eq(91L), anyLong())).thenReturn(Optional.empty());
+        when(chatService.createRoom(eq(5L), eq(7L), eq("alice"), eq("incident"), eq(List.of("bob"))))
+            .thenReturn(new ChatService.CreatedRoomResult(savedRoom, Set.of(bob, alice)));
+        when(chatService.getProjectName(5L)).thenReturn("the project");
 
         var request = new ChatRestController.ChatRoomRequest("incident", List.of("bob"));
 

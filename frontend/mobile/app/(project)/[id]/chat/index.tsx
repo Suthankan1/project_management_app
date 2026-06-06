@@ -22,15 +22,13 @@ type ChatScreenContentProps = {
   topOffset?: number;
 };
 
-export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenContentProps) {
 interface ReactionTarget {
   message: ChatMessage;
   anchorY: number;
   isMe: boolean;
 }
 
-export default function ChatScreen() {
-  const { id: projectId } = useLocalSearchParams<{ id: string }>();
+export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenContentProps) {
   const [showSidebar, setShowSidebar] = useState(true);
   const [showSearch, setShowSearch]   = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,13 +51,14 @@ export default function ChatScreen() {
     teamTypingUsers, roomTypingUsers, privateTypingUsers,
     featureFlags, searchResults, isSearchLoading,
     messageReactions, activeThreadRoot, threadMessages,
-    onlineUsers, isLoading, isSocketConnected, error,
+    onlineUsers, isLoading, isSocketConnected, isNetworkOnline, error,
+    hasStaleCachedMessages, queuedChatCount, failedChatCount, serverChangedWhileOffline,
     roomMentionCounts, teamMentionCount,
     selectPrivateUser, selectRoom,
     sendMessage, sendRoomMessage, sendThreadReply,
     openThread, closeThread,
     editMessage, deleteMessage, toggleReaction,
-    loadPrivateHistory, loadRoomHistory,
+    loadRoomHistory,
     createRoom, deleteRoom, updateRoomMeta, pinRoomMessage,
     sendTyping, searchMessages, retryConnection,
   } = useChat(projectId as string);
@@ -183,6 +182,11 @@ export default function ChatScreen() {
             shouldShowErrorBanner={shouldShowErrorBanner}
             error={error}
             onRetry={retryConnection}
+            isOffline={!isNetworkOnline}
+            isShowingStaleCache={hasStaleCachedMessages}
+            queuedCount={queuedChatCount}
+            failedCount={failedChatCount}
+            serverChangedWhileOffline={serverChangedWhileOffline}
           />
 
           <ChatHeader
@@ -213,21 +217,14 @@ export default function ChatScreen() {
               isSearchLoading={isSearchLoading}
               searchResults={searchResults}
               onOpenResult={async (result) => {
-                const aliases = new Set([currentUser.toLowerCase(), ...currentUserAliases.map(a => a.toLowerCase())]);
-                if (result.context === 'ROOM' && result.roomId) {
+                if (result.roomId) {
                   selectRoom(result.roomId);
                   await loadRoomHistory(result.roomId);
-                  setShowSearch(false);
-                } else if (result.context === 'PRIVATE') {
-                  const sender = (result.sender || '').toLowerCase();
-                  const recipient = (result.recipient || '').toLowerCase();
-                  const partner = aliases.has(sender) ? recipient : sender;
-                  if (partner) {
-                    selectPrivateUser(partner);
-                    await loadPrivateHistory(partner);
-                    setShowSearch(false);
-                  }
+                } else {
+                  selectRoom(null);
+                  selectPrivateUser(null);
                 }
+                setShowSearch(false);
               }}
             />
           )}
@@ -254,7 +251,7 @@ export default function ChatScreen() {
           <ChatInput
             onSendMessage={handleSendMessage}
             onTypingChange={sendTyping}
-            disabled={isLoading || !isConnected || shouldShowErrorBanner}
+            disabled={isLoading || shouldShowErrorBanner}
             placeholder={
               hasSelectedRoom
                 ? `Message #${selectedRoom?.name ?? 'channel'}…`

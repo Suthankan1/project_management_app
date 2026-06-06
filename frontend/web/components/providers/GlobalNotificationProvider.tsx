@@ -7,12 +7,16 @@ import * as notificationsApi from '@/services/notifications-service';
 import { Notification } from '@/services/notifications-service';
 import { toast } from '@/components/ui/Toast';
 import { AUTH_TOKEN_CHANGED_EVENT, getValidToken } from '@/lib/auth';
+import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 import { buildSessionCacheKey, getSessionCache, setSessionCache } from '@/lib/session-cache';
 
 interface GlobalNotificationContextType {
+  client: Client | null;
   notifications: Notification[];
   unreadCount: number;
   realtimeConnected: boolean;
+  realtimeReconnecting: boolean;
   subscribeRealtime: (
     destination: string,
     callback: (message: IMessage) => void,
@@ -20,8 +24,12 @@ interface GlobalNotificationContextType {
   sendRealtime: (
     destination: string,
     body: string,
-    headers?: Record<string, string>,
+    options?: {
+      headers?: Record<string, string>;
+      queueWhenDisconnected?: boolean;
+    },
   ) => void;
+  retryRealtimeConnection: () => void;
   markAsRead: (id: number) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   deleteNotificationById: (id: number) => Promise<void>;
@@ -36,6 +44,12 @@ const NOTIFICATIONS_CACHE_TTL_MS = 45_000;
 type NotificationsCachePayload = {
   notifications: Notification[];
   unreadCount: number;
+};
+
+type QueuedRealtimeMessage = {
+  destination: string;
+  body: string;
+  headers?: Record<string, string>;
 };
 
 function normalizePath(path: string): string {
@@ -78,9 +92,11 @@ function isOnRelevantRoute(currentPath: string | null, currentQuery: string, tar
 }
 
 export function GlobalNotificationProvider({ children }: { children: React.ReactNode }) {
+  const [clientState, setClientState] = useState<Client | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
+  const [realtimeReconnecting, setRealtimeReconnecting] = useState(false);
   const pathname = usePathname();
   // We use refs to avoid re-triggering stomp effects on route path transitions
   const pathnameRef = useRef(pathname);
@@ -90,7 +106,11 @@ export function GlobalNotificationProvider({ children }: { children: React.React
   const stompClientRef = useRef<Client | null>(null);
   const activeTokenRef = useRef<string | null>(null);
   const isConnectingRef = useRef(false);
-  const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+  const reconnectTimerRef = useRef<number | null>(null);
+  const reconnectAttemptRef = useRef(0);
+  const queuedRealtimeMessagesRef = useRef<QueuedRealtimeMessage[]>([]);
+  const reconnectAttemptHandlerRef = useRef<(token: string) => void>(() => {});
+  const backendUrl = getApiBaseUrl();
 
   useEffect(() => {
     pathnameRef.current = pathname;
@@ -101,20 +121,17 @@ export function GlobalNotificationProvider({ children }: { children: React.React
 
   const loadInitialData = useCallback(async () => {
     try {
-      const [notifs, count] = await Promise.all([
-        notificationsApi.fetchNotifications(),
-        notificationsApi.fetchUnreadCount(),
-      ]);
-      setNotifications(notifs);
-      setUnreadCount(count);
-      seenNotificationIdsRef.current = new Set(notifs.map((notif) => notif.id));
+      const feed = await notificationsApi.fetchNotifications();
+      setNotifications(feed.notifications);
+      setUnreadCount(feed.unreadCount);
+      seenNotificationIdsRef.current = new Set(feed.notifications.map((notif) => notif.id));
       const cacheKey = notificationsCacheKeyRef.current;
       if (cacheKey) {
         setSessionCache<NotificationsCachePayload>(
           cacheKey,
           {
-            notifications: notifs,
-            unreadCount: count,
+            notifications: feed.notifications,
+            unreadCount: feed.unreadCount,
           },
           NOTIFICATIONS_CACHE_TTL_MS,
         );
@@ -124,42 +141,84 @@ export function GlobalNotificationProvider({ children }: { children: React.React
     }
   }, []);
 
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimerRef.current !== null) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
+
+  const flushQueuedRealtimeMessages = useCallback((client: Client) => {
+    if (queuedRealtimeMessagesRef.current.length === 0) {
+      return;
+    }
+
+    const queuedMessages = queuedRealtimeMessagesRef.current;
+    queuedRealtimeMessagesRef.current = [];
+    queuedMessages.forEach((message) => {
+      client.publish({
+        destination: message.destination,
+        body: message.body,
+        headers: message.headers,
+      });
+    });
+  }, []);
+
   const disconnectClient = useCallback(() => {
+    clearReconnectTimer();
+    reconnectAttemptRef.current = 0;
+    queuedRealtimeMessagesRef.current = [];
     isConnectingRef.current = false;
     setRealtimeConnected(false);
+    setRealtimeReconnecting(false);
+
     if (stompClientRef.current) {
       stompClientRef.current.deactivate();
       stompClientRef.current = null;
+    }
+
+    setClientState(null);
+  }, [clearReconnectTimer]);
+
+  const handleConnectionLost = useCallback((client: Client, token: string) => {
+    if (stompClientRef.current === client) {
+      stompClientRef.current = null;
+      setClientState(null);
+    }
+
+    isConnectingRef.current = false;
+    setRealtimeConnected(false);
+    setRealtimeReconnecting(true);
+
+    if (activeTokenRef.current === token) {
+      reconnectAttemptHandlerRef.current(token);
     }
   }, []);
 
   const connectRealtime = useCallback((token: string) => {
     if (!backendUrl) return;
 
-    const hasSameActiveConnection =
-      stompClientRef.current?.connected && activeTokenRef.current === token;
-
-    if (hasSameActiveConnection || (isConnectingRef.current && activeTokenRef.current === token)) {
-      return;
-    }
-
-    disconnectClient();
+    clearReconnectTimer();
     isConnectingRef.current = true;
     activeTokenRef.current = token;
 
-    const wsUrl = backendUrl.replace(/^http/, 'ws');
+    const wsUrl = resolveWebSocketBaseUrl(backendUrl);
     const client = new Client({
       brokerURL: `${wsUrl}/ws-native`,
       connectHeaders: { Authorization: `Bearer ${token}` },
       debug: () => {},
-      reconnectDelay: 5000,
+      reconnectDelay: 0,
       onConnect: () => {
-        isConnectingRef.current = false;
-        setRealtimeConnected(true);
-
         if (stompClientRef.current !== client) {
           return;
         }
+
+        isConnectingRef.current = false;
+        reconnectAttemptRef.current = 0;
+        setRealtimeReconnecting(false);
+        setRealtimeConnected(true);
+
+        flushQueuedRealtimeMessages(client);
 
         client.subscribe('/user/queue/notifications', (payload) => {
           const newNotif: Notification = JSON.parse(payload.body);
@@ -185,7 +244,6 @@ export function GlobalNotificationProvider({ children }: { children: React.React
           const isOnRelevantPage = isOnRelevantRoute(currentPath, currentQuery, targetPath);
 
           if (!isOnRelevantPage) {
-            setUnreadCount((prev) => prev + 1);
             toast(newNotif.message, 'info', 5000);
           } else {
             // If we're on the relevant page, we can instantly mark it as read behind the scenes
@@ -195,20 +253,61 @@ export function GlobalNotificationProvider({ children }: { children: React.React
             );
           }
         });
+
+        client.subscribe('/user/queue/notifications-badge', (payload) => {
+          const newCount = Number(payload.body);
+          if (!isNaN(newCount)) {
+            setUnreadCount(newCount);
+          }
+        });
       },
       onStompError: () => {
-        isConnectingRef.current = false;
-        setRealtimeConnected(false);
+        handleConnectionLost(client, token);
       },
       onWebSocketClose: () => {
-        isConnectingRef.current = false;
-        setRealtimeConnected(false);
+        handleConnectionLost(client, token);
+      },
+      onDisconnect: () => {
+        handleConnectionLost(client, token);
       },
     });
 
     stompClientRef.current = client;
+    setClientState(client);
     client.activate();
-  }, [backendUrl, disconnectClient]);
+  }, [backendUrl, clearReconnectTimer, flushQueuedRealtimeMessages, handleConnectionLost]);
+
+  const scheduleReconnect = useCallback((token: string) => {
+    if (!token || reconnectTimerRef.current !== null) {
+      return;
+    }
+
+    const delay = Math.min(1000 * (2 ** reconnectAttemptRef.current), 30_000);
+    reconnectAttemptRef.current += 1;
+    setRealtimeConnected(false);
+    setRealtimeReconnecting(true);
+
+    reconnectTimerRef.current = window.setTimeout(() => {
+      reconnectTimerRef.current = null;
+      connectRealtime(token);
+    }, delay);
+  }, [connectRealtime]);
+
+  useEffect(() => {
+    reconnectAttemptHandlerRef.current = scheduleReconnect;
+  }, [scheduleReconnect]);
+
+  const retryRealtimeConnection = useCallback(() => {
+    const token = activeTokenRef.current || getValidToken();
+    if (!token) {
+      return;
+    }
+
+    clearReconnectTimer();
+    reconnectAttemptRef.current = 0;
+    setRealtimeReconnecting(true);
+    connectRealtime(token);
+  }, [clearReconnectTimer, connectRealtime]);
 
   const syncAuthAndConnection = useCallback(() => {
     const token = getValidToken();
@@ -251,7 +350,7 @@ export function GlobalNotificationProvider({ children }: { children: React.React
       void loadInitialData();
     }
 
-    if (tokenChanged || !stompClientRef.current?.connected) {
+    if (tokenChanged || (!stompClientRef.current?.connected && !isConnectingRef.current && reconnectTimerRef.current === null)) {
       connectRealtime(token);
     }
   }, [connectRealtime, disconnectClient, loadInitialData]);
@@ -325,10 +424,27 @@ export function GlobalNotificationProvider({ children }: { children: React.React
   );
 
   const sendRealtime = useCallback(
-    (destination: string, body: string, headers?: Record<string, string>) => {
+    (
+      destination: string,
+      body: string,
+      options?: {
+        headers?: Record<string, string>;
+        queueWhenDisconnected?: boolean;
+      },
+    ) => {
       const client = stompClientRef.current;
-      if (!client?.connected) return;
-      client.publish({ destination, body, headers });
+      if (!client?.connected) {
+        if (options?.queueWhenDisconnected) {
+          queuedRealtimeMessagesRef.current.push({
+            destination,
+            body,
+            headers: options.headers,
+          });
+        }
+        return;
+      }
+
+      client.publish({ destination, body, headers: options?.headers });
     },
     [],
   );
@@ -396,11 +512,14 @@ export function GlobalNotificationProvider({ children }: { children: React.React
   return (
     <GlobalNotificationContext.Provider
       value={{
+        client: clientState,
         notifications,
         unreadCount,
         realtimeConnected,
+        realtimeReconnecting,
         subscribeRealtime,
         sendRealtime,
+        retryRealtimeConnection,
         markAsRead,
         markAllAsRead,
         deleteNotificationById,

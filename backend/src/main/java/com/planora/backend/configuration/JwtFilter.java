@@ -1,6 +1,8 @@
 package com.planora.backend.configuration;
 
 import com.planora.backend.service.JWTService;
+import com.planora.backend.dto.ApiErrorResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.MalformedJwtException;
@@ -21,7 +23,6 @@ import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
@@ -29,21 +30,8 @@ public class JwtFilter extends OncePerRequestFilter {
     private final JWTService jwtService;
     private final UserDetailsService userDetailsService;
     private static final Logger logger = LoggerFactory.getLogger(JwtFilter.class);
-        private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
-        private static final List<String> PUBLIC_ENDPOINTS = List.of(
-            "/api/auth/register",
-            "/api/auth/reg/verify",
-            "/api/auth/login",
-            "/api/auth/resend",
-            "/api/auth/forgot",
-            "/api/auth/reset",
-            "/api/auth/refresh",
-            "/ws/**",
-            "/ws-native/**",
-            "/v3/api-docs/**",
-            "/swagger-ui/**",
-            "/swagger-ui.html"
-        );
+    private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
+    // Single source of truth — see PublicEndpoints for the canonical list.
 
     public JwtFilter(JWTService jwtService,UserDetailsService userDetailsService) {
         this.jwtService = jwtService;
@@ -57,7 +45,11 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         String path = request.getServletPath();
-        return PUBLIC_ENDPOINTS.stream().anyMatch(pattern -> PATH_MATCHER.match(pattern, path));
+        if (path == null || path.isBlank()) {
+            path = request.getRequestURI();
+        }
+        String requestPath = path;
+        return PublicEndpoints.PATTERNS.stream().anyMatch(pattern -> PATH_MATCHER.match(pattern, requestPath));
     }
 
 
@@ -81,9 +73,15 @@ public class JwtFilter extends OncePerRequestFilter {
             if (!userDetails.isEnabled()) {
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 response.setContentType("application/json");
-                response.getWriter().write(
-                        "{\"error\": \"Email not verified\", \"errorCode\": \"EMAIL_NOT_VERIFIED\"}"
+                ApiErrorResponse errorResponse = new ApiErrorResponse(
+                    java.time.LocalDateTime.now().toString(),
+                    HttpServletResponse.SC_FORBIDDEN,
+                    "EMAIL_NOT_VERIFIED",
+                    "Email not verified",
+                    request.getRequestURI(),
+                    null
                 );
+                response.getWriter().write(new ObjectMapper().writeValueAsString(errorResponse));
                 return;
             }
 
@@ -101,24 +99,32 @@ public class JwtFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
         } catch (UsernameNotFoundException e) {
             logger.info("User not found for token: {}", e.getMessage());
-            sendErrorResponse(response, "User not found");
+            sendErrorResponse(request, response, "User not found");
         } catch (ExpiredJwtException e) {
             logger.debug("JWT expired for request: {}", request.getRequestURI());
-            sendErrorResponse(response, "Token has expired");
+            sendErrorResponse(request, response, "Token has expired");
         } catch (MalformedJwtException e) {
             logger.debug("Malformed JWT on request: {}", request.getRequestURI());
-            sendErrorResponse(response, "Invalid token format");
+            sendErrorResponse(request, response, "Invalid token format");
         } catch (JwtException | IllegalArgumentException e) {
             logger.error("JWT Error: {}", e.getMessage());
-            sendErrorResponse(response, "Invalid or expired token");
+            sendErrorResponse(request, response, "Invalid or expired token");
         }
 
     }
 
-    private void sendErrorResponse(HttpServletResponse response, String message) throws IOException {
+    private void sendErrorResponse(HttpServletRequest request, HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setHeader("WWW-Authenticate", "Bearer realm=\"planora\"");
         response.setContentType("application/json");
-        response.getWriter().write("{\"error\": \"" + message + "\"}");
+        ApiErrorResponse errorResponse = new ApiErrorResponse(
+            java.time.LocalDateTime.now().toString(),
+            HttpServletResponse.SC_UNAUTHORIZED,
+            "UNAUTHORIZED",
+            message,
+            request.getRequestURI(),
+            null
+        );
+        response.getWriter().write(new ObjectMapper().writeValueAsString(errorResponse));
     }
 }

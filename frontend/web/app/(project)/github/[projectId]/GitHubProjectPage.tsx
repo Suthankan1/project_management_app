@@ -1,36 +1,98 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  GitBranch, Globe, Lock, RefreshCw, Search, X, Check, Link2,
+  Bell, GitBranch, Globe, Lock, RefreshCw, Search, X, Check, Link2,
   LogOut, User, ExternalLink, GitPullRequest, ChevronDown, AlertCircle, GitCommit,
-  SlidersHorizontal,
+  SlidersHorizontal, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { ensureValidToken } from '@/lib/auth';
+import api from '@/lib/axios';
+import { useGlobalNotifications } from '@/components/providers/GlobalNotificationProvider';
+import { useGithubPRSocket, type GithubPRUpdate } from '@/hooks/useGithubPRSocket';
+import { useGithubCISocket, type GithubCIUpdate } from '@/hooks/useGithubCISocket';
+import { useGithubIssueSocket, type GithubIssueUpdate } from '@/hooks/useGithubIssueSocket';
+import { useGithubTaskBadgeSocket, type GithubTaskBadgeUpdate } from '@/hooks/useGithubTaskBadgeSocket';
+import { StompProvider } from '@/ws/stomp-provider';
+import CIStatusBanner from '@/components/github/CIStatusBanner';
+import GitHubAutomationsPanel from '@/components/github/GitHubAutomationsPanel';
+import AutomationRuleBuilder from '@/components/github/AutomationRuleBuilder';
+import ImportIssueModal from '@/components/github/ImportIssueModal';
+import { Popover } from '@/components/ui';
 import {
   getProjectGitHubRepo,
   setProjectGitHubRepo,
   clearProjectGitHubRepo,
-  getGitHubToken,
-  clearGitHubToken,
-  fetchRepositoriesWithToken,
+  hasConnectedGitHubAccount,
+  fetchRepositories,
   fetchGitHubUser,
+  fetchPullRequest,
   fetchPullRequests,
   fetchCommits,
   fetchIssues,
+  fetchImportedGitHubIssueNumbers,
+  fetchGitHubAutomationRules,
+  fetchGitHubAutomationLogs,
+  deleteGitHubAutomationRule,
+  setGitHubAutomationRuleEnabled,
+  getSavedGitHubAccounts,
+  upsertSavedGitHubAccount,
   type GitHubRepository,
   type GitHubPullRequest,
   type GitHubCommit,
   type GitHubIssue,
   type GitHubUser,
   type ProjectGitHubConnection,
+  type GithubAutomationRule,
+  type GithubAutomationLog,
+  type SavedGitHubAccount,
 } from '@/services/githubService';
 import IssueCard from '@/components/github/IssueCard';
 import GitHubMark from '@/components/github/GitHubMark';
+import { fetchMembers } from '@/services/members-service';
+import { getUserFromToken } from '@/lib/auth';
+import type { Notification } from '@/services/notifications-service';
 
 const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+
+// ── Shared glass style tokens ─────────────────────────────────────────────────
+const glass = {
+  card: {
+    background: 'rgba(255,255,255,0.04)',
+    backdropFilter: 'blur(20px) saturate(180%)',
+    border: '1px solid rgba(255,255,255,0.09)',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07)',
+  },
+  cardHover: {
+    boxShadow: '0 12px 40px rgba(99,102,241,0.18), inset 0 1px 0 rgba(255,255,255,0.1)',
+  },
+  modal: {
+    background: 'rgba(10,15,35,0.88)',
+    backdropFilter: 'blur(28px) saturate(180%)',
+    border: '1px solid rgba(255,255,255,0.11)',
+    boxShadow: '0 24px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)',
+  },
+  button: {
+    background: 'rgba(255,255,255,0.06)',
+    backdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255,255,255,0.1)',
+  },
+  buttonActive: {
+    background: 'rgba(99,102,241,0.22)',
+    backdropFilter: 'blur(12px)',
+    border: '1px solid rgba(99,102,241,0.32)',
+    boxShadow: '0 0 18px rgba(99,102,241,0.2), inset 0 1px 0 rgba(255,255,255,0.12)',
+  },
+  input: {
+    background: 'rgba(255,255,255,0.05)',
+    backdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255,255,255,0.1)',
+  },
+  divider: { borderColor: 'rgba(255,255,255,0.07)' },
+} as const;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function timeAgo(dateStr: string): string {
@@ -45,55 +107,203 @@ function timeAgo(dateStr: string): string {
   return `${months}mo ago`;
 }
 
-function prStatus(pr: GitHubPullRequest): { label: string; color: string; dot: string } {
-  if (pr.draft) return { label: 'Draft', color: 'text-slate-500 bg-slate-100 border-slate-200', dot: 'bg-slate-400' };
-  if (pr.merged_at) return { label: 'Merged', color: 'text-purple-700 bg-purple-50 border-purple-200', dot: 'bg-purple-500' };
-  if (pr.state === 'closed') return { label: 'Closed', color: 'text-red-700 bg-red-50 border-red-200', dot: 'bg-red-500' };
-  return { label: 'Open', color: 'text-green-700 bg-green-50 border-green-200', dot: 'bg-green-500' };
+function prStatus(pr: GitHubPullRequest): { label: string; color: string; dot: string; glow: string } {
+  if (pr.draft) return { label: 'Draft', color: 'text-slate-400 bg-slate-400/10 border-slate-400/20', dot: 'bg-slate-400', glow: '' };
+  if (pr.merged_at) return { label: 'Merged', color: 'text-purple-300 bg-purple-400/12 border-purple-400/25', dot: 'bg-purple-400', glow: 'shadow-[0_0_10px_rgba(168,85,247,0.35)]' };
+  if (pr.state === 'closed') return { label: 'Closed', color: 'text-red-300 bg-red-400/12 border-red-400/25', dot: 'bg-red-400', glow: '' };
+  return { label: 'Open', color: 'text-emerald-300 bg-emerald-400/12 border-emerald-400/25', dot: 'bg-emerald-400', glow: 'shadow-[0_0_10px_rgba(52,211,153,0.35)]' };
+}
+
+
+function isGitHubRepoNotification(notification: Notification, repoFullName: string): boolean {
+  const normalizedRepo = repoFullName.trim().toLowerCase();
+  if (!normalizedRepo) return false;
+
+  const link = typeof notification.link === 'string' ? notification.link.toLowerCase() : '';
+  return link.includes(`github.com/${normalizedRepo}/`);
+}
+
+type GitHubTabKey = 'pullRequests' | 'commits' | 'issues';
+
+function classifyGitHubNotification(notification: Notification): GitHubTabKey | null {
+  const link = typeof notification.link === 'string' ? notification.link.toLowerCase() : '';
+  const message = typeof notification.message === 'string' ? notification.message.toLowerCase() : '';
+
+  if (link.includes('/pull/') || message.includes('pr opened') || message.includes('pr merged')) {
+    return 'pullRequests';
+  }
+
+  if (link.includes('/commit/') || link.includes('/checks') || message.includes('ci failed')) {
+    return 'commits';
+  }
+
+  if (link.includes('/issues/') || message.includes('issue opened') || message.includes('issue closed') || message.includes('issue #')) {
+    return 'issues';
+  }
+
+  return null;
 }
 
 // ── Disconnected state ────────────────────────────────────────────────────────
-function DisconnectedView({ onConnect }: { onConnect: () => void }) {
+function DisconnectedView({
+  onConnect,
+  onLogout,
+  isPostLogout,
+}: {
+  onConnect: () => void;
+  onLogout: () => void;
+  isPostLogout: boolean;
+}) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
-      transition={{ duration: 0.25 }}
-      className="flex flex-col items-center gap-6 max-w-md w-full text-center"
+      transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
+      className="flex flex-col items-center gap-8 max-w-sm w-full text-center"
     >
-      <div className="w-20 h-20 rounded-3xl bg-slate-900 flex items-center justify-center shadow-[0_8px_32px_rgba(0,0,0,0.18)]">
-        <GitHubMark size={40} className="text-white" />
+      {/* Logo orb */}
+      <div className="relative">
+        <div
+          className="absolute inset-[-16px] rounded-full blur-3xl opacity-50"
+          style={{ background: 'radial-gradient(circle, #6366f1, transparent 70%)' }}
+        />
+        <motion.div
+          animate={{ boxShadow: ['0 0 24px rgba(99,102,241,0.25)', '0 0 48px rgba(99,102,241,0.4)', '0 0 24px rgba(99,102,241,0.25)'] }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+          className="relative w-[88px] h-[88px] rounded-[28px] flex items-center justify-center"
+          style={{
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 100%)',
+            backdropFilter: 'blur(24px) saturate(200%)',
+            border: '1px solid rgba(255,255,255,0.18)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.18)',
+          }}
+        >
+          <GitHubMark size={42} className="text-white" />
+        </motion.div>
       </div>
-      <div className="flex flex-col gap-2">
-        <h2 className="text-xl font-outfit font-bold text-slate-800">Connect to GitHub</h2>
-        <p className="text-sm text-slate-500 font-outfit leading-relaxed">
-          Link this project to a GitHub repository to track pull requests and activity.
-        </p>
-      </div>
-      <div className="flex flex-col gap-2 w-full text-left bg-slate-50 rounded-2xl p-4 border border-slate-100">
-        {['View last 10 pull requests', 'Track open, merged & closed PRs', 'See branch and author details'].map(item => (
-          <div key={item} className="flex items-center gap-2.5">
-            <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-              <Check size={10} className="text-green-600" strokeWidth={3} />
-            </div>
-            <span className="text-sm text-slate-600 font-outfit">{item}</span>
+
+      {isPostLogout ? (
+        <>
+          <div className="flex flex-col gap-2.5">
+            <h2 className="text-[22px] font-outfit font-black text-white tracking-tight">
+              Choose a GitHub account
+            </h2>
+            <p className="text-sm text-slate-400 font-outfit leading-relaxed">
+              You&apos;ll be redirected to GitHub to sign in. If you have multiple accounts you&apos;ll see a picker.
+            </p>
           </div>
-        ))}
-      </div>
-      <motion.button
-        onClick={onConnect}
-        whileHover={{ scale: 1.03, y: -1 }}
-        whileTap={{ scale: 0.97 }}
-        className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-slate-900 text-white font-outfit font-bold text-sm shadow-[0_4px_20px_rgba(0,0,0,0.25)] hover:bg-slate-800 transition-colors"
+
+          <div
+            className="w-full rounded-2xl p-4"
+            style={{
+              background: 'rgba(99,102,241,0.08)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(99,102,241,0.2)',
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)' }}
+              >
+                <User size={11} className="text-indigo-300" />
+              </div>
+              <span className="text-sm text-slate-300 font-outfit text-left leading-relaxed">
+                Your previous account has been disconnected. Sign in with any GitHub account.
+              </span>
+            </div>
+          </div>
+
+          <motion.button
+            onClick={onConnect}
+            whileHover={{ scale: 1.03, y: -2 }}
+            whileTap={{ scale: 0.97 }}
+            className="flex items-center gap-3 px-8 py-3.5 rounded-2xl font-outfit font-bold text-[15px] text-white w-full justify-center"
+            style={{
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.7) 0%, rgba(168,85,247,0.6) 100%)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              boxShadow: '0 4px 28px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+            }}
+          >
+            <GitHubMark size={18} className="text-white" />
+            Choose GitHub account
+          </motion.button>
+        </>
+      ) : (
+        <>
+          <div className="flex flex-col gap-2.5">
+            <h2 className="text-[22px] font-outfit font-black text-white tracking-tight">
+              Connect to GitHub
+            </h2>
+            <p className="text-sm text-slate-400 font-outfit leading-relaxed">
+              Link this project to a GitHub repository to track pull requests, commits, and issues.
+            </p>
+          </div>
+
+          <div
+            className="flex flex-col gap-3 w-full rounded-2xl p-5"
+            style={{
+              background: 'rgba(255,255,255,0.03)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(255,255,255,0.07)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+            }}
+          >
+            {[
+              { icon: <GitPullRequest size={13} />, text: 'View pull requests in real time' },
+              { icon: <GitCommit size={13} />, text: 'Track commits and branch history' },
+              { icon: <AlertCircle size={13} />, text: 'Monitor open, merged & closed PRs' },
+            ].map(item => (
+              <div key={item.text} className="flex items-center gap-3">
+                <div
+                  className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-emerald-400"
+                  style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)' }}
+                >
+                  {item.icon}
+                </div>
+                <span className="text-sm text-slate-300 font-outfit flex-1 text-left">{item.text}</span>
+                <Check size={13} className="text-emerald-400 shrink-0" strokeWidth={2.5} />
+              </div>
+            ))}
+          </div>
+
+          <motion.button
+            onClick={onConnect}
+            whileHover={{ scale: 1.03, y: -2 }}
+            whileTap={{ scale: 0.97 }}
+            className="flex items-center gap-3 px-8 py-3.5 rounded-2xl font-outfit font-bold text-[15px] text-white w-full justify-center"
+            style={{
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.06) 100%)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255,255,255,0.22)',
+              boxShadow: '0 4px 28px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2)',
+            }}
+          >
+            <GitHubMark size={18} className="text-white" />
+            Connect to GitHub
+          </motion.button>
+        </>
+      )}
+
+      <button
+        onClick={onLogout}
+        className="flex items-center gap-1.5 text-xs font-outfit font-semibold text-red-400/70 hover:text-red-400 transition-colors"
       >
-        <GitHubMark size={18} className="text-white" />
-        Connect to GitHub
-      </motion.button>
+        <LogOut size={12} />
+        Logout from GitHub
+      </button>
+
       {!GITHUB_CLIENT_ID && (
-        <p className="text-xs text-amber-600 font-outfit bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
-          Set <code className="font-mono">NEXT_PUBLIC_GITHUB_CLIENT_ID</code> to enable GitHub OAuth.
-        </p>
+        <div
+          className="w-full rounded-xl px-4 py-3"
+          style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)' }}
+        >
+          <p className="text-xs text-amber-300 font-outfit">
+            Set <code className="font-mono">NEXT_PUBLIC_GITHUB_CLIENT_ID</code> to enable GitHub OAuth.
+          </p>
+        </div>
       )}
     </motion.div>
   );
@@ -109,39 +319,36 @@ function PRCard({ pr }: { pr: GitHubPullRequest }) {
       rel="noopener noreferrer"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2, boxShadow: '0 8px 28px rgba(0,0,0,0.10)' }}
+      whileHover={{ y: -3, ...glass.cardHover }}
       transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-      className="flex flex-col gap-3 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-slate-300 transition-colors group"
+      className="flex flex-col gap-3 p-4 rounded-2xl group transition-all cursor-pointer"
+      style={glass.card}
     >
-      {/* Top row: number + status + date */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="flex items-center gap-1.5 text-xs font-outfit font-bold text-slate-400">
+        <span className="flex items-center gap-1.5 text-xs font-outfit font-bold text-slate-500">
           <GitPullRequest size={12} />
           #{pr.number}
         </span>
-        <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-outfit font-semibold border ${status.color}`}>
+        <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-outfit font-semibold border ${status.color} ${status.glow}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
           {status.label}
         </span>
-        <span className="ml-auto text-[11px] text-slate-400 font-outfit shrink-0">
+        <span className="ml-auto text-[11px] text-slate-600 font-outfit shrink-0">
           {timeAgo(pr.updated_at)}
         </span>
       </div>
 
-      {/* Title */}
-      <p className="text-sm font-outfit font-semibold text-slate-800 leading-snug line-clamp-2 group-hover:text-blue-600 transition-colors">
+      <p className="text-sm font-outfit font-semibold text-slate-100 leading-snug line-clamp-2 group-hover:text-indigo-300 transition-colors">
         {pr.title}
       </p>
 
-      {/* Branch row */}
-      <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-outfit">
+      <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-outfit">
         <GitBranch size={11} />
-        <span className="font-semibold text-slate-500">{pr.head.ref}</span>
-        <span>→</span>
-        <span>{pr.base.ref}</span>
+        <span className="font-semibold text-slate-400">{pr.head.ref}</span>
+        <span className="text-slate-700">→</span>
+        <span className="text-slate-500">{pr.base.ref}</span>
       </div>
 
-      {/* Author + labels */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-1.5">
           <Image
@@ -149,7 +356,7 @@ function PRCard({ pr }: { pr: GitHubPullRequest }) {
             alt={pr.user.login}
             width={18}
             height={18}
-            className="rounded-full"
+            className="rounded-full ring-1 ring-white/10"
             unoptimized
           />
           <span className="text-[11px] text-slate-500 font-outfit">@{pr.user.login}</span>
@@ -161,7 +368,7 @@ function PRCard({ pr }: { pr: GitHubPullRequest }) {
             style={{
               backgroundColor: `#${label.color}22`,
               color: `#${label.color}`,
-              border: `1px solid #${label.color}44`,
+              border: `1px solid #${label.color}33`,
             }}
           >
             {label.name}
@@ -186,32 +393,36 @@ function CommitCard({ commit }: { commit: GitHubCommit }) {
       rel="noopener noreferrer"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2, boxShadow: '0 8px 28px rgba(0,0,0,0.10)' }}
+      whileHover={{ y: -3, ...glass.cardHover }}
       transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-      className="flex flex-col gap-3 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-slate-300 transition-colors group"
+      className="flex flex-col gap-3 p-4 rounded-2xl group transition-all cursor-pointer"
+      style={glass.card}
     >
-      {/* SHA + date */}
       <div className="flex items-center gap-2">
-        <span className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">
+        <span
+          className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-slate-400 px-2 py-0.5 rounded-lg"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+        >
           <GitCommit size={11} />
           {shortSha}
         </span>
-        <span className="ml-auto text-[11px] text-slate-400 font-outfit shrink-0">
+        <span className="ml-auto text-[11px] text-slate-600 font-outfit shrink-0">
           {timeAgo(commit.commit.author.date)}
         </span>
       </div>
 
-      {/* Message */}
-      <p className="text-sm font-outfit font-semibold text-slate-800 leading-snug line-clamp-2 group-hover:text-blue-600 transition-colors">
+      <p className="text-sm font-outfit font-semibold text-slate-100 leading-snug line-clamp-2 group-hover:text-indigo-300 transition-colors">
         {firstLine}
       </p>
 
-      {/* Author */}
       <div className="flex items-center gap-1.5">
         {avatarUrl ? (
-          <Image src={avatarUrl} alt={authorName} width={18} height={18} className="rounded-full" unoptimized />
+          <Image src={avatarUrl} alt={authorName} width={18} height={18} className="rounded-full ring-1 ring-white/10" unoptimized />
         ) : (
-          <div className="w-[18px] h-[18px] rounded-full bg-slate-200 flex items-center justify-center shrink-0">
+          <div
+            className="w-[18px] h-[18px] rounded-full flex items-center justify-center shrink-0"
+            style={{ background: 'rgba(255,255,255,0.08)' }}
+          >
             <User size={10} className="text-slate-400" />
           </div>
         )}
@@ -226,10 +437,12 @@ function AccountDropdown({
   user,
   onLogout,
   onChangeRepo,
+  canChangeRepo,
 }: {
   user: GitHubUser | null;
   onLogout: () => void;
   onChangeRepo: () => void;
+  canChangeRepo: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -247,16 +460,17 @@ function AccountDropdown({
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(p => !p)}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors shadow-sm"
+        className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all hover:bg-white/[0.06]"
+        style={glass.button}
       >
         {user?.avatar_url ? (
-          <Image src={user.avatar_url} alt={user.login} width={20} height={20} className="rounded-full" unoptimized />
+          <Image src={user.avatar_url} alt={user.login} width={20} height={20} className="rounded-full ring-1 ring-white/15" unoptimized />
         ) : (
-          <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center">
-            <User size={11} className="text-slate-500" />
+          <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center">
+            <User size={11} className="text-slate-300" />
           </div>
         )}
-        <span className="text-xs font-outfit font-semibold text-slate-700">
+        <span className="text-xs font-outfit font-semibold text-slate-200 hidden sm:inline">
           {user?.login ?? 'Account'}
         </span>
         <ChevronDown size={12} className={`text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
@@ -269,23 +483,23 @@ function AccountDropdown({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 6 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 top-full mt-2 w-60 bg-white border border-slate-200 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.12)] overflow-hidden z-[300]"
+            className="absolute right-0 top-full mt-2 w-64 rounded-2xl overflow-hidden z-[300]"
+            style={glass.modal}
           >
-            {/* Account info */}
-            <div className="px-4 py-3.5 border-b border-slate-100">
+            <div className="px-4 py-3.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
               <div className="flex items-center gap-3">
                 {user?.avatar_url ? (
-                  <Image src={user.avatar_url} alt={user.login} width={36} height={36} className="rounded-full" unoptimized />
+                  <Image src={user.avatar_url} alt={user.login} width={38} height={38} className="rounded-full ring-2 ring-white/10" unoptimized />
                 ) : (
-                  <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
-                    <User size={16} className="text-slate-400" />
+                  <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
+                    <User size={16} className="text-slate-300" />
                   </div>
                 )}
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-outfit font-bold text-slate-800 truncate">
+                  <span className="text-sm font-outfit font-bold text-slate-100 truncate">
                     {user?.name ?? user?.login ?? '—'}
                   </span>
-                  <span className="text-xs text-slate-400 font-outfit truncate">@{user?.login}</span>
+                  <span className="text-xs text-slate-500 font-outfit truncate">@{user?.login}</span>
                 </div>
               </div>
               {user && (
@@ -293,7 +507,7 @@ function AccountDropdown({
                   href={user.html_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-2.5 flex items-center gap-1.5 text-xs text-blue-500 font-outfit font-semibold hover:underline"
+                  className="mt-2.5 flex items-center gap-1.5 text-xs text-indigo-400 font-outfit font-semibold hover:text-indigo-300 transition-colors"
                 >
                   <ExternalLink size={11} />
                   View GitHub profile
@@ -301,18 +515,19 @@ function AccountDropdown({
               )}
             </div>
 
-            {/* Actions */}
             <div className="py-1.5">
-              <button
-                onClick={() => { setOpen(false); onChangeRepo(); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-outfit font-semibold text-slate-700 hover:bg-slate-50 transition-colors text-left"
-              >
-                <Link2 size={14} className="text-slate-400" />
-                Change repository
-              </button>
+              {canChangeRepo && (
+                <button
+                  onClick={() => { setOpen(false); onChangeRepo(); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-outfit font-semibold text-slate-300 hover:bg-white/[0.05] transition-colors text-left"
+                >
+                  <Link2 size={14} className="text-slate-500" />
+                  Change repository
+                </button>
+              )}
               <button
                 onClick={() => { setOpen(false); onLogout(); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-outfit font-semibold text-red-600 hover:bg-red-50 transition-colors text-left"
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-outfit font-semibold text-red-400 hover:bg-red-400/[0.08] transition-colors text-left"
               >
                 <LogOut size={14} />
                 Logout from GitHub
@@ -344,75 +559,114 @@ function RepoModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-[500] flex items-center justify-center p-4"
-      style={{ background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)' }}
+      style={{ background: 'rgba(5,8,20,0.72)', backdropFilter: 'blur(10px)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        initial={{ opacity: 0, scale: 0.96, y: 14 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-        className="bg-white rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.18)] w-full max-w-lg overflow-hidden flex flex-col"
-        style={{ maxHeight: '80vh' }}
+        exit={{ opacity: 0, scale: 0.96, y: 14 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        className="w-full max-w-lg overflow-hidden flex flex-col rounded-2xl"
+        style={{ ...glass.modal, maxHeight: '80vh' }}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+        <div
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+        >
           <div className="flex items-center gap-2.5">
-            <GitHubMark size={18} className="text-slate-800" />
-            <span className="font-outfit font-bold text-slate-800 text-base">Select a repository</span>
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
+            >
+              <GitHubMark size={15} className="text-white" />
+            </div>
+            <span className="font-outfit font-bold text-slate-100 text-base">Select a repository</span>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={onRefresh} disabled={loading} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-40" title="Refresh">
+            <button
+              onClick={onRefresh}
+              disabled={loading}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.06] transition-colors disabled:opacity-40"
+              title="Refresh"
+            >
               <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
             </button>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.06] transition-colors"
+            >
               <X size={15} />
             </button>
           </div>
         </div>
 
-        <div className="px-4 py-3 border-b border-slate-100">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200">
-            <Search size={14} className="text-slate-400 shrink-0" />
-            <input autoFocus type="text" placeholder="Search repositories…" value={search} onChange={e => onSearch(e.target.value)}
-              className="flex-1 text-sm font-outfit bg-transparent outline-none text-slate-700 placeholder:text-slate-400" />
-            {search && <button onClick={() => onSearch('')} className="text-slate-400 hover:text-slate-600"><X size={13} /></button>}
+        <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={glass.input}>
+            <Search size={14} className="text-slate-500 shrink-0" />
+            <input
+              autoFocus
+              type="text"
+              placeholder="Search repositories…"
+              value={search}
+              onChange={e => onSearch(e.target.value)}
+              className="flex-1 text-sm font-outfit bg-transparent outline-none text-slate-200 placeholder:text-slate-600"
+            />
+            {search && (
+              <button onClick={() => onSearch('')} className="text-slate-500 hover:text-slate-300 transition-colors">
+                <X size={13} />
+              </button>
+            )}
           </div>
         </div>
 
         <div className="overflow-y-auto flex-1">
           {loading && (
             <div className="flex flex-col items-center gap-3 py-12">
-              <div className="w-8 h-8 rounded-xl bg-slate-100 animate-pulse" />
-              <span className="text-sm text-slate-400 font-outfit">Loading repositories…</span>
+              <div className="w-8 h-8 rounded-xl bg-white/[0.06] animate-pulse" />
+              <span className="text-sm text-slate-500 font-outfit">Loading repositories…</span>
             </div>
           )}
           {!loading && error && (
             <div className="flex flex-col items-center gap-3 py-12 px-6 text-center">
-              <div className="w-8 h-8 rounded-xl bg-red-100 flex items-center justify-center">
-                <X size={16} className="text-red-500" />
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)' }}
+              >
+                <X size={16} className="text-red-400" />
               </div>
-              <p className="text-sm text-slate-600 font-outfit">{error}</p>
-              <button onClick={onRefresh} className="text-sm text-blue-600 font-outfit font-semibold hover:underline">Try again</button>
+              <p className="text-sm text-slate-400 font-outfit">{error}</p>
+              <button onClick={onRefresh} className="text-sm text-indigo-400 font-outfit font-semibold hover:text-indigo-300 transition-colors">
+                Try again
+              </button>
             </div>
           )}
           {!loading && !error && repos.length === 0 && (
             <div className="flex flex-col items-center gap-2 py-12">
-              <span className="text-sm text-slate-400 font-outfit">No repositories found</span>
+              <span className="text-sm text-slate-500 font-outfit">No repositories found</span>
             </div>
           )}
           {!loading && !error && repos.length > 0 && (
             <ul className="py-1.5">
               {repos.map(repo => (
                 <li key={repo.id}>
-                  <button onClick={() => onSelect(repo)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left group">
-                    <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 group-hover:bg-slate-200 transition-colors">
-                      <GitHubMark size={14} className="text-slate-600" />
+                  <button
+                    onClick={() => onSelect(repo)}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors text-left group"
+                  >
+                    <div
+                      className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-white/[0.1] transition-colors"
+                      style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}
+                    >
+                      <GitHubMark size={14} className="text-slate-300" />
                     </div>
                     <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-sm font-outfit font-semibold text-slate-800 truncate">{repo.full_name}</span>
+                      <span className="text-sm font-outfit font-semibold text-slate-200 truncate">{repo.full_name}</span>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="flex items-center gap-1 text-[11px] text-slate-400 font-outfit"><GitBranch size={10} />{repo.default_branch}</span>
-                        <span className={`flex items-center gap-1 text-[11px] font-outfit ${repo.private ? 'text-slate-400' : 'text-blue-400'}`}>
+                        <span className="flex items-center gap-1 text-[11px] text-slate-500 font-outfit">
+                          <GitBranch size={10} />{repo.default_branch}
+                        </span>
+                        <span className={`flex items-center gap-1 text-[11px] font-outfit ${repo.private ? 'text-slate-500' : 'text-blue-400'}`}>
                           {repo.private ? <Lock size={9} /> : <Globe size={9} />}
                           {repo.private ? 'Private' : 'Public'}
                         </span>
@@ -429,59 +683,94 @@ function RepoModal({
   );
 }
 
-// ── Shared skeleton loader ────────────────────────────────────────────────────
-function SkeletonList() {
-  return (
-    <div className="flex flex-col gap-3">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="h-[120px] rounded-2xl bg-slate-100 animate-pulse" />
-      ))}
-    </div>
-  );
-}
-
-// ── Connected dashboard ───────────────────────────────────────────────────────
-function IssueImportModal({ issue, onClose }: { issue: GitHubIssue; onClose: () => void }) {
+// ── Account picker modal ──────────────────────────────────────────────────────
+function AccountPickerModal({
+  accounts,
+  onSelect,
+  onAddAccount,
+  onClose,
+}: {
+  accounts: SavedGitHubAccount[];
+  onSelect: (login: string) => void;
+  onAddAccount: () => void;
+  onClose: () => void;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-[500] flex items-center justify-center p-4"
-      style={{ background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)' }}
+      style={{ background: 'rgba(5,8,20,0.72)', backdropFilter: 'blur(10px)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        initial={{ opacity: 0, scale: 0.96, y: 14 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-[0_24px_80px_rgba(0,0,0,0.18)]"
+        exit={{ opacity: 0, scale: 0.96, y: 14 }}
+        transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+        className="w-full max-w-sm rounded-2xl overflow-hidden"
+        style={glass.modal}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-outfit font-semibold text-slate-400">Import GitHub issue</p>
-            <h3 className="mt-1 text-base font-outfit font-bold text-slate-800">
-              #{issue.number} {issue.title}
-            </h3>
+        <div
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+        >
+          <div className="flex items-center gap-2.5">
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
+            >
+              <GitHubMark size={13} className="text-white" />
+            </div>
+            <h2 className="text-sm font-outfit font-bold text-slate-100">Choose a GitHub account</h2>
           </div>
           <button
-            type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-white/[0.06] hover:text-slate-200 transition-colors"
           >
-            <X size={16} />
+            <X size={15} />
           </button>
         </div>
-        <p className="mt-4 text-sm font-outfit text-slate-500">
-          Choose import options and create the Planora task in the import workflow.
-        </p>
-        <div className="mt-5 flex justify-end">
+
+        <div className="py-1.5 max-h-[300px] overflow-y-auto">
+          {accounts.map(account => (
+            <button
+              key={account.login}
+              onClick={() => onSelect(account.login)}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors group text-left"
+            >
+              <Image
+                src={account.avatarUrl}
+                alt={account.login}
+                width={36}
+                height={36}
+                className="rounded-full flex-shrink-0 ring-2 ring-white/10"
+                unoptimized
+              />
+              <div className="flex flex-col min-w-0 flex-1">
+                {account.name && (
+                  <span className="text-sm font-outfit font-semibold text-slate-200 truncate leading-tight">
+                    {account.name}
+                  </span>
+                )}
+                <span className="text-xs text-slate-500 font-outfit truncate">@{account.login}</span>
+              </div>
+              <span className="text-xs font-outfit font-semibold text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                Connect →
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="px-4 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
           <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-outfit font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+            onClick={onAddAccount}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-outfit font-semibold text-slate-300 hover:text-slate-100 hover:bg-white/[0.06] transition-all"
+            style={{ border: '1px solid rgba(255,255,255,0.09)' }}
           >
-            Close
+            <User size={13} className="text-slate-500" />
+            Use a different account
           </button>
         </div>
       </motion.div>
@@ -489,8 +778,134 @@ function IssueImportModal({ issue, onClose }: { issue: GitHubIssue; onClose: () 
   );
 }
 
+// ── Pagination ────────────────────────────────────────────────────────────────
+const PAGE_SIZE = 5;
+
+function PaginationBar({
+  page,
+  total,
+  onPrev,
+  onNext,
+}: {
+  page: number;
+  total: number;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-3 pt-2">
+      <button
+        onClick={onPrev}
+        disabled={page === 1}
+        className="p-2 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/[0.07]"
+        style={glass.button}
+      >
+        <ChevronLeft size={14} className="text-slate-400" />
+      </button>
+      <span
+        className="text-xs font-outfit text-slate-400 tabular-nums px-3.5 py-1.5 rounded-lg"
+        style={{ background: 'rgba(255,255,255,0.04)' }}
+      >
+        {page} / {totalPages}
+      </span>
+      <button
+        onClick={onNext}
+        disabled={page === totalPages}
+        className="p-2 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/[0.07]"
+        style={glass.button}
+      >
+        <ChevronRight size={14} className="text-slate-400" />
+      </button>
+    </div>
+  );
+}
+
+// ── Skeleton loader ───────────────────────────────────────────────────────────
+function SkeletonList() {
+  return (
+    <div className="flex flex-col gap-3">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className="h-[116px] rounded-2xl animate-pulse"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+        />
+      ))}
+    </div>
+  );
+}
+
+type IssueFilterOption = {
+  value: string;
+  label: string;
+};
+
+function IssueFilterDropdown({
+  label,
+  value,
+  options,
+  onChange,
+  ariaLabel,
+}: {
+  label: string;
+  value: string;
+  options: IssueFilterOption[];
+  onChange: (value: string) => void;
+  ariaLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find(option => option.value === value) ?? options[0];
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      align="start"
+      className="w-[min(16rem,calc(100vw-1rem))] overflow-hidden p-0 sm:w-[18rem]"
+      trigger={(
+        <button
+          type="button"
+          aria-label={ariaLabel}
+          className="flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-left text-xs font-outfit font-medium text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-white focus:border-blue-400 focus:outline-none sm:px-3 sm:py-2.5 sm:text-sm"
+        >
+          <span className="min-w-0 truncate">
+            {selected?.label ?? label}
+          </span>
+          <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+      )}
+    >
+      <div className="max-h-64 overflow-auto p-2">
+        {options.map(option => {
+          const isSelected = option.value === value;
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+              className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${isSelected
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+            >
+              <span className="min-w-0 truncate">{option.label}</span>
+              {isSelected && <Check size={14} className="shrink-0" />}
+            </button>
+          );
+        })}
+      </div>
+    </Popover>
+  );
+}
 function IssuesPanel({
-  connection: _connection,
+  projectId,
+  repoFullName,
   issues,
   loading,
   error,
@@ -498,7 +913,8 @@ function IssuesPanel({
   onRequireLogin,
   onRefresh,
 }: {
-  connection: ProjectGitHubConnection;
+  projectId: string;
+  repoFullName: string;
   issues: GitHubIssue[];
   loading: boolean;
   error: string | null;
@@ -507,82 +923,178 @@ function IssuesPanel({
   onRefresh: () => void;
 }) {
   const [selectedIssue, setSelectedIssue] = useState<GitHubIssue | null>(null);
-  const [importedIssueNumbers] = useState<Set<number>>(() => new Set());
+  const [importedIssueNumbers, setImportedIssueNumbers] = useState<Set<number>>(() => new Set());
+  const [stateFilter, setStateFilter] = useState<'all' | GitHubIssue['state']>('all');
+  const [labelFilter, setLabelFilter] = useState('');
+
+  const availableLabels = useMemo(
+    () => Array.from(new Set(
+      issues.flatMap(issue => issue.labels.map(label => label.name)).filter(Boolean),
+    )).sort((first, second) => first.localeCompare(second)),
+    [issues],
+  );
+
+  const filteredIssues = useMemo(
+    () => issues.filter(issue =>
+      (stateFilter === 'all' || issue.state === stateFilter)
+      && (!labelFilter || issue.labels.some(label => label.name === labelFilter)),
+    ),
+    [issues, labelFilter, stateFilter],
+  );
+
+  const filtersActive = stateFilter !== 'all' || labelFilter !== '';
 
   useEffect(() => {
     onCountChange(issues.length);
   }, [issues, onCountChange]);
 
+  useEffect(() => {
+    let active = true;
+
+    void fetchImportedGitHubIssueNumbers(projectId, repoFullName)
+      .then(issueNumbers => {
+        if (active) {
+          setImportedIssueNumbers(current => new Set([...current, ...issueNumbers]));
+        }
+      })
+      .catch(() => {
+        // The issue list remains usable when linked task metadata is unavailable.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [projectId, repoFullName]);
+
   return (
     <div className="flex flex-col gap-4 min-w-0">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-outfit font-bold text-slate-700">Issues</h2>
+          <h2 className="text-sm font-outfit font-bold text-slate-300">Issues</h2>
           {!loading && !error && (
-            <span className="text-sm text-slate-400 font-outfit">({issues.length})</span>
+            <span className="text-sm text-slate-400 font-outfit">
+              ({filtersActive ? `${filteredIssues.length} of ` : ''}{issues.length})
+            </span>
           )}
         </div>
         <button
           type="button"
           onClick={onRefresh}
           disabled={loading}
-          className="p-2 rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:opacity-40"
+          className="inline-flex items-center justify-center self-start rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:opacity-40 sm:self-auto"
           title="Refresh issues"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
       </div>
 
-      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
-        <SlidersHorizontal size={14} className="text-slate-400" />
-        <span className="text-xs font-outfit font-semibold text-slate-500">Filters</span>
-        <button disabled className="ml-2 rounded-lg bg-slate-50 px-2.5 py-1 text-xs font-outfit text-slate-400">
-          All states
-        </button>
-        <button disabled className="rounded-lg bg-slate-50 px-2.5 py-1 text-xs font-outfit text-slate-400">
-          All labels
-        </button>
+      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal size={14} className="text-slate-400" />
+          <span className="text-xs font-outfit font-semibold uppercase tracking-wide text-slate-500">Filters</span>
+          {filtersActive && (
+            <button
+              type="button"
+              onClick={() => {
+                setStateFilter('all');
+                setLabelFilter('');
+              }}
+              className="ml-auto text-xs font-outfit font-semibold text-blue-600 hover:underline"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
+          <IssueFilterDropdown
+            label="All states"
+            value={stateFilter}
+            ariaLabel="Filter issues by state"
+            onChange={(nextValue) => setStateFilter(nextValue as 'all' | GitHubIssue['state'])}
+            options={[
+              { value: 'all', label: 'All states' },
+              { value: 'open', label: 'Open' },
+              { value: 'closed', label: 'Closed' },
+            ]}
+          />
+          <IssueFilterDropdown
+            label="All labels"
+            value={labelFilter}
+            ariaLabel="Filter issues by label"
+            onChange={setLabelFilter}
+            options={[
+              { value: '', label: 'All labels' },
+              ...availableLabels.map(label => ({ value: label, label })),
+            ]}
+          />
+          <div className="sm:flex sm:justify-end">
+            {filtersActive ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setStateFilter('all');
+                  setLabelFilter('');
+                }}
+                className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-outfit font-semibold text-slate-600 transition-colors hover:bg-slate-50 sm:min-w-[5rem]"
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       {loading && <SkeletonList />}
 
       {!loading && error && (
         <div className="flex flex-col items-center gap-4 py-10 text-center">
-          <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
-            <AlertCircle size={16} className="text-red-500" />
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)' }}
+          >
+            <AlertCircle size={16} className="text-red-400" />
           </div>
           <p className="text-xs text-slate-500 font-outfit">{error}</p>
-          <div className="flex flex-col items-center gap-2">
-            {(!getGitHubToken() || error.toLowerCase().includes('connect')) ? (
-              <button
-                onClick={() => onRequireLogin()}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900 text-white font-outfit font-bold text-sm shadow-sm hover:bg-slate-800 transition-colors"
-              >
-                <GitHubMark size={14} className="text-white" />
-                Connect to GitHub
-              </button>
-            ) : (
-              <button
-                onClick={() => onRefresh()}
-                className="text-xs text-blue-600 font-outfit font-semibold hover:underline"
-              >
-                Retry
-              </button>
-            )}
-          </div>
+          {(!hasConnectedGitHubAccount() || error.toLowerCase().includes('connect')) ? (
+            <motion.button
+              onClick={() => onRequireLogin()}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-white font-outfit font-bold text-sm"
+              style={{
+                background: 'linear-gradient(135deg, rgba(99,102,241,0.6), rgba(168,85,247,0.5))',
+                border: '1px solid rgba(255,255,255,0.15)',
+              }}
+            >
+              <GitHubMark size={14} className="text-white" />
+              Connect to GitHub
+            </motion.button>
+          ) : (
+            <button onClick={onRefresh} className="text-xs text-indigo-400 font-outfit font-semibold hover:text-indigo-300 transition-colors">
+              Retry
+            </button>
+          )}
         </div>
       )}
 
       {!loading && !error && issues.length === 0 && (
         <div className="flex flex-col items-center gap-2 py-10">
-          <AlertCircle size={20} className="text-slate-300" />
-          <p className="text-xs text-slate-400 font-outfit">No issues found</p>
+          <AlertCircle size={20} className="text-slate-700" />
+          <p className="text-xs text-slate-500 font-outfit">No issues found</p>
         </div>
       )}
 
-      {!loading && !error && issues.length > 0 && (
+      {!loading && !error && issues.length > 0 && filteredIssues.length === 0 && (
+        <div className="flex flex-col items-center gap-2 py-10">
+          <AlertCircle size={20} className="text-slate-300" />
+          <p className="text-xs text-slate-400 font-outfit">No issues match the selected filters</p>
+        </div>
+      )}
+
+      {!loading && !error && filteredIssues.length > 0 && (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {issues.map(issue => (
+          {filteredIssues.map(issue => (
             <IssueCard
               key={issue.id}
               issue={issue}
@@ -594,13 +1106,26 @@ function IssuesPanel({
       )}
 
       <AnimatePresence>
-        {selectedIssue && <IssueImportModal issue={selectedIssue} onClose={() => setSelectedIssue(null)} />}
+        {selectedIssue && (
+          <ImportIssueModal
+            issue={selectedIssue}
+            projectId={projectId}
+            repoFullName={repoFullName}
+            onSuccess={() => {
+              setImportedIssueNumbers(current => new Set(current).add(selectedIssue.number));
+              setSelectedIssue(null);
+            }}
+            onClose={() => setSelectedIssue(null)}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
 }
 
+// ── Connected Dashboard ───────────────────────────────────────────────────────
 function ConnectedDashboard({
+  projectId,
   connection,
   prs,
   commits,
@@ -613,7 +1138,22 @@ function ConnectedDashboard({
   onRefresh,
   onLogout,
   onChangeRepo,
+  onPRUpdate,
+  onIssueUpdate,
+  automationRules,
+  automationLogs,
+  automationRulesLoading,
+  automationLogsLoading,
+  automationRulesError,
+  automationLogsError,
+  onCreateAutomationRule,
+  onDeleteAutomationRule,
+  onToggleAutomationRule,
+  onRefreshAutomationRules,
+  onRefreshAutomationLogs,
+  canChangeRepo,
 }: {
+  projectId: string;
   connection: ProjectGitHubConnection;
   prs: GitHubPullRequest[];
   commits: GitHubCommit[];
@@ -626,30 +1166,157 @@ function ConnectedDashboard({
   onRefresh: () => void;
   onLogout: () => void;
   onChangeRepo: () => void;
+  onPRUpdate: (update: GithubPRUpdate) => void;
+  onIssueUpdate: (update: GithubIssueUpdate) => void;
+  automationRules: GithubAutomationRule[];
+  automationLogs: GithubAutomationLog[];
+  automationRulesLoading: boolean;
+  automationLogsLoading: boolean;
+  automationRulesError: string | null;
+  automationLogsError: string | null;
+  onCreateAutomationRule: () => void;
+  onDeleteAutomationRule: (ruleId: number) => void;
+  onToggleAutomationRule: (ruleId: number, enabled: boolean) => void;
+  onRefreshAutomationRules: () => void;
+  onRefreshAutomationLogs: () => void;
+  canChangeRepo: boolean;
 }) {
+  const { notifications: globalNotifications, markAsRead } = useGlobalNotifications();
+  type LiveNotice = {
+    id: string;
+    message: string;
+    href: string;
+    tone: 'info' | 'success' | 'danger';
+  };
+
   const [activeTab, setActiveTab] = useState<'pullRequests' | 'commits' | 'issues'>('pullRequests');
   const [issueCount, setIssueCount] = useState<number | null>(null);
+  const [newPRNotice, setNewPRNotice] = useState<GithubPRUpdate | null>(null);
+  const [latestCIUpdate, setLatestCIUpdate] = useState<GithubCIUpdate | null>(null);
+  const [liveNotices, setLiveNotices] = useState<LiveNotice[]>([]);
+  const [activityError, setActivityError] = useState<string | null>(null);
+
+  const githubNotifications = useMemo(() => {
+    return globalNotifications
+      .filter((notification) => isGitHubRepoNotification(notification, connection.repoFullName))
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  }, [connection.repoFullName, globalNotifications]);
+
+  const unreadGithubNotificationCount = useMemo(
+    () => githubNotifications.filter((notification) => !notification.read).length,
+    [githubNotifications],
+  );
+
+  const recentGithubNotifications = githubNotifications.filter((notification) => !notification.read).slice(0, 4);
+  const unreadGitHubTabCounts = useMemo(() => {
+    return githubNotifications.reduce<Record<GitHubTabKey, number>>((counts, notification) => {
+      if (notification.read) {
+        return counts;
+      }
+
+      const tabKey = classifyGitHubNotification(notification);
+      if (tabKey) {
+        counts[tabKey] += 1;
+      }
+
+      return counts;
+    }, {
+      pullRequests: 0,
+      commits: 0,
+      issues: 0,
+    });
+  }, [githubNotifications]);
+
+  const pushNotice = useCallback((notice: Omit<LiveNotice, 'id'>) => {
+    setLiveNotices((current) => [{
+      ...notice,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    }, ...current].slice(0, 4));
+  }, []);
+
+  const handlePRUpdate = useCallback((update: GithubPRUpdate) => {
+    if (update.type === 'opened') {
+      setNewPRNotice(update);
+      setActiveTab('pullRequests');
+    }
+    onPRUpdate(update);
+  }, [onPRUpdate]);
+
+  const handleSocketError = useCallback((message: string) => {
+    setActivityError(message);
+  }, []);
+
+  useGithubPRSocket(projectId, handlePRUpdate, handleSocketError);
+  useGithubCISocket(projectId, useCallback((update: GithubCIUpdate) => {
+    setLatestCIUpdate(update);
+  }, []), handleSocketError);
+  useGithubIssueSocket(projectId, useCallback((update: GithubIssueUpdate) => {
+    pushNotice({
+      message: `Issue ${update.action}: #${update.issueNumber} ${update.issueTitle}`,
+      href: `https://github.com/${connection.repoFullName}/issues/${update.issueNumber}`,
+      tone: update.action === 'closed' ? 'success' : 'info',
+    });
+    onIssueUpdate(update);
+  }, [connection.repoFullName, pushNotice, onIssueUpdate]), handleSocketError);
+  useGithubTaskBadgeSocket(projectId, useCallback((update: GithubTaskBadgeUpdate) => {
+    pushNotice({
+      message: `Task #${update.taskId} linked issue #${update.githubIssueNumber} is ${update.issueState}`,
+      href: `https://github.com/${update.githubRepoFullName}/issues/${update.githubIssueNumber}`,
+      tone: update.issueState === 'closed' ? 'success' : 'info',
+    });
+  }, [pushNotice]), handleSocketError);
+
+  const markGitHubNotificationRead = useCallback(async (notificationId: number) => {
+    try {
+      await markAsRead(notificationId);
+      setActivityError(null);
+    } catch (error) {
+      setActivityError(error instanceof Error ? error.message : 'Failed to mark GitHub notification as read.');
+    }
+  }, [markAsRead]);
+
+  const markAllGitHubNotificationsRead = useCallback(async () => {
+    const unreadIds = githubNotifications.filter((notification) => !notification.read).map((notification) => notification.id);
+    if (unreadIds.length === 0) {
+      return;
+    }
+
+    const results = await Promise.allSettled(unreadIds.map((id) => markAsRead(id)));
+    const failedCount = results.filter((result) => result.status === 'rejected').length;
+    if (failedCount > 0) {
+      setActivityError(`Failed to mark ${failedCount} GitHub notification${failedCount === 1 ? '' : 's'} as read.`);
+    } else {
+      setActivityError(null);
+    }
+  }, [githubNotifications, markAsRead]);
+  const [prPage, setPRPage] = useState(1);
+  const [commitPage, setCommitPage] = useState(1);
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="w-full flex flex-col gap-5"
-    >
-      {/* ── Top bar ─────────────────────────────────────────── */}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full flex flex-col gap-5">
+
+      {/* ── Repo header ─────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 shadow-sm">
+        {/* Repo badge */}
+        <div
+          className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl"
+          style={{
+            background: 'rgba(255,255,255,0.06)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            boxShadow: '0 0 24px rgba(99,102,241,0.12), inset 0 1px 0 rgba(255,255,255,0.08)',
+          }}
+        >
           <GitHubMark size={14} className="text-white" />
-          <span className="text-xs font-outfit font-bold text-white truncate max-w-[220px]">
+          <span className="text-xs font-outfit font-bold text-slate-100 truncate max-w-[180px] sm:max-w-[240px]">
             {connection.repoFullName}
           </span>
-          <span className={`flex items-center gap-1 text-[10px] font-outfit px-1.5 py-0.5 rounded-full ${
-            connection.private ? 'bg-slate-700 text-slate-300' : 'bg-blue-500/20 text-blue-300'
-          }`}>
+          <span className={`flex items-center gap-1 text-[10px] font-outfit px-1.5 py-0.5 rounded-full ${connection.private ? 'bg-slate-700 text-slate-300' : 'bg-blue-500/20 text-blue-300'
+            }`}>
             {connection.private ? <Lock size={8} /> : <Globe size={8} />}
             {connection.private ? 'Private' : 'Public'}
           </span>
-          <span className="flex items-center gap-1 text-[10px] font-outfit text-slate-400">
+          <span className="hidden sm:flex items-center gap-1 text-[10px] font-outfit text-slate-600">
             <GitBranch size={10} />
             {connection.defaultBranch}
           </span>
@@ -657,157 +1324,374 @@ function ConnectedDashboard({
 
         <div className="flex-1" />
 
+        {/* Action buttons */}
         <div className="flex items-center gap-2">
           <button
             onClick={onRefresh}
             disabled={loading}
             title="Refresh"
-            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors shadow-sm text-slate-500 hover:text-slate-700 disabled:opacity-40"
+            className="p-2 rounded-xl transition-all text-slate-400 hover:text-slate-200 hover:bg-white/[0.07] disabled:opacity-40"
+            style={glass.button}
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
-          <button
-            onClick={onChangeRepo}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors shadow-sm text-xs font-outfit font-semibold text-slate-700"
-          >
-            <Link2 size={13} />
-            Change repo
-          </button>
-          <AccountDropdown user={user} onLogout={onLogout} onChangeRepo={onChangeRepo} />
+          {canChangeRepo && (
+            <button
+              onClick={onChangeRepo}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-outfit font-semibold text-slate-300 hover:text-slate-100 hover:bg-white/[0.07] transition-all"
+              style={glass.button}
+            >
+              <Link2 size={13} />
+              Change repo
+            </button>
+          )}
+          <AccountDropdown user={user} onLogout={onLogout} onChangeRepo={onChangeRepo} canChangeRepo={canChangeRepo} />
         </div>
       </div>
 
-      {/* ── Two-column content ──────────────────────────────────────────── */}
+      {activityError && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
+          <div className="mt-0.5 rounded-lg bg-amber-100 p-1.5 text-amber-600">
+            <AlertCircle size={15} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-outfit font-semibold text-slate-800">GitHub notifications need attention</p>
+            <p className="text-xs font-outfit text-slate-500">{activityError}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActivityError(null)}
+            className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-amber-100 hover:text-slate-600"
+            aria-label="Dismiss GitHub notification error"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-4 sm:py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex items-center gap-2">
+            <Bell size={15} className="text-slate-500" />
+            <span className="text-sm font-outfit font-bold text-slate-800">GitHub notifications</span>
+            {unreadGithubNotificationCount > 0 && (
+              <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-sm">
+                {unreadGithubNotificationCount > 9 ? '9+' : unreadGithubNotificationCount}
+              </span>
+            )}
+          </div>
+          <div className="flex w-full items-stretch gap-2 sm:ml-auto sm:w-auto sm:items-center">
+            <button
+              type="button"
+              onClick={() => void markAllGitHubNotificationsRead()}
+              disabled={unreadGithubNotificationCount === 0}
+              className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-outfit font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40 sm:flex-none"
+            >
+              Mark all as read
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2">
+          {recentGithubNotifications.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm text-slate-400 font-outfit">
+              No unread GitHub notifications yet.
+            </div>
+          ) : (
+            recentGithubNotifications.map((notification) => {
+              const isUnread = !notification.read;
+              return (
+                <div
+                  key={notification.id}
+                  className={`flex flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-start ${isUnread ? 'border-blue-100 bg-blue-50/60' : 'border-slate-200 bg-slate-50'}`}
+                >
+                  <div className={`mt-1 h-2.5 w-2.5 rounded-full ${isUnread ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-outfit ${isUnread ? 'font-semibold text-slate-800' : 'font-medium text-slate-600'}`}>
+                      {notification.message}
+                    </p>
+                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                      <a
+                        href={notification.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => void markGitHubNotificationRead(notification.id)}
+                        className="inline-flex items-center gap-1 text-xs font-outfit font-semibold text-blue-600 hover:underline"
+                      >
+                        View on GitHub <ExternalLink size={11} />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => void markGitHubNotificationRead(notification.id)}
+                        className="text-xs font-outfit font-semibold text-slate-500 hover:text-slate-700"
+                      >
+                        Mark read
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <CIStatusBanner update={latestCIUpdate} repoFullName={connection.repoFullName} />
+
+      <GitHubAutomationsPanel
+        rules={automationRules}
+        logs={automationLogs}
+        loadingRules={automationRulesLoading}
+        loadingLogs={automationLogsLoading}
+        rulesError={automationRulesError}
+        logsError={automationLogsError}
+        onCreateRule={onCreateAutomationRule}
+        onDeleteRule={onDeleteAutomationRule}
+        onToggleRule={onToggleAutomationRule}
+        onRefreshRules={onRefreshAutomationRules}
+        onRefreshLogs={onRefreshAutomationLogs}
+      />
+
+      <AnimatePresence>
+        {newPRNotice && (
+          <motion.div
+            role="status"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 shadow-sm"
+          >
+            <div className="mt-0.5 rounded-lg bg-blue-100 p-1.5 text-blue-600">
+              <GitPullRequest size={15} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-outfit font-semibold text-slate-800">
+                New PR opened: #{newPRNotice.prNumber} {newPRNotice.prTitle}
+              </p>
+              <a
+                href={newPRNotice.prUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-flex items-center gap-1 text-xs font-outfit font-semibold text-blue-600 hover:underline"
+              >
+                View pull request <ExternalLink size={11} />
+              </a>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNewPRNotice(null)}
+              aria-label="Dismiss new pull request notification"
+              className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-blue-100 hover:text-slate-600"
+            >
+              <X size={15} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence initial={false}>
+        {liveNotices.map((notice) => (
+          <motion.div
+            key={notice.id}
+            role="status"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className={`flex items-start gap-3 rounded-2xl border px-4 py-3 shadow-sm ${notice.tone === 'danger'
+                ? 'border-red-100 bg-red-50'
+                : notice.tone === 'success'
+                  ? 'border-emerald-100 bg-emerald-50'
+                  : 'border-slate-200 bg-white'
+              }`}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-outfit font-semibold text-slate-800">{notice.message}</p>
+              <a
+                href={notice.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-flex items-center gap-1 text-xs font-outfit font-semibold text-blue-600 hover:underline"
+              >
+                View on GitHub <ExternalLink size={11} />
+              </a>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLiveNotices((current) => current.filter((item) => item.id !== notice.id))}
+              aria-label="Dismiss GitHub activity notification"
+              className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            >
+              <X size={15} />
+            </button>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
       <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
         {([
-          { id: 'pullRequests', label: 'Pull Requests' },
-          { id: 'commits', label: 'Commits' },
-          { id: 'issues', label: `Issues${issueCount === null ? '' : ` (${issueCount})`}` },
+          { id: 'pullRequests', label: 'Pull Requests', short: 'PRs', icon: <GitPullRequest size={13} /> },
+          { id: 'commits', label: 'Commits', short: 'Commits', icon: <GitCommit size={13} /> },
+          {
+            id: 'issues',
+            label: `Issues${issueCount === null ? '' : ` (${issueCount})`}`,
+            short: `Issues${issueCount === null ? '' : ` (${issueCount})`}`,
+            icon: <AlertCircle size={13} />,
+          },
         ] as const).map(tab => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`rounded-xl px-4 py-2 text-sm font-outfit font-semibold transition-colors ${
-              activeTab === tab.id
+            className={`rounded-xl px-4 py-2 text-sm font-outfit font-semibold transition-colors ${activeTab === tab.id
                 ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
-            }`}
+              }`}
           >
-            {tab.label}
+            <span className="inline-flex items-center gap-2">
+              <span>{tab.label}</span>
+              {unreadGitHubTabCounts[tab.id] > 0 && (
+                <span className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${activeTab === tab.id ? 'bg-white/15 text-white' : 'bg-red-600 text-white'
+                  }`}>
+                  {unreadGitHubTabCounts[tab.id] > 9 ? '9+' : unreadGitHubTabCounts[tab.id]}
+                </span>
+              )}
+            </span>
           </button>
         ))}
       </div>
 
+      {/* ── Content grid ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6">
 
-        {/* ── Left: Pull Requests ──────────────────────────────────── */}
+        {/* Pull Requests */}
         {activeTab === 'pullRequests' && (
           <div className="flex flex-col gap-3 min-w-0">
             <div className="flex items-center gap-2">
               <GitPullRequest size={15} className="text-slate-500 shrink-0" />
-            <h2 className="text-sm font-outfit font-bold text-slate-700">
-              Pull Requests
-              {!loading && !prError && (
-                <span className="ml-1.5 text-slate-400 font-normal">({prs.length})</span>
-              )}
-            </h2>
-            <a
-              href={`https://github.com/${connection.repoFullName}/pulls`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline shrink-0"
-            >
-              GitHub <ExternalLink size={10} />
-            </a>
-          </div>
+              <h2 className="text-sm font-outfit font-bold text-slate-700">
+                Pull Requests
+                {!loading && !prError && (
+                  <span className="ml-1.5 text-slate-400 font-normal">({prs.length})</span>
+                )}
+              </h2>
+              <a
+                href={`https://github.com/${connection.repoFullName}/pulls`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline shrink-0"
+              >
+                GitHub <ExternalLink size={10} />
+              </a>
+            </div>
 
-          {loading && <SkeletonList />}
+            {loading && <SkeletonList />}
 
-          {!loading && prError && (
-            <div className="flex flex-col items-center gap-2 py-10 text-center">
-              <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
-                <AlertCircle size={16} className="text-red-500" />
+            {!loading && prError && (
+              <div className="flex flex-col items-center gap-2 py-10 text-center">
+                <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
+                  <AlertCircle size={16} className="text-red-500" />
+                </div>
+                <p className="text-xs text-slate-500 font-outfit">{prError}</p>
+                <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
               </div>
-              <p className="text-xs text-slate-500 font-outfit">{prError}</p>
-              <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
-            </div>
-          )}
+            )}
 
-          {!loading && !prError && prs.length === 0 && (
-            <div className="flex flex-col items-center gap-2 py-10">
-              <GitPullRequest size={20} className="text-slate-300" />
-              <p className="text-xs text-slate-400 font-outfit">No pull requests found</p>
-            </div>
-          )}
+            {!loading && !prError && prs.length === 0 && (
+              <div className="flex flex-col items-center gap-2 py-10">
+                <GitPullRequest size={20} className="text-slate-300" />
+                <p className="text-xs text-slate-400 font-outfit">No pull requests found</p>
+              </div>
+            )}
 
-          {!loading && !prError && prs.length > 0 && (
-            <div className="flex flex-col gap-3">
-              {prs.map((pr, i) => (
-                <motion.div key={pr.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                  <PRCard pr={pr} />
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </div>
+            {!loading && !prError && prs.length > 0 && (() => {
+              const start = (prPage - 1) * PAGE_SIZE;
+              const page = prs.slice(start, start + PAGE_SIZE);
+              return (
+                <div className="flex flex-col gap-3">
+                  {page.map((pr, i) => (
+                    <motion.div key={pr.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+                      <PRCard pr={pr} />
+                    </motion.div>
+                  ))}
+                  <PaginationBar
+                    page={prPage}
+                    total={prs.length}
+                    onPrev={() => setPRPage(p => Math.max(1, p - 1))}
+                    onNext={() => setPRPage(p => Math.min(Math.ceil(prs.length / PAGE_SIZE), p + 1))}
+                  />
+                </div>
+              );
+            })()}
+          </div>
         )}
 
-        {/* ── Right: Commits ───────────────────────────────────────── */}
+        {/* Commits */}
         {activeTab === 'commits' && (
           <div className="flex flex-col gap-3 min-w-0">
             <div className="flex items-center gap-2">
               <GitCommit size={15} className="text-slate-500 shrink-0" />
-            <h2 className="text-sm font-outfit font-bold text-slate-700">
-              Commits
-              {!loading && !commitError && (
-                <span className="ml-1.5 text-slate-400 font-normal">({commits.length})</span>
-              )}
-            </h2>
-            <a
-              href={`https://github.com/${connection.repoFullName}/commits`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline shrink-0"
-            >
-              GitHub <ExternalLink size={10} />
-            </a>
-          </div>
+              <h2 className="text-sm font-outfit font-bold text-slate-700">
+                Commits
+                {!loading && !commitError && (
+                  <span className="ml-1.5 text-slate-400 font-normal">({commits.length})</span>
+                )}
+              </h2>
+              <a
+                href={`https://github.com/${connection.repoFullName}/commits`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto flex items-center gap-1 text-xs text-blue-500 font-outfit font-semibold hover:underline shrink-0"
+              >
+                GitHub <ExternalLink size={10} />
+              </a>
+            </div>
 
-          {loading && <SkeletonList />}
+            {loading && <SkeletonList />}
 
-          {!loading && commitError && (
-            <div className="flex flex-col items-center gap-2 py-10 text-center">
-              <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
-                <AlertCircle size={16} className="text-red-500" />
+            {!loading && commitError && (
+              <div className="flex flex-col items-center gap-2 py-10 text-center">
+                <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center">
+                  <AlertCircle size={16} className="text-red-500" />
+                </div>
+                <p className="text-xs text-slate-500 font-outfit">{commitError}</p>
+                <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
               </div>
-              <p className="text-xs text-slate-500 font-outfit">{commitError}</p>
-              <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
-            </div>
-          )}
+            )}
 
-          {!loading && !commitError && commits.length === 0 && (
-            <div className="flex flex-col items-center gap-2 py-10">
-              <GitCommit size={20} className="text-slate-300" />
-              <p className="text-xs text-slate-400 font-outfit">No commits found</p>
-            </div>
-          )}
+            {!loading && !commitError && commits.length === 0 && (
+              <div className="flex flex-col items-center gap-2 py-10">
+                <GitCommit size={20} className="text-slate-300" />
+                <p className="text-xs text-slate-400 font-outfit">No commits found</p>
+              </div>
+            )}
 
-          {!loading && !commitError && commits.length > 0 && (
-            <div className="flex flex-col gap-3">
-              {commits.map((commit, i) => (
-                <motion.div key={commit.sha} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                  <CommitCard commit={commit} />
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </div>
+            {!loading && !commitError && commits.length > 0 && (() => {
+              const start = (commitPage - 1) * PAGE_SIZE;
+              const page = commits.slice(start, start + PAGE_SIZE);
+              return (
+                <div className="flex flex-col gap-3">
+                  {page.map((commit, i) => (
+                    <motion.div key={commit.sha} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+                      <CommitCard commit={commit} />
+                    </motion.div>
+                  ))}
+                  <PaginationBar
+                    page={commitPage}
+                    total={commits.length}
+                    onPrev={() => setCommitPage(p => Math.max(1, p - 1))}
+                    onNext={() => setCommitPage(p => Math.min(Math.ceil(commits.length / PAGE_SIZE), p + 1))}
+                  />
+                </div>
+              );
+            })()}
+          </div>
         )}
 
+        {/* Issues */}
         <div className={activeTab === 'issues' ? '' : 'hidden'}>
           <IssuesPanel
-            connection={connection}
+            projectId={projectId}
+            repoFullName={connection.repoFullName}
             issues={issues}
             loading={loading}
             error={issueError}
@@ -835,8 +1719,19 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   const [prError, setPRError] = useState<string | null>(null);
   const [commitError, setCommitError] = useState<string | null>(null);
   const [issueError, setIssueError] = useState<string | null>(null);
+  const [socketToken, setSocketToken] = useState<string | null>(null);
+  const [automationRules, setAutomationRules] = useState<GithubAutomationRule[]>([]);
+  const [automationLogs, setAutomationLogs] = useState<GithubAutomationLog[]>([]);
+  const [automationRulesLoading, setAutomationRulesLoading] = useState(false);
+  const [automationLogsLoading, setAutomationLogsLoading] = useState(false);
+  const [automationRulesError, setAutomationRulesError] = useState<string | null>(null);
+  const [automationLogsError, setAutomationLogsError] = useState<string | null>(null);
+  const [showAutomationBuilder, setShowAutomationBuilder] = useState(false);
+  const [canChangeRepo, setCanChangeRepo] = useState(false);
+  const [isPostLogout, setIsPostLogout] = useState(false);
+  const [savedAccounts, setSavedAccounts] = useState<SavedGitHubAccount[]>([]);
+  const [showAccountPicker, setShowAccountPicker] = useState(false);
 
-  // Repo modal state
   const [showModal, setShowModal] = useState(false);
   const [allRepos, setAllRepos] = useState<GitHubRepository[]>([]);
   const [repoSearch, setRepoSearch] = useState('');
@@ -844,22 +1739,46 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   const [repoError, setRepoError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     setConnection(getProjectGitHubRepo(projectId));
+    const loadSocketToken = async () => {
+      const token = await ensureValidToken();
+      if (active) setSocketToken(token);
+    };
+    void loadSocketToken();
+
+    return () => {
+      active = false;
+    };
+  }, [projectId]);
+
+  useEffect(() => {
+    localStorage.removeItem('github_force_relogin');
+    setSavedAccounts(getSavedGitHubAccounts());
+  }, []);
+
+  useEffect(() => {
+    const currentUser = getUserFromToken();
+    if (!currentUser?.userId) return;
+    fetchMembers(projectId)
+      .then(members => {
+        const me = members.find(m => m.userId === currentUser.userId);
+        setCanChangeRepo(me?.role === 'OWNER' || me?.role === 'ADMIN');
+      })
+      .catch(() => { });
   }, [projectId]);
 
   const loadData = useCallback(async (conn: ProjectGitHubConnection) => {
-    const token = getGitHubToken();
-    if (!token) return;
     setLoading(true);
     setPRError(null);
     setCommitError(null);
     setIssueError(null);
 
     const [prResult, commitResult, issueResult, userResult] = await Promise.allSettled([
-      fetchPullRequests(token, conn.ownerLogin, conn.repoName),
-      fetchCommits(token, conn.ownerLogin, conn.repoName),
+      fetchPullRequests(conn.ownerLogin, conn.repoName),
+      fetchCommits(conn.ownerLogin, conn.repoName),
       fetchIssues(conn.repoFullName),
-      fetchGitHubUser(token),
+      fetchGitHubUser(),
     ]);
 
     if (prResult.status === 'fulfilled') setPRs(prResult.value);
@@ -871,22 +1790,78 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     if (issueResult.status === 'fulfilled') setIssues(issueResult.value);
     else setIssueError(issueResult.reason instanceof Error ? issueResult.reason.message : 'Failed to load issues');
 
-    if (userResult.status === 'fulfilled') setUser(userResult.value);
+    if (userResult.status === 'fulfilled') {
+      const githubUser = userResult.value;
+      setUser(githubUser);
+      upsertSavedGitHubAccount({ login: githubUser.login, name: githubUser.name, avatarUrl: githubUser.avatar_url });
+      setSavedAccounts(getSavedGitHubAccounts());
+    }
     setLoading(false);
   }, []);
 
-  // Auto-load data when connection is set
+  const loadIssues = useCallback(async (conn: ProjectGitHubConnection) => {
+    try {
+      const latestIssues = await fetchIssues(conn.repoFullName);
+      setIssues(latestIssues);
+      setIssueError(null);
+    } catch (error) {
+      setIssueError(error instanceof Error ? error.message : 'Failed to load issues');
+    }
+  }, []);
+
   useEffect(() => {
     if (connection) void loadData(connection);
   }, [connection, loadData]);
 
+  const loadAutomationRules = useCallback(async () => {
+    if (!connection) return;
+
+    setAutomationRulesLoading(true);
+    setAutomationRulesError(null);
+
+    try {
+      const rules = await fetchGitHubAutomationRules(projectId);
+      setAutomationRules(rules);
+    } catch (error) {
+      setAutomationRulesError(error instanceof Error ? error.message : 'Failed to load automation rules');
+    } finally {
+      setAutomationRulesLoading(false);
+    }
+  }, [connection, projectId]);
+
+  const loadAutomationLogs = useCallback(async () => {
+    if (!connection) return;
+
+    setAutomationLogsLoading(true);
+    setAutomationLogsError(null);
+
+    try {
+      const logs = await fetchGitHubAutomationLogs(projectId);
+      setAutomationLogs(logs);
+    } catch (error) {
+      setAutomationLogsError(error instanceof Error ? error.message : 'Failed to load automation logs');
+    } finally {
+      setAutomationLogsLoading(false);
+    }
+  }, [connection, projectId]);
+
+  useEffect(() => {
+    if (connection) {
+      void loadAutomationRules();
+      void loadAutomationLogs();
+    } else {
+      setAutomationRules([]);
+      setAutomationLogs([]);
+      setAutomationRulesError(null);
+      setAutomationLogsError(null);
+    }
+  }, [connection, loadAutomationLogs, loadAutomationRules]);
+
   const loadRepos = useCallback(async () => {
-    const token = getGitHubToken();
-    if (!token) return;
     setLoadingRepos(true);
     setRepoError(null);
     try {
-      const data = await fetchRepositoriesWithToken(token);
+      const data = await fetchRepositories();
       setAllRepos(data);
     } catch (err) {
       setRepoError(err instanceof Error ? err.message : 'Failed to load repositories');
@@ -895,30 +1870,41 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     }
   }, []);
 
-  // After returning from GitHub OAuth
   useEffect(() => {
     if (searchParams.get('select_repo') !== '1') return;
     router.replace(`/github/${projectId}`);
     setShowModal(true);
     void loadRepos();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleConnectGitHub = () => {
+  const handleConnectGitHub = (loginHint?: string) => {
     if (!GITHUB_CLIENT_ID) {
       alert('GitHub OAuth is not configured.\nPlease set NEXT_PUBLIC_GITHUB_CLIENT_ID.');
       return;
     }
     const redirectUri = `${window.location.origin}/github/callback`;
-    window.location.href =
-      `https://github.com/login/oauth/authorize` +
-      `?client_id=${GITHUB_CLIENT_ID}&scope=repo&state=${projectId}` +
-      `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    const params = new URLSearchParams({
+      client_id: GITHUB_CLIENT_ID,
+      scope: 'repo',
+      state: projectId,
+      redirect_uri: redirectUri,
+    });
+    if (loginHint !== undefined) params.set('login', loginHint);
+    window.location.href = `https://github.com/login/oauth/authorize?${params}`;
+  };
+
+  const handleInitiateConnect = () => {
+    if (savedAccounts.length > 0) setShowAccountPicker(true);
+    else handleConnectGitHub();
   };
 
   const handleOpenModal = async () => {
-    const token = getGitHubToken();
-    if (!token) { handleConnectGitHub(); return; }
+    if (!hasConnectedGitHubAccount()) {
+      if (savedAccounts.length > 0) setShowAccountPicker(true);
+      else handleConnectGitHub();
+      return;
+    }
     setShowModal(true);
     await loadRepos();
   };
@@ -927,69 +1913,187 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     setProjectGitHubRepo(projectId, repo);
     const newConn = getProjectGitHubRepo(projectId)!;
     setConnection(newConn);
+    setIsPostLogout(false);
     setShowModal(false);
     setRepoSearch('');
     void loadData(newConn);
   };
 
   const handleLogout = async () => {
-    const token = getGitHubToken();
-    if (token) {
-      try {
-        await fetch('/api/github/revoke', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        });
-      } catch { /* ignore */ }
+    try {
+      await api.post('/api/github/revoke');
+      // Fetch the updated user profile from the backend to clear the githubUsername field in local cache
+      const profileRes = await api.get('/api/user/profile');
+      if (profileRes.data) {
+        localStorage.setItem('userProfile', JSON.stringify(profileRes.data));
+      } else {
+        localStorage.removeItem('userProfile');
+      }
+    } catch {
+      // Fallback: manually delete githubUsername from userProfile in localStorage if request fails
+      const profile = localStorage.getItem('userProfile');
+      if (profile) {
+        try {
+          const parsed = JSON.parse(profile);
+          delete parsed.githubUsername;
+          localStorage.setItem('userProfile', JSON.stringify(parsed));
+        } catch {
+          localStorage.removeItem('userProfile');
+        }
+      }
     }
-    clearGitHubToken();
     clearProjectGitHubRepo(projectId);
+    setIsPostLogout(true);
     setConnection(null);
     setUser(null);
     setPRs([]);
     setCommits([]);
+    setAutomationRules([]);
+    setAutomationLogs([]);
+    setAutomationRulesError(null);
+    setAutomationLogsError(null);
+    setShowAutomationBuilder(false);
   };
+
+  const handleAutomationRuleCreated = (rule: GithubAutomationRule) => {
+    setAutomationRules((current) => [rule, ...current.filter((existing) => existing.id !== rule.id)]);
+  };
+
+  const handleDeleteAutomationRule = async (ruleId: number) => {
+    try {
+      await deleteGitHubAutomationRule(projectId, ruleId);
+      setAutomationRules((current) => current.filter((rule) => rule.id !== ruleId));
+    } catch (error) {
+      console.error('Failed to delete GitHub automation rule:', error);
+      setAutomationRulesError(error instanceof Error ? error.message : 'Failed to delete automation rule');
+    }
+  };
+
+  const handleToggleAutomationRule = async (ruleId: number, enabled: boolean) => {
+    try {
+      const updated = await setGitHubAutomationRuleEnabled(projectId, ruleId, enabled);
+      setAutomationRules((current) => current.map((rule) => (rule.id === ruleId ? updated : rule)));
+    } catch (error) {
+      console.error('Failed to toggle GitHub automation rule:', error);
+      setAutomationRulesError(error instanceof Error ? error.message : 'Failed to update automation rule');
+    }
+  };
+
+  const handlePRUpdate = useCallback(async (update: GithubPRUpdate) => {
+    if (!connection) return;
+
+    if (update.type === 'opened') {
+      try {
+        const pr = await fetchPullRequest(connection.ownerLogin, connection.repoName, update.prNumber);
+        setPRs((current) => [pr, ...current.filter((existing) => existing.number !== pr.number)]);
+        setPRError(null);
+      } catch (error) {
+        setPRError(error instanceof Error
+          ? error.message
+          : `Received PR update #${update.prNumber}, but could not refresh the details.`);
+      }
+      return;
+    }
+
+    setPRs((current) => current.map((pr) => {
+      if (pr.number !== update.prNumber) return pr;
+      return {
+        ...pr,
+        state: 'closed',
+        merged_at: update.type === 'merged' ? (pr.merged_at ?? new Date().toISOString()) : null,
+        updated_at: new Date().toISOString(),
+      };
+    }));
+  }, [connection]);
+
+  const handleIssueUpdate = useCallback(() => {
+    if (!connection) return;
+
+    void loadIssues(connection);
+  }, [connection, loadIssues]);
 
   const filteredRepos = allRepos.filter(r =>
     r.full_name.toLowerCase().includes(repoSearch.toLowerCase())
   );
 
+  const connectedDashboard = connection ? (
+    <ConnectedDashboard
+      key={connection.repoFullName}
+      projectId={projectId}
+      connection={connection}
+      prs={prs}
+      commits={commits}
+      issues={issues}
+      loading={loading}
+      prError={prError}
+      commitError={commitError}
+      issueError={issueError}
+      user={user}
+      onRefresh={() => void loadData(connection)}
+      onLogout={() => void handleLogout()}
+      onChangeRepo={handleOpenModal}
+      onPRUpdate={(update) => void handlePRUpdate(update)}
+      onIssueUpdate={() => void handleIssueUpdate()}
+      automationRules={automationRules}
+      automationRulesLoading={automationRulesLoading}
+      automationRulesError={automationRulesError}
+      onCreateAutomationRule={() => setShowAutomationBuilder(true)}
+      onDeleteAutomationRule={(ruleId) => void handleDeleteAutomationRule(ruleId)}
+      onToggleAutomationRule={(ruleId, enabled) => void handleToggleAutomationRule(ruleId, enabled)}
+      onRefreshAutomationRules={() => void loadAutomationRules()}
+      automationLogs={automationLogs}
+      automationLogsLoading={automationLogsLoading}
+      automationLogsError={automationLogsError}
+      onRefreshAutomationLogs={() => void loadAutomationLogs()}
+      canChangeRepo={canChangeRepo}
+    />
+  ) : null;
+
   return (
     <div className={`w-full px-6 py-6 ${connection ? '' : 'min-h-[calc(100vh-130px)] flex flex-col items-center justify-center'}`}>
       <AnimatePresence mode="wait">
         {connection ? (
-          <ConnectedDashboard
-              key="dashboard"
-              connection={connection}
-              prs={prs}
-              commits={commits}
-              issues={issues}
-              loading={loading}
-              prError={prError}
-              commitError={commitError}
-              issueError={issueError}
-              user={user}
-              onRefresh={() => void loadData(connection)}
-              onLogout={() => void handleLogout()}
-              onChangeRepo={handleOpenModal}
-            />
+          socketToken ? (
+            <StompProvider token={socketToken}>{connectedDashboard}</StompProvider>
+          ) : connectedDashboard
         ) : (
-          <DisconnectedView key="disconnected" onConnect={handleConnectGitHub} />
+          <DisconnectedView key="disconnected" onConnect={handleInitiateConnect} onLogout={() => void handleLogout()} isPostLogout={isPostLogout} />
+        )}
+      </AnimatePresence>
+
+
+        <AnimatePresence>
+          {showModal && (
+            <RepoModal
+              repos={filteredRepos}
+              search={repoSearch}
+              loading={loadingRepos}
+              error={repoError}
+              onSearch={setRepoSearch}
+              onSelect={handleSelectRepo}
+              onClose={() => { setShowModal(false); setRepoSearch(''); }}
+              onRefresh={() => void loadRepos()}
+            />
+          )}
+        </AnimatePresence>
+
+      <AnimatePresence>
+        {showAutomationBuilder && connection && (
+          <AutomationRuleBuilder
+            projectId={projectId}
+            onCreated={handleAutomationRuleCreated}
+            onClose={() => setShowAutomationBuilder(false)}
+          />
         )}
       </AnimatePresence>
 
       <AnimatePresence>
-        {showModal && (
-          <RepoModal
-            repos={filteredRepos}
-            search={repoSearch}
-            loading={loadingRepos}
-            error={repoError}
-            onSearch={setRepoSearch}
-            onSelect={handleSelectRepo}
-            onClose={() => { setShowModal(false); setRepoSearch(''); }}
-            onRefresh={() => void loadRepos()}
+        {showAccountPicker && (
+          <AccountPickerModal
+            accounts={savedAccounts}
+            onSelect={login => { setShowAccountPicker(false); handleConnectGitHub(login); }}
+            onAddAccount={() => { setShowAccountPicker(false); handleConnectGitHub(''); }}
+            onClose={() => setShowAccountPicker(false)}
           />
         )}
       </AnimatePresence>

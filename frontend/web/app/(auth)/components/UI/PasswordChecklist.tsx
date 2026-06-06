@@ -7,7 +7,7 @@ interface PasswordChecklistProps {
   unmetClassName?: string;
 }
 
-export default function PasswordChecklist({ password, unmetClassName = 'text-gray-400' }: PasswordChecklistProps) {
+export default function PasswordChecklist({ password, unmetClassName = 'text-cu-text-muted' }: PasswordChecklistProps) {
   return (
     <ul className="space-y-0.5">
       {PASSWORD_REQUIREMENTS.map((req) => {

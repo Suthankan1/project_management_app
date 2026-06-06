@@ -11,7 +11,7 @@ const SprintSection: React.FC<SprintSectionProps> = ({ sprint }) => {
 
   return (
     <SidebarField label="Sprint">
-      <span className="text-sm text-blue-600 hover:underline cursor-pointer">{sprint}</span>
+      <span className="text-sm text-cu-primary hover:underline cursor-pointer">{sprint}</span>
     </SidebarField>
   );
 };

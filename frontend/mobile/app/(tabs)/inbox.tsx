@@ -1,388 +1,366 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, FlatList, Animated,
-  StyleSheet, Pressable, Platform, Alert,
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import Svg, { Path, Circle } from 'react-native-svg';
-import { T } from '@/src/constants/tokens';
 import api from '@/src/api/axios';
+import { T } from '@/src/constants/tokens';
 
-// ─── Type (mirrors web Notification interface exactly) ────────────────────────
-
-interface Notification {
-  id: number;
-  message: string;
-  type?: string;
-  link?: string;
-  read: boolean;
-  createdAt: string;
-  [key: string]: unknown;
-}
-
-type NotificationFilter = 'all' | 'unread' | 'read';
-
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
-
-function SkeletonItem() {
-  const anim = useRef(new Animated.Value(0.4)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(anim, { toValue: 1, duration: 750, useNativeDriver: true }),
-        Animated.timing(anim, { toValue: 0.4, duration: 750, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
-  return (
-    <Animated.View style={[sk.wrap, { opacity: anim }]}>
-      <View style={sk.dot} />
-      <View style={sk.body}>
-        <View style={sk.line1} />
-        <View style={sk.line2} />
-        <View style={sk.line3} />
-      </View>
-    </Animated.View>
-  );
-}
-
-const sk = StyleSheet.create({
-  wrap:  { flexDirection: 'row', padding: 16, gap: 14, alignItems: 'flex-start' },
-  dot:   { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E5E7EB', marginTop: 2 },
-  body:  { flex: 1, gap: 7 },
-  line1: { height: 10, width: '40%', backgroundColor: '#E5E7EB', borderRadius: 5 },
-  line2: { height: 14, width: '90%', backgroundColor: '#E5E7EB', borderRadius: 5 },
-  line3: { height: 10, width: '30%', backgroundColor: '#E5E7EB', borderRadius: 5 },
-});
-
-// ─── Type icon + colors (mirrors web NotificationsList tone logic) ────────────
-
-const TYPE_TONE: Record<string, { icon: string; bg: string; color: string }> = {
-  COMMENT:       { icon: '💬', bg: '#EFF6FF', color: '#2563EB' },
-  MENTION:       { icon: '@',  bg: '#F5F3FF', color: '#7C3AED' },
-  TASK_ASSIGNED: { icon: '✓',  bg: '#ECFDF5', color: '#059669' },
-  TASK_UPDATED:  { icon: '✎',  bg: '#FFF7ED', color: '#EA580C' },
-  PROJECT:       { icon: '📁', bg: '#FAFAFA', color: '#374151' },
+type ChatInboxActivity = {
+  projectId: number;
+  projectName: string;
+  chatType: 'TEAM' | 'ROOM' | 'DIRECT';
+  roomId?: number | null;
+  roomName?: string | null;
+  username?: string | null;
+  participantLabel?: string | null;
+  lastMessage?: string | null;
+  lastMessageSender?: string | null;
+  lastMessageTimestamp?: string | null;
+  unseenCount: number;
+  unread: boolean;
 };
 
-function NotifIcon({ type }: { type?: string }) {
-  const tone = TYPE_TONE[type ?? ''] ?? { icon: '🔔', bg: '#FFFBEB', color: '#D97706' };
-  return (
-    <View style={[nIcon.wrap, { backgroundColor: tone.bg }]}>
-      <Text style={[nIcon.emoji, { color: tone.color }]}>{tone.icon}</Text>
-    </View>
-  );
+type ChatInboxResponse = {
+  recentActivities: ChatInboxActivity[];
+  totalUnread: number;
+};
+
+function formatRelativeTime(timestamp?: string | null): string {
+  if (!timestamp) return 'No messages';
+
+  const time = new Date(timestamp).getTime();
+  if (Number.isNaN(time)) return 'Unknown';
+
+  const diffMin = Math.floor((Date.now() - time) / 60000);
+  if (diffMin < 1) return 'Just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 7) return `${diffDay}d ago`;
+
+  return new Date(timestamp).toLocaleDateString();
 }
-const nIcon = StyleSheet.create({
-  wrap:  { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  emoji: { fontSize: 18 },
-});
 
-// ─── Relative time (mirrors web utils.ts formatRelativeTime) ─────────────────
-
-function timeAgo(iso: string) {
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 60)    return 'Just now';
-  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800)return `${Math.floor(diff / 86400)}d ago`;
-  return new Date(iso).toLocaleDateString();
+function getActivityTitle(activity: ChatInboxActivity): string {
+  if (activity.chatType === 'TEAM') return 'Team Chat';
+  if (activity.chatType === 'ROOM') return activity.roomName || 'Channel';
+  return activity.participantLabel || activity.username || 'Direct Message';
 }
 
-// ─── Notification row ────────────────────────────────────────────────────────
+function getActivityIcon(activity: ChatInboxActivity): keyof typeof Ionicons.glyphMap {
+  if (activity.chatType === 'TEAM') return 'people-outline';
+  if (activity.chatType === 'ROOM') return 'chatbubbles-outline';
+  return 'person-circle-outline';
+}
 
-function NotifRow({
-  item, onRead, onDelete,
-}: {
-  item: Notification;
-  onRead: (id: number) => void;
-  onDelete: (id: number) => void;
-}) {
+function buildChatRoute(activity: ChatInboxActivity): string {
+  const base = `/(project)/${activity.projectId}/chat`;
+  if (activity.chatType === 'ROOM' && activity.roomId) {
+    return `${base}?roomId=${activity.roomId}`;
+  }
+  if (activity.chatType === 'DIRECT' && activity.username) {
+    return `${base}?with=${encodeURIComponent(activity.username)}`;
+  }
+  return `${base}?view=team`;
+}
+
+function InboxRow({ activity }: { activity: ChatInboxActivity }) {
+  const router = useRouter();
+
   return (
     <Pressable
-      onPress={() => !item.read && onRead(item.id)}
-      style={({ pressed }) => [nRow.row, !item.read && nRow.unread, pressed && nRow.pressed]}
+      onPress={() => router.push(buildChatRoute(activity) as never)}
+      style={({ pressed }) => [styles.row, activity.unread && styles.rowUnread, pressed && styles.rowPressed]}
     >
-      {/* Unread blue dot */}
-      {!item.read && <View style={nRow.blueDot} />}
-
-      {/* Icon */}
-      <NotifIcon type={item.type} />
-
-      {/* Content */}
-      <View style={nRow.body}>
-        <Text style={[nRow.msg, item.read && nRow.msgRead]} numberOfLines={3}>
-          {item.message}
-        </Text>
-        <Text style={nRow.time}>{timeAgo(item.createdAt)}</Text>
+      <View style={[styles.iconWrap, activity.unread && styles.iconWrapUnread]}>
+        <Ionicons name={getActivityIcon(activity)} size={21} color={activity.unread ? T.primary : '#64748B'} />
       </View>
-
-      {/* Delete button */}
-      <TouchableOpacity
-        style={nRow.delBtn}
-        onPress={() => onDelete(item.id)}
-        hitSlop={8}
-      >
-        <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" strokeWidth={2} strokeLinecap="round">
-          <Path d="M18 6L6 18M6 6l12 12" />
-        </Svg>
-      </TouchableOpacity>
+      <View style={styles.rowBody}>
+        <View style={styles.rowHeader}>
+          <Text style={[styles.rowTitle, activity.unread && styles.rowTitleUnread]} numberOfLines={1}>
+            {getActivityTitle(activity)}
+          </Text>
+          <Text style={styles.timeText}>{formatRelativeTime(activity.lastMessageTimestamp)}</Text>
+        </View>
+        <Text style={styles.projectText} numberOfLines={1}>{activity.projectName}</Text>
+        <Text style={styles.messageText} numberOfLines={2}>
+          {activity.lastMessageSender ? `${activity.lastMessageSender}: ` : ''}
+          {activity.lastMessage || 'No recent messages'}
+        </Text>
+      </View>
+      {activity.unread && activity.unseenCount > 0 && (
+        <View style={styles.unreadBadge}>
+          <Text style={styles.unreadBadgeText}>{activity.unseenCount > 99 ? '99+' : activity.unseenCount}</Text>
+        </View>
+      )}
     </Pressable>
   );
 }
 
-const nRow = StyleSheet.create({
-  row: {
-    flexDirection: 'row', alignItems: 'flex-start',
-    paddingHorizontal: 16, paddingVertical: 14,
-    backgroundColor: '#FFFFFF', gap: 12,
-    position: 'relative',
-  },
-  unread:  { backgroundColor: '#FAFBFF' },
-  pressed: { backgroundColor: '#F8FAFC' },
-  blueDot: {
-    position: 'absolute', left: 5, top: '50%',
-    width: 6, height: 6, borderRadius: 3, backgroundColor: T.primary,
-  },
-  body:    { flex: 1, gap: 4 },
-  msg:     { fontSize: 13.5, fontWeight: '500', color: '#1E293B', lineHeight: 19 },
-  msgRead: { color: '#6B7280', fontWeight: '400' },
-  time:    { fontSize: 11, color: '#9CA3AF' },
-  delBtn:  { padding: 6, borderRadius: 8, marginTop: 2 },
-});
-
-// ─── Stats row (mirrors web NotificationStats component) ─────────────────────
-
-function StatsRow({ total, unread }: { total: number; unread: number }) {
-  const read = total - unread;
-  const stats = [
-    { label: 'Total', value: total, bg: '#F8FAFC', textColor: '#374151' },
-    { label: 'Unread', value: unread, bg: T.primaryLight, textColor: T.primary },
-    { label: 'Read', value: read, bg: '#F0FDF4', textColor: '#15803D' },
-  ];
-  return (
-    <View style={statsRow.wrap}>
-      {stats.map(s => (
-        <View key={s.label} style={[statsRow.card, { backgroundColor: s.bg }]}>
-          <Text style={[statsRow.val, { color: s.textColor }]}>{s.value}</Text>
-          <Text style={statsRow.label}>{s.label}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-const statsRow = StyleSheet.create({
-  wrap:  { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
-  card:  { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, gap: 2 },
-  val:   { fontSize: 22, fontWeight: '800' },
-  label: { fontSize: 11, fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.6 },
-});
-
-// ─── Main InboxScreen ────────────────────────────────────────────────────────
-
 export default function InboxScreen() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading,       setLoading]       = useState(true);
-  const [refreshing,    setRefreshing]    = useState(false);
-  const [filter,        setFilter]        = useState<NotificationFilter>('all');
-  const [deletingAll,   setDeletingAll]   = useState(false);
+  const [data, setData] = useState<ChatInboxResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // ── Fetch — mirrors web: GET /api/notifications ───────────────────────────
-  const fetchAll = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+  const loadInbox = useCallback(async (refresh = false) => {
+    if (refresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
-      const res = await api.get<Notification[]>('/api/notifications');
-      const sorted = [...res.data].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      setNotifications(sorted);
-    } catch { setNotifications([]); }
-    finally { setLoading(false); setRefreshing(false); }
+      setError(null);
+      const response = await api.get<ChatInboxResponse>('/api/chat/inbox', {
+        params: { projectLimit: 20, activityLimit: 50 },
+      });
+      setData(response.data);
+    } catch {
+      setError('Unable to load inbox.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  useEffect(() => { void fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    void loadInbox();
+  }, [loadInbox]);
 
-  // ── Mark single read — mirrors: PATCH /api/notifications/:id/read ─────────
-  const markRead = useCallback(async (id: number) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    try { await api.patch(`/api/notifications/${id}/read`); }
-    catch { void fetchAll(); }
-  }, [fetchAll]);
-
-  // ── Mark all read — mirrors: PATCH /api/notifications/read-all ───────────
-  const markAllRead = useCallback(async () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    try { await api.patch('/api/notifications/read-all'); }
-    catch { void fetchAll(); }
-  }, [fetchAll]);
-
-  // ── Delete single — mirrors: DELETE /api/notifications/:id ───────────────
-  const deleteSingle = useCallback(async (id: number) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
-    try { await api.delete(`/api/notifications/${id}`); }
-    catch { void fetchAll(); }
-  }, [fetchAll]);
-
-  // ── Delete all — mirrors: Promise.allSettled of deleteNotification(id)s ───
-  const deleteAll = useCallback(async () => {
-    if (notifications.length === 0 || deletingAll) return;
-    Alert.alert('Clear all', 'Delete all notifications?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete all', style: 'destructive', onPress: async () => {
-        setDeletingAll(true);
-        const ids = notifications.map(n => n.id);
-        await Promise.allSettled(ids.map(id => api.delete(`/api/notifications/${id}`)));
-        setNotifications([]);
-        setDeletingAll(false);
-      }},
-    ]);
-  }, [notifications, deletingAll]);
-
-  // ── Derived state ─────────────────────────────────────────────────────────
-  const unreadCount = useMemo(() => notifications.filter(n => !n.read).length, [notifications]);
-
-  const visible = useMemo(() => {
-    if (filter === 'unread') return notifications.filter(n => !n.read);
-    if (filter === 'read')   return notifications.filter(n => n.read);
-    return notifications;
-  }, [notifications, filter]);
-
-  const FILTERS: { key: NotificationFilter; label: string }[] = [
-    { key: 'all',    label: 'All'    },
-    { key: 'unread', label: 'Unread' },
-    { key: 'read',   label: 'Read'   },
-  ];
+  const activities = useMemo(() => data?.recentActivities || [], [data?.recentActivities]);
 
   return (
-    <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <StatusBar style="dark" />
-
-      {/* ── Header (mirrors web NotificationHeader) ── */}
-      <View style={s.header}>
+      <View style={styles.header}>
         <View>
-          <Text style={s.title}>Inbox</Text>
-          {unreadCount > 0 && (
-            <Text style={s.sub}>{unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}</Text>
-          )}
+          <Text style={styles.eyebrow}>Messages</Text>
+          <Text style={styles.title}>Inbox</Text>
         </View>
-        <View style={s.headerActions}>
-          {unreadCount > 0 && (
-            <TouchableOpacity style={s.markAllBtn} onPress={markAllRead}>
-              <Text style={s.markAllTxt}>Mark all read</Text>
-            </TouchableOpacity>
-          )}
-          {notifications.length > 0 && (
-            <TouchableOpacity style={s.deleteAllBtn} onPress={deleteAll} disabled={deletingAll}>
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={2} strokeLinecap="round">
-                <Path d="M3 6h18M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2" />
-              </Svg>
-              <Text style={s.deleteAllTxt}>{deletingAll ? 'Clearing…' : 'Clear all'}</Text>
-            </TouchableOpacity>
-          )}
+        <View style={styles.countBadge}>
+          <Text style={styles.countText}>{data?.totalUnread || 0}</Text>
         </View>
       </View>
 
-      {/* ── Stats ── */}
-      {!loading && <StatsRow total={notifications.length} unread={unreadCount} />}
-
-      {/* ── Filter tabs (mirrors web NotificationFilters) ── */}
-      <View style={s.filterRow}>
-        {FILTERS.map(f => (
-          <TouchableOpacity
-            key={f.key}
-            style={[s.filterTab, filter === f.key && s.filterTabActive]}
-            onPress={() => setFilter(f.key)}
-          >
-            <Text style={[s.filterTxt, filter === f.key && s.filterTxtActive]}>
-              {f.label}
-              {f.key === 'unread' && unreadCount > 0 ? ` (${unreadCount})` : ''}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* ── List (mirrors web NotificationsList) ── */}
-      {loading ? (
-        <View>
-          {[0,1,2,3,4,5].map(i => (
-            <View key={i}>
-              <SkeletonItem />
-              {i < 5 && <View style={s.divider} />}
-            </View>
-          ))}
-        </View>
-      ) : (
-        <FlatList
-          data={visible}
-          keyExtractor={n => String(n.id)}
-          showsVerticalScrollIndicator={false}
-          refreshing={refreshing}
-          onRefresh={() => fetchAll(true)}
-          contentContainerStyle={s.list}
-          ItemSeparatorComponent={() => <View style={s.divider} />}
-          ListEmptyComponent={
-            <View style={s.emptyWrap}>
-              <Text style={s.emptyEmoji}>
-                {filter === 'unread' ? '✅' : '📭'}
-              </Text>
-              <Text style={s.emptyTitle}>
-                {filter === 'unread' ? 'All caught up!' : 'No notifications'}
-              </Text>
-              <Text style={s.emptySub}>
-                {filter === 'unread' ? 'No unread notifications.' : 'Your inbox is clear.'}
-              </Text>
-            </View>
-          }
-          renderItem={({ item }) => (
-            <NotifRow item={item} onRead={markRead} onDelete={deleteSingle} />
-          )}
-        />
-      )}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadInbox(true)} tintColor={T.primary} colors={[T.primary]} />
+        }
+      >
+        {loading && activities.length === 0 ? (
+          <View style={styles.centerState}>
+            <ActivityIndicator color={T.primary} />
+          </View>
+        ) : error ? (
+          <Pressable onPress={() => loadInbox()} style={styles.emptyState}>
+            <Ionicons name="warning-outline" size={28} color="#EF4444" />
+            <Text style={styles.emptyTitle}>{error}</Text>
+            <Text style={styles.emptyText}>Tap to retry.</Text>
+          </Pressable>
+        ) : activities.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="mail-open-outline" size={28} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>No messages yet</Text>
+            <Text style={styles.emptyText}>Team, room, and direct chat activity will appear here.</Text>
+          </View>
+        ) : (
+          activities.map((activity, index) => (
+            <InboxRow
+              key={`${activity.projectId}-${activity.chatType}-${activity.roomId || activity.username || 'team'}-${index}`}
+              activity={activity}
+            />
+          ))
+        )}
+        <View style={styles.bottomPad} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF' },
-
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   header: {
-    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10,
-    borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
+    minHeight: 76,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEF2F7',
   },
-  title: { fontSize: 24, fontWeight: '800', color: '#101828', letterSpacing: -0.5 },
-  sub:   { fontSize: 12, color: T.primary, fontWeight: '600', marginTop: 2 },
-
-  headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 },
-  markAllBtn: {
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10,
-    backgroundColor: T.primaryLight,
+  eyebrow: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
   },
-  markAllTxt:    { fontSize: 11, fontWeight: '700', color: T.primary },
-  deleteAllBtn:  { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: '#FFF5F5' },
-  deleteAllTxt:  { fontSize: 11, fontWeight: '700', color: '#DC2626' },
-
-  filterRow: {
-    flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10, gap: 8,
-    backgroundColor: '#FAFAFA', borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
+  title: {
+    marginTop: 3,
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: 0,
   },
-  filterTab: {
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-    backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: 'transparent',
+  countBadge: {
+    minWidth: 38,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(21,93,252,0.09)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
   },
-  filterTabActive: { backgroundColor: T.primaryLight, borderColor: '#C7D7FD' },
-  filterTxt:       { fontSize: 12, fontWeight: '600', color: '#6B7280' },
-  filterTxtActive: { color: T.primary, fontWeight: '700' },
-
-  list:    { paddingBottom: 110 },
-  divider: { height: 1, backgroundColor: '#F8FAFC', marginLeft: 70 },
-
-  emptyWrap:  { alignItems: 'center', paddingTop: 80, gap: 10 },
-  emptyEmoji: { fontSize: 52 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: '#374151' },
-  emptySub:   { fontSize: 13, color: '#9CA3AF' },
+  countText: {
+    color: T.primary,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  scroll: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  listContent: {
+    padding: 14,
+    gap: 10,
+  },
+  row: {
+    position: 'relative',
+    flexDirection: 'row',
+    gap: 12,
+    padding: 13,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  rowUnread: {
+    borderColor: 'rgba(21,93,252,0.3)',
+  },
+  rowPressed: {
+    opacity: 0.88,
+  },
+  iconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrapUnread: {
+    backgroundColor: 'rgba(21,93,252,0.09)',
+  },
+  rowBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rowTitle: {
+    flex: 1,
+    color: '#0F172A',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  rowTitleUnread: {
+    color: T.primary,
+    fontWeight: '800',
+  },
+  timeText: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  projectText: {
+    marginTop: 3,
+    color: '#64748B',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  messageText: {
+    marginTop: 5,
+    color: '#475569',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    backgroundColor: T.primary,
+  },
+  unreadBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  centerState: {
+    minHeight: 260,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyState: {
+    minHeight: 260,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  emptyTitle: {
+    marginTop: 10,
+    color: '#0F172A',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  emptyText: {
+    marginTop: 5,
+    color: '#64748B',
+    textAlign: 'center',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  bottomPad: {
+    height: 104,
+  },
 });

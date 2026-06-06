@@ -19,13 +19,17 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@api-contracts/*": ["../api-contracts/*"],
+      "@planora/contracts": ["../api-contracts/index.ts"],
+      "@planora/contracts/*": ["../api-contracts/*"]
     }
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
+    "../api-contracts/**/*.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"

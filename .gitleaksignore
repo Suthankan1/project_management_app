@@ -1,0 +1,6 @@
+449dd7fe0e418b1c0de90d2b55269c7550e372df:backend/src/test/resources/application-test.properties:generic-api-key:15
+ec6aee1ba84ef06e4580158f1d212d1a4bf1dee5:backend/src/test/resources/application-test.properties:generic-api-key:8
+240ca9573798c80b5d5f4efd8f76eb38c8d0c2bb:.env:generic-api-key:1
+33b9b438ec4ad4eeb26017fe42ad0157e850e9ad:ChatModelUI.html:generic-api-key:5
+109d04749089c31785eea65f5aaec0769451e02d:scripts/generate-api-contracts.mjs:generic-api-key:78
+dc0ad2638c8cdeb4bad5c141570b375e5cfc9512:backend/src/test/java/com/planora/backend/controller/UserAuthIntegrationTest.java:generic-api-key:105

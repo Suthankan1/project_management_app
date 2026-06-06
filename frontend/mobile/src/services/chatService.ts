@@ -1,5 +1,10 @@
 import api from '@/src/api/axios';
 import {
+  postTelemetry as postTelemetryBuilder,
+  createRoom as createRoomBuilder,
+  createChatMessage as createChatMessageBuilder,
+} from '@planora/contracts';
+import {
   ChatMessage,
   ChatReactionSummary,
   ChatRoom,
@@ -94,16 +99,37 @@ export async function fetchThreadMessages(parentMessageId: number, projectId: st
 }
 
 export async function searchMessages(projectId: string, query: string): Promise<ChatSearchResult[]> {
-  const { data } = await api.get<ChatSearchResult[]>(`/api/projects/${projectId}/chat/search`, {
-    params: { q: query },
+  const { data } = await api.get<{ messages: ChatSearchResult[] }>(`/api/search`, {
+    params: { q: query, projectId },
+  });
+  return data.messages || [];
+}
+
+export async function sendRestMessage(
+  projectId: string,
+  content: string,
+  recipient?: string,
+  localId?: string,
+): Promise<ChatMessage> {
+  const { data } = await createChatMessageBuilder(api, projectId, {
+    content,
+    recipient,
+    localId,
+    formatType: 'PLAIN',
   });
   return data;
 }
 
-export async function sendRestMessage(projectId: string, content: string, recipient?: string): Promise<ChatMessage> {
-  const { data } = await api.post(`/api/projects/${projectId}/chat/messages`, {
+export async function sendRoomRestMessage(
+  projectId: string,
+  roomId: number,
+  content: string,
+  localId?: string,
+): Promise<ChatMessage> {
+  const { data } = await createChatMessageBuilder(api, projectId, {
     content,
-    recipient,
+    roomId,
+    localId,
     formatType: 'PLAIN',
   });
   return data;
@@ -144,7 +170,7 @@ export async function postThreadReply(
 }
 
 export async function createRoom(projectId: string, name: string, memberUsernames: string[]): Promise<ChatRoom> {
-  const { data } = await api.post(`/api/projects/${projectId}/chat/rooms`, {
+  const { data } = await createRoomBuilder(api, projectId, {
     name,
     members: memberUsernames,
   });
@@ -220,5 +246,5 @@ export async function postTelemetry(
   target: string,
   details?: string
 ): Promise<void> {
-  await api.post(`/api/projects/${projectId}/chat/telemetry`, { action, target, details });
+  await postTelemetryBuilder(api, projectId, { action, target, details });
 }

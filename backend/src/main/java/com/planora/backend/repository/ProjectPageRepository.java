@@ -10,4 +10,7 @@ import java.util.List;
 public interface ProjectPageRepository extends JpaRepository<ProjectPage,Long> {
     //To fetch all pages related to a project
     List<ProjectPage> findByProjectId(Long projectId);
+
+    //To fetch top 5 recently viewed pages
+    List<ProjectPage> findTop5ByProjectIdAndLastViewedAtIsNotNullOrderByLastViewedAtDesc(Long projectId);
 }

@@ -24,26 +24,35 @@ import com.planora.backend.model.User;
 import com.planora.backend.repository.ProjectRepository;
 import com.planora.backend.repository.TaskRepository;
 
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class GithubIssueImportService {
 
-    @Autowired
-    private GithubIssuesSyncService githubIssuesSyncService;
+    private final GithubIssuesSyncService githubIssuesSyncService;
 
-    @Autowired
-    private ProjectRepository projectRepository;
+    private final ProjectRepository projectRepository;
 
-    @Autowired
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
-    @Autowired
-    private TeamMembershipLookupService teamMembershipLookupService;
+    private final TeamMembershipLookupService teamMembershipLookupService;
 
-    @Autowired
-    private GithubIssueConversionService githubIssueConversionService;
+    private final GithubIssueConversionService githubIssueConversionService;
+
+    private final GithubTokenService githubTokenService;
 
     @Transactional
     public GithubIssueImportResponseDTO importIssues(GithubIssueImportRequestDTO request, User currentUser) {
+        return importIssues(request, currentUser, null);
+    }
+
+    @Transactional
+    public GithubIssueImportResponseDTO importIssues(
+            GithubIssueImportRequestDTO request,
+            User currentUser,
+            String requestGithubToken
+    ) {
         Project project = projectRepository.findById(request.getProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
@@ -53,7 +62,9 @@ public class GithubIssueImportService {
             throw new ForbiddenException("User is not a member of this project");
         }
 
-        String token = currentUser.getGithubAccessToken();
+        String token = requestGithubToken == null || requestGithubToken.isBlank()
+                ? githubTokenService.getToken(currentUser.getUserId())
+                : requestGithubToken;
         if (token == null || token.isBlank()) {
             throw new GithubAuthenticationException("GitHub account is not connected");
         }

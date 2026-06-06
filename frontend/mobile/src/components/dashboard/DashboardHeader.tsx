@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { T } from '../../constants/tokens';
+import api from '../../api/axios';
 
 // ─── Bell icon ────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,29 @@ interface DashboardHeaderProps {
 export default function DashboardHeader({ username = 'User', profileInitial }: DashboardHeaderProps) {
   const router = useRouter();
   const initial = profileInitial ?? username.charAt(0).toUpperCase();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      api.get<{ count: number }>('/api/notifications/unread-count')
+        .then(({ data }) => {
+          if (active) {
+            setUnreadCount(Number(data.count) || 0);
+          }
+        })
+        .catch(() => {
+          if (active) {
+            setUnreadCount(0);
+          }
+        });
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   return (
     <View style={styles.container}>
@@ -43,6 +67,11 @@ export default function DashboardHeader({ username = 'User', profileInitial }: D
           accessibilityLabel="Notifications"
         >
           <BellIcon />
+          {unreadCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -109,6 +138,28 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+
+  badge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: '#EF4444',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    lineHeight: 11,
+    fontWeight: '900',
   },
 
   avatar: {

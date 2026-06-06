@@ -24,7 +24,6 @@ export function useProjectTabs(projectId: string | null, isAgile: boolean) {
       { id: 'dms',        label: 'DMS' },
       { id: 'list',       label: 'List' },
       { id: 'report',     label: 'Report' },
-      { id: 'github',     label: 'GitHub' },
     );
 
     return base;
@@ -49,28 +48,28 @@ export function useProjectTabs(projectId: string | null, isAgile: boolean) {
     return 'summary';
   }, [pathname]);
 
-  const withProjectId = (basePath: string) => {
-    if (!projectId) return basePath;
-    return `${basePath}?projectId=${projectId}`;
+  const withProjectId = (basePath: string, targetProjectId = projectId) => {
+    if (!targetProjectId) return basePath;
+    return `${basePath}?projectId=${targetProjectId}`;
   };
 
-  const getTabHref = (tabId: string) => {
+  const getTabHref = (tabId: string, targetProjectId = projectId) => {
     switch (tabId) {
-      case 'summary':    return projectId ? `/summary/${projectId}` : '/dashboard';
-      case 'timeline':   return withProjectId('/timeline');
-      case 'backlog':    return isAgile ? withProjectId('/sprint-backlog') : withProjectId('/backlog');
-      case 'board':      return isAgile ? withProjectId('/sprint-board')   : withProjectId('/kanban');
-      case 'list':       return withProjectId('/list');
-      case 'calendar':   return withProjectId('/calendar');
-      case 'burndown':   return withProjectId('/burndown');
-      case 'chats':      return projectId ? `/project/${projectId}/chat` : '/dashboard';
-      case 'milestones': return withProjectId('/milestones');
-      case 'workload':   return withProjectId('/workload');
-      case 'members':    return projectId ? `/members/${projectId}` : '/members';
-      case 'dms':        return withProjectId('/pages');
-      case 'report':     return projectId ? `/report/${projectId}` : '/dashboard';
-      case 'github':     return projectId ? `/github/${projectId}` : '/dashboard';
-      default:           return projectId ? `/summary/${projectId}` : '/dashboard';
+      case 'summary':    return targetProjectId ? `/summary/${targetProjectId}` : '/dashboard';
+      case 'timeline':   return targetProjectId ? `/timeline/${targetProjectId}` : '/timeline';
+      case 'backlog':    return isAgile ? withProjectId('/sprint-backlog', targetProjectId) : withProjectId('/backlog', targetProjectId);
+      case 'board':      return isAgile ? withProjectId('/sprint-board', targetProjectId)   : withProjectId('/kanban', targetProjectId);
+      case 'list':       return withProjectId('/list', targetProjectId);
+      case 'calendar':   return withProjectId('/calendar', targetProjectId);
+      case 'burndown':   return withProjectId('/burndown', targetProjectId);
+      case 'chats':      return targetProjectId ? `/project/${targetProjectId}/chat` : '/dashboard';
+      case 'milestones': return withProjectId('/milestones', targetProjectId);
+      case 'workload':   return withProjectId('/workload', targetProjectId);
+      case 'members':    return targetProjectId ? `/members/${targetProjectId}` : '/members';
+      case 'dms':        return withProjectId('/pages', targetProjectId);
+      case 'report':     return targetProjectId ? `/report/${targetProjectId}` : '/dashboard';
+      case 'github':     return targetProjectId ? `/github/${targetProjectId}` : '/dashboard';
+      default:           return targetProjectId ? `/summary/${targetProjectId}` : '/dashboard';
     }
   };
 

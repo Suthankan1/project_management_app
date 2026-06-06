@@ -20,7 +20,11 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Svg, { Circle, Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { T, STATUS_MAP, StatusKey } from '../../constants/tokens';
+import { Colors } from '../../constants/colors';
+import OfflineStaleBanner from '../ui/OfflineStaleBanner';
+import { offlineSyncManager } from '../../services/offlineSyncManager';
 import {
   BoardMember,
   BoardLabel,
@@ -175,6 +179,8 @@ function TaskCard({
   onEdit,
   onDelete,
   onDueDatePress,
+  onAssigneePress,
+  onConflictPress,
   onDragEnd,
   onDragStateChange,
   onDragMove,
@@ -183,6 +189,8 @@ function TaskCard({
   onEdit: (task: BoardTask) => void;
   onDelete: (task: BoardTask) => void;
   onDueDatePress: (task: BoardTask) => void;
+  onAssigneePress: (task: BoardTask) => void;
+  onConflictPress: (task: BoardTask) => void;
   onDragEnd: (task: BoardTask, dropX: number, translationX: number) => void;
   onDragStateChange: (active: boolean) => void;
   onDragMove: (screenX: number) => void;
@@ -300,6 +308,22 @@ function TaskCard({
               <Text style={[card.priorityText, { color: priority.text }]}>{task.priority}</Text>
             </View>
           ) : <View />}
+
+          {/* Offline Sync Status Indicator */}
+          {task.syncStatus === 'pending' && (
+            <View style={card.syncIndicator}>
+              <ActivityIndicator size="small" color="#94A3B8" />
+            </View>
+          )}
+          {task.syncStatus === 'failed' && (
+            <TouchableOpacity
+              activeOpacity={0.78}
+              onPress={() => onConflictPress(task)}
+              style={[card.syncIndicator, card.syncFailedIndicator]}
+            >
+              <Ionicons name="alert-circle" size={16} color="#DC2626" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <Text style={card.title} numberOfLines={3}>{task.title}</Text>
@@ -345,12 +369,16 @@ function TaskCard({
         )}
 
         <View style={card.footerRow}>
-          <View style={card.assigneeRow}>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            onPress={() => onAssigneePress(task)}
+            style={card.assigneeRow}
+          >
             <View style={card.avatar}>
               <Text style={card.avatarText}>{initialsFromName(task.assigneeName)}</Text>
             </View>
             <Text style={card.assigneeName} numberOfLines={1}>{task.assigneeName || 'Unassigned'}</Text>
-          </View>
+          </TouchableOpacity>
 
           {totalSubtasks > 0 && (
             <View style={card.subtaskWrap}>
@@ -373,6 +401,8 @@ function BoardColumn({
   onDeleteTask,
   onEditTask,
   onDueDatePress,
+  onAssigneePress,
+  onConflictPress,
   onCreateTask,
   onDeleteColumn,
   onDragTask,
@@ -384,6 +414,8 @@ function BoardColumn({
   onDeleteTask: (task: BoardTask) => void;
   onEditTask: (task: BoardTask) => void;
   onDueDatePress: (task: BoardTask) => void;
+  onAssigneePress: (task: BoardTask) => void;
+  onConflictPress: (task: BoardTask) => void;
   onCreateTask: (column: KanbanBoardColumn) => void;
   onDeleteColumn: (column: KanbanBoardColumn) => void;
   onDragTask: (task: BoardTask, column: KanbanBoardColumn, dropX: number, translationX: number) => void;
@@ -439,6 +471,8 @@ function BoardColumn({
               onEdit={onEditTask}
               onDelete={onDeleteTask}
               onDueDatePress={onDueDatePress}
+              onAssigneePress={onAssigneePress}
+              onConflictPress={onConflictPress}
               onDragStateChange={onDragStateChange}
               onDragMove={onDragMove}
               onDragEnd={(draggedTask, dropX, translationX) => onDragTask(draggedTask, column, dropX, translationX)}
@@ -587,13 +621,19 @@ function AssigneePickerModal({
   visible,
   members,
   selectedId,
+  loading,
+  error,
   onClose,
+  onRetry,
   onSelect,
 }: {
   visible: boolean;
   members: BoardMember[];
   selectedId: number | null;
+  loading?: boolean;
+  error?: string | null;
   onClose: () => void;
+  onRetry?: () => void;
   onSelect: (id: number | null) => void;
 }) {
   return (
@@ -617,7 +657,14 @@ function AssigneePickerModal({
             {selectedId === null && <Text style={modal.currentText}>Selected</Text>}
           </TouchableOpacity>
 
-          {members.map((member) => {
+          {loading && (
+            <View style={modal.emptyOption}>
+              <ActivityIndicator color={T.primary} />
+              <Text style={modal.emptyOptionText}>Loading assignees...</Text>
+            </View>
+          )}
+
+          {!loading && members.map((member) => {
             const active = selectedId === member.userId;
             return (
               <TouchableOpacity
@@ -638,7 +685,18 @@ function AssigneePickerModal({
             );
           })}
 
-          {members.length === 0 && (
+          {!loading && !!error && (
+            <View style={modal.errorOption}>
+              <Text style={modal.errorOptionText}>{error}</Text>
+              {!!onRetry && (
+                <TouchableOpacity activeOpacity={0.8} onPress={onRetry} style={modal.retryBtn}>
+                  <Text style={modal.retryText}>Retry</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {!loading && !error && members.length === 0 && (
             <View style={modal.emptyOption}>
               <Text style={modal.emptyOptionText}>No members found</Text>
             </View>
@@ -668,17 +726,23 @@ export default function ProjectBoardScreen({
     columns,
     tasks,
     members,
+    membersLoading,
+    membersError,
     loading,
     refreshing,
     error,
     refresh,
+    retryMembers,
     moveTask,
     createTask,
     deleteTask,
     updateTaskTitle,
     updateTaskDueDate,
+    updateTaskAssignee,
     createColumn,
     deleteColumn,
+    isOnline,
+    isStale,
   } = useProjectBoard(projectId);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -697,6 +761,47 @@ export default function ProjectBoardScreen({
   const [showCreateDatePicker, setShowCreateDatePicker] = useState(false);
   const [showAssigneePicker, setShowAssigneePicker] = useState(false);
   const [dateTask, setDateTask] = useState<BoardTask | null>(null);
+  const [assigneePickerTask, setAssigneePickerTask] = useState<BoardTask | null>(null);
+
+  const openAssigneePicker = (task: BoardTask) => {
+    setAssigneePickerTask(task);
+  };
+
+  const handleConflictPress = (task: BoardTask) => {
+    const queue = offlineSyncManager.getQueue();
+    const mutation = queue.find((m) => m.taskId === task.id && m.status === 'failed');
+    if (!mutation) return;
+
+    Alert.alert(
+      'Conflict Detected',
+      `This task was modified on the server while you were offline.\n\n` +
+      `Error: ${mutation.error}\n\n` +
+      `Your change: ${mutation.type.replace('UPDATE_', '')} \n` +
+      `Current Server Status: ${task.status}\n` +
+      `Current Server Due: ${task.dueDate ? task.dueDate.slice(0, 10) : 'None'}\n` +
+      `Current Server Assignee: ${task.assigneeName || 'Unassigned'}\n\n` +
+      `Select a resolution action:`,
+      [
+        {
+          text: 'Force Sync (Keep Mine)',
+          onPress: () => {
+            void offlineSyncManager.resolveConflict(mutation.id, 'overwrite');
+          },
+        },
+        {
+          text: 'Discard (Revert)',
+          style: 'destructive',
+          onPress: () => {
+            void offlineSyncManager.resolveConflict(mutation.id, 'discard');
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [savingDate, setSavingDate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -966,6 +1071,7 @@ export default function ProjectBoardScreen({
   return (
     <SafeAreaView style={s.safe} edges={topOffset ? ['left', 'right'] : ['top', 'left', 'right']}>
       <StatusBar style="dark" />
+      <OfflineStaleBanner isOnline={isOnline} isStale={isStale} />
       <BoardBackdrop />
 
       <ScrollView
@@ -1089,6 +1195,8 @@ export default function ProjectBoardScreen({
                   onDeleteTask={confirmDeleteTask}
                   onEditTask={openEditTask}
                   onDueDatePress={openDatePicker}
+                  onAssigneePress={openAssigneePicker}
+                  onConflictPress={handleConflictPress}
                   onCreateTask={openCreateTask}
                   onDeleteColumn={confirmDeleteColumn}
                   onDragTask={handleDragTask}
@@ -1188,11 +1296,28 @@ export default function ProjectBoardScreen({
       />
 
       <AssigneePickerModal
-        visible={showAssigneePicker}
+        visible={showAssigneePicker || !!assigneePickerTask}
         members={members}
-        selectedId={newTaskAssigneeId}
-        onClose={() => setShowAssigneePicker(false)}
-        onSelect={setNewTaskAssigneeId}
+        selectedId={assigneePickerTask ? (members.find(m => m.name === assigneePickerTask.assigneeName)?.userId ?? null) : newTaskAssigneeId}
+        loading={membersLoading}
+        error={membersError}
+        onClose={() => {
+          setShowAssigneePicker(false);
+          setAssigneePickerTask(null);
+        }}
+        onRetry={retryMembers}
+        onSelect={async (id) => {
+          if (assigneePickerTask) {
+            try {
+              await updateTaskAssignee(assigneePickerTask.id, id);
+            } catch {
+              Alert.alert('Assignee not updated', 'Please try again.');
+            }
+            setAssigneePickerTask(null);
+          } else {
+            setNewTaskAssigneeId(id);
+          }
+        }}
       />
 
       <Modal visible={showTaskModal} transparent animationType="slide">
@@ -1229,18 +1354,27 @@ export default function ProjectBoardScreen({
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={0.78}
+                disabled={membersLoading}
                 onPress={() => setShowAssigneePicker(true)}
-                style={modal.formPicker}
+                style={[modal.formPicker, membersLoading && modal.disabled]}
               >
                 <UserIcon active={!!newTaskAssigneeId} />
                 <View style={modal.formPickerTextWrap}>
                   <Text style={modal.formPickerLabel}>Assignee</Text>
                   <Text style={[modal.formPickerValue, selectedNewTaskAssignee && modal.formPickerValueActive]} numberOfLines={1}>
-                    {selectedNewTaskAssignee?.name || 'Unassigned'}
+                    {membersLoading ? 'Loading assignees...' : selectedNewTaskAssignee?.name || 'Unassigned'}
                   </Text>
                 </View>
               </TouchableOpacity>
             </View>
+            {!!membersError && (
+              <View style={modal.inlineError}>
+                <Text style={modal.errorOptionText}>{membersError}</Text>
+                <TouchableOpacity activeOpacity={0.8} onPress={retryMembers} style={modal.retryBtn}>
+                  <Text style={modal.retryText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             <TouchableOpacity activeOpacity={0.85} disabled={submitting || !newTaskTitle.trim()} onPress={submitCreateTask} style={[modal.primaryBtn, (!newTaskTitle.trim() || submitting) && modal.disabled]}>
               {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={modal.primaryText}>Create task</Text>}
             </TouchableOpacity>
@@ -1577,7 +1711,16 @@ const card = StyleSheet.create({
       android: { elevation: 24 },
     }),
   },
-  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 17, paddingRight: 34 },
+  topRow: { flexDirection: 'row', alignItems: 'center', minHeight: 17, paddingRight: 34, gap: 6 },
+  syncIndicator: {
+    marginLeft: 'auto',
+    marginRight: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  syncFailedIndicator: {
+    padding: 2,
+  },
   priority: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -1727,6 +1870,32 @@ const modal = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyOptionText: { fontSize: 13, fontWeight: '800', color: '#94A3B8' },
+  errorOption: {
+    minHeight: 58,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FEF2F2',
+    padding: 12,
+    gap: 8,
+  },
+  inlineError: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FEF2F2',
+    padding: 12,
+    gap: 8,
+  },
+  errorOptionText: { fontSize: 12, fontWeight: '800', color: '#B91C1C' },
+  retryBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  retryText: { fontSize: 12, fontWeight: '900', color: '#FFFFFF' },
   input: {
     minHeight: 48,
     borderRadius: 12,

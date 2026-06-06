@@ -6,6 +6,7 @@ import com.planora.backend.dto.TaskResponseDTO;
 import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.Comment;
+import com.planora.backend.model.KanbanColumn;
 import com.planora.backend.model.Priority;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Task;
@@ -15,6 +16,7 @@ import com.planora.backend.model.TeamRole;
 import com.planora.backend.model.User;
 import com.planora.backend.model.Milestone;
 import com.planora.backend.repository.CommentRepository;
+import com.planora.backend.repository.KanbanColumnRepository;
 import com.planora.backend.repository.LabelRepository;
 import com.planora.backend.repository.ProjectRepository;
 import com.planora.backend.repository.SprintRepository;
@@ -32,6 +34,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -42,6 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.contains;
@@ -60,6 +68,8 @@ class TaskServiceTest {
 
     @Mock
     private TaskRepository taskRepository;
+    @Mock
+    private KanbanColumnRepository kanbanColumnRepository;
     @Mock
     private ProjectRepository projectRepository;
     @Mock
@@ -227,19 +237,94 @@ class TaskServiceTest {
     @Test
     void getTasksByProject_batchesDependencyLookup() {
         Task taskOne = buildTask(71L);
+        taskOne.setGithubIssueNumber(34L);
+        taskOne.setGithubRepoFullName("planora/app");
         Task taskTwo = buildTask(72L);
 
         when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
-        when(taskRepository.findByProjectIdWithScalars(10L)).thenReturn(List.of(taskOne, taskTwo));
+        when(taskRepository.findByProjectIdWithScalarsAndArchived(10L, false)).thenReturn(List.of(taskOne, taskTwo));
         when(taskRepository.findByIdInWithCollections(List.of(71L, 72L))).thenReturn(List.of(taskOne, taskTwo));
         when(taskRepository.findDependencyRowsByTaskIds(List.of(71L, 72L)))
-                .thenReturn(java.util.Collections.singletonList(new Object[] {71L, 99L, "Foundation task"}));
+                .thenReturn(java.util.Collections.singletonList(new Object[] {71L, 99L, "Foundation task", "TODO"}));
+        when(taskRepository.findDependentRowsByTaskIds(List.of(71L, 72L)))
+                .thenReturn(java.util.Collections.emptyList());
 
         List<TaskResponseDTO> result = taskService.getTasksByProject(10L, 500L, null, null, null, null, null);
 
         assertEquals(2, result.size());
         assertNotNull(result.getFirst().getDependencies());
+        assertEquals(34L, result.getFirst().getGithubIssueNumber());
+        assertEquals("planora/app", result.getFirst().getGithubRepoFullName());
         verify(taskRepository, times(1)).findDependencyRowsByTaskIds(List.of(71L, 72L));
+    }
+
+    @Test
+    void getTasksByProject_paginated_batchesDependencyLookup() {
+        Task taskOne = buildTask(71L);
+        taskOne.setGithubIssueNumber(34L);
+        taskOne.setGithubRepoFullName("planora/app");
+        Task taskTwo = buildTask(72L);
+
+        PageRequest pageable = PageRequest.of(0, 10);
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(taskRepository.findByProjectIdAndArchived(10L, false, pageable))
+                .thenReturn(new PageImpl<>(List.of(taskOne, taskTwo), pageable, 2));
+        when(taskRepository.findByIdInWithCollections(List.of(71L, 72L))).thenReturn(List.of(taskOne, taskTwo));
+        when(taskRepository.findDependencyRowsByTaskIds(List.of(71L, 72L)))
+                .thenReturn(java.util.Collections.singletonList(new Object[] {71L, 99L, "Foundation task", "TODO"}));
+        when(taskRepository.findDependentRowsByTaskIds(List.of(71L, 72L)))
+                .thenReturn(java.util.Collections.emptyList());
+
+        Page<TaskResponseDTO> result = taskService.getTasksByProject(10L, 500L, pageable);
+
+        assertEquals(2, result.getContent().size());
+        assertNotNull(result.getContent().getFirst().getDependencies());
+        assertEquals(34L, result.getContent().getFirst().getGithubIssueNumber());
+        assertEquals("planora/app", result.getContent().getFirst().getGithubRepoFullName());
+        verify(taskRepository, times(1)).findDependencyRowsByTaskIds(List.of(71L, 72L));
+    }
+
+    @Test
+    void getTasksByProject_paginated_canLoadArchivedTasks() {
+        Task task = buildTask(71L);
+        task.setArchived(true);
+
+        PageRequest pageable = PageRequest.of(0, 10);
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(taskRepository.findByProjectIdAndArchived(10L, true, pageable))
+                .thenReturn(new PageImpl<>(List.of(task), pageable, 1));
+        when(taskRepository.findByIdInWithCollections(List.of(71L))).thenReturn(List.of(task));
+        when(taskRepository.findDependencyRowsByTaskIds(List.of(71L))).thenReturn(java.util.Collections.emptyList());
+        when(taskRepository.findDependentRowsByTaskIds(List.of(71L))).thenReturn(java.util.Collections.emptyList());
+
+        Page<TaskResponseDTO> result = taskService.getTasksByProject(10L, 500L, pageable, true);
+
+        assertEquals(1, result.getContent().size());
+        assertTrue(result.getContent().getFirst().isArchived());
+        verify(taskRepository).findByProjectIdAndArchived(10L, true, pageable);
+    }
+
+    @Test
+    void getTasksByProject_paginated_invalidSortByThrowsBeforeRepositoryLookup() {
+        PageRequest pageable = PageRequest.of(0, 10, Sort.by("project.team.owner.passwordHash").ascending());
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> taskService.getTasksByProject(10L, 500L, pageable));
+
+        assertEquals(
+                "Invalid task sort field 'project.team.owner.passwordHash'. Allowed values: createdAt, updatedAt, dueDate, priority, status, title, projectTaskNumber",
+                exception.getMessage());
+        verify(projectRepository, never()).findById(anyLong());
+        verify(taskRepository, never()).findByProjectIdAndArchived(anyLong(), any(Boolean.class), any(Pageable.class));
+    }
+
+    @Test
+    void taskSortDirectionValidationAcceptsOnlyAscOrDesc() {
+        assertEquals(true, TaskService.isAllowedTaskSortDirection("asc"));
+        assertEquals(true, TaskService.isAllowedTaskSortDirection("DESC"));
+        assertEquals(false, TaskService.isAllowedTaskSortDirection("sideways"));
+        assertEquals(false, TaskService.isAllowedTaskSortDirection(null));
     }
 
     @Test
@@ -543,6 +628,59 @@ class TaskServiceTest {
     }
 
     @Test
+    void addDependency_createsCycle_throwsIllegalArgumentException() {
+        Task task50 = buildTask(50L);
+        Task task60 = buildTask(60L);
+        Task task70 = buildTask(70L);
+
+        // Chain: 60 depends on 70, 70 depends on 50
+        task60.getDependencies().add(task70);
+        task70.getDependencies().add(task50);
+
+        when(taskRepository.findByIdWithProjectTeam(50L)).thenReturn(Optional.of(task50));
+        when(taskRepository.findByIdWithProjectTeam(60L)).thenReturn(Optional.of(task60));
+
+        when(taskRepository.findByIdWithDependencies(60L)).thenReturn(Optional.of(task60));
+        when(taskRepository.findByIdWithDependencies(70L)).thenReturn(Optional.of(task70));
+        when(taskRepository.findByIdWithDependencies(50L)).thenReturn(Optional.of(task50));
+
+        when(userRepository.findById(500L)).thenReturn(Optional.of(actorUser));
+
+        // Adding 50 depends on 60 would close the loop: 50 -> 60 -> 70 -> 50
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> taskService.addDependency(50L, 60L, 500L));
+
+        assertEquals("Adding this dependency would create a circular dependency chain.", exception.getMessage());
+    }
+
+    @Test
+    void addDependency_crossProjectInaccessible_throwsForbiddenException() {
+        Task task50 = buildTask(50L);
+
+        // Blocker is in team 99
+        Team otherTeam = new Team();
+        otherTeam.setId(99L);
+        Project otherProject = new Project();
+        otherProject.setId(55L);
+        otherProject.setTeam(otherTeam);
+
+        Task task60 = new Task();
+        task60.setId(60L);
+        task60.setProject(otherProject);
+
+        when(taskRepository.findByIdWithProjectTeam(50L)).thenReturn(Optional.of(task50));
+        when(taskRepository.findByIdWithProjectTeam(60L)).thenReturn(Optional.of(task60));
+
+        // teamMembershipLookupService will return null for team 99 and user 500L
+        when(teamMembershipLookupService.getTeamMember(99L, 500L)).thenReturn(null);
+
+        ForbiddenException exception = assertThrows(ForbiddenException.class,
+                () -> taskService.addDependency(50L, 60L, 500L));
+
+        assertEquals("User is not a member of this team", exception.getMessage());
+    }
+
+    @Test
     void bulkUpdateStatus_crossProject_throwsForbiddenException() {
         // task1 belongs to project (team 20), task2 belongs to a different project (team 99)
         Team otherTeam = new Team();
@@ -691,5 +829,49 @@ class TaskServiceTest {
         taskService.updateTask(1300L, request, 500L);
 
         assertNull(task.getMilestone());
+    }
+
+    @Test
+    void updateTaskColumn_setsColumnStatusAndPersistsTask() {
+        Task task = buildTask(1400L);
+        KanbanColumn column = new KanbanColumn();
+        column.setId(7L);
+        column.setStatus("IN_REVIEW");
+        when(taskRepository.findById(1400L)).thenReturn(Optional.of(task));
+        when(kanbanColumnRepository.findById(7L)).thenReturn(Optional.of(column));
+
+        taskService.updateTaskColumn(1400L, 7L);
+
+        assertEquals(column, task.getKanbanColumn());
+        assertEquals("IN_REVIEW", task.getStatus());
+        verify(taskRepository).save(task);
+    }
+
+    @Test
+    void getAssignedTasks_withDuplicateDatabaseResults_deduplicatesAndDoesNotCrash() {
+        Long userId = 200L;
+        int limit = 20;
+
+        when(taskRepository.findAssignedTaskIdsByUser(eq(userId), any(Pageable.class)))
+                .thenReturn(List.of(71L, 71L));
+
+        Task task = buildTask(71L);
+
+        when(taskRepository.findByIdInWithScalars(List.of(71L, 71L)))
+                .thenReturn(List.of(task, task));
+
+        when(taskRepository.findByIdInWithCollections(List.of(71L, 71L)))
+                .thenReturn(List.of(task, task));
+
+        when(taskRepository.findDependencyRowsByTaskIds(List.of(71L, 71L)))
+                .thenReturn(java.util.Collections.emptyList());
+        when(taskRepository.findDependentRowsByTaskIds(List.of(71L, 71L)))
+                .thenReturn(java.util.Collections.emptyList());
+
+        List<TaskResponseDTO> result = taskService.getAssignedTasks(userId, limit);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(71L, result.getFirst().getId());
     }
 }

@@ -23,15 +23,15 @@ export default function PortfolioMetrics({ portfolio }: Props) {
           initial={{ opacity: 0, scale: 0.94 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
-          className="bg-white rounded-xl border border-[#E8E8ED] p-4 flex flex-col gap-2.5"
+          className="bg-cu-bg rounded-xl border border-cu-border p-4 flex flex-col gap-2.5 shadow-cu-sm"
         >
           <div className="w-8 h-8 rounded-lg flex items-center justify-center"
             style={{ background: `${m.color}15` }}>
             <div className="w-2.5 h-2.5 rounded-full" style={{ background: m.color }} />
           </div>
           <div>
-            <div className="text-[#1A1A2E] font-bold text-xl leading-none">{m.value}</div>
-            <div className="text-[#9CA3AF] text-xs mt-1">{m.label}</div>
+            <div className="text-cu-text-primary font-bold text-xl leading-none">{m.value}</div>
+            <div className="text-cu-text-muted text-xs mt-1">{m.label}</div>
           </div>
         </motion.div>
       ))}

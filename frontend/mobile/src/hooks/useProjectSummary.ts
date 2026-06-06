@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/axios';
+import { offlineSyncManager } from '../services/offlineSyncManager';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -50,41 +52,39 @@ export interface SummaryData {
   isAgile: boolean;
 }
 
-interface CacheEntry {
-  data: SummaryData;
-  milestones: MilestoneItem[];
-  fetchedAt: number;
-}
-
-// ─── Module-level cache (survives re-renders, cleared on app restart) ──────────
-// TTL: 60 seconds — data is fresh enough, re-fetch in background if stale
-const CACHE: Map<number, CacheEntry> = new Map();
-const CACHE_TTL_MS = 60_000;
-
-function getCached(projectId: number): CacheEntry | null {
-  const entry = CACHE.get(projectId);
-  if (!entry) return null;
-  if (Date.now() - entry.fetchedAt > CACHE_TTL_MS) {
-    CACHE.delete(projectId);
-    return null;
-  }
-  return entry;
-}
-
 // ─── useProjectSummary Hook ────────────────────────────────────────────────────
 
 const AGILE_TYPES = ['AGILE', 'SCRUM'];
 
 export function useProjectSummary(projectId: number) {
-  // Seed state from cache immediately — zero loading time on revisit
-  const cached = projectId ? getCached(projectId) : null;
-
-  const [data, setData] = useState<SummaryData | null>(cached?.data ?? null);
-  const [milestones, setMilestones] = useState<MilestoneItem[]>(cached?.milestones ?? []);
-  // If we have a valid cache hit, skip the loading state entirely
-  const [loading, setLoading] = useState(!cached);
+  const [data, setData] = useState<SummaryData | null>(null);
+  const [milestones, setMilestones] = useState<MilestoneItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [isOnline, setIsOnline] = useState(offlineSyncManager.getOnlineStatus());
+  const [isStale, setIsStale] = useState(true);
+
   const isMounted = useRef(true);
+  const CACHE_KEY = `project_summary_${projectId}`;
+
+  // ── Load cache on mount ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!projectId) return;
+    (async () => {
+      try {
+        const cached = await AsyncStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { cachedData, cachedMilestones } = JSON.parse(cached);
+          if (cachedData) setData(cachedData);
+          if (cachedMilestones) setMilestones(cachedMilestones);
+          setIsStale(true);
+        }
+      } catch (e) {
+        console.error('Failed to load project summary cache', e);
+      }
+    })();
+  }, [projectId, CACHE_KEY]);
 
   const fetchAll = useCallback(async (background = false) => {
     if (!projectId) return;
@@ -109,35 +109,53 @@ export function useProjectSummary(projectId: number) {
         isAgile,
       };
 
-
-
       const newMilestones: MilestoneItem[] = milestonesRes.data || [];
-
-      // Update cache
-      CACHE.set(projectId, { data: newData, milestones: newMilestones, fetchedAt: Date.now() });
 
       setData(newData);
       setMilestones(newMilestones);
+      setIsStale(false);
+
+      // Save cache
+      await AsyncStorage.setItem(
+        CACHE_KEY,
+        JSON.stringify({
+          cachedData: newData,
+          cachedMilestones: newMilestones,
+        })
+      );
     } catch (e) {
       if (!isMounted.current) return;
       if (!background) setError('Failed to load project summary. Pull down to retry.');
     } finally {
       if (isMounted.current) setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, CACHE_KEY]);
 
   useEffect(() => {
     isMounted.current = true;
-    const cached = projectId ? getCached(projectId) : null;
-    if (cached) {
-      // Cache hit: show data immediately, re-fetch silently in background
-      void fetchAll(true);
-    } else {
-      // Cache miss: full load
-      void fetchAll(false);
-    }
+    void fetchAll(false);
     return () => { isMounted.current = false; };
   }, [fetchAll]);
 
-  return { data, milestones, loading, error, refresh: () => fetchAll(false) };
+  // ── Listen to Sync Manager connection & sync events ────────────────────────
+  useEffect(() => {
+    const removeListener = offlineSyncManager.addListener((event) => {
+      if (event.type === 'CONNECTION_CHANGED') {
+        setIsOnline(event.isOnline);
+      } else if (event.type === 'SYNC_COMPLETED' || event.type === 'TASK_CREATED' || event.type === 'TASK_UPDATED') {
+        void fetchAll(true);
+      }
+    });
+    return removeListener;
+  }, [fetchAll]);
+
+  return {
+    data,
+    milestones,
+    loading,
+    error,
+    refresh: () => fetchAll(false),
+    isOnline,
+    isStale,
+  };
 }

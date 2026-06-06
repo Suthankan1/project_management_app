@@ -29,7 +29,7 @@ import lombok.Setter;
 public class ChatMessage {
     
     // Reactions are excluded from default serialization to prevent recursive payload expansion.
-    @jakarta.persistence.OneToMany(mappedBy = "message", cascade = jakarta.persistence.CascadeType.ALL, fetch = jakarta.persistence.FetchType.LAZY)
+    @jakarta.persistence.OneToMany(mappedBy = "message", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true, fetch = jakarta.persistence.FetchType.LAZY)
     @JsonIgnore
     private java.util.List<ChatReaction> reactions = new java.util.ArrayList<>();
 
@@ -37,6 +37,7 @@ public class ChatMessage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Enumerated(EnumType.STRING)
     private MessageType type;
 
     @Column(columnDefinition = "text")
@@ -48,6 +49,7 @@ public class ChatMessage {
 
     private Long roomId;
 
+    @Enumerated(EnumType.STRING)
     private ChatType chatType;
 
     // parentMessageId links replies to a thread root while keeping a single message table.
