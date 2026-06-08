@@ -78,10 +78,8 @@ export function useLoginForm() {
         // Step 2: Persist the Access JWT.
         saveToken((response as { token?: string }).token || (response as { accessToken?: string }).accessToken || '');
 
-        // Step 3: Persist the Refresh Token (if the backend issues them).
-        if ((response as { refreshToken?: string }).refreshToken) {
-          saveRefreshToken((response as { refreshToken?: string }).refreshToken!);
-        }
+        // Step 3: Persist the Refresh Token presence (HttpOnly cookie is set by backend).
+        saveRefreshToken('true');
 
         // Step 4: Route to the authenticated app (or back to the deep link they came from).
         const redirectTo = searchParams.get('redirect') || '/dashboard';

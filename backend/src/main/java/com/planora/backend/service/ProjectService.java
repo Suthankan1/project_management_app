@@ -6,6 +6,7 @@ import com.planora.backend.dto.UpdateProjectDTO;
 import com.planora.backend.dto.ProjectMetricsDTO;
 import com.planora.backend.exception.ConflictException;
 import com.planora.backend.exception.ForbiddenException;
+import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.*;
 import com.planora.backend.repository.ProjectAccessRepository;
 import com.planora.backend.repository.ProjectFavoriteRepository;
@@ -59,7 +60,7 @@ public class ProjectService {
 
         // The controller sets ownerId from the authenticated user.
         User owner = userRepository.findById(dto.getOwnerId())
-                .orElseThrow(() -> new RuntimeException("Owner not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
 
         // Decide whether to use an existing team or create a new one.
         // existing team
@@ -200,7 +201,7 @@ public class ProjectService {
         // Saves the latest access time so recent-project lists stay accurate.
         Project project = findProjectById(projectId);
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         ProjectAccess access = projectAccessRepository.findByProject_IdAndUser_UserId(projectId, userId)
                 .orElse(new ProjectAccess());
@@ -217,7 +218,7 @@ public class ProjectService {
         // Adds the project to favorites if missing, otherwise removes it.
         Project project = findProjectById(projectId);
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         projectFavoriteRepository.findByUserAndProject(user, project)
                 .ifPresentOrElse(
@@ -271,7 +272,7 @@ public class ProjectService {
     @Transactional(readOnly = true)
     public List<ProjectResponseDTO> getFavoriteProjectsForUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         // Keep only favorites that belong to teams the user still has access to.
         List<TeamMember> memberships = teamMemberRepository.findByUserUserId(userId);
@@ -367,7 +368,7 @@ public class ProjectService {
     // Loads a project entity or throws a clear error if it does not exist.
     private Project findProjectById(Long id) {
         return projectRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Project not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + id));
     }
 
     // Converts an entity into the response DTO used by the frontend.

@@ -6,7 +6,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @NoArgsConstructor
-@AllArgsConstructor
 @Getter
 @Setter
 public class PhotoUploadResponse {
@@ -14,4 +13,13 @@ public class PhotoUploadResponse {
     private String message;
     private String photoUrl;
     private String errorCode;
+    private String fileUrl;
+
+    public PhotoUploadResponse(boolean success, String message, String url, String errorCode) {
+        this.success = success;
+        this.message = message;
+        this.photoUrl = url;
+        this.fileUrl = url;
+        this.errorCode = errorCode;
+    }
 }

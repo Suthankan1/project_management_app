@@ -544,4 +544,35 @@ class TaskControllerTest {
 
         verify(service).linkGithubIssue(eq(1L), eq(42L), eq("owner/repo"), anyLong());
     }
+
+    @Test
+    @WithMockUserPrincipal
+    void createSubTask_validPayload_succeeds() throws Exception {
+        TaskRequestDTO request = new TaskRequestDTO();
+        request.setTitle("Valid subtask title");
+        request.setStatus("TODO");
+
+        when(service.createSubTask(eq(1L), any(TaskRequestDTO.class), anyLong())).thenReturn(sampleTask);
+
+        mockMvc.perform(post("/api/tasks/1/subtasks")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void createSubTask_invalidPayload_returns400() throws Exception {
+        TaskRequestDTO request = new TaskRequestDTO();
+        request.setTitle(""); // blank title
+
+        mockMvc.perform(post("/api/tasks/1/subtasks")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
 }
