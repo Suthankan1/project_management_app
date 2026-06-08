@@ -172,4 +172,9 @@ class YjsWebSocketHandlerTest {
         verify(session).close(closeStatusCaptor.capture());
         assertEquals(4401, closeStatusCaptor.getValue().getCode());
     }
+
+    @Test
+    void returnsCorrectSubProtocols() {
+        assertEquals(java.util.List.of("planora-yjs"), newHandler().getSubProtocols());
+    }
 }

@@ -430,7 +430,7 @@ public class TaskController {
     @PostMapping("/{parentId}/subtasks")
     public ResponseEntity<TaskResponseDTO> createSubTask(
             @PathVariable Long parentId,
-            @Validated({TaskRequestDTO.OnCreate.class, Default.class}) @RequestBody TaskRequestDTO subTaskRequest,
+            @Validated({TaskRequestDTO.OnSubTaskCreate.class, Default.class}) @RequestBody TaskRequestDTO subTaskRequest,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();

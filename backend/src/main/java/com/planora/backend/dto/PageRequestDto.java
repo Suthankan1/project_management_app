@@ -14,6 +14,6 @@ public class PageRequestDto {
     @Size(max = 200, message = "Title must be at most 200 characters")
     private String title;
 
-    @Size(max = 50000, message = "Content must be at most 50000 characters")
+    @Size(max = 2000000, message = "Content must be at most 2000000 characters")
     private String content;
 }

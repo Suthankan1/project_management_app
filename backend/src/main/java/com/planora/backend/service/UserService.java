@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import com.planora.backend.dto.LoginResponse;
 import com.planora.backend.dto.UpdateProfileRequest;
 import com.planora.backend.dto.UserResponseDTO;
+import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.User;
 import com.planora.backend.model.VerificationToken;
 import com.planora.backend.repository.TokenRepository;
@@ -638,11 +639,11 @@ public class UserService {
      */
     public User getUserByEmail(String email) {
         if (email == null || email.isBlank()) {
-            throw new RuntimeException("User email is required");
+            throw new IllegalArgumentException("User email is required");
         }
 
         return userRepository.findFirstByEmailIgnoreCase(email.toLowerCase())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
     // Updates specific user details (specifically fullName for now).
@@ -651,7 +652,7 @@ public class UserService {
         // Step 1. Fetch the user.
         User user = userRepository.findFirstByEmailIgnoreCase(email.toLowerCase()).orElse(null);
         if (user == null) {
-            throw new RuntimeException("User not found");
+            throw new ResourceNotFoundException("User not found");
         }
 
         // Step 2. Validate incoming data.
@@ -676,7 +677,7 @@ public class UserService {
     public User updateUserProfile(String email, UpdateProfileRequest request) {
         // Step 1. Fetch user.
         User user = userRepository.findFirstByEmailIgnoreCase(email.toLowerCase())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         // Step 2. Selectively apply updates. Null checks ensure we don't overwrite existing data with null.
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
@@ -722,7 +723,7 @@ public class UserService {
         // Step 1. Validate User exists.
         User user = userRepository.findFirstByEmailIgnoreCase(email.toLowerCase()).orElse(null);
         if (user == null) {
-            throw new RuntimeException("User not found");
+            throw new ResourceNotFoundException("User not found");
         }
 
         // Step 2. Hard validation on file size (25MB limit).

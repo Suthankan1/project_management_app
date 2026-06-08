@@ -165,13 +165,23 @@ export function saveRefreshToken(_token: string): void {
         sessionStorage.removeItem('refreshToken');
         localStorage.removeItem(REFRESH_TOKEN_KEY);
         sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-        localStorage.setItem('planora:has_refresh_token', 'true');
+        if (getRememberMe()) {
+            localStorage.setItem('planora:has_refresh_token', 'true');
+            sessionStorage.removeItem('planora:has_refresh_token');
+        } else {
+            sessionStorage.setItem('planora:has_refresh_token', 'true');
+            localStorage.removeItem('planora:has_refresh_token');
+        }
     }
 }
 
 export function getRefreshToken(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem('planora:has_refresh_token') === 'true' ? 'true' : null;
+    if (getRememberMe()) {
+        return localStorage.getItem('planora:has_refresh_token') === 'true' ? 'true' : null;
+    } else {
+        return sessionStorage.getItem('planora:has_refresh_token') === 'true' ? 'true' : null;
+    }
 }
 
 export function clearTokens(): void {
@@ -186,6 +196,7 @@ export function clearTokens(): void {
         localStorage.removeItem('planora:has_refresh_token');
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('refreshToken');
+        sessionStorage.removeItem('planora:has_refresh_token');
         sessionStorage.removeItem(TOKEN_KEY);
         sessionStorage.removeItem(REFRESH_TOKEN_KEY);
         // Wipe all planora: prefixed data caches so the next user session
