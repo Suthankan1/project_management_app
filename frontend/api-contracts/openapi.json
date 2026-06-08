@@ -2481,7 +2481,7 @@
       "PageRequestDto": {
         "properties": {
           "content": {
-            "maxLength": 50000,
+            "maxLength": 2000000,
             "minLength": 0,
             "type": "string"
           },

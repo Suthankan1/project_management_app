@@ -28,7 +28,7 @@
     "@tanstack/react-virtual": "^3.13.23",
     "@tiptap/extension-bubble-menu": "^3.21.0",
     "@tiptap/extension-collaboration": "^3.22.3",
-    "@tiptap/extension-collaboration-cursor": "^3.0.0",
+    "@tiptap/extension-collaboration-caret": "^3.22.3",
     "@tiptap/extension-highlight": "^3.21.0",
     "@tiptap/extension-link": "^3.21.0",
     "@tiptap/extension-placeholder": "^3.21.0",

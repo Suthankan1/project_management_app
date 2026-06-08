@@ -46,6 +46,9 @@ const nextConfig = {
     ];
   },
   async headers() {
+    const backendHost = process.env.NEXT_PUBLIC_BACKEND_HOST;
+    const additionalFrameSources = backendHost ? `https://${backendHost}` : '';
+
     const cspHeader = `
       default-src 'self';
       script-src 'self' 'unsafe-eval' 'unsafe-inline';
@@ -57,6 +60,7 @@ const nextConfig = {
       base-uri 'self';
       form-action 'self';
       frame-ancestors 'none';
+      frame-src 'self' http://localhost:8080 https://*.amazonaws.com blob: ${additionalFrameSources};
     `.replace(/\s{2,}/g, ' ').trim();
 
     return [
