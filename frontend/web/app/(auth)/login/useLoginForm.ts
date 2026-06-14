@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ensureValidToken, saveToken, saveRefreshToken, setRememberMe } from '@/lib/auth';
+import { AUTH_TOKEN_CHANGED_EVENT, ensureValidToken, saveToken, saveRefreshToken, setRememberMe } from '@/lib/auth';
 import { authApi } from '@/services/api-contract';
 
 /*
@@ -39,9 +39,15 @@ export function useLoginForm() {
       }
     };
 
+    const handleAuthTokenChanged = () => {
+      void redirectIfAuthenticated();
+    };
+
     void redirectIfAuthenticated();
+    window.addEventListener(AUTH_TOKEN_CHANGED_EVENT, handleAuthTokenChanged);
     return () => {
       isMounted = false;
+      window.removeEventListener(AUTH_TOKEN_CHANGED_EVENT, handleAuthTokenChanged);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -79,7 +85,7 @@ export function useLoginForm() {
         saveToken((response as { token?: string }).token || (response as { accessToken?: string }).accessToken || '');
 
         // Step 3: Persist the Refresh Token presence (HttpOnly cookie is set by backend).
-        saveRefreshToken('true');
+        saveRefreshToken('true', { broadcast: true });
 
         // Step 4: Route to the authenticated app (or back to the deep link they came from).
         const redirectTo = searchParams.get('redirect') || '/dashboard';
