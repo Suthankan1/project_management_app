@@ -33,6 +33,12 @@ const authTabId = Math.random().toString(36).slice(2);
 
 type AuthSyncType = 'login' | 'logout';
 
+interface RefreshAccessTokenOptions {
+    allowCookieRefresh?: boolean;
+}
+
+type EnsureValidTokenOptions = RefreshAccessTokenOptions;
+
 interface AuthSyncMessage {
     type?: AuthSyncType;
     token?: string | null;
@@ -408,9 +414,9 @@ export function getValidToken(): string | null {
  * access token (and refresh token if rotated), and returns the new access token.
  * On failure it clears all tokens and throws.
  */
-async function requestRefreshAccessToken(): Promise<string> {
+async function requestRefreshAccessToken(options: RefreshAccessTokenOptions = {}): Promise<string> {
     const rt = getRefreshToken();
-    if (!rt) {
+    if (!rt && !options.allowCookieRefresh) {
         clearTokens();
         throw new Error('No refresh token available');
     }
@@ -434,9 +440,9 @@ async function requestRefreshAccessToken(): Promise<string> {
     }
 }
 
-export function refreshAccessToken(): Promise<string> {
+export function refreshAccessToken(options: RefreshAccessTokenOptions = {}): Promise<string> {
     if (!refreshAccessTokenPromise) {
-        refreshAccessTokenPromise = requestRefreshAccessToken().finally(() => {
+        refreshAccessTokenPromise = requestRefreshAccessToken(options).finally(() => {
             refreshAccessTokenPromise = null;
         });
     }
@@ -447,14 +453,14 @@ export function refreshAccessToken(): Promise<string> {
  * Returns a usable access token, refreshing it first when the short-lived token
  * has expired but the 30-day refresh token is still available.
  */
-export async function ensureValidToken(): Promise<string | null> {
+export async function ensureValidToken(options: EnsureValidTokenOptions = {}): Promise<string | null> {
     const token = getValidToken();
     if (token) return token;
 
-    if (!getRefreshToken()) return null;
+    if (!getRefreshToken() && !options.allowCookieRefresh) return null;
 
     try {
-        return await refreshAccessToken();
+        return await refreshAccessToken(options);
     } catch {
         return null;
     }

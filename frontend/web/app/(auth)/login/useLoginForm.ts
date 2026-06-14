@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AUTH_TOKEN_CHANGED_EVENT, ensureValidToken, saveToken, saveRefreshToken, setRememberMe } from '@/lib/auth';
 import { authApi } from '@/services/api-contract';
 
+const PENDING_INVITE_TOKEN_KEY = 'pendingInviteToken';
+
 /*
  * Headless Business Logic Hook for Login.
  * Manages the API contract between the Next.js frontend and the Spring Boot backend.
@@ -31,11 +33,17 @@ export function useLoginForm() {
   useEffect(() => {
     let isMounted = true;
 
+    const getAuthenticatedRedirect = () => {
+      const pendingInviteToken = localStorage.getItem(PENDING_INVITE_TOKEN_KEY);
+      return searchParams.get('redirect')
+        || (pendingInviteToken ? `/accept-invite?token=${encodeURIComponent(pendingInviteToken)}` : '/dashboard');
+    };
+
     const redirectIfAuthenticated = async () => {
-      if (await ensureValidToken()) {
+      if (await ensureValidToken({ allowCookieRefresh: true })) {
         // Use replace() instead of push() so the user can't hit the "Back" button
         // and end up stuck on the login page again.
-        if (isMounted) router.replace('/dashboard');
+        if (isMounted) router.replace(getAuthenticatedRedirect());
       }
     };
 
@@ -88,7 +96,9 @@ export function useLoginForm() {
         saveRefreshToken('true', { broadcast: true });
 
         // Step 4: Route to the authenticated app (or back to the deep link they came from).
-        const redirectTo = searchParams.get('redirect') || '/dashboard';
+        const pendingInviteToken = localStorage.getItem(PENDING_INVITE_TOKEN_KEY);
+        const redirectTo = searchParams.get('redirect')
+          || (pendingInviteToken ? `/accept-invite?token=${encodeURIComponent(pendingInviteToken)}` : '/dashboard');
         router.push(redirectTo);
       } else {
         setError((response as { message?: string }).message || 'Login failed. Please try again.');
