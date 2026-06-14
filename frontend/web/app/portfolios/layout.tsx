@@ -12,7 +12,7 @@ export default function PortfoliosLayout({ children }: { children: React.ReactNo
         let isMounted = true;
 
         const ensureAuthenticated = async () => {
-            const token = await ensureValidToken();
+            const token = await ensureValidToken({ allowCookieRefresh: true });
             if (token || !isMounted) return;
             router.replace('/login');
         };

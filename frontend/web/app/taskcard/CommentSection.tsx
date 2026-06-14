@@ -4,9 +4,10 @@ import Image from 'next/image';
 import { getUserFromToken } from '@/lib/auth';
 import ActivityFeed from './ActivityFeed';
 import CommentItem from './components/CommentItem';
-import { authApi, tasksApi, projectsApi } from '@/services/api-contract';
+import { tasksApi, projectsApi } from '@/services/api-contract';
 import type { Member } from '@/services/projects-contract';
 import { getApiBaseUrl } from '@/lib/api-base-url';
+import { getOrFetchUserMap } from './sidebar/userMapCache';
 
 interface Comment {
   id: number;
@@ -22,13 +23,39 @@ interface CommentSectionProps {
 }
 
 interface UserProfile {
+  userId?: number;
   username?: string;
   email?: string;
   profilePicUrl?: string | null;
+  fullName?: string;
 }
 
 // Relative profile picture URLs from the API need a host prefix; absolute CDN URLs are used as-is.
 const API_BASE_URL = getApiBaseUrl();
+
+function buildUsersMap(users: UserProfile[]): Record<string, string | null> {
+  const map: Record<string, string | null> = {};
+
+  users.forEach((u) => {
+    const pic = u.profilePicUrl || null;
+    if (typeof u.userId === 'number') {
+      map[`id:${u.userId}`] = pic;
+    }
+    if (u.email) {
+      map[`email:${u.email.toLowerCase()}`] = pic;
+    }
+    if (u.username) {
+      map[u.username] = pic;
+      map[`username:${u.username.toLowerCase()}`] = pic;
+    }
+    if (u.fullName) {
+      map[u.fullName] = pic;
+      map[`fullname:${u.fullName.toLowerCase()}`] = pic;
+    }
+  });
+
+  return map;
+}
 
 const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef, projectId }) => {
   const [activeTab, setActiveTab] = useState<'Comments' | 'History'>('Comments');
@@ -42,40 +69,51 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef, pro
     const user = getUserFromToken();
     if (user) {
       setCurrentUser(user);
-      
-      // Fetch users to populate profile pictures and map them by username
+
+      let isActive = true;
+
+      // Avatar enrichment is optional; comments should still work if this lookup is unauthorized.
       const fetchUsers = async () => {
         try {
-          let response: UserProfile[];
+          let uidMap: Record<string, string | null>;
           if (projectId) {
             const members = await projectsApi.getMembers(projectId);
-            response = members.map((m: Member) => m.user ? {
+            uidMap = buildUsersMap(members.map((m: Member) => m.user ? {
+              userId: m.user.userId,
               username: m.user.username,
               email: m.user.email,
               profilePicUrl: m.user.profilePicUrl
             } : {
+              userId: m.userId,
               username: m.username,
               email: m.email,
               profilePicUrl: null
-            });
+            }));
           } else {
-            response = await authApi.getAllUsers();
+            uidMap = await getOrFetchUserMap();
           }
-          const uidMap: Record<string, string | null> = {};
-          response.forEach((u: UserProfile) => {
-             if (u.username) {
-               uidMap[u.username] = u.profilePicUrl || null;
-             }
-             if (u.email === user.email && u.profilePicUrl) {
-               setCurrentUser(prev => prev ? { ...prev, profilePicUrl: u.profilePicUrl } : null);
-             }
-          });
+
+          if (!isActive) return;
+
+          const currentUserPic = uidMap[`email:${user.email.toLowerCase()}`]
+            || (user.userId ? uidMap[`id:${user.userId}`] : null)
+            || (user.username ? uidMap[user.username] || uidMap[`username:${user.username.toLowerCase()}`] : null);
+
+          if (currentUserPic) {
+            setCurrentUser(prev => prev ? { ...prev, profilePicUrl: currentUserPic } : null);
+          }
           setUsersMap(uidMap);
-        } catch (error) {
-          console.error('Failed to fetch users:', error);
+        } catch {
+          if (isActive) {
+            setUsersMap({});
+          }
         }
       };
       void fetchUsers();
+
+      return () => {
+        isActive = false;
+      };
     }
   }, [projectId]);
 
