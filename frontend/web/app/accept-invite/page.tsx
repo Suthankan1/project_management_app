@@ -1,10 +1,16 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { getValidToken } from '@/lib/auth';
+import { AUTH_TOKEN_CHANGED_EVENT, ensureValidToken } from '@/lib/auth';
 import { projectsApi } from '@/services/api-contract';
+
+const PENDING_INVITE_TOKEN_KEY = 'pendingInviteToken';
+
+function buildInviteRedirect(token: string): string {
+    return `/accept-invite?token=${encodeURIComponent(token)}`;
+}
 
 function AcceptInviteContent() {
     const searchParams = useSearchParams();
@@ -12,36 +18,42 @@ function AcceptInviteContent() {
 
     const [token, setToken] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [acceptedToken, setAcceptedToken] = useState<string | null>(null);
     const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     useEffect(() => {
         const fromUrl = searchParams.get('token');
-        if (fromUrl) {
-            setToken(fromUrl);
-        } else {
-            setMsg({ type: 'error', text: 'Invalid or missing invitation link.' });
+        const fromPending = typeof window !== 'undefined'
+            ? localStorage.getItem(PENDING_INVITE_TOKEN_KEY)
+            : null;
+        const inviteToken = fromUrl || fromPending;
+
+        if (inviteToken) {
+            setToken(inviteToken);
+            return;
         }
+
+        setMsg({ type: 'error', text: 'Invalid or missing invitation link.' });
     }, [searchParams]);
 
-    const handleAccept = async () => {
+    const acceptInvitation = useCallback(async ({ redirectToLogin }: { redirectToLogin: boolean }) => {
         setMsg(null);
-        if (!token) return;
+        if (!token || loading || acceptedToken === token) return;
 
-        // Ensure user is logged in
-        if (typeof window !== 'undefined') {
-            const authToken = getValidToken();
-            if (!authToken) {
-                // Save token so they can accept after login
-                localStorage.setItem('pendingInviteToken', token);
-                // Redirect to login (assuming /login exists for user, adapt if it's / register)
-                router.push('/login?message=Please log in to accept your invitation');
-                return;
+        const authToken = await ensureValidToken({ allowCookieRefresh: true });
+        if (!authToken) {
+            if (redirectToLogin) {
+                localStorage.setItem(PENDING_INVITE_TOKEN_KEY, token);
+                router.push(`/login?redirect=${encodeURIComponent(buildInviteRedirect(token))}`);
             }
+            return;
         }
 
         try {
             setLoading(true);
             await projectsApi.acceptInvitation(token);
+            localStorage.removeItem(PENDING_INVITE_TOKEN_KEY);
+            setAcceptedToken(token);
             setMsg({ type: 'success', text: 'Invitation accepted! You are now a member of the project team.' });
 
             // Redirect to dashboard after brief delay
@@ -59,6 +71,25 @@ function AcceptInviteContent() {
         } finally {
             setLoading(false);
         }
+    }, [acceptedToken, loading, router, token]);
+
+    useEffect(() => {
+        if (!token || acceptedToken === token || msg?.type === 'success') return;
+
+        const acceptIfAuthenticated = () => {
+            void acceptInvitation({ redirectToLogin: false });
+        };
+
+        acceptIfAuthenticated();
+        window.addEventListener(AUTH_TOKEN_CHANGED_EVENT, acceptIfAuthenticated);
+
+        return () => {
+            window.removeEventListener(AUTH_TOKEN_CHANGED_EVENT, acceptIfAuthenticated);
+        };
+    }, [acceptInvitation, acceptedToken, msg?.type, token]);
+
+    const handleAccept = async () => {
+        await acceptInvitation({ redirectToLogin: true });
     };
 
     return (
