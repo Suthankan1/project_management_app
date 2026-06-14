@@ -16,7 +16,7 @@ export default function DashboardLayout({
         let isMounted = true;
 
         const ensureAuthenticated = async () => {
-            const token = await ensureValidToken();
+            const token = await ensureValidToken({ allowCookieRefresh: true });
             if (token || !isMounted) return;
             router.replace('/login');
         };

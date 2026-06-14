@@ -44,7 +44,7 @@ export default function ProjectLayout({
     let isMounted = true;
 
     const ensureAuthenticated = async () => {
-      const token = await ensureValidToken();
+      const token = await ensureValidToken({ allowCookieRefresh: true });
       if (!token && isMounted) {
         router.replace('/login');
       }
