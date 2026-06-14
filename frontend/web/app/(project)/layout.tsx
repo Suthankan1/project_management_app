@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import FullLayout from '@/components/layout/FullLayout';
 import api from '@/lib/axios';
-import { ensureValidToken } from '@/lib/auth';
+import { AUTH_TOKEN_CHANGED_EVENT, ensureValidToken } from '@/lib/auth';
 
 /**
  * Unified Project Layout
@@ -43,12 +43,17 @@ export default function ProjectLayout({
   useEffect(() => {
     let isMounted = true;
 
-    const syncProjectContext = async () => {
+    const ensureAuthenticated = async () => {
       const token = await ensureValidToken();
-      if (!token) {
-        if (isMounted) router.replace('/login');
-        return;
+      if (!token && isMounted) {
+        router.replace('/login');
       }
+      return token;
+    };
+
+    const syncProjectContext = async () => {
+      const token = await ensureAuthenticated();
+      if (!token) return;
 
       if (!projectId) return;
       // Skip if we already synced this project
@@ -82,10 +87,16 @@ export default function ProjectLayout({
       }
     };
 
+    const handleAuthTokenChanged = () => {
+      void ensureAuthenticated();
+    };
+
     void syncProjectContext();
+    window.addEventListener(AUTH_TOKEN_CHANGED_EVENT, handleAuthTokenChanged);
 
     return () => {
       isMounted = false;
+      window.removeEventListener(AUTH_TOKEN_CHANGED_EVENT, handleAuthTokenChanged);
     };
   }, [projectId, router]);
 
