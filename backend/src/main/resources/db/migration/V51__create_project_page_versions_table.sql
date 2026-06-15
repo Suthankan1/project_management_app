@@ -10,4 +10,4 @@ CREATE TABLE IF NOT EXISTS project_page_versions (
     CONSTRAINT uk_project_page_version UNIQUE (page_id, version_number)
 );
 
-CREATE INDEX idx_project_page_versions_page ON project_page_versions(page_id);
+CREATE INDEX IF NOT EXISTS idx_project_page_versions_page ON project_page_versions(page_id);
