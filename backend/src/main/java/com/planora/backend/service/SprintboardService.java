@@ -97,29 +97,32 @@ public class SprintboardService {
 
         requireViewBoard(sprint.getProId(), currentUserId);
 
-        if (sprintboardRepository.existsBySprintId(sprintId)) {
-            return sprintboardRepository.findBySprintId(sprintId).orElse(null);
-        }
-
-        Sprintboard sprintboard = new Sprintboard();
-        sprintboard.setSprint(sprint);
-
-        Sprintboard savedSprintboard = sprintboardRepository.save(sprintboard);
-
-        // Create default columns
-        springcolumnService.initializeColumnsForSprintboard(savedSprintboard);
-
-        return savedSprintboard;
+        return findOrCreateSprintboardForSprint(sprint);
     }
 
+    private Sprintboard findOrCreateSprintboardForSprint(Sprint sprint) {
+        return sprintboardRepository.findBySprintId(sprint.getId())
+                .orElseGet(() -> {
+                    Sprintboard sprintboard = new Sprintboard();
+                    sprintboard.setSprint(sprint);
+
+                    Sprintboard savedSprintboard = sprintboardRepository.save(sprintboard);
+
+                    // Create default columns
+                    springcolumnService.initializeColumnsForSprintboard(savedSprintboard);
+
+                    return savedSprintboard;
+                });
+    }
+
+    @Transactional
     public SprintboardResponseDTO getSprintboardBySprintId(Long sprintId, Long currentUserId) {
         Sprint sprint = sprintRepository.findById(sprintId)
                 .orElseThrow(() -> new RuntimeException("Sprint not found"));
 
         requireViewBoard(sprint.getProId(), currentUserId);
 
-        Sprintboard sprintboard = sprintboardRepository.findBySprintId(sprintId)
-                .orElseThrow(() -> new RuntimeException("Sprintboard not found for sprint"));
+        Sprintboard sprintboard = findOrCreateSprintboardForSprint(sprint);
 
         SprintboardResponseDTO response = new SprintboardResponseDTO();
         response.setId(sprintboard.getId());
@@ -145,14 +148,13 @@ public class SprintboardService {
         return response;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public SprintboardFullResponseDTO getFullSprintboardBySprintId(Long sprintId, Long currentUserId) {
         Sprint sprint = sprintRepository.findById(sprintId)
                 .orElseThrow(() -> new RuntimeException("Sprint not found"));
         requireViewBoard(sprint.getProId(), currentUserId);
 
-        Sprintboard sprintboard = sprintboardRepository.findBySprintId(sprintId)
-                .orElseThrow(() -> new RuntimeException("Sprintboard not found for sprint"));
+        Sprintboard sprintboard = findOrCreateSprintboardForSprint(sprint);
 
         List<Sprintcolumn> columns = springcolumnRepository.findBySprintboardIdOrderByPosition(sprintboard.getId());
         List<Task> scalarTasks = taskRepository.findBySprintIdWithScalars(sprintId);

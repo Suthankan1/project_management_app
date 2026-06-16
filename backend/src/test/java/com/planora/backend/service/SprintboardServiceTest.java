@@ -157,6 +157,33 @@ class SprintboardServiceTest {
     // -------- new tests --------
 
     @Test
+    void getFullSprintboardBySprintId_whenBoardMissing_createsBoardWithDefaultColumns() {
+        Project project = makeProject();
+        Sprint sprint = makeSprint(project);
+        sprint.setName("Sprint 1");
+        sprint.setStatus(SprintStatus.ACTIVE);
+
+        Sprintboard savedSprintboard = makeSprintboard(sprint);
+
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+
+        when(sprintRepository.findById(5L)).thenReturn(Optional.of(sprint));
+        when(projectRepository.findById(3L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(10L, 100L)).thenReturn(Optional.of(member));
+        when(sprintboardRepository.findBySprintId(5L)).thenReturn(Optional.empty());
+        when(sprintboardRepository.save(any(Sprintboard.class))).thenReturn(savedSprintboard);
+        when(springcolumnRepository.findBySprintboardIdOrderByPosition(7L)).thenReturn(List.of());
+        when(taskRepository.findBySprintIdWithScalars(5L)).thenReturn(List.of());
+
+        var result = sprintboardService.getFullSprintboardBySprintId(5L, 100L);
+
+        org.junit.jupiter.api.Assertions.assertEquals(7L, result.getId());
+        org.junit.jupiter.api.Assertions.assertEquals(5L, result.getSprintId());
+        verify(springcolumnService).initializeColumnsForSprintboard(savedSprintboard);
+    }
+
+    @Test
     void addColumnToSprintboard_createsColumnWithMaxPositionPlusOne() {
         Project project = makeProject();
         Sprint sprint = makeSprint(project);
