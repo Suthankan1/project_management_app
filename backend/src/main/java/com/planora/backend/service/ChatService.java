@@ -350,10 +350,20 @@ public class ChatService {
      */
     @SuppressWarnings("null")
     public ChatMessageDTO saveMessage(ChatMessage message) {
+        applyMessageDefaults(message);
+        return convertToDTO(chatMessageRepository.save(message));
+    }
+
+    private void applyMessageDefaults(ChatMessage message) {
+        if (message == null) {
+            return;
+        }
         if (message.getFormatType() == null) {
             message.setFormatType(ChatMessage.FormatType.PLAIN);
         }
-        return convertToDTO(chatMessageRepository.save(message));
+        if (message.getDeleted() == null) {
+            message.setDeleted(false);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -904,7 +914,7 @@ public class ChatService {
         message.setChatType(dto.getChatType());
         message.setParentMessageId(dto.getParentMessageId());
         message.setFormatType(dto.getFormatType());
-        message.setDeleted(dto.getDeleted());
+        message.setDeleted(Boolean.TRUE.equals(dto.getDeleted()));
         message.setDeletedAt(dto.getDeletedAt());
         message.setEditedAt(dto.getEditedAt());
         // timestamp is managed by JPA (@CreationTimestamp)
