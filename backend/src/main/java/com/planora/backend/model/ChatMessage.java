@@ -14,6 +14,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -58,6 +60,7 @@ public class ChatMessage {
     @Enumerated(EnumType.STRING)
     private FormatType formatType = FormatType.PLAIN;
 
+    @Column(nullable = false)
     private Boolean deleted = false;
 
     // Soft-delete metadata allows moderation/history flows without hard deletes.
@@ -84,6 +87,17 @@ public class ChatMessage {
     public enum FormatType {
         PLAIN,
         MARKDOWN
+    }
+
+    @PrePersist
+    @PreUpdate
+    private void applyDefaults() {
+        if (formatType == null) {
+            formatType = FormatType.PLAIN;
+        }
+        if (deleted == null) {
+            deleted = false;
+        }
     }
 
     @Override
