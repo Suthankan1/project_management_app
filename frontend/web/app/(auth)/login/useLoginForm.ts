@@ -47,7 +47,7 @@ export function useLoginForm() {
     };
 
     const redirectIfAuthenticated = async () => {
-      if (await ensureValidToken({ allowCookieRefresh: true })) {
+      if (await ensureValidToken()) {
         // Use replace() instead of push() so the user can't hit the "Back" button
         // and end up stuck on the login page again.
         if (isMounted) router.replace(getAuthenticatedRedirect());
