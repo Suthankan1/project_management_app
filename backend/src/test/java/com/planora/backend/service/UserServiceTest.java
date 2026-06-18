@@ -528,6 +528,7 @@ public class UserServiceTest {
         assertTrue(result.isSuccess());
         assertEquals("new-access", result.getToken());
         assertEquals("new-refresh", result.getRefreshToken());
+        verify(tokenRepository).deleteByUserAndTokenType(testUser, VerificationToken.TokenType.REFRESH_TOKEN);
     }
 
     @Test
@@ -557,7 +558,7 @@ public class UserServiceTest {
         LoginResponse result = userService.refreshTokens("tampered-token");
 
         assertNull(result);
-        verify(tokenRepository).delete(storedToken);
+        verify(tokenRepository).deleteByUserAndTokenType(testUser, VerificationToken.TokenType.REFRESH_TOKEN);
     }
 
     @Test
@@ -581,32 +582,21 @@ public class UserServiceTest {
     }
 
     @Test
-    void testRevokeRefreshToken_DeletesStoredRefreshToken() {
-        VerificationToken storedToken = new VerificationToken();
-        storedToken.setUser(testUser);
-        storedToken.setToken("refresh-jti");
-        storedToken.setExpiry(Instant.now().plusSeconds(600));
-        storedToken.setUsed(false);
-        storedToken.setTokenType(VerificationToken.TokenType.REFRESH_TOKEN);
-
+    void testRevokeRefreshToken_DeletesRefreshTokenRecords() {
         when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
-        when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.REFRESH_TOKEN)).thenReturn(storedToken);
 
         userService.revokeRefreshToken("test@example.com");
 
-        verify(tokenRepository).delete(storedToken);
-        verify(tokenRepository).flush();
+        verify(tokenRepository).deleteByUserAndTokenType(testUser, VerificationToken.TokenType.REFRESH_TOKEN);
     }
 
     @Test
-    void testRevokeRefreshToken_NoStoredRefreshToken_DoesNothing() {
-        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(testUser));
-        when(tokenRepository.findByUserAndTokenType(testUser, VerificationToken.TokenType.REFRESH_TOKEN)).thenReturn(null);
+    void testRevokeRefreshToken_NoUser_DoesNothing() {
+        when(userRepository.findFirstByEmailIgnoreCase("test@example.com")).thenReturn(Optional.empty());
 
         userService.revokeRefreshToken("test@example.com");
 
-        verify(tokenRepository, never()).delete(any());
-        verify(tokenRepository, never()).flush();
+        verify(tokenRepository, never()).deleteByUserAndTokenType(any(), any());
     }
 
     @Test

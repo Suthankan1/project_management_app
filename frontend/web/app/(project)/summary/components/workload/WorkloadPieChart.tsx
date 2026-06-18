@@ -129,7 +129,7 @@ export function WorkloadPieChart({
                   onMouseEnter={onPieEnter}
                 >
                   {activeWorkloadData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} style={{ outline: 'none' }} />
+                    <Cell key={`cell-${entry.key}`} fill={entry.color} style={{ outline: 'none' }} />
                   ))}
                 </Pie>
               </PieChart>

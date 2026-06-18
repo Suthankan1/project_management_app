@@ -87,6 +87,7 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
       });
 
       workloads[workloadKey] = {
+        key: workloadKey,
         isMember: true,
         id: m.id,
         name: memberName,
@@ -113,9 +114,10 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
       } else if (assigneeNameKey && workloadByName[assigneeNameKey]) {
         key = workloadByName[assigneeNameKey];
       } else if (displayAssigneeName) {
-        key = `O_${displayAssigneeName}`;
+        key = assigneeIdKey ? `O_ID_${assigneeIdKey}` : `O_${assigneeNameKey || displayAssigneeName}`;
         if (!workloads[key]) {
           workloads[key] = {
+            key,
             isMember: false,
             name: displayAssigneeName,
             avatar: resolveSummaryAvatarUrl(t.assigneePhotoUrl || t.assignee?.avatar || t.assignee?.profilePicUrl),
@@ -126,6 +128,7 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
       } else {
         if (!workloads["UNASSIGNED"]) {
           workloads["UNASSIGNED"] = {
+            key: "UNASSIGNED",
             isMember: false,
             name: 'Unassigned',
             tasks: 0, completed: 0, overdue: 0
