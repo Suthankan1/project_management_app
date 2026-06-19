@@ -1,5 +1,9 @@
 import api from '@/lib/axios';
-import { postTelemetry as postTelemetryBuilder, createRoom as createRoomBuilder } from '@planora/contracts';
+import {
+  postTelemetry as postTelemetryBuilder,
+  createRoom as createRoomBuilder,
+  createChatMessage as createChatMessageBuilder,
+} from '@planora/contracts';
 import type {
   ChatMessage,
   ChatReactionSummary,
@@ -196,7 +200,7 @@ export const chatApi = {
     content: string,
     localId?: string,
   ): Promise<ChatMessage> => {
-    const { data } = await api.post(`/api/projects/${projectId}/chat/messages`, {
+    const { data } = await createChatMessageBuilder(api, projectId, {
       content,
       localId,
       formatType: 'PLAIN',
@@ -209,7 +213,7 @@ export const chatApi = {
     content: string,
     localId?: string,
   ): Promise<ChatMessage> => {
-    const { data } = await api.post(`/api/projects/${projectId}/chat/messages`, {
+    const { data } = await createChatMessageBuilder(api, projectId, {
       content,
       recipient,
       localId,
@@ -223,7 +227,7 @@ export const chatApi = {
     content: string,
     localId?: string,
   ): Promise<ChatMessage> => {
-    const { data } = await api.post(`/api/projects/${projectId}/chat/messages`, {
+    const { data } = await createChatMessageBuilder(api, projectId, {
       content,
       roomId,
       localId,
