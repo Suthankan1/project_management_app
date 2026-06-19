@@ -25,6 +25,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import com.planora.backend.controller.ProjectMemberController;
 import com.planora.backend.dto.ProjectInviteRequest;
+import com.planora.backend.exception.InvitationExpiredException;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Team;
 import com.planora.backend.model.TeamInvitation;
@@ -203,7 +204,9 @@ class ProjectInvitationServiceTest {
 
         when(teamInvitationRepository.findByTokenWithLock("expired-token")).thenReturn(Optional.of(invitation));
 
-        assertThrows(RuntimeException.class, () -> projectInvitationService.acceptInvitation("expired-token", 20L));
+        assertThrows(InvitationExpiredException.class, () -> projectInvitationService.acceptInvitation("expired-token", 20L));
+        assertEquals("EXPIRED", invitation.getStatus());
+        verify(teamInvitationRepository).save(invitation);
     }
 
     @Test

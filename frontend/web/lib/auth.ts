@@ -29,6 +29,8 @@ interface JwtPayload {
 let refreshAccessTokenPromise: Promise<string> | null = null;
 let authSyncListenerInstalled = false;
 let authBroadcastChannel: BroadcastChannel | null = null;
+let authLogoutInProgress = false;
+let authStateGeneration = 0;
 const authTabId = Math.random().toString(36).slice(2);
 
 type AuthSyncType = 'login' | 'logout';
@@ -52,7 +54,17 @@ function emitAuthTokenChanged(): void {
     }
 }
 
+function markAuthActive(): void {
+    authLogoutInProgress = false;
+}
+
+function markAuthLoggedOut(): void {
+    authLogoutInProgress = true;
+    authStateGeneration += 1;
+}
+
 function setMemoryAccessToken(token: string): void {
+    markAuthActive();
     memoryToken = token;
     initializeSessionCacheForCurrentAuth(token);
     emitAuthTokenChanged();
@@ -63,6 +75,7 @@ function handleAuthBroadcastMessage(event: MessageEvent<AuthSyncMessage>): void 
     if (!message || message.sourceTabId === authTabId) return;
 
     if (message.type === 'logout') {
+        markAuthLoggedOut();
         clearLocalAuthState();
         emitAuthTokenChanged();
         return;
@@ -191,6 +204,7 @@ async function acquireRefreshLock(): Promise<() => void> {
 
 function handleCrossTabAuthEvent(event: StorageEvent): void {
     if (event.key === REFRESH_TOKEN_MARKER_KEY && event.newValue === null) {
+        markAuthLoggedOut();
         clearLocalAuthState();
         emitAuthTokenChanged();
         return;
@@ -201,9 +215,11 @@ function handleCrossTabAuthEvent(event: StorageEvent): void {
     try {
         const message = JSON.parse(event.newValue) as { type?: string };
         if (message.type === 'logout') {
+            markAuthLoggedOut();
             clearLocalAuthState();
             emitAuthTokenChanged();
         } else if (message.type === 'login') {
+            markAuthActive();
             window.setTimeout(emitAuthTokenChanged, 100);
         }
     } catch {
@@ -227,6 +243,7 @@ ensureAuthSyncListener();
 export function setRememberMe(remember: boolean): void {
     if (typeof window === 'undefined') return;
     ensureAuthSyncListener();
+    markAuthActive();
     if (remember) {
         localStorage.setItem('rememberMe', 'true');
     } else {
@@ -357,6 +374,7 @@ export function saveToken(token: string): void {
 export function saveRefreshToken(_token: string, options: { broadcast?: boolean } = {}): void {
     if (typeof window !== 'undefined') {
         ensureAuthSyncListener();
+        markAuthActive();
         localStorage.removeItem('refreshToken');
         sessionStorage.removeItem('refreshToken');
         localStorage.removeItem(REFRESH_TOKEN_KEY);
@@ -382,6 +400,7 @@ export function getRefreshToken(): string | null {
 export function clearTokens(): void {
     if (typeof window !== 'undefined') {
         ensureAuthSyncListener();
+        markAuthLoggedOut();
         clearLocalAuthState();
 
         // Non-blocking logout call to clear HttpOnly cookie
@@ -415,13 +434,22 @@ export function getValidToken(): string | null {
  * On failure it clears all tokens and throws.
  */
 async function requestRefreshAccessToken(options: RefreshAccessTokenOptions = {}): Promise<string> {
+    if (authLogoutInProgress) {
+        throw new Error('Token refresh cancelled during logout');
+    }
+
     const rt = getRefreshToken();
     if (!rt && !options.allowCookieRefresh) {
         clearTokens();
         throw new Error('No refresh token available');
     }
+    const refreshGeneration = authStateGeneration;
     const releaseRefreshLock = await acquireRefreshLock();
     try {
+        if (authLogoutInProgress || refreshGeneration !== authStateGeneration) {
+            throw new Error('Token refresh cancelled during logout');
+        }
+
         const res = await fetch(`${getApiBaseUrl()}/api/auth/refresh`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -432,6 +460,11 @@ async function requestRefreshAccessToken(options: RefreshAccessTokenOptions = {}
             throw new Error('Token refresh failed');
         }
         const data = await res.json();
+
+        if (authLogoutInProgress || refreshGeneration !== authStateGeneration) {
+            throw new Error('Token refresh cancelled during logout');
+        }
+
         saveToken(data.token);
         saveRefreshToken('true', { broadcast: true });
         return data.token;
@@ -456,6 +489,8 @@ export function refreshAccessToken(options: RefreshAccessTokenOptions = {}): Pro
 export async function ensureValidToken(options: EnsureValidTokenOptions = {}): Promise<string | null> {
     const token = getValidToken();
     if (token) return token;
+
+    if (authLogoutInProgress) return null;
 
     if (!getRefreshToken() && !options.allowCookieRefresh) return null;
 
