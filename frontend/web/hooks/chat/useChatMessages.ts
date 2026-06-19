@@ -250,10 +250,10 @@ export function useChatMessages(projectId: string) {
   );
 
   const sendMessage = useCallback(
-    (
+    async (
       content: string,
       currentUser: string,
-      stompSend: (dest: string, body: string) => void,
+      stompSend: ((dest: string, body: string) => void) | undefined,
       trackTelemetry: (action: string, target: string) => void,
       recipient?: string | null,
     ) => {
@@ -271,12 +271,22 @@ export function useChatMessages(projectId: string) {
           formatType: 'PLAIN',
           timestamp: new Date().toISOString(),
         };
-        stompSend(
-          `/app/project/${projectId}/chat.sendPrivateMessage`,
-          JSON.stringify(msg),
-        );
         trackTelemetry('chat_private_message_sent', 'private');
         updateMessageEverywhere(msg, true);
+        if (stompSend) {
+          stompSend(
+            `/app/project/${projectId}/chat.sendPrivateMessage`,
+            JSON.stringify(msg),
+          );
+          return;
+        }
+
+        try {
+          const saved = await chatApi.postPrivateMessage(projectId, recipient, trimmed, localId);
+          updateMessageEverywhere(saved);
+        } catch (err) {
+          console.error('Failed to persist private chat message', err);
+        }
         return;
       }
 
@@ -289,22 +299,32 @@ export function useChatMessages(projectId: string) {
         formatType: 'PLAIN',
         timestamp: new Date().toISOString(),
       };
-      stompSend(
-        `/app/project/${projectId}/chat.sendMessage`,
-        JSON.stringify(msg),
-      );
       trackTelemetry('chat_team_message_sent', 'team');
       updateMessageEverywhere(msg, true);
+      if (stompSend) {
+        stompSend(
+          `/app/project/${projectId}/chat.sendMessage`,
+          JSON.stringify(msg),
+        );
+        return;
+      }
+
+      try {
+        const saved = await chatApi.postTeamMessage(projectId, trimmed, localId);
+        updateMessageEverywhere(saved);
+      } catch (err) {
+        console.error('Failed to persist team chat message', err);
+      }
     },
     [projectId, updateMessageEverywhere],
   );
 
   const sendRoomMessage = useCallback(
-    (
+    async (
       content: string,
       roomId: number,
       currentUser: string,
-      stompSend: (dest: string, body: string) => void,
+      stompSend: ((dest: string, body: string) => void) | undefined,
       trackTelemetry: (action: string, target: string, details?: string) => void,
     ) => {
       const trimmed = content.trim();
@@ -320,12 +340,22 @@ export function useChatMessages(projectId: string) {
         formatType: 'PLAIN',
         timestamp: new Date().toISOString(),
       };
-      stompSend(
-        `/app/project/${projectId}/room/${roomId}/send`,
-        JSON.stringify(msg),
-      );
       trackTelemetry('chat_room_message_sent', 'room', `roomId=${roomId}`);
       updateMessageEverywhere(msg, true);
+      if (stompSend) {
+        stompSend(
+          `/app/project/${projectId}/room/${roomId}/send`,
+          JSON.stringify(msg),
+        );
+        return;
+      }
+
+      try {
+        const saved = await chatApi.postRoomMessage(projectId, roomId, trimmed, localId);
+        updateMessageEverywhere(saved);
+      } catch (err) {
+        console.error('Failed to persist room chat message', err);
+      }
     },
     [projectId, updateMessageEverywhere],
   );
