@@ -6,7 +6,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProduction = process.env.NODE_ENV === 'production';
 const localBackendOrigin = 'http://localhost:8080';
 const localWebSocketOrigin = 'ws://localhost:8080';
-const awsImageSource = 'https://*.amazonaws.com';
+const awsRegion = process.env.AWS_REGION || 'eu-north-1';
+const awsS3Sources = [
+  'https://*.amazonaws.com',
+  'https://*.s3.amazonaws.com',
+  `https://*.s3.${awsRegion}.amazonaws.com`,
+  `https://*.s3-${awsRegion}.amazonaws.com`,
+];
 const githubAvatarImageSource = 'https://avatars.githubusercontent.com';
 
 function originFromUrl(rawUrl) {
@@ -96,18 +102,19 @@ const nextConfig = {
       ...backendSources,
       websocketOrigin,
       ...localWebSocketSources,
+      ...awsS3Sources,
     ]);
     const imageSources = uniqueSources([
       "'self'",
       'data:',
       'blob:',
-      awsImageSource,
+      ...awsS3Sources,
       githubAvatarImageSource,
       ...backendSources,
     ]);
     const frameSources = uniqueSources([
       "'self'",
-      awsImageSource,
+      ...awsS3Sources,
       'blob:',
       ...backendSources,
     ]);
