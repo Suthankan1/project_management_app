@@ -9,6 +9,7 @@ import com.planora.backend.exception.GithubIssueValidationException;
 import com.planora.backend.exception.GithubRateLimitException;
 import com.planora.backend.exception.GithubIntegrationDisabledException;
 import com.planora.backend.exception.GithubRepositoryNotFoundException;
+import com.planora.backend.exception.InvitationExpiredException;
 import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.exception.StorageQuotaExceededException;
 import jakarta.persistence.EntityNotFoundException;
@@ -80,6 +81,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(StorageQuotaExceededException.class)
     public ResponseEntity<ApiErrorResponse> handleStorageQuotaExceeded(StorageQuotaExceededException ex, HttpServletRequest request) {
         return buildError(HttpStatus.PAYLOAD_TOO_LARGE, "STORAGE_QUOTA_EXCEEDED", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(InvitationExpiredException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvitationExpired(InvitationExpiredException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.GONE, "INVITATION_EXPIRED", ex.getMessage(), request);
     }
 
     @ExceptionHandler(EntityNotFoundException.class)

@@ -4,7 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { AxiosError } from 'axios';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/axios';
-import { getUserFromToken } from '@/lib/auth';
+import { ensureValidToken, getUserFromToken } from '@/lib/auth';
 import { updateProfile } from '@planora/contracts';
 
 type UserResponse = {
@@ -73,20 +73,30 @@ export function useProfile() {
     const resolvedProfilePicUrl = useMemo(() => profilePicUrl || '', [profilePicUrl]);
 
     useEffect(() => {
-        const tokenUser = getUserFromToken();
-        if (!tokenUser) {
-            router.push('/login');
-            return;
-        }
-        setIsLoading(true);
-        setErrorMessage('');
-        setSuccessMessage('');
-        setUsername(tokenUser.username || '');
-        setEmail(tokenUser.email || '');
+        let isMounted = true;
 
         const loadProfile = async () => {
+            const token = await ensureValidToken({ allowCookieRefresh: true });
+            if (!token || !isMounted) {
+                if (isMounted) router.push('/login');
+                return;
+            }
+
+            const tokenUser = getUserFromToken();
+            if (!tokenUser) {
+                router.push('/login');
+                return;
+            }
+
+            setIsLoading(true);
+            setErrorMessage('');
+            setSuccessMessage('');
+            setUsername(tokenUser.username || '');
+            setEmail(tokenUser.email || '');
+
             try {
                 const response = await api.get<UserResponse>('/api/user/profile');
+                if (!isMounted) return;
                 const p = response.data;
                 setUsername(p.username || tokenUser.username || '');
                 setEmail(p.email || tokenUser.email || '');
@@ -102,12 +112,16 @@ export function useProfile() {
                 setProfilePicUrl(p.profilePicUrl || '');
                 setLastActive(p.lastActive || null);
             } catch (error: unknown) {
-                setErrorMessage(getApiErrorMessage(error, 'Failed to load profile details.'));
+                if (isMounted) setErrorMessage(getApiErrorMessage(error, 'Failed to load profile details.'));
             } finally {
-                setIsLoading(false);
+                if (isMounted) setIsLoading(false);
             }
         };
         void loadProfile();
+
+        return () => {
+            isMounted = false;
+        };
     }, [router, reloadToken]);
 
     const reloadProfile = () => {

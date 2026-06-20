@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.planora.backend.controller.ProjectMemberController;
 import com.planora.backend.dto.ProjectInviteRequest;
+import com.planora.backend.exception.InvitationExpiredException;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.TeamInvitation;
 import com.planora.backend.model.TeamMember;
@@ -111,7 +112,7 @@ public class ProjectInvitationService {
                 invitation.getToken());
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = InvitationExpiredException.class)
     public void acceptInvitation(String token, Long userId) {
         if (token == null || token.isBlank()) {
             throw new RuntimeException("Invalid invitation token");
@@ -128,7 +129,11 @@ public class ProjectInvitationService {
         teamMemberService.enforceCreatorOnlyOwnerRole(invitation.getTeam().getId(), projectOwnerUserId);
 
         if (invitation.getExpiresAt() != null && invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Invitation has expired");
+            if (!"EXPIRED".equalsIgnoreCase(invitation.getStatus())) {
+                invitation.setStatus("EXPIRED");
+                teamInvitationRepository.save(invitation);
+            }
+            throw new InvitationExpiredException("Invitation has expired");
         }
 
         User user = userRepository.findById(userId)

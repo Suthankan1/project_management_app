@@ -1,7 +1,6 @@
 import type { Member, MemberCombined, PendingInvite } from './types';
-import { getApiBaseUrl } from '@/lib/api-base-url';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
-const API_BASE_URL = getApiBaseUrl();
 const MEMBERS_CACHE_KEY_PREFIX = 'planora:members:';
 
 export function getMembersCacheKey(projectId: string): string {
@@ -65,16 +64,5 @@ export function canManageMember(
 }
 
 export function resolveProfilePicUrl(profilePicUrl?: string): string {
-  if (!profilePicUrl) return '';
-
-  if (
-    profilePicUrl.startsWith('http://') ||
-    profilePicUrl.startsWith('https://') ||
-    profilePicUrl.startsWith('data:') ||
-    profilePicUrl.startsWith('blob:')
-  ) {
-    return profilePicUrl;
-  }
-
-  return `${API_BASE_URL}${profilePicUrl.startsWith('/') ? '' : '/'}${profilePicUrl}`;
+  return resolveProfilePhotoUrl(profilePicUrl) || '';
 }

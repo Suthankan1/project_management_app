@@ -6210,6 +6210,29 @@
         ]
       }
     },
+    "/api/github/oauth-config": {
+      "get": {
+        "operationId": "getOAuthConfig",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "object"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "git-hub-controller"
+        ]
+      }
+    },
     "/api/github/project/{projectId}/commits": {
       "get": {
         "operationId": "getCommits",
@@ -6668,6 +6691,29 @@
             "content": {
               "*/*": {
                 "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "git-hub-controller"
+        ]
+      }
+    },
+    "/api/github/status": {
+      "get": {
+        "operationId": "getStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
                   "type": "object"
                 }
               }

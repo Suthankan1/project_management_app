@@ -1,4 +1,4 @@
-import { ensureValidToken, getRefreshToken, getValidToken, refreshAccessToken, saveRefreshToken, saveToken, setRememberMe } from './auth';
+import { clearTokens, ensureValidToken, getRefreshToken, getValidToken, refreshAccessToken, saveRefreshToken, saveToken, setRememberMe } from './auth';
 
 function createJwt(payload: Record<string, unknown>): string {
   const encodedPayload = window.btoa(JSON.stringify(payload))
@@ -133,6 +133,9 @@ describe('auth requestRefreshAccessToken URL handling', () => {
   });
 
   it('can refresh from the HttpOnly cookie when the local marker is missing', async () => {
+    saveRefreshToken('mock-refresh-token');
+    window.localStorage.removeItem('planora:has_refresh_token');
+
     expect(getRefreshToken()).toBeNull();
 
     fetchMock.mockResolvedValueOnce({
@@ -146,5 +149,47 @@ describe('auth requestRefreshAccessToken URL handling', () => {
     expect(token).toBe('cookie-only-access-token');
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(window.localStorage.getItem('planora:has_refresh_token')).toBe('true');
+  });
+
+  it('does not refresh from cookies after explicit logout', async () => {
+    saveRefreshToken('mock-refresh-token');
+
+    fetchMock.mockResolvedValue({ ok: true, status: 200 });
+    clearTokens();
+    fetchMock.mockClear();
+
+    const token = await ensureValidToken({ allowCookieRefresh: true });
+
+    expect(token).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('ignores an in-flight refresh response after logout', async () => {
+    saveRefreshToken('mock-refresh-token');
+
+    let resolveRefresh!: (response: unknown) => void;
+    fetchMock.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveRefresh = resolve;
+    }));
+
+    const refreshPromise = refreshAccessToken({ allowCookieRefresh: true });
+    await Promise.resolve();
+
+    fetchMock.mockResolvedValue({ ok: true, status: 200 });
+    clearTokens();
+
+    resolveRefresh({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        token: createJwt({
+          sub: 'person@example.com',
+          exp: Math.floor(Date.now() / 1000) + 60 * 60,
+        }),
+      }),
+    });
+
+    await expect(refreshPromise).rejects.toThrow('Token refresh cancelled during logout');
+    expect(getValidToken()).toBeNull();
   });
 });

@@ -12,6 +12,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
@@ -20,11 +23,15 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.net.URI;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -54,6 +61,12 @@ public class UserServiceTest {
     @Mock
     private S3Presigner s3Presigner;
 
+    @Mock
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Mock
+    private ValueOperations<String, String> valueOperations;
+
     @InjectMocks
     private UserService userService;
 
@@ -65,6 +78,7 @@ public class UserServiceTest {
         testUser.setEmail("test@example.com");
         testUser.setPassword("Test@1234");
         testUser.setUsername("testuser");
+        lenient().when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
     }
 
     @Test
@@ -197,6 +211,7 @@ public class UserServiceTest {
         assertEquals("mock-access-token", result.getToken());
         assertEquals("mock-refresh-token", result.getRefreshToken());
         assertEquals("Login successful", result.getMessage());
+        verify(stringRedisTemplate).delete("login-attempt:test@example.com");
     }
 
     // (d) loginUser with unverified account returns UNVERIFIED_EMAIL errorCode
@@ -303,6 +318,12 @@ public class UserServiceTest {
 
     @Test
     void testLoginUser_LocksAfterFiveInvalidCredentialAttempts() {
+        Map<String, String> redisValues = new HashMap<>();
+        when(valueOperations.get(anyString())).thenAnswer(invocation -> redisValues.get(invocation.getArgument(0)));
+        doAnswer(invocation -> {
+            redisValues.put(invocation.getArgument(0), invocation.getArgument(1));
+            return null;
+        }).when(valueOperations).set(anyString(), anyString(), any(Duration.class));
         when(authenticationManager.authenticate(any()))
                 .thenThrow(new BadCredentialsException("Bad credentials"));
 
@@ -317,6 +338,22 @@ public class UserServiceTest {
         assertFalse(lockedLogin.isSuccess());
         assertEquals("ACCOUNT_LOCKED", lockedLogin.getErrorCode());
         verify(authenticationManager, times(5)).authenticate(any());
+    }
+
+    @Test
+    void testLoginUser_RedisFailureDuringLockoutCheck_FailsOpenAndAllowsSuccessfulLogin() {
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(stringRedisTemplate.opsForValue()).thenThrow(new RuntimeException("Redis unavailable"));
+        when(authenticationManager.authenticate(any())).thenReturn(authentication);
+        when(userRepository.findFirstByEmailIgnoreCase(any())).thenReturn(Optional.of(testUser));
+        when(jwtService.generateToken(anyString(), anyString(), any())).thenReturn("mock-access-token");
+        when(jwtService.generateRefreshToken(anyString())).thenReturn("mock-refresh-token");
+
+        LoginResponse result = userService.loginUser(testUser);
+
+        assertTrue(result.isSuccess());
+        assertEquals("mock-access-token", result.getToken());
     }
 
     @Test
@@ -684,6 +721,20 @@ public class UserServiceTest {
     @Test
     void testGeneratePresignedUrl_NullInput_ReturnsNull() {
         assertNull(userService.generatePresignedUrl(null));
+    }
+
+    @Test
+    void uploadProfilePicture_evictsProfileAndPhotoUrlCaches() throws Exception {
+        Caching caching = UserService.class
+                .getMethod("uploadProfilePicture", String.class, org.springframework.web.multipart.MultipartFile.class)
+                .getAnnotation(Caching.class);
+
+        assertNotNull(caching);
+        assertEquals(2, caching.evict().length);
+        assertArrayEquals(new String[]{"userProfile"}, caching.evict()[0].value());
+        assertEquals("#email", caching.evict()[0].key());
+        assertArrayEquals(new String[]{"userPhotoUrls"}, caching.evict()[1].value());
+        assertTrue(caching.evict()[1].allEntries());
     }
 
     @Test

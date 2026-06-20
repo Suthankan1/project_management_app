@@ -19,9 +19,14 @@ export default function LoginPage() {
     remember, setRemember,
     showPassword, setShowPassword,
     isLoading,
+    isCheckingSession,
     error,
     handleLogin,
   } = useLoginForm();
+
+  if (isCheckingSession) {
+    return <div className="min-h-screen" aria-label="Checking session" />;
+  }
 
     return (
 

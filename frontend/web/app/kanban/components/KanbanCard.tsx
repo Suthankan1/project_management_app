@@ -7,15 +7,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Task, Subtask } from '../../(project)/kanban/types';
 import { Calendar, Trash2, Edit2 } from 'lucide-react';
 import GitHubIssueBadge from '@/components/github/GitHubIssueBadge';
-import { getApiBaseUrl } from '@/lib/api-base-url';
-
-const API_BASE_URL = getApiBaseUrl();
-
-function resolveUrl(url?: string | null) {
-    if (!url) return null;
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    return `${API_BASE_URL}${url}`;
-}
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 interface KanbanCardProps {
   task: Task;
@@ -26,7 +18,7 @@ interface KanbanCardProps {
 }
 
 export default function KanbanCard({ task, onDelete, onEdit, onOpenTask, usersMap }: KanbanCardProps) {
-  const avatarUrl = task.assigneeName ? resolveUrl(usersMap?.[task.assigneeName] ?? null) : null;
+  const avatarUrl = task.assigneeName ? resolveProfilePhotoUrl(usersMap?.[task.assigneeName] ?? null) : null;
   const completedSubtasks = task.subtasks?.filter((s: Subtask) => s.status === 'DONE').length ?? 0;
   const totalSubtasks = task.subtasks?.length ?? 0;
 

@@ -39,6 +39,7 @@ interface TaskSidebarProps {
   taskDescription?: string;
   status: string;
   assignee: string | null;
+  assigneePhotoUrl?: string | null;
   reporter: string | null;
   reporterId?: number | null;
   labels: string[];
@@ -77,14 +78,14 @@ interface TaskSidebarProps {
   onAssigneesChanged?: () => void;
   canEdit?: boolean;
   canChangeReporter?: boolean;
-  members?: Array<{ memberId: number; userId: number; name: string }>;
+  members?: Array<{ memberId: number; userId: number; name: string; photoUrl?: string | null }>;
   allLabels?: Array<{ id: number; name: string }>;
   sprints?: Array<{ id: number; name: string }>;
   onCreateGitHubIssue?: () => void;
 }
 
 const TaskSidebar: React.FC<TaskSidebarProps> = ({
-  taskId, projectId, taskTitle, taskDescription, status, assignee, reporter, labels, labelIds = [], priority, sprint, storyPoint,
+  taskId, projectId, taskTitle, taskDescription, status, assignee, assigneePhotoUrl, reporter, labels, labelIds = [], priority, sprint, storyPoint,
   milestoneId, milestoneName, githubIssueNumber = null, githubRepoFullName = null, projectGitHubRepo = null, assignees,
   recurrenceRule, recurrenceEnd, customInterval, recurrenceLimit, dates, reporterId, sprintId,
   onUpdateStatus, onUpdatePriority, onUpdateStoryPoint, onUpdateDueDate, onUpdateMilestone,
@@ -180,7 +181,7 @@ const TaskSidebar: React.FC<TaskSidebarProps> = ({
         </button>
         {sections.details && <div className="p-4 space-y-4">
           {(!assignees || assignees.length === 0) && (
-            <AssigneeSection assignee={assignee} onUnassign={onUnassign} />
+            <AssigneeSection assignee={assignee} profilePicUrl={assigneePhotoUrl} onUnassign={onUnassign} />
           )}
           {taskId != null && (
             <MultiAssigneeSection

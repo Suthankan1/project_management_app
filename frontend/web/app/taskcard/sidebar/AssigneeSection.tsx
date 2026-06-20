@@ -3,14 +3,16 @@ import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { X } from 'lucide-react';
 import { getOrFetchUserMap } from './userMapCache';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 import SidebarField from './SidebarField';
 
 interface AssigneeSectionProps {
   assignee: string | null;
+  profilePicUrl?: string | null;
   onUnassign?: () => void;
 }
 
-const AssigneeSection: React.FC<AssigneeSectionProps> = ({ assignee, onUnassign }) => {
+const AssigneeSection: React.FC<AssigneeSectionProps> = ({ assignee, profilePicUrl, onUnassign }) => {
   const [usersMap, setUsersMap] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
@@ -20,7 +22,7 @@ const AssigneeSection: React.FC<AssigneeSectionProps> = ({ assignee, onUnassign 
 
   if (!assignee) return null;
 
-  const picUrl = usersMap[assignee] ?? '';
+  const picUrl = resolveProfilePhotoUrl(profilePicUrl) || resolveProfilePhotoUrl(usersMap[assignee]) || '';
 
   return (
     <SidebarField label="Assignee">

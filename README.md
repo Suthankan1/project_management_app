@@ -75,7 +75,7 @@ Planora is a full-stack project management and team collaboration platform. It s
 | Database | PostgreSQL (Supabase in production) |
 | Migrations | Flyway |
 | Auth | JWT (`JJWT 0.12`) |
-| Caching | Spring Cache + Caffeine |
+| Caching | Spring Cache + Redis + Caffeine |
 | File Storage | AWS S3 (SDK v2) |
 | Email | Spring Mail (SMTP) |
 | Rate Limiting | Bucket4j |
@@ -114,7 +114,7 @@ The frontend proxies all `/api/*` calls to the backend (configured in `netlify.t
 - **Java 21** (Temurin) — for running the backend manually
 - **Node.js 22 / npm** — for running the frontend manually (configured via `.nvmrc` in `frontend/web`)
 - **PostgreSQL** — local instance or a Supabase project
-- **Redis** — required for rate limiting and notification unread-count caching unless notification Redis caching is disabled
+- **Redis** — required for multi-instance cache sharing, auth counters, rate limiting, and notification unread-count caching unless the relevant cache flags are disabled
 - **AWS account** — S3 buckets for file storage (optional for local dev with stubs)
 - **Gmail account** — for SMTP email sending (optional for local dev)
 
@@ -145,8 +145,10 @@ cp .env.example .env
 | `POSTGRES_DB` | Local Docker Postgres database name | `planora_db` |
 | `POSTGRES_USER` | Local Docker Postgres user | `planora` |
 | `POSTGRES_PASSWORD` | Local Docker Postgres password | `change_me_local_db_password` |
-| `REDIS_HOST` | Redis host for rate limiting and notification cache. Use `redis` only inside Docker Compose. | `localhost` |
+| `REDIS_HOST` | Redis host for Spring Cache, auth counters, rate limiting, and notification cache. Use `redis` only inside Docker Compose. | `localhost` |
 | `REDIS_PORT` | Redis port | `6379` |
+| `APP_CACHE_REDIS_ENABLED` | Enables Redis-backed Spring Cache for DTO/simple-value caches. Tests use Caffeine fallback. | `true` |
+| `APP_CACHE_REDIS_FAIL_OPEN` | Treats Redis cache errors as non-fatal and serves from the source of truth. | `true` |
 | `NOTIFICATIONS_CACHE_REDIS_ENABLED` | Enables Redis unread-count caching for notifications. Set to `false` to read notification counts directly from the database. | `true` |
 | `REDIS_CONNECT_TIMEOUT` | Redis connection timeout for fast failure when Redis is unavailable. | `500ms` |
 | `REDIS_TIMEOUT` | Redis command timeout for fast failure when Redis is unavailable. | `500ms` |
@@ -164,6 +166,8 @@ cp .env.example .env
 | `AWS_TASK_STORAGE_BUCKET` | Task attachment bucket name | `your-task-attachments-bucket` |
 | `CORS_ALLOWED_ORIGINS` | Frontend origin(s) | `http://localhost:3000` |
 
+Optional Spring Cache TTL overrides are available via `APP_CACHE_REDIS_TTL_PROJECT_MEMBERSHIP`, `APP_CACHE_REDIS_TTL_PROJECT_TEAM_ID`, `APP_CACHE_REDIS_TTL_GITHUB_ISSUES`, `APP_CACHE_REDIS_TTL_GITHUB_ISSUE_COMMENTS`, `APP_CACHE_REDIS_TTL_USER_PROFILE`, `APP_CACHE_REDIS_TTL_USER_PHOTO_URLS`, `APP_CACHE_REDIS_TTL_PROJECT_RECENT`, and `APP_CACHE_REDIS_TTL_PROJECT_FAVORITES`.
+
 Additional optional variables are listed in `.env.example`.
 
 #### Chosen Deployment Model: Same-Origin Proxy
@@ -177,7 +181,7 @@ In this model:
 
 For local Docker development, the values in `.env.example` are safe placeholders for configuration shape only. Replace the AWS credentials and bucket names if you need real file upload flows.
 
-For manual local backend runs outside Docker, use host addresses instead of Docker service names. For example, set `SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/planora_db` and `REDIS_HOST=localhost`. If you do not have Redis running locally, set `NOTIFICATIONS_CACHE_REDIS_ENABLED=false` so notification unread counts go directly to the database; the flag only affects notification caching, and Redis remains the configured dependency for rate limiting.
+For manual local backend runs outside Docker, use host addresses instead of Docker service names. For example, set `SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/planora_db` and `REDIS_HOST=localhost`. If you do not have Redis running locally, set `APP_CACHE_REDIS_ENABLED=false` so Spring Cache uses local Caffeine, and set `NOTIFICATIONS_CACHE_REDIS_ENABLED=false` so notification unread counts go directly to the database. Auth/rate-limit Redis paths fail open when Redis is unavailable, but production should still point `REDIS_HOST` at a real Redis instance.
 
 For AWS S3 storage, create separate private buckets for profile photos, DMS documents, chat attachments, and task attachments. Set the four bucket environment variables differently in staging and production; the backend reads the bucket names at startup, so no code changes are needed between environments.
 
@@ -189,7 +193,7 @@ For staging and production, set all required variables in the hosting platform:
 |---|---|
 | Local Docker | `SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/planora_db`, matching `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `JWT_SECRET`, mail settings, AWS credentials, and the four storage bucket names if uploads are used. |
 | Staging | External PostgreSQL JDBC URL with SSL if required by the provider, staging database credentials, staging JWT secret, staging SMTP credentials, staging AWS credentials, staging-only S3 buckets, and staging `CORS_ALLOWED_ORIGINS`. Do not use `db:5432` outside Docker Compose. |
-| Production | Managed PostgreSQL JDBC URL with SSL, production database credentials, production Redis host (`REDIS_HOST`) pointing at a real instance or `NOTIFICATIONS_CACHE_REDIS_ENABLED=false` for notification cache bypass, strong production JWT secret, production SMTP credentials, production AWS credentials, production-only S3 buckets, production `CORS_ALLOWED_ORIGINS`, and any provider-specific Flyway settings. Missing production bucket variables fail startup. Do not reuse local or staging bucket names. |
+| Production | Managed PostgreSQL JDBC URL with SSL, production database credentials, production Redis host (`REDIS_HOST`) pointing at a real instance for Spring Cache/auth counters/rate limiting, `APP_CACHE_REDIS_FAIL_OPEN=true` unless you intentionally want cache outages to fail requests, strong production JWT secret, production SMTP credentials, production AWS credentials, production-only S3 buckets, production `CORS_ALLOWED_ORIGINS`, and any provider-specific Flyway settings. Missing production bucket variables fail startup. Do not reuse local or staging bucket names. |
 
 ### 3. Run with Docker Compose
 
@@ -207,7 +211,7 @@ The backend API will be available at `http://localhost:8080`.
 
 #### Backend
 
-Start PostgreSQL and Redis first. Docker Compose already includes Redis; for manual runs you can use a local Redis server with `REDIS_HOST=localhost`, or set `NOTIFICATIONS_CACHE_REDIS_ENABLED=false` to bypass notification unread-count caching when Redis is not available.
+Start PostgreSQL and Redis first. Docker Compose already includes Redis; for manual runs you can use a local Redis server with `REDIS_HOST=localhost`, or set `APP_CACHE_REDIS_ENABLED=false` and `NOTIFICATIONS_CACHE_REDIS_ENABLED=false` to run without Redis-backed caches locally.
 
 ```bash
 cd backend

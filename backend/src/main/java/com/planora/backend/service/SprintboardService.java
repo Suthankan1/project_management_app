@@ -43,6 +43,7 @@ public class SprintboardService {
     private final UserRepository userRepository;
     private final SpringcolumnService springcolumnService;
     private final NotificationService notificationService;
+    private final UserService userService;
 
     public SprintboardService(SprintboardRepository sprintboardRepository,
                               SpringcolumnRepository springcolumnRepository,
@@ -52,7 +53,8 @@ public class SprintboardService {
                               TeamMemberRepository teamMemberRepository,
                               UserRepository userRepository,
                               SpringcolumnService springcolumnService,
-                              NotificationService notificationService) {
+                              NotificationService notificationService,
+                              UserService userService) {
         this.sprintboardRepository = sprintboardRepository;
         this.springcolumnRepository = springcolumnRepository;
         this.sprintRepository = sprintRepository;
@@ -62,6 +64,7 @@ public class SprintboardService {
         this.userRepository = userRepository;
         this.springcolumnService = springcolumnService;
         this.notificationService = notificationService;
+        this.userService = userService;
     }
 
 
@@ -435,7 +438,7 @@ public class SprintboardService {
             dto.setAssigneeName((fullName != null && !fullName.isBlank())
                     ? fullName
                     : displayAssignee.getUser().getUsername());
-            dto.setAssigneePhotoUrl(displayAssignee.getUser().getProfilePicUrl());
+            dto.setAssigneePhotoUrl(userService.generatePresignedUrl(displayAssignee.getUser().getProfilePicUrl()));
         }
         if (task.getLabels() != null && !task.getLabels().isEmpty()) {
             var label = task.getLabels().iterator().next();

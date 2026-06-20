@@ -15,6 +15,7 @@ export interface CachedChatSnapshot {
   users?: string[];
   rooms?: ChatRoom[];
   featureFlags?: ChatFeatureFlags;
+  userProfilePics?: Record<string, string>;
   teamMessages: ChatMessage[];
   roomMessages: Record<number, ChatMessage[]>;
   privateMessages: Record<string, ChatMessage[]>;

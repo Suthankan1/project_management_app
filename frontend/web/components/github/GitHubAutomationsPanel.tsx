@@ -100,20 +100,20 @@ function logIcon(trigger: GithubAutomationTrigger) {
 
 function EmptyState({ onCreateRule }: { onCreateRule: () => void }) {
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-dashed border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/60 p-6 text-center sm:p-8">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-900 text-white shadow-lg shadow-slate-900/10">
+    <div className="relative overflow-hidden rounded-3xl border border-dashed border-cu-border bg-cu-bg-secondary p-6 text-center sm:p-8">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-cu-primary text-white shadow-lg shadow-cu-primary/20">
         <GitHubMark size={34} className="text-white" />
       </div>
       <div className="mx-auto mt-5 max-w-xl">
-        <h3 className="text-lg font-semibold text-slate-900">No GitHub automations yet. Add one to automate your workflow.</h3>
-        <p className="mt-2 text-sm text-slate-500">
+        <h3 className="text-lg font-semibold text-cu-text-primary">No GitHub automations yet. Add one to automate your workflow.</h3>
+        <p className="mt-2 text-sm text-cu-text-secondary">
           Connect GitHub events to task movement, task creation, or notifications for this project.
         </p>
       </div>
       <button
         type="button"
         onClick={onCreateRule}
-        className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+        className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-cu-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-cu-primary-hover"
       >
         <Sparkles size={15} />
         Add Rule
@@ -140,29 +140,29 @@ export default function GitHubAutomationsPanel({
   const recentLogs = useMemo(() => logs.slice(0, 10), [logs]);
 
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <section className="rounded-3xl border border-cu-border bg-cu-bg p-4 shadow-cu-sm sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="flex items-start gap-3 sm:items-center">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
-            <GitHubMark size={20} className="text-white" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cu-bg-secondary text-cu-text-primary shadow-sm">
+            <GitHubMark size={20} className="text-cu-text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">GitHub Automations</h2>
-            <p className="text-sm text-slate-500">Rules, enablement, and execution logs for this project.</p>
+            <h2 className="text-lg font-semibold text-cu-text-primary">GitHub Automations</h2>
+            <p className="text-sm text-cu-text-secondary">Rules, enablement, and execution logs for this project.</p>
           </div>
         </div>
         <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center">
           <button
             type="button"
             onClick={onRefreshRules}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 sm:w-auto"
+            className="w-full rounded-2xl border border-cu-border bg-cu-bg px-3 py-2 text-sm font-semibold text-cu-text-secondary shadow-cu-sm transition-colors hover:bg-cu-hover hover:text-cu-text-primary sm:w-auto"
           >
             Refresh Rules
           </button>
           <button
             type="button"
             onClick={onCreateRule}
-            className="w-full rounded-2xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 sm:w-auto"
+            className="w-full rounded-2xl bg-cu-primary px-3 py-2 text-sm font-semibold text-white shadow-cu-sm transition-colors hover:bg-cu-primary-hover sm:w-auto"
           >
             + Add Rule
           </button>
@@ -180,7 +180,7 @@ export default function GitHubAutomationsPanel({
         {loadingRules ? (
           <div className="grid gap-3 lg:grid-cols-2">
             {Array.from({ length: 2 }).map((_, index) => (
-              <div key={index} className="h-36 animate-pulse rounded-3xl bg-slate-100" />
+              <div key={index} className="h-36 animate-pulse rounded-3xl bg-cu-bg-secondary" />
             ))}
           </div>
         ) : rules.length === 0 ? (
@@ -196,10 +196,10 @@ export default function GitHubAutomationsPanel({
                   key={rule.id}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="rounded-3xl border border-slate-200 bg-slate-50 p-4 shadow-sm"
+                  className="rounded-3xl border border-cu-border bg-cu-bg-secondary p-4 shadow-sm"
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-slate-600 shadow-sm">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cu-bg text-cu-text-secondary shadow-sm">
                       <triggerStyle.icon size={18} />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -208,13 +208,13 @@ export default function GitHubAutomationsPanel({
                           <triggerStyle.icon size={11} />
                           {triggerStyle.label}
                         </span>
-                        <ArrowRight size={14} className="text-slate-400" />
+                        <ArrowRight size={14} className="text-cu-text-tertiary" />
                         <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${actionStyle.className}`}>
                           {actionStyle.label}
                         </span>
                       </div>
-                      <p className="mt-3 text-sm font-semibold text-slate-900">{triggerSummary(rule)}</p>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-3 text-sm font-semibold text-cu-text-primary">{triggerSummary(rule)}</p>
+                      <p className="mt-1 text-xs text-cu-text-secondary">
                         {rule.enabled ? 'Enabled and actively evaluated.' : 'Disabled and skipped by automation processing.'}
                       </p>
                     </div>
@@ -240,7 +240,7 @@ export default function GitHubAutomationsPanel({
                             onDeleteRule(rule.id);
                           }
                         }}
-                        className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-white hover:text-red-600"
+                        className="rounded-xl p-2 text-cu-text-tertiary transition-colors hover:bg-cu-hover hover:text-red-600"
                         aria-label="Delete automation rule"
                       >
                         <Trash2 size={15} />
@@ -254,15 +254,15 @@ export default function GitHubAutomationsPanel({
         )}
       </div>
 
-      <div className="mt-6 rounded-3xl border border-slate-200 bg-white">
+      <div className="mt-6 rounded-3xl border border-cu-border bg-cu-bg">
         <button
           type="button"
           onClick={() => setLogsOpen((current) => !current)}
           className="flex w-full flex-col gap-3 px-4 py-4 text-left sm:flex-row sm:items-center sm:justify-between"
         >
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">Recent logs</h3>
-            <p className="text-xs text-slate-500">Last 10 execution events from GitHub automations.</p>
+            <h3 className="text-sm font-semibold text-cu-text-primary">Recent logs</h3>
+            <p className="text-xs text-cu-text-secondary">Last 10 execution events from GitHub automations.</p>
           </div>
           <ChevronDown size={16} className={['text-slate-400 transition-transform', logsOpen ? 'rotate-180' : ''].join(' ')} />
         </button>
@@ -275,11 +275,11 @@ export default function GitHubAutomationsPanel({
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <div className="border-t border-slate-100 px-4 py-4">
+              <div className="border-t border-cu-border px-4 py-4">
                 {loadingLogs ? (
                   <div className="space-y-3">
                     {Array.from({ length: 3 }).map((_, index) => (
-                      <div key={index} className="h-16 animate-pulse rounded-2xl bg-slate-100" />
+                      <div key={index} className="h-16 animate-pulse rounded-2xl bg-cu-bg-secondary" />
                     ))}
                   </div>
                 ) : logsError ? (
@@ -288,7 +288,7 @@ export default function GitHubAutomationsPanel({
                     <p>{logsError}</p>
                   </div>
                 ) : recentLogs.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                  <div className="rounded-2xl border border-dashed border-cu-border bg-cu-bg-secondary px-4 py-8 text-center text-sm text-cu-text-secondary">
                     No automation logs yet.
                   </div>
                 ) : (
@@ -298,8 +298,8 @@ export default function GitHubAutomationsPanel({
                       const outcomeStyle = OUTCOME_STYLES[log.outcome] ?? OUTCOME_STYLES.SKIPPED;
 
                       return (
-                        <div key={log.id} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white text-slate-600 shadow-sm">
+                        <div key={log.id} className="flex items-start gap-3 rounded-2xl border border-cu-border bg-cu-bg-secondary px-4 py-3">
+                          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-cu-bg text-cu-text-secondary shadow-sm">
                             <LogIcon size={16} />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -307,9 +307,9 @@ export default function GitHubAutomationsPanel({
                               <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${outcomeStyle.className}`}>
                                 {outcomeStyle.label}
                               </span>
-                              <span className="text-xs font-semibold text-slate-500">{formatTimestamp(log.executedAt)}</span>
+                              <span className="text-xs font-semibold text-cu-text-tertiary">{formatTimestamp(log.executedAt)}</span>
                             </div>
-                            <p className="mt-2 text-sm font-medium text-slate-800">{log.message}</p>
+                            <p className="mt-2 text-sm font-medium text-cu-text-primary">{log.message}</p>
                           </div>
                         </div>
                       );
@@ -320,7 +320,7 @@ export default function GitHubAutomationsPanel({
                   <button
                     type="button"
                     onClick={onRefreshLogs}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 sm:w-auto"
+                    className="w-full rounded-2xl border border-cu-border bg-cu-bg px-3 py-2 text-sm font-semibold text-cu-text-secondary shadow-cu-sm transition-colors hover:bg-cu-hover hover:text-cu-text-primary sm:w-auto"
                   >
                     Refresh Logs
                   </button>

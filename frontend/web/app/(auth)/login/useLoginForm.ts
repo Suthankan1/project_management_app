@@ -29,6 +29,7 @@ export function useLoginForm() {
   const [showPassword, setShowPassword] = useState(false);
 
   // ── Network State ──
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -51,6 +52,8 @@ export function useLoginForm() {
         // Use replace() instead of push() so the user can't hit the "Back" button
         // and end up stuck on the login page again.
         if (isMounted) router.replace(getAuthenticatedRedirect());
+      } else if (isMounted) {
+        setIsCheckingSession(false);
       }
     };
 
@@ -155,6 +158,7 @@ export function useLoginForm() {
     remember, setRemember,
     showPassword, setShowPassword,
     isLoading,
+    isCheckingSession,
     error,
     handleLogin,
   };

@@ -52,12 +52,33 @@ public class GitHubIntegrationService {
     @Value("${github.client.secret:}")
     private String clientSecret;
 
+    @Value("${github.mobile.client.id:${github.client.id:}}")
+    private String mobileClientId;
+
+    @Value("${github.mobile.client.secret:${github.client.secret:}}")
+    private String mobileClientSecret;
+
+    @Value("${github.mobile.redirect-uri:mobile://github-callback}")
+    private String mobileRedirectUri;
+
     private final GithubTokenService githubTokenService;
     private final UserRepository userRepository;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
     private final CiStatusResolver ciStatusResolver;
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public String getMobileClientId() {
+        return (mobileClientId != null && !mobileClientId.isBlank()) ? mobileClientId : clientId;
+    }
+
+    public String getMobileRedirectUri() {
+        return mobileRedirectUri;
+    }
 
     /**
      * Fetches the authenticated user's repositories from GitHub.
@@ -369,7 +390,16 @@ public class GitHubIntegrationService {
     }
 
     public void exchangeAndSaveToken(Long userId, String email, String code) {
-        if (isBlank(clientId) || isBlank(clientSecret)) {
+        exchangeAndSaveToken(userId, email, code, null);
+    }
+
+    public void exchangeAndSaveToken(Long userId, String email, String code, String redirectUri) {
+        // Use mobile-specific credentials when the redirect URI is the mobile redirect URI.
+        boolean isMobile = redirectUri != null && redirectUri.equals(mobileRedirectUri);
+        String effectiveClientId     = isMobile ? getMobileClientId()     : clientId;
+        String effectiveClientSecret = isMobile ? mobileClientSecret : clientSecret;
+
+        if (isBlank(effectiveClientId) || isBlank(effectiveClientSecret)) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "GitHub OAuth is not configured on this server");
         }
@@ -379,11 +409,13 @@ public class GitHubIntegrationService {
         headers.set(HttpHeaders.ACCEPT, "application/json");
         headers.set(HttpHeaders.CONTENT_TYPE, "application/json");
 
-        Map<String, String> requestBody = Map.of(
-                "client_id", clientId,
-                "client_secret", clientSecret,
-                "code", code
-        );
+        Map<String, String> requestBody = new LinkedHashMap<>();
+        requestBody.put("client_id", effectiveClientId);
+        requestBody.put("client_secret", effectiveClientSecret);
+        requestBody.put("code", code);
+        if (!isBlank(redirectUri)) {
+            requestBody.put("redirect_uri", redirectUri);
+        }
 
         try {
             ResponseEntity<JsonNode> response = restTemplate.exchange(
