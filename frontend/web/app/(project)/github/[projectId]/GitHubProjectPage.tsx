@@ -1903,6 +1903,12 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     setLoadingRepos(true);
     setRepoError(null);
     try {
+      const status = await fetchGitHubConnectionStatus();
+      if (!status.connected) {
+        setAllRepos([]);
+        setRepoError(githubConnectRequiredMessage);
+        return;
+      }
       const data = await fetchRepositories();
       setAllRepos(data);
     } catch (err) {
@@ -1942,7 +1948,15 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   };
 
   const handleOpenModal = async () => {
-    if (!hasConnectedGitHubAccount()) {
+    let isGitHubConnected = false;
+    try {
+      const status = await fetchGitHubConnectionStatus();
+      isGitHubConnected = status.connected;
+    } catch {
+      isGitHubConnected = false;
+    }
+
+    if (!isGitHubConnected) {
       if (savedAccounts.length > 0) setShowAccountPicker(true);
       else handleConnectGitHub();
       return;
