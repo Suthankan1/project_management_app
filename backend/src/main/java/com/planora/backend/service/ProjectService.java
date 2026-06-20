@@ -340,8 +340,6 @@ public class ProjectService {
             project.setName(dto.getName());
         if (dto.getDescription() != null)
             project.setDescription(dto.getDescription());
-        if (dto.getType() != null)
-            project.setType(ProjectType.valueOf(dto.getType()));
 
         Project updatedProject = projectRepository.save(project);
         return convertToResponseDTO(updatedProject, null);

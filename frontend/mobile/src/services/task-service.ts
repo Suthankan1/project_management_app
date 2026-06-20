@@ -51,6 +51,27 @@ export interface SprintVelocityPoint {
   completedPoints: number;
 }
 
+export interface RecurrenceUpdatePayload {
+  recurrenceActive?: boolean;
+  recurrenceRule?: string | null;
+  recurrenceEnd?: string | null;
+  customInterval?: number | null;
+  recurrenceLimit?: number | null;
+}
+
+export interface RecurringTask {
+  id: number;
+  title: string;
+  recurrenceRule: string | null;
+  recurrenceEnd: string | null;
+  recurrenceActive: boolean;
+  customInterval: number | null;
+  recurrenceLimit: number | null;
+  recurrenceCount: number;
+  nextOccurrence: string | null;
+  dueDate?: string | null;
+}
+
 export const taskService = {
   listByProject: (projectId: number | string, params?: TaskListQueryParams): Promise<any> =>
     api.get(`/api/tasks/project/${projectId}`, { params }).then(r => r.data),
@@ -65,6 +86,10 @@ export const taskService = {
     api.post('/api/tasks', payload).then(r => r.data),
 
   update: (taskId: number | string, payload: UpdateTaskRequest): Promise<any> =>
+    api.put(`/api/tasks/${taskId}`, payload).then(r => r.data),
+
+  // Update recurrence-specific fields on a task (pause/resume or remove a schedule).
+  setRecurrence: (taskId: number | string, payload: RecurrenceUpdatePayload): Promise<any> =>
     api.put(`/api/tasks/${taskId}`, payload).then(r => r.data),
 
   delete: (taskId: number | string): Promise<void> =>
