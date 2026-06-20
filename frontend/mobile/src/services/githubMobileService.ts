@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const TOKEN_KEY = 'github_token';
 const REPO_PREFIX = 'github_repo_';
@@ -6,13 +7,13 @@ const GH_API = 'https://api.github.com';
 
 // ── Token ──────────────────────────────────────────────────────────────────────
 export async function getGitHubToken(): Promise<string | null> {
-  return AsyncStorage.getItem(TOKEN_KEY);
+  return SecureStore.getItemAsync(TOKEN_KEY);
 }
 export async function saveGitHubToken(token: string): Promise<void> {
-  await AsyncStorage.setItem(TOKEN_KEY, token);
+  await SecureStore.setItemAsync(TOKEN_KEY, token);
 }
 export async function clearGitHubToken(): Promise<void> {
-  await AsyncStorage.removeItem(TOKEN_KEY);
+  await SecureStore.deleteItemAsync(TOKEN_KEY);
 }
 
 // ── Project repo connection ────────────────────────────────────────────────────

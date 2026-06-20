@@ -103,16 +103,16 @@ ALTER TABLE users ALTER COLUMN github_username TYPE VARCHAR(39);
 
 The old name was misleading — adding the column is V33's responsibility.
 
-### Automatic Repair on Startup (Development / Staging)
+### Automatic Repair on Startup (Development / Explicit Opt-in)
 
-`FlywayRepairConfiguration` (see `backend/src/main/java/com/planora/backend/configuration/FlywayRepairConfiguration.java`) runs `flyway.repair()` before every `flyway.migrate()` call when the property `app.flyway.repair-on-startup=true` is set. This is enabled by default in all environments (default value is `true`) and is explicitly set to `true` in `application-dev.properties`.
+`FlywayRepairConfiguration` (see `backend/src/main/java/com/planora/backend/configuration/FlywayRepairConfiguration.java`) runs `flyway.repair()` before every `flyway.migrate()` call when the property `app.flyway.repair-on-startup=true` is set. This is disabled by default in the base configuration and explicitly enabled only in `application-dev.properties` or environments that opt in with `APP_FLYWAY_REPAIR_ON_STARTUP=true`.
 
 On the first startup after the rename, Flyway repair will:
 1. Detect that the classpath migration for version `35` now resolves to the description `alter_github_username_length_to_39`.
 2. Update the `description` and `checksum` columns in `flyway_schema_history` for version `35` to match the renamed file.
 3. Proceed with `migrate()` normally — no re-execution of the migration occurs.
 
-No manual action is required in development or staging environments.
+No manual action is required in local development environments that use the dev profile. Shared/staging environments should choose explicitly whether to opt in or perform a controlled manual repair.
 
 ### Manual Repair for Production
 

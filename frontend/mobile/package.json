@@ -63,6 +63,10 @@
     "ts-jest": "^29.4.11",
     "typescript": "~5.9.2"
   },
+  "overrides": {
+    "@react-native/virtualized-lists": "0.81.5",
+    "react-native": "0.81.5"
+  },
   "private": true,
   "expo": {
     "doctor": {
