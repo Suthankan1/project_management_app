@@ -45,7 +45,7 @@ describe('usePages hook', () => {
       expect(result.current.pages).toHaveLength(2);
     });
 
-    let promise;
+    let promise: Promise<void> | undefined;
     act(() => {
       promise = result.current.toggleStar(2);
     });
@@ -199,7 +199,7 @@ describe('usePages hook', () => {
       expect(result.current.pages).toHaveLength(1);
     });
 
-    let promise;
+    let promise: Promise<void> | undefined;
     act(() => {
       promise = result.current.toggleStar(1);
     });
@@ -209,7 +209,7 @@ describe('usePages hook', () => {
     });
     expect(result.current.pages[0].isStarred).toBe(true);
 
-    let promise2;
+    let promise2: Promise<void> | undefined;
     act(() => {
       promise2 = result.current.toggleStar(1);
     });
