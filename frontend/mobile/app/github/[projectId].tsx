@@ -17,12 +17,12 @@ import {
   getGitHubToken, saveGitHubToken, clearGitHubToken,
   getProjectGitHubRepo, setProjectGitHubRepo, clearProjectGitHubRepo,
   fetchGitHubUser, fetchRepositoriesWithToken, fetchPullRequests, fetchCommits, fetchIssues,
+  fetchGitHubOAuthConfig,
   exchangeCodeForToken,
   type ProjectGitHubConnection, type GitHubUser,
   type GitHubPullRequest, type GitHubCommit, type GitHubIssue, type GitHubRepository,
 } from '../../src/services/githubMobileService';
 
-const GITHUB_CLIENT_ID = process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID ?? '';
 const REDIRECT_URI = 'mobile://github-callback';
 type ActiveTab = 'prs' | 'commits' | 'issues';
 type IssueFilter = 'open' | 'closed' | 'all';
@@ -888,21 +888,22 @@ export default function GitHubScreen() {
 
   // ── OAuth connect ────────────────────────────────────────────────────────
   const handleConnect = useCallback(async () => {
-    if (!GITHUB_CLIENT_ID) {
-      setError('GitHub OAuth not configured (EXPO_PUBLIC_GITHUB_CLIENT_ID missing).');
-      return;
-    }
     setConnecting(true);
     setError(null);
     try {
+      const oauthConfig = await fetchGitHubOAuthConfig();
+      if (!oauthConfig.configured || !oauthConfig.clientId) {
+        setError('GitHub OAuth is not configured on the backend.');
+        return;
+      }
       const authUrl =
         `https://github.com/login/oauth/authorize` +
-        `?client_id=${GITHUB_CLIENT_ID}&scope=repo&state=${projectId}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+        `?client_id=${oauthConfig.clientId}&scope=repo&state=${projectId}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
       const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
       if (result.type === 'success' && result.url) {
         const code = new URL(result.url).searchParams.get('code');
         if (code) {
-          const accessToken = await exchangeCodeForToken(code);
+          const accessToken = await exchangeCodeForToken(code, REDIRECT_URI);
           if (accessToken) {
             await saveGitHubToken(accessToken);
             setToken(accessToken);
@@ -910,7 +911,7 @@ export default function GitHubScreen() {
             setRepos(data);
             setShowRepoPicker(true);
           } else {
-            setError('Token exchange failed. Check EXPO_PUBLIC_WEB_URL points to the web frontend.');
+            setError('GitHub token exchange failed. Check the backend GitHub OAuth configuration.');
           }
         }
       }

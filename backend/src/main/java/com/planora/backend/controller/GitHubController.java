@@ -24,6 +24,19 @@ public class GitHubController {
     private final GitHubIntegrationService gitHubIntegrationService;
     private final GithubTokenService githubTokenService;
 
+    @GetMapping("/oauth-config")
+    public ResponseEntity<Map<String, Object>> getOAuthConfig(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String clientId = gitHubIntegrationService.getClientId();
+        boolean configured = clientId != null && !clientId.isBlank();
+        return ResponseEntity.ok(Map.of(
+                "configured", configured,
+                "clientId", configured ? clientId : ""));
+    }
+
     @GetMapping("/status")
     public ResponseEntity<Map<String, Boolean>> getStatus(
             @AuthenticationPrincipal UserPrincipal currentUser) {
@@ -58,9 +71,10 @@ public class GitHubController {
         if (code == null || code.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "No authorization code provided"));
         }
+        String redirectUri = body.getOrDefault("redirectUri", body.get("redirect_uri"));
 
         try {
-            gitHubIntegrationService.exchangeAndSaveToken(currentUser.getUserId(), currentUser.getUsername(), code);
+            gitHubIntegrationService.exchangeAndSaveToken(currentUser.getUserId(), currentUser.getUsername(), code, redirectUri);
             return ResponseEntity.ok(Map.of("success", true));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", e.getMessage()));

@@ -59,6 +59,10 @@ public class GitHubIntegrationService {
 
     private final CiStatusResolver ciStatusResolver;
 
+    public String getClientId() {
+        return clientId;
+    }
+
     /**
      * Fetches the authenticated user's repositories from GitHub.
      *
@@ -369,6 +373,10 @@ public class GitHubIntegrationService {
     }
 
     public void exchangeAndSaveToken(Long userId, String email, String code) {
+        exchangeAndSaveToken(userId, email, code, null);
+    }
+
+    public void exchangeAndSaveToken(Long userId, String email, String code, String redirectUri) {
         if (isBlank(clientId) || isBlank(clientSecret)) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "GitHub OAuth is not configured on this server");
@@ -379,11 +387,13 @@ public class GitHubIntegrationService {
         headers.set(HttpHeaders.ACCEPT, "application/json");
         headers.set(HttpHeaders.CONTENT_TYPE, "application/json");
 
-        Map<String, String> requestBody = Map.of(
-                "client_id", clientId,
-                "client_secret", clientSecret,
-                "code", code
-        );
+        Map<String, String> requestBody = new LinkedHashMap<>();
+        requestBody.put("client_id", clientId);
+        requestBody.put("client_secret", clientSecret);
+        requestBody.put("code", code);
+        if (!isBlank(redirectUri)) {
+            requestBody.put("redirect_uri", redirectUri);
+        }
 
         try {
             ResponseEntity<JsonNode> response = restTemplate.exchange(

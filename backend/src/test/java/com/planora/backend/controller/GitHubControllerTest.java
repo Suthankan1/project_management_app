@@ -67,6 +67,20 @@ class GitHubControllerTest {
     }
 
     @Test
+    void getOAuthConfig_returnsPublicClientIdOnly() throws Exception {
+        when(gitHubIntegrationService.getClientId()).thenReturn("github-client-id");
+
+        mockMvc.perform(get("/api/github/oauth-config")
+                        .with(user(principal))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.configured").value(true))
+                .andExpect(jsonPath("$.clientId").value("github-client-id"))
+                .andExpect(jsonPath("$.clientSecret").doesNotExist())
+                .andExpect(jsonPath("$.secret").doesNotExist());
+    }
+
+    @Test
     void getStatus_returnsConnectedTrueWhenTokenExists() throws Exception {
         when(githubTokenService.getToken(1L)).thenReturn("decrypted-token");
 
@@ -130,7 +144,7 @@ class GitHubControllerTest {
                 .andExpect(jsonPath("$.access_token").doesNotExist())
                 .andExpect(jsonPath("$.token").doesNotExist());
 
-        verify(gitHubIntegrationService).exchangeAndSaveToken(1L, "test@example.com", "auth-code");
+        verify(gitHubIntegrationService).exchangeAndSaveToken(1L, "test@example.com", "auth-code", null);
     }
 
     @Test
