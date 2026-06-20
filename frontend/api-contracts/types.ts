@@ -5325,7 +5325,6 @@ export interface components {
         UpdateProjectDTO: {
             description?: string;
             name?: string;
-            type?: string;
         };
         UpdateStatusRequest: {
             status: string;
