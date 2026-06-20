@@ -52,6 +52,9 @@ public class GitHubIntegrationService {
     @Value("${github.client.secret:}")
     private String clientSecret;
 
+    @Value("${github.mobile.redirect-uri:mobile://github-callback}")
+    private String mobileRedirectUri;
+
     private final GithubTokenService githubTokenService;
     private final UserRepository userRepository;
 
@@ -61,6 +64,10 @@ public class GitHubIntegrationService {
 
     public String getClientId() {
         return clientId;
+    }
+
+    public String getMobileRedirectUri() {
+        return mobileRedirectUri;
     }
 
     /**

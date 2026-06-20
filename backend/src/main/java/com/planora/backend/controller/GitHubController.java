@@ -31,10 +31,12 @@ public class GitHubController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         String clientId = gitHubIntegrationService.getClientId();
+        String mobileRedirectUri = gitHubIntegrationService.getMobileRedirectUri();
         boolean configured = clientId != null && !clientId.isBlank();
         return ResponseEntity.ok(Map.of(
                 "configured", configured,
-                "clientId", configured ? clientId : ""));
+                "clientId", configured ? clientId : "",
+                "redirectUri", mobileRedirectUri == null ? "" : mobileRedirectUri));
     }
 
     @GetMapping("/status")

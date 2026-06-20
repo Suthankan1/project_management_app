@@ -23,7 +23,7 @@ import {
   type GitHubPullRequest, type GitHubCommit, type GitHubIssue, type GitHubRepository,
 } from '../../src/services/githubMobileService';
 
-const REDIRECT_URI = 'mobile://github-callback';
+const DEFAULT_REDIRECT_URI = 'mobile://github-callback';
 type ActiveTab = 'prs' | 'commits' | 'issues';
 type IssueFilter = 'open' | 'closed' | 'all';
 type NotificationType = 'pull-request' | 'issue' | 'security' | 'release';
@@ -896,14 +896,15 @@ export default function GitHubScreen() {
         setError('GitHub OAuth is not configured on the backend.');
         return;
       }
+      const redirectUri = oauthConfig.redirectUri || DEFAULT_REDIRECT_URI;
       const authUrl =
         `https://github.com/login/oauth/authorize` +
-        `?client_id=${oauthConfig.clientId}&scope=repo&state=${projectId}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
+        `?client_id=${oauthConfig.clientId}&scope=repo&state=${projectId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
       if (result.type === 'success' && result.url) {
         const code = new URL(result.url).searchParams.get('code');
         if (code) {
-          const accessToken = await exchangeCodeForToken(code, REDIRECT_URI);
+          const accessToken = await exchangeCodeForToken(code, redirectUri);
           if (accessToken) {
             await saveGitHubToken(accessToken);
             setToken(accessToken);

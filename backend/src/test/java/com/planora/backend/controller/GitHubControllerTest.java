@@ -69,6 +69,7 @@ class GitHubControllerTest {
     @Test
     void getOAuthConfig_returnsPublicClientIdOnly() throws Exception {
         when(gitHubIntegrationService.getClientId()).thenReturn("github-client-id");
+        when(gitHubIntegrationService.getMobileRedirectUri()).thenReturn("mobile://github-callback");
 
         mockMvc.perform(get("/api/github/oauth-config")
                         .with(user(principal))
@@ -76,6 +77,7 @@ class GitHubControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.configured").value(true))
                 .andExpect(jsonPath("$.clientId").value("github-client-id"))
+                .andExpect(jsonPath("$.redirectUri").value("mobile://github-callback"))
                 .andExpect(jsonPath("$.clientSecret").doesNotExist())
                 .andExpect(jsonPath("$.secret").doesNotExist());
     }

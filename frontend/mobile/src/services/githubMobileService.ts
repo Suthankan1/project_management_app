@@ -18,8 +18,8 @@ export async function clearGitHubToken(): Promise<void> {
   await api.post('/api/github/revoke');
 }
 
-export async function fetchGitHubOAuthConfig(): Promise<{ configured: boolean; clientId: string }> {
-  const { data } = await api.get<{ configured: boolean; clientId: string }>('/api/github/oauth-config');
+export async function fetchGitHubOAuthConfig(): Promise<{ configured: boolean; clientId: string; redirectUri: string }> {
+  const { data } = await api.get<{ configured: boolean; clientId: string; redirectUri: string }>('/api/github/oauth-config');
   return data;
 }
 
