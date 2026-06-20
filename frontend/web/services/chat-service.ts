@@ -1,4 +1,4 @@
-import { chatApi, authApi } from './api-contract';
+import { authApi, chatApi } from './api-contract';
 import type {
   ChatFeatureFlags,
   ChatMessage,
@@ -64,7 +64,7 @@ export async function fetchChatMembers(projectId: string): Promise<string[]> {
 }
 
 export async function fetchAllUserProfiles(): Promise<AuthUserSummary[]> {
-  return authApi.getAllUsers();
+  return [];
 }
 
 export async function fetchCurrentUser(): Promise<{ username: string }> {

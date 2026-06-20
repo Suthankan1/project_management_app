@@ -15,7 +15,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -32,12 +34,11 @@ import com.planora.backend.model.User;
 import com.planora.backend.model.VerificationToken;
 import com.planora.backend.repository.TokenRepository;
 import com.planora.backend.repository.UserRepository;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Cache;
 
 import jakarta.transaction.Transactional;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -66,6 +67,7 @@ public class UserService {
 
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Value("${aws.s3.profile-bucket}")
     private String profileBucket;
@@ -80,10 +82,6 @@ public class UserService {
     private UserService getSelf() {
         return self != null ? self : this;
     }
-
-    private final Cache<String, LoginAttemptRecord> loginAttemptCache = Caffeine.newBuilder()
-            .expireAfterWrite(Duration.ofMinutes(20))
-            .build();
 
     // Note: OTP-issuance rate limiting (forgot / resend / resend-otp) is enforced upstream by
     // RateLimitingFilter, which uses a Redis-backed IP+email keyed counter shared across all
@@ -101,7 +99,7 @@ public class UserService {
         }
     }
 
-    public UserService(UserRepository userRepository, JWTService jwtService, AuthenticationManager authenticationManager, TokenRepository tokenRepository, EmailService emailService, S3Client s3Client, S3Presigner s3Presigner) {
+    public UserService(UserRepository userRepository, JWTService jwtService, AuthenticationManager authenticationManager, TokenRepository tokenRepository, EmailService emailService, S3Client s3Client, S3Presigner s3Presigner, StringRedisTemplate stringRedisTemplate) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
@@ -109,6 +107,7 @@ public class UserService {
         this.emailService = emailService;
         this.s3Client = s3Client;
         this.s3Presigner = s3Presigner;
+        this.stringRedisTemplate = stringRedisTemplate;
     }
 
     /*
@@ -205,7 +204,7 @@ public class UserService {
     @Transactional
     public LoginResponse loginUser(User user) {
         String email = user.getEmail().toLowerCase();
-        LoginAttemptRecord loginAttemptRecord = loginAttemptCache.getIfPresent(email);
+        LoginAttemptRecord loginAttemptRecord = getLoginAttemptRecord(email);
 
         if (loginAttemptRecord != null && loginAttemptRecord.isLocked(Instant.now())) {
             LoginResponse response = new LoginResponse();
@@ -224,7 +223,7 @@ public class UserService {
 
             // Step 2. If auth succeeds, generate JWT.
             if (authentication.isAuthenticated()) {
-                loginAttemptCache.invalidate(email);
+                clearLoginAttemptRecord(email);
                 User authenticatedUser = userRepository.findFirstByEmailIgnoreCase(email).orElse(null);
 
                 // Create short-lived access token and long-lived refresh token.
@@ -260,10 +259,7 @@ public class UserService {
 
         } catch (AuthenticationException e) {
             // Exception caught: Password does not match hash.
-            LoginAttemptRecord updatedLoginAttemptRecord = loginAttemptCache.asMap().compute(email, (key, record) -> {
-                LoginAttemptRecord currentRecord = record == null ? new LoginAttemptRecord(0, null) : record;
-                return currentRecord.recordFailedAttempt(Instant.now());
-            });
+            LoginAttemptRecord updatedLoginAttemptRecord = recordFailedLoginAttempt(email, Instant.now());
             if (updatedLoginAttemptRecord.failedAttempts() == 5) {
                 logger.warn("Account locked for email: {}", email);
             }
@@ -273,6 +269,76 @@ public class UserService {
             response.setMessage("Incorrect username or password");
             response.setErrorCode("INVALID_CREDENTIALS");
             return response;
+        }
+    }
+
+    private LoginAttemptRecord getLoginAttemptRecord(String email) {
+        if (stringRedisTemplate == null) {
+            return null;
+        }
+        try {
+            String encoded = stringRedisTemplate.opsForValue().get(loginAttemptKey(email));
+            return parseLoginAttemptRecord(encoded);
+        } catch (RuntimeException ex) {
+            logger.warn("Redis unavailable while reading login lockout for {}: {}", email, ex.getMessage());
+            return null;
+        }
+    }
+
+    private LoginAttemptRecord recordFailedLoginAttempt(String email, Instant now) {
+        LoginAttemptRecord currentRecord = getLoginAttemptRecord(email);
+        LoginAttemptRecord updatedRecord = (currentRecord == null
+                ? new LoginAttemptRecord(0, null)
+                : currentRecord).recordFailedAttempt(now);
+        if (stringRedisTemplate == null) {
+            return updatedRecord;
+        }
+        try {
+            stringRedisTemplate.opsForValue().set(
+                    loginAttemptKey(email),
+                    encodeLoginAttemptRecord(updatedRecord),
+                    Duration.ofMinutes(20));
+        } catch (RuntimeException ex) {
+            logger.warn("Redis unavailable while writing login lockout for {}: {}", email, ex.getMessage());
+        }
+        return updatedRecord;
+    }
+
+    private void clearLoginAttemptRecord(String email) {
+        if (stringRedisTemplate == null) {
+            return;
+        }
+        try {
+            stringRedisTemplate.delete(loginAttemptKey(email));
+        } catch (RuntimeException ex) {
+            logger.warn("Redis unavailable while clearing login lockout for {}: {}", email, ex.getMessage());
+        }
+    }
+
+    private String loginAttemptKey(String email) {
+        return "login-attempt:" + email;
+    }
+
+    private String encodeLoginAttemptRecord(LoginAttemptRecord record) {
+        long lockedUntilEpochMillis = record.lockedUntil() == null ? 0L : record.lockedUntil().toEpochMilli();
+        return record.failedAttempts() + ":" + lockedUntilEpochMillis;
+    }
+
+    private LoginAttemptRecord parseLoginAttemptRecord(String encoded) {
+        if (encoded == null || encoded.isBlank()) {
+            return null;
+        }
+        String[] parts = encoded.split(":", 2);
+        if (parts.length != 2) {
+            return null;
+        }
+        try {
+            int failedAttempts = Integer.parseInt(parts[0]);
+            long lockedUntilEpochMillis = Long.parseLong(parts[1]);
+            Instant lockedUntil = lockedUntilEpochMillis > 0 ? Instant.ofEpochMilli(lockedUntilEpochMillis) : null;
+            return new LoginAttemptRecord(failedAttempts, lockedUntil);
+        } catch (NumberFormatException ex) {
+            return null;
         }
     }
 
@@ -703,6 +769,10 @@ public class UserService {
      * Automatically handles the cleanup of the user's old profile picture to save AWS storage costs.
      */
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "userProfile", key = "#email"),
+            @CacheEvict(value = "userPhotoUrls", allEntries = true)
+    })
     public String uploadProfilePicture(String email, MultipartFile file) {
         // Step 1. Validate User exists.
         User user = userRepository.findFirstByEmailIgnoreCase(email.toLowerCase()).orElse(null);

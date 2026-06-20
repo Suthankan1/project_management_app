@@ -18,6 +18,8 @@ import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.TeamRepository;
 import com.planora.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +53,7 @@ public class ProjectService {
 
     // Creates a project, links it to a team, and assigns the logged-in user as owner.
     @Transactional
+    @CacheEvict(cacheNames = {"project-recent", "project-favorites"}, allEntries = true)
     public ProjectResponseDTO createProject(ProjectDTO dto) {
         Project project = new Project();
         project.setName(dto.getName());
@@ -197,6 +200,7 @@ public class ProjectService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"project-recent", "project-favorites"}, allEntries = true)
     public void recordProjectAccess(Long projectId, Long userId) {
         // Saves the latest access time so recent-project lists stay accurate.
         Project project = findProjectById(projectId);
@@ -214,6 +218,7 @@ public class ProjectService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"project-recent", "project-favorites"}, allEntries = true)
     public void toggleFavorite(Long projectId, Long userId) {
         // Adds the project to favorites if missing, otherwise removes it.
         Project project = findProjectById(projectId);
@@ -234,6 +239,7 @@ public class ProjectService {
 
     // Returns the most recently accessed projects for the user.
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = "project-recent", key = "#userId + ':' + #limit")
     public List<ProjectResponseDTO> getRecentProjectsForUser(Long userId, int limit) {
         // Find all teams the user belongs to.
         List<TeamMember> memberships = teamMemberRepository.findByUserUserId(userId);
@@ -270,6 +276,7 @@ public class ProjectService {
 
     // Returns only the user's favorite projects that are still accessible.
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = "project-favorites", key = "#userId")
     public List<ProjectResponseDTO> getFavoriteProjectsForUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
@@ -325,6 +332,7 @@ public class ProjectService {
 
     // Updates the fields provided in the request.
     @Transactional
+    @CacheEvict(cacheNames = {"project-recent", "project-favorites"}, allEntries = true)
     public ProjectResponseDTO updateProject(Long id, UpdateProjectDTO dto) {
         Project project = findProjectById(id);
 
@@ -341,6 +349,7 @@ public class ProjectService {
 
     // Deletes a project after owner permission is verified.
     @Transactional
+    @CacheEvict(cacheNames = {"project-recent", "project-favorites"}, allEntries = true)
     public void deleteProject(Long projectId, Long teamId, Long userId) {
         Project project = findProjectById(projectId);
         validateOwnerPermission(teamId, userId);

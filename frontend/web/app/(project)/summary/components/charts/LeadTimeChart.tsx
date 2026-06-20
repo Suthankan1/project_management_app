@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { Task } from '@/types';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { SafeChartFrame } from '@/components/shared/SafeChartFrame';
 
 /**
@@ -36,15 +36,15 @@ export function LeadTimeChart({ tasks }: { tasks: Task[] }) {
       <div className="flex-1 min-h-0 w-full relative">
         {data.length > 0 ? (
           <SafeChartFrame>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -28 }}>
+            {({ width, height }) => (
+              <LineChart width={width} height={height} data={data} margin={{ top: 4, right: 8, bottom: 0, left: -28 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--cu-border)" />
                 <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--cu-text-muted)' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 9, fill: 'var(--cu-text-muted)' }} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--cu-border)', background: 'var(--cu-bg)', color: 'var(--cu-text-primary)', fontSize: '11px' }} />
                 <Line type="monotone" dataKey="avgDays" name="Avg Days" stroke="var(--cu-warning)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
               </LineChart>
-            </ResponsiveContainer>
+            )}
           </SafeChartFrame>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-cu-bg-secondary rounded-lg border border-dashed border-cu-border">
