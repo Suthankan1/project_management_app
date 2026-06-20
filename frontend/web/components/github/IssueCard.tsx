@@ -130,7 +130,7 @@ export function IssueCard({ issue, onImport, isImported = false }: IssueCardProp
                       alt={login}
                       width={20}
                       height={20}
-                      className="rounded-full ring-2 ring-cu-bg"
+                      className="h-5 w-5 rounded-full ring-2 ring-cu-bg"
                       unoptimized
                     />
                   ) : (

@@ -7,6 +7,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const localBackendOrigin = 'http://localhost:8080';
 const localWebSocketOrigin = 'ws://localhost:8080';
 const awsImageSource = 'https://*.amazonaws.com';
+const githubAvatarImageSource = 'https://avatars.githubusercontent.com';
 
 function originFromUrl(rawUrl) {
   if (!rawUrl) return null;
@@ -101,6 +102,7 @@ const nextConfig = {
       'data:',
       'blob:',
       awsImageSource,
+      githubAvatarImageSource,
       ...backendSources,
     ]);
     const frameSources = uniqueSources([
@@ -147,6 +149,12 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: '**.amazonaws.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'avatars.githubusercontent.com',
         port: '',
         pathname: '/**',
       },

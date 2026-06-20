@@ -360,7 +360,7 @@ function PRCard({ pr }: { pr: GitHubPullRequest }) {
             alt={pr.user.login}
             width={18}
             height={18}
-            className="rounded-full ring-1 ring-white/10"
+            className="h-[18px] w-[18px] rounded-full ring-1 ring-white/10"
             unoptimized
           />
           <span className="text-[11px] text-cu-text-tertiary font-outfit">@{pr.user.login}</span>
@@ -420,7 +420,7 @@ function CommitCard({ commit }: { commit: GitHubCommit }) {
 
       <div className="flex items-center gap-1.5">
         {avatarUrl ? (
-          <Image src={avatarUrl} alt={authorName} width={18} height={18} className="rounded-full ring-1 ring-white/10" unoptimized />
+          <Image src={avatarUrl} alt={authorName} width={18} height={18} className="h-[18px] w-[18px] rounded-full ring-1 ring-white/10" unoptimized />
         ) : (
           <div
             className="w-[18px] h-[18px] rounded-full flex items-center justify-center shrink-0"
@@ -467,7 +467,7 @@ function AccountDropdown({
         style={glass.button}
       >
         {user?.avatar_url ? (
-          <Image src={user.avatar_url} alt={user.login} width={20} height={20} className="rounded-full ring-1 ring-white/15" unoptimized />
+          <Image src={user.avatar_url} alt={user.login} width={20} height={20} className="h-5 w-5 rounded-full ring-1 ring-white/15" unoptimized />
         ) : (
           <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center">
             <User size={11} className="text-cu-text-tertiary" />
@@ -492,7 +492,7 @@ function AccountDropdown({
             <div className="px-4 py-3.5" style={glass.divider}>
               <div className="flex items-center gap-3">
                 {user?.avatar_url ? (
-                  <Image src={user.avatar_url} alt={user.login} width={38} height={38} className="rounded-full ring-2 ring-white/10" unoptimized />
+                  <Image src={user.avatar_url} alt={user.login} width={38} height={38} className="h-[38px] w-[38px] rounded-full ring-2 ring-white/10" unoptimized />
                 ) : (
                   <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
                     <User size={16} className="text-cu-text-tertiary" />
@@ -744,7 +744,7 @@ function AccountPickerModal({
                 alt={account.login}
                 width={36}
                 height={36}
-                className="rounded-full flex-shrink-0 ring-2 ring-white/10"
+                className="h-9 w-9 flex-shrink-0 rounded-full ring-2 ring-white/10"
                 unoptimized
               />
               <div className="flex flex-col min-w-0 flex-1">
