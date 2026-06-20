@@ -68,7 +68,7 @@ class GitHubControllerTest {
 
     @Test
     void getOAuthConfig_returnsPublicClientIdOnly() throws Exception {
-        when(gitHubIntegrationService.getClientId()).thenReturn("github-client-id");
+        when(gitHubIntegrationService.getMobileClientId()).thenReturn("github-client-id");
         when(gitHubIntegrationService.getMobileRedirectUri()).thenReturn("mobile://github-callback");
 
         mockMvc.perform(get("/api/github/oauth-config")
