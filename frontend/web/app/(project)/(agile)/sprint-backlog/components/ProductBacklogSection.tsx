@@ -98,6 +98,8 @@ export default function ProductBacklogSection({
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskTitleLength, setNewTaskTitleLength] = useState(0);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [isDragOverSection, setIsDragOverSection] = useState(false);
+  const dragEnterCounterRef = useRef(0);
 
   const { activeDragId, touchDropIndex, ghost, draggingTask, getTouchProps } = useTouchDragSort({
     tasks,
@@ -197,8 +199,39 @@ export default function ProductBacklogSection({
     }
   };
 
+  const handleSectionDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragEnterCounterRef.current++;
+    setIsDragOverSection(true);
+  };
+
+  const handleSectionDragLeave = () => {
+    dragEnterCounterRef.current--;
+    if (dragEnterCounterRef.current <= 0) {
+      dragEnterCounterRef.current = 0;
+      setIsDragOverSection(false);
+      setDropIndex(null);
+    }
+  };
+
+  const handleSectionDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleSectionDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragEnterCounterRef.current = 0;
+    setIsDragOverSection(false);
+    setDropIndex(null);
+    const taskId = Number(e.dataTransfer.getData('text/plain'));
+    if (taskId) {
+      onDropTask(taskId);
+    }
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setDropIndex(null);
     const taskId = Number(e.dataTransfer.getData('text/plain'));
     if (taskId) {
@@ -224,7 +257,15 @@ export default function ProductBacklogSection({
   }, [tasks]);
 
   return (
-    <div className="rounded-xl border border-cu-border bg-cu-bg-secondary p-4 sm:p-5 shadow-cu-sm">
+    <div
+      className={`rounded-xl border bg-cu-bg-secondary p-4 sm:p-5 shadow-cu-sm transition-colors ${
+        isDragOverSection ? 'border-cu-primary bg-cu-primary/5' : 'border-cu-border'
+      }`}
+      onDragEnter={handleSectionDragEnter}
+      onDragLeave={handleSectionDragLeave}
+      onDragOver={handleSectionDragOver}
+      onDrop={handleSectionDrop}
+    >
 <div className="mb-3 flex min-h-10 flex-wrap items-center justify-between border-b border-cu-border pb-3 gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <button
@@ -263,9 +304,16 @@ export default function ProductBacklogSection({
         </div>
       </div>
 
+      {/* Collapsed drop zone indicator */}
+      {!isOpen && isDragOverSection && (
+        <div className="mt-3 rounded-lg border-2 border-dashed border-cu-primary bg-cu-primary/5 px-4 py-6 text-center text-[13px] font-medium text-cu-primary">
+          Drop here to add to Backlog
+        </div>
+      )}
+
       {isOpen && (
         <div>
-          <motion.div ref={taskListRef} layout className="flex flex-col gap-[5px]" onDragOver={(e) => { e.preventDefault(); setDropIndex(tasks.length); }} onDrop={handleDrop}>
+          <motion.div ref={taskListRef} layout className="flex flex-col gap-[5px]" onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDropIndex(tasks.length); }} onDrop={handleDrop}>
             <AnimatePresence initial={false}>
               {tasks.map((task, index) => (
                 <div key={task.id}>
@@ -298,8 +346,10 @@ export default function ProductBacklogSection({
                       onDragEnd={(e: React.DragEvent<HTMLDivElement>) => {
                         (e.target as HTMLElement).style.opacity = '1';
                         setDropIndex(null);
+                        setIsDragOverSection(false);
+                        dragEnterCounterRef.current = 0;
                       }}
-                      onDragOver={(e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); setDropIndex(index); }}
+                      onDragOver={(e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setDropIndex(index); }}
                       onDrop={(e: React.DragEvent<HTMLDivElement>) => handleDropAtIndex(e, index)}
                     >
                       <TaskRow
