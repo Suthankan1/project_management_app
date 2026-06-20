@@ -24,6 +24,16 @@ public class GitHubController {
     private final GitHubIntegrationService gitHubIntegrationService;
     private final GithubTokenService githubTokenService;
 
+    @GetMapping("/status")
+    public ResponseEntity<Map<String, Boolean>> getStatus(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String token = githubTokenService.getToken(currentUser.getUserId());
+        return ResponseEntity.ok(Map.of("connected", token != null && !token.isBlank()));
+    }
+
     @GetMapping("/repositories")
     public ResponseEntity<List<GitHubRepositoryDTO>> getRepositories(
             @AuthenticationPrincipal UserPrincipal currentUser) {

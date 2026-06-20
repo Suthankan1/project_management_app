@@ -67,6 +67,28 @@ class GitHubControllerTest {
     }
 
     @Test
+    void getStatus_returnsConnectedTrueWhenTokenExists() throws Exception {
+        when(githubTokenService.getToken(1L)).thenReturn("decrypted-token");
+
+        mockMvc.perform(get("/api/github/status")
+                        .with(user(principal))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.connected").value(true));
+    }
+
+    @Test
+    void getStatus_returnsConnectedFalseWhenTokenMissing() throws Exception {
+        when(githubTokenService.getToken(1L)).thenReturn(null);
+
+        mockMvc.perform(get("/api/github/status")
+                        .with(user(principal))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.connected").value(false));
+    }
+
+    @Test
     void getRepositories_returnsListWhenConnected() throws Exception {
         String mockToken = "decrypted-token";
         when(githubTokenService.getToken(1L)).thenReturn(mockToken);
