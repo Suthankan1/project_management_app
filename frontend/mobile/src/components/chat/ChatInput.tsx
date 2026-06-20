@@ -4,7 +4,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
   Platform,
   Text,
   ScrollView,
@@ -187,31 +186,30 @@ export function ChatInput(props: ChatInputProps) {
       </Animated.View>
 
       {/* Input bar — renders after emoji sheet so it sits on top */}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View
-          style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}
-          onLayout={onContainerLayout}
-        >
-          {uploading && (
-            <View style={styles.uploadBanner}>
+      <View
+        style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}
+        onLayout={onContainerLayout}
+      >
+        {uploading && (
+          <View style={styles.uploadBanner}>
               <Ionicons name="cloud-upload-outline" size={16} color={Colors.bannerAmberText} />
               <Text style={styles.uploadText}>Uploading…</Text>
               <ActivityIndicator size="small" color={Colors.bannerAmberText} />
               <TouchableOpacity style={styles.uploadDismiss} onPress={() => setUploading(false)}>
                 <Ionicons name="close" size={16} color={Colors.bannerAmberText} />
               </TouchableOpacity>
-            </View>
-          )}
+          </View>
+        )}
 
-          <View style={styles.inputRow}>
-            <TouchableOpacity
+        <View style={styles.inputRow}>
+          <TouchableOpacity
               style={styles.iconBtn}
               onPress={() => setShowEmojiPicker(v => !v)}
-            >
+          >
               <Ionicons name="happy-outline" size={24} color={Colors.textSecondary} />
-            </TouchableOpacity>
+          </TouchableOpacity>
 
-            <TextInput
+          <TextInput
               style={styles.textInput}
               placeholder={placeholder ?? 'Type a message...'}
               placeholderTextColor={Colors.textMuted}
@@ -220,29 +218,28 @@ export function ChatInput(props: ChatInputProps) {
               onFocus={() => setShowEmojiPicker(false)}
               multiline
               editable={!disabled}
-            />
+          />
 
-            <View style={styles.rightIcons}>
-              <TouchableOpacity style={styles.iconBtn} onPress={handleAttach}>
+          <View style={styles.rightIcons}>
+            <TouchableOpacity style={styles.iconBtn} onPress={handleAttach}>
                 <Ionicons name="attach-outline" size={24} color={Colors.textSecondary} />
-              </TouchableOpacity>
+            </TouchableOpacity>
 
-              <Animated.View style={animatedSendStyle}>
-                <TouchableOpacity
+            <Animated.View style={animatedSendStyle}>
+              <TouchableOpacity
                   style={[
                     styles.sendBtn,
                     { backgroundColor: input.trim() ? Colors.primary : Colors.borderDefault },
                   ]}
                   onPress={handleSend}
                   disabled={!input.trim() || !!disabled}
-                >
+              >
                   <Ionicons name="send" size={18} color={Colors.white} />
-                </TouchableOpacity>
-              </Animated.View>
-            </View>
+              </TouchableOpacity>
+            </Animated.View>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
 
       {/*
        * Mention dropdown renders last so it sits above the input bar.

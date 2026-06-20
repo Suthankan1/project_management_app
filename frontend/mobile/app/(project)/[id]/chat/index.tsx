@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, GestureResponderEvent } from 'react-native';
+import { KeyboardAvoidingView, Platform, View, StyleSheet, GestureResponderEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useChat } from '@/src/hooks/chat/useChat';
@@ -176,7 +176,11 @@ export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenConten
           teamMentionCount={teamMentionCount}
         />
       ) : (
-        <View style={styles.chatArea}>
+        <KeyboardAvoidingView
+          style={styles.chatArea}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? topOffset : 0}
+        >
           <ChatConnectionBanner
             isConnected={isConnected}
             shouldShowErrorBanner={shouldShowErrorBanner}
@@ -263,7 +267,7 @@ export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenConten
             mentionCandidates={mentionCandidates}
             projectId={projectId as string}
           />
-        </View>
+        </KeyboardAvoidingView>
       )}
 
       {/* Modals */}

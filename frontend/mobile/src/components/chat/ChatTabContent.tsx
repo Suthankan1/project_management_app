@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GestureResponderEvent, View, StyleSheet } from 'react-native';
+import { GestureResponderEvent, KeyboardAvoidingView, Platform, View, StyleSheet } from 'react-native';
 import { useChat } from '@/src/hooks/chat/useChat';
 import { ChatSidebar }          from '@/src/components/chat/ChatSidebar';
 import { ChatHeader }           from '@/src/components/chat/ChatHeader';
@@ -162,7 +162,10 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
           />
         </View>
       ) : (
-        <View style={[s.chatArea, { paddingTop: navHeight }]}>
+        <KeyboardAvoidingView
+          style={[s.chatArea, { paddingTop: navHeight }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <ChatConnectionBanner
             isConnected={isConnected}
             shouldShowErrorBanner={shouldShowErrorBanner}
@@ -248,7 +251,7 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
             mentionCandidates={mentionCandidates}
             projectId={projectId}
           />
-        </View>
+        </KeyboardAvoidingView>
       )}
 
       <CreateChannelModal
