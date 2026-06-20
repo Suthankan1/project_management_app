@@ -334,13 +334,7 @@ export const ChatMessages = ({
               )}
 
               <div
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (msg.id) {
-                    setActiveMessageId(msg.id);
-                  }
-                }}
-                className={`flex cursor-pointer items-end ${hasAvatar ? 'gap-2.5' : 'gap-1.5'} relative ${grouped ? 'mt-0.5' : 'mt-3'} ${isMe ? 'flex-row-reverse' : 'flex-row'} ${isMentioned ? 'pl-1.5 border-l-2 border-amber-400 rounded-l' : ''}`}
+                className={`flex items-end ${hasAvatar ? 'gap-2.5' : 'gap-1.5'} relative ${grouped ? 'mt-0.5' : 'mt-3'} ${isMe ? 'flex-row-reverse' : 'flex-row'} ${isMentioned ? 'pl-1.5 border-l-2 border-amber-400 rounded-l' : ''}`}
               >
                 {/* Avatar */}
                 {hasAvatar && (
@@ -371,7 +365,15 @@ export const ChatMessages = ({
                   )}
 
                   {/* Bubble + action bar wrapper */}
-                  <div className="relative">
+                  <div
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (msg.id) {
+                        setActiveMessageId(msg.id);
+                      }
+                    }}
+                    className="relative cursor-pointer"
+                  >
                     {/* Hover action bar */}
                     {!!msg.id && isActiveMessage && (
                       <div className={`absolute bottom-full mb-1 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-1 bg-cu-bg border border-cu-border shadow-cu-lg rounded-xl px-2 py-2`}>
@@ -483,7 +485,10 @@ export const ChatMessages = ({
 
                   {/* Reactions row */}
                   {!!msg.id && isActiveMessage && !msg.deleted && msgReactions.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1.5">
+                    <div
+                      onClick={(event) => event.stopPropagation()}
+                      className="flex flex-wrap gap-1 mt-1.5"
+                    >
                       {msgReactions.map((reaction) => (
                         <button
                           key={`${msg.id}-${reaction.emoji}`}
