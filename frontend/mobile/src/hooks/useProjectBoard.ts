@@ -231,7 +231,7 @@ export function useProjectBoard(projectId: number) {
 
       const [boardData, tasksData, membersResult] = await Promise.all([
         kanbanService.getBoard(projectId),
-        taskService.listByProject(projectId),
+        taskService.listAllByProject(projectId),
         projectService.getMembersCached(projectId)
           .then((data) => ({ ok: true as const, data }))
           .catch(() => ({ ok: false as const, data: [] as unknown[] })),

@@ -90,7 +90,7 @@ export function useMobileBacklog(projectId: number) {
 
     try {
       const [tasksData, sprintsData, projectData, membersData] = await Promise.all([
-        taskService.listByProject(projectId),
+        taskService.listAllByProject(projectId),
         sprintService.listByProject(projectId).catch(() => []),
         projectService.get(projectId).catch(() => null),
         projectService.getMembers(projectId).catch(() => []),
@@ -251,86 +251,151 @@ export function useMobileBacklog(projectId: number) {
   }, [fetchBacklog, projectId, projectKey, sprints.length]);
 
   const updateStatus = useCallback(async (taskId: number, status: string) => {
-    const previous = tasks;
+    const previousTasks = tasks;
+    const previousSprints = sprints;
     setTasks((current) => current.map((task) => task.id === taskId ? { ...task, status } : task));
+    setSprints((current) => current.map((sprint) => ({
+      ...sprint,
+      tasks: sprint.tasks.map((task) => task.id === taskId ? { ...task, status } : task)
+    })));
     try {
       await taskService.updateStatus(taskId, status);
       await fetchBacklog(true);
     } catch (err) {
-      setTasks(previous);
+      setTasks(previousTasks);
+      setSprints(previousSprints);
       Alert.alert('Status not updated', apiErrorMessage(err, 'Please try again.'));
     }
-  }, [fetchBacklog, tasks]);
+  }, [fetchBacklog, tasks, sprints]);
 
   const updateStoryPoints = useCallback(async (taskId: number, storyPoint: number) => {
     const value = Math.max(0, Number.isNaN(storyPoint) ? 0 : storyPoint);
-    const previous = tasks;
+    const previousTasks = tasks;
+    const previousSprints = sprints;
     setTasks((current) => current.map((task) => task.id === taskId ? { ...task, storyPoint: value } : task));
+    setSprints((current) => current.map((sprint) => ({
+      ...sprint,
+      tasks: sprint.tasks.map((task) => task.id === taskId ? { ...task, storyPoint: value } : task)
+    })));
     try {
       await taskService.update(taskId, { storyPoint: value });
       await fetchBacklog(true);
     } catch (err) {
-      setTasks(previous);
+      setTasks(previousTasks);
+      setSprints(previousSprints);
       Alert.alert('Points not updated', apiErrorMessage(err, 'Please try again.'));
     }
-  }, [fetchBacklog, tasks]);
+  }, [fetchBacklog, tasks, sprints]);
 
   const moveTaskToSprint = useCallback(async (taskId: number, sprintId: number | null) => {
-    const previous = tasks;
+    const previousTasks = tasks;
+    const previousSprints = sprints;
     setTasks((current) => current.map((task) => task.id === taskId ? { ...task, sprintId, selected: false } : task));
+    setSprints((current) => {
+      const taskToMove = tasks.find((t) => t.id === taskId);
+      if (!taskToMove) return current;
+      const updatedTask = { ...taskToMove, sprintId, selected: false };
+      return current.map((sprint) => {
+        let sprintTasks = sprint.tasks.filter((t) => t.id !== taskId);
+        if (sprint.id === sprintId) {
+          sprintTasks = [...sprintTasks, updatedTask];
+        }
+        return { ...sprint, tasks: sprintTasks };
+      });
+    });
     try {
       await taskService.update(taskId, { sprintId });
       await fetchBacklog(true);
     } catch (err) {
-      setTasks(previous);
+      setTasks(previousTasks);
+      setSprints(previousSprints);
       Alert.alert('Task not moved', apiErrorMessage(err, 'Please try again.'));
     }
-  }, [fetchBacklog, tasks]);
+  }, [fetchBacklog, tasks, sprints]);
 
   const deleteTask = useCallback(async (taskId: number) => {
-    const previous = tasks;
+    const previousTasks = tasks;
+    const previousSprints = sprints;
     setTasks((current) => current.filter((task) => task.id !== taskId));
+    setSprints((current) => current.map((sprint) => ({
+      ...sprint,
+      tasks: sprint.tasks.filter((task) => task.id !== taskId)
+    })));
     try {
       await taskService.delete(taskId);
       await fetchBacklog(true);
     } catch (err) {
-      setTasks(previous);
+      setTasks(previousTasks);
+      setSprints(previousSprints);
       Alert.alert('Delete failed', apiErrorMessage(err, 'Only Project Owners or Admins can delete tasks.'));
     }
-  }, [fetchBacklog, tasks]);
+  }, [fetchBacklog, tasks, sprints]);
 
   const bulkStatus = useCallback(async (status: string) => {
     if (!selectedIds.length) return;
+    const previousTasks = tasks;
+    const previousSprints = sprints;
+    setTasks((current) => current.map((task) => selectedIds.includes(task.id) ? { ...task, status, selected: false } : task));
+    setSprints((current) => current.map((sprint) => ({
+      ...sprint,
+      tasks: sprint.tasks.map((task) => selectedIds.includes(task.id) ? { ...task, status, selected: false } : task)
+    })));
     try {
       await taskService.bulkUpdateStatus({ taskIds: selectedIds, status });
       clearSelection();
       await fetchBacklog(true);
     } catch (err) {
+      setTasks(previousTasks);
+      setSprints(previousSprints);
       Alert.alert('Bulk update failed', apiErrorMessage(err, 'Please try again.'));
     }
-  }, [clearSelection, fetchBacklog, selectedIds]);
+  }, [clearSelection, fetchBacklog, selectedIds, tasks, sprints]);
 
   const bulkDelete = useCallback(async () => {
     if (!selectedIds.length) return;
+    const previousTasks = tasks;
+    const previousSprints = sprints;
+    setTasks((current) => current.filter((task) => !selectedIds.includes(task.id)));
+    setSprints((current) => current.map((sprint) => ({
+      ...sprint,
+      tasks: sprint.tasks.filter((task) => !selectedIds.includes(task.id))
+    })));
     try {
       await taskService.bulkDelete({ taskIds: selectedIds });
       clearSelection();
       await fetchBacklog(true);
     } catch (err) {
+      setTasks(previousTasks);
+      setSprints(previousSprints);
       Alert.alert('Bulk delete failed', apiErrorMessage(err, 'Only Project Owners or Admins can delete tasks.'));
     }
-  }, [clearSelection, fetchBacklog, selectedIds]);
+  }, [clearSelection, fetchBacklog, selectedIds, tasks, sprints]);
 
   const bulkMoveToSprint = useCallback(async (sprintId: number | null) => {
     if (!selectedIds.length) return;
+    const previousTasks = tasks;
+    const previousSprints = sprints;
+    setTasks((current) => current.map((task) => selectedIds.includes(task.id) ? { ...task, sprintId, selected: false } : task));
+    setSprints((current) => {
+      const movedTasks = tasks.filter((t) => selectedIds.includes(t.id)).map((t) => ({ ...t, sprintId, selected: false }));
+      return current.map((sprint) => {
+        let sprintTasks = sprint.tasks.filter((t) => !selectedIds.includes(t.id));
+        if (sprint.id === sprintId) {
+          sprintTasks = [...sprintTasks, ...movedTasks];
+        }
+        return { ...sprint, tasks: sprintTasks };
+      });
+    });
     try {
       await Promise.all(selectedIds.map((taskId) => taskService.update(taskId, { sprintId })));
       clearSelection();
       await fetchBacklog(true);
     } catch (err) {
+      setTasks(previousTasks);
+      setSprints(previousSprints);
       Alert.alert('Bulk move failed', apiErrorMessage(err, 'Please try again.'));
     }
-  }, [clearSelection, fetchBacklog, selectedIds]);
+  }, [clearSelection, fetchBacklog, selectedIds, tasks, sprints]);
 
   const stats = useMemo(() => {
     const visible = [...filteredProductTasks, ...filteredSprints.flatMap((sprint) => sprint.tasks)];

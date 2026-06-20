@@ -109,7 +109,7 @@ function TaskCard({
   return (
     <View style={[styles.taskCard, selected && styles.taskCardSelected]}>
       <TouchableOpacity activeOpacity={0.75} onPress={onToggle} style={[styles.checkBox, selected && styles.checkBoxActive]}>
-        {selected && <Icon name="check" color="#FFFFFF" size={13} />}
+        {selected && <Icon name="check" color="#FFFFFF" size={15} />}
       </TouchableOpacity>
 
       <View style={styles.taskMain}>
@@ -155,7 +155,7 @@ function TaskCard({
           </TouchableOpacity>
         )}
         <TouchableOpacity activeOpacity={0.75} onPress={onDelete} style={styles.iconBtnDanger}>
-          <Icon name="trash" color="#DC2626" size={15} />
+          <Icon name="trash" color="#DC2626" size={16} />
         </TouchableOpacity>
       </View>
 
@@ -210,27 +210,29 @@ function FilterSheet({
   onSelect: (value: string) => void;
 }) {
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <SafeAreaView style={styles.sheetSafe}>
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
-          <Text style={styles.sheetTitle}>{title}</Text>
-          {options.map((option) => {
-            const active = value === option;
-            const label = getLabel ? getLabel(option) : option === 'ALL' ? 'All' : option.replace(/_/g, ' ');
-            return (
-              <TouchableOpacity key={option} activeOpacity={0.75} onPress={() => { onSelect(option); onClose(); }} style={[styles.sheetOption, active && styles.sheetOptionActive]}>
-                <View style={[styles.optionDot, active && styles.optionDotActive]} />
-                <Text style={styles.sheetOptionText}>{label}</Text>
-                {active && <Text style={styles.selectedText}>Selected</Text>}
-              </TouchableOpacity>
-            );
-          })}
-          <TouchableOpacity activeOpacity={0.75} onPress={onClose} style={styles.secondaryBtn}>
-            <Text style={styles.secondaryText}>Cancel</Text>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity activeOpacity={1} onPress={onClose} style={styles.sheetSafe}>
+        <SafeAreaView style={{ width: '100%' }}>
+          <TouchableOpacity activeOpacity={1} style={styles.sheet}>
+            <View style={styles.handle} />
+            <Text style={styles.sheetTitle}>{title}</Text>
+            {options.map((option) => {
+              const active = value === option;
+              const label = getLabel ? getLabel(option) : option === 'ALL' ? 'All' : option.replace(/_/g, ' ');
+              return (
+                <TouchableOpacity key={option} activeOpacity={0.75} onPress={() => { onSelect(option); onClose(); }} style={[styles.sheetOption, active && styles.sheetOptionActive]}>
+                  <View style={[styles.optionDot, active && styles.optionDotActive]} />
+                  <Text style={styles.sheetOptionText}>{label}</Text>
+                  {active && <Text style={styles.selectedText}>Selected</Text>}
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity activeOpacity={0.75} onPress={onClose} style={styles.secondaryBtn}>
+              <Text style={styles.secondaryText}>Cancel</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </TouchableOpacity>
     </Modal>
   );
 }
@@ -251,36 +253,38 @@ function CreateSheet({
   const [value, setValue] = useState('');
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={styles.sheetSafe}>
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
-          <Text style={styles.sheetTitle}>{title}</Text>
-          <TextInput
-            value={value}
-            onChangeText={setValue}
-            placeholder={placeholder}
-            placeholderTextColor="#94A3B8"
-            style={styles.input}
-            autoFocus
-          />
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => {
-              if (!value.trim()) return;
-              onSubmit(value);
-              setValue('');
-              onClose();
-            }}
-            style={[styles.primaryBtn, !value.trim() && styles.disabledBtn]}
-            disabled={!value.trim()}
-          >
-            <Text style={styles.primaryText}>Create</Text>
+      <TouchableOpacity activeOpacity={1} onPress={onClose} style={styles.sheetSafe}>
+        <SafeAreaView style={{ width: '100%' }}>
+          <TouchableOpacity activeOpacity={1} style={styles.sheet}>
+            <View style={styles.handle} />
+            <Text style={styles.sheetTitle}>{title}</Text>
+            <TextInput
+              value={value}
+              onChangeText={setValue}
+              placeholder={placeholder}
+              placeholderTextColor="#94A3B8"
+              style={styles.input}
+              autoFocus
+            />
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                if (!value.trim()) return;
+                onSubmit(value);
+                setValue('');
+                onClose();
+              }}
+              style={[styles.primaryBtn, !value.trim() && styles.disabledBtn]}
+              disabled={!value.trim()}
+            >
+              <Text style={styles.primaryText}>Create</Text>
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.75} onPress={onClose} style={styles.secondaryBtn}>
+              <Text style={styles.secondaryText}>Cancel</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
-          <TouchableOpacity activeOpacity={0.75} onPress={onClose} style={styles.secondaryBtn}>
-            <Text style={styles.secondaryText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </TouchableOpacity>
     </Modal>
   );
 }
@@ -721,104 +725,104 @@ const styles = StyleSheet.create({
     height: 280,
   },
   scroll: { flex: 1, backgroundColor: 'transparent' },
-  content: { paddingHorizontal: 14, gap: 7 },
+  content: { paddingHorizontal: 16, gap: 10 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: T.bgSecondary },
   loadingText: { fontSize: 13, fontWeight: '700', color: T.textSecondary },
   hero: {
     backgroundColor: 'rgba(255, 255, 255, 0.78)',
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.92)',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    gap: 3,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 10,
     overflow: 'hidden',
     ...shadow,
   },
   glassLayer: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: 'hidden',
   },
   glassWash: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(255, 255, 255, 0.48)',
   },
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  heroIcon: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  heroIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   heroIconAgile: {},
   heroTitleWrap: { flex: 1, minWidth: 0 },
-  eyebrow: { fontSize: 7, fontWeight: '900', color: '#94A3B8', letterSpacing: 0.7 },
-  title: { fontSize: 14, fontWeight: '900', color: '#0F172A', marginTop: 0, letterSpacing: -0.2 },
-  headerIconBtn: { width: 26, height: 26, borderRadius: 8, backgroundColor: 'rgba(239, 246, 255, 0.92)', borderWidth: 1, borderColor: 'rgba(191, 219, 254, 0.95)', alignItems: 'center', justifyContent: 'center' },
-  progressWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  progressTrack: { flex: 1, height: 3, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
+  eyebrow: { fontSize: 9, fontWeight: '900', color: '#94A3B8', letterSpacing: 0.7 },
+  title: { fontSize: 18, fontWeight: '900', color: '#0F172A', marginTop: 1, letterSpacing: -0.2 },
+  headerIconBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(239, 246, 255, 0.92)', borderWidth: 1, borderColor: 'rgba(191, 219, 254, 0.95)', alignItems: 'center', justifyContent: 'center' },
+  progressWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  progressTrack: { flex: 1, height: 6, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 999, backgroundColor: '#22C55E' },
-  progressText: { fontSize: 8, fontWeight: '800', color: T.textSecondary },
-  statRow: { flexDirection: 'row', gap: 6 },
-  stat: { flex: 1, borderRadius: 8, borderWidth: 1, paddingVertical: 1, alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.44)' },
-  statValue: { fontSize: 13, fontWeight: '900' },
-  statLabel: { fontSize: 7, fontWeight: '800', color: T.textSecondary, letterSpacing: 0.2, textTransform: 'uppercase' },
-  createSprintBtn: { height: 24, borderRadius: 8, backgroundColor: T.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  createSprintText: { fontSize: 10, fontWeight: '900', color: '#FFFFFF' },
+  progressText: { fontSize: 11, fontWeight: '800', color: T.textSecondary },
+  statRow: { flexDirection: 'row', gap: 8 },
+  stat: { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 8, alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.44)' },
+  statValue: { fontSize: 16, fontWeight: '900' },
+  statLabel: { fontSize: 10, fontWeight: '800', color: T.textSecondary, letterSpacing: 0.2, textTransform: 'uppercase' },
+  createSprintBtn: { height: 32, borderRadius: 10, backgroundColor: T.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  createSprintText: { fontSize: 12, fontWeight: '900', color: '#FFFFFF' },
   filters: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.82)',
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(226, 232, 240, 0.9)',
-    padding: 3,
+    padding: 4,
     ...shadow,
   },
-  searchWrap: { flex: 1, minHeight: 29, borderRadius: 9, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.78)', backgroundColor: 'rgba(248, 250, 252, 0.82)', paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  searchInput: { flex: 1, fontSize: 12, color: '#0F172A', paddingVertical: 0 },
-  filterBtn: { width: 29, height: 29, borderRadius: 9, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.78)', backgroundColor: 'rgba(248, 250, 252, 0.82)', alignItems: 'center', justifyContent: 'center' },
+  searchWrap: { flex: 1, minHeight: 36, borderRadius: 11, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.78)', backgroundColor: 'rgba(248, 250, 252, 0.82)', paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  searchInput: { flex: 1, fontSize: 13, color: '#0F172A', paddingVertical: 0 },
+  filterBtn: { width: 36, height: 36, borderRadius: 11, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.78)', backgroundColor: 'rgba(248, 250, 252, 0.82)', alignItems: 'center', justifyContent: 'center' },
   filterBtnActive: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   filterLetter: { fontSize: 13, fontWeight: '900', color: '#64748B' },
   filterLetterActive: { color: T.primary },
   errorBox: { borderRadius: 14, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', padding: 12 },
   errorTitle: { fontSize: 13, fontWeight: '900', color: '#991B1B' },
   errorText: { fontSize: 12, fontWeight: '700', color: '#B91C1C', marginTop: 2 },
-  sections: { gap: 6 },
-  section: { backgroundColor: 'rgba(255, 255, 255, 0.88)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.9)', padding: 5, gap: 3, ...shadow },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 5 },
-  sectionTitle: { fontSize: 11, fontWeight: '900', color: '#0F172A' },
-  sectionSub: { fontSize: 8, fontWeight: '700', color: '#94A3B8', marginTop: 0 },
-  smallPrimary: { width: 22, height: 22, borderRadius: 7, backgroundColor: T.primary, alignItems: 'center', justifyContent: 'center', ...Platform.select({ ios: { shadowColor: T.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8 }, android: { elevation: 3 } }) },
+  sections: { gap: 12 },
+  section: { backgroundColor: 'rgba(255, 255, 255, 0.88)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.9)', padding: 12, gap: 8, ...shadow },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingBottom: 4 },
+  sectionTitle: { fontSize: 14, fontWeight: '900', color: '#0F172A' },
+  sectionSub: { fontSize: 11, fontWeight: '700', color: '#94A3B8', marginTop: 1 },
+  smallPrimary: { width: 32, height: 32, borderRadius: 10, backgroundColor: T.primary, alignItems: 'center', justifyContent: 'center', ...Platform.select({ ios: { shadowColor: T.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8 }, android: { elevation: 3 } }) },
   mutedLine: { fontSize: 12, fontWeight: '700', color: '#94A3B8', textAlign: 'center', paddingVertical: 16 },
-  emptyPanel: { minHeight: 150, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', padding: 18, gap: 8 },
+  emptyPanel: { minHeight: 150, borderRadius: 20, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', padding: 18, gap: 8 },
   emptyTitle: { fontSize: 15, fontWeight: '900', color: '#64748B' },
   emptyText: { fontSize: 12, fontWeight: '700', color: '#94A3B8', textAlign: 'center' },
-  taskCard: { flexDirection: 'row', gap: 4, borderRadius: 13, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.72)', backgroundColor: 'rgba(255, 255, 255, 0.96)', padding: 4, ...shadow },
+  taskCard: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(226, 232, 240, 0.72)', backgroundColor: 'rgba(255, 255, 255, 0.96)', padding: 12, ...shadow },
   taskCardSelected: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
-  checkBox: { width: 16, height: 16, borderRadius: 5, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  checkBox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   checkBoxActive: { backgroundColor: T.primary, borderColor: T.primary },
-  taskMain: { flex: 1, minWidth: 0, gap: 2 },
-  taskTop: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  taskCode: { fontSize: 8, fontWeight: '900', color: '#64748B' },
-  priorityPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, borderWidth: 1, paddingHorizontal: 5, paddingVertical: 1 },
-  priorityDot: { width: 5, height: 5, borderRadius: 3 },
-  priorityText: { fontSize: 8, fontWeight: '900' },
-  taskTitle: { fontSize: 11, fontWeight: '900', color: '#0F172A', lineHeight: 13 },
+  taskMain: { flex: 1, minWidth: 0, gap: 6 },
+  taskTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  taskCode: { fontSize: 11, fontWeight: '900', color: '#64748B' },
+  priorityPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 2 },
+  priorityDot: { width: 6, height: 6, borderRadius: 3 },
+  priorityText: { fontSize: 10, fontWeight: '900' },
+  taskTitle: { fontSize: 14, fontWeight: '900', color: '#0F172A', lineHeight: 18 },
   doneTitle: { color: '#94A3B8', textDecorationLine: 'line-through' },
-  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 3 },
-  statusPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
-  statusText: { fontSize: 8, fontWeight: '900' },
-  dateText: { fontSize: 8, fontWeight: '800', color: '#64748B' },
-  assigneeWrap: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 120 },
-  avatar: { width: 17, height: 17, borderRadius: 9, backgroundColor: T.primary, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 7, fontWeight: '900', color: '#FFFFFF' },
-  assigneeText: { flex: 1, fontSize: 9, fontWeight: '800', color: '#64748B' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  statusPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  statusText: { fontSize: 10, fontWeight: '900' },
+  dateText: { fontSize: 11, fontWeight: '800', color: '#64748B' },
+  assigneeWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 140 },
+  avatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: T.primary, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 10, fontWeight: '900', color: '#FFFFFF' },
+  assigneeText: { flex: 1, fontSize: 12, fontWeight: '800', color: '#64748B' },
   labelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  labelPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
-  labelText: { fontSize: 8, fontWeight: '900' },
-  taskActions: { alignItems: 'center', gap: 3 },
-  iconBtnDanger: { width: 20, height: 20, borderRadius: 7, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },
-  pointsBtn: { width: 22, minHeight: 24, borderRadius: 7, borderWidth: 1, borderColor: '#DDD6FE', backgroundColor: '#F5F3FF', alignItems: 'center', justifyContent: 'center' },
-  pointsValue: { fontSize: 10, fontWeight: '900', color: '#8B5CF6' },
-  pointsLabel: { fontSize: 6, fontWeight: '900', color: '#8B5CF6' },
+  labelPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  labelText: { fontSize: 10, fontWeight: '900' },
+  taskActions: { alignItems: 'center', justifyContent: 'center', gap: 6 },
+  iconBtnDanger: { width: 32, height: 32, borderRadius: 9, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },
+  pointsBtn: { width: 32, height: 32, borderRadius: 9, borderWidth: 1, borderColor: '#DDD6FE', backgroundColor: '#F5F3FF', alignItems: 'center', justifyContent: 'center' },
+  pointsValue: { fontSize: 11, fontWeight: '900', color: '#8B5CF6' },
+  pointsLabel: { fontSize: 7, fontWeight: '900', color: '#8B5CF6', marginTop: -2 },
   centerOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.35)', alignItems: 'center', justifyContent: 'center', padding: 20 },
   popover: { width: '100%', maxWidth: 360, borderRadius: 18, backgroundColor: '#FFFFFF', padding: 16, gap: 10 },
   popoverTitle: { fontSize: 16, fontWeight: '900', color: '#0F172A' },
