@@ -1,14 +1,27 @@
 import axios from 'axios';
 import { clearTokens, getRefreshToken, getValidToken, getUserFromToken, refreshAccessToken } from './auth';
 import { router } from 'expo-router';
-import { API_BASE_URL } from '../api/baseUrl';
+import { resolveApiBaseUrl } from '../api/baseUrl';
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Dynamically resolve the base URL on every request so that
+// Constants.expoConfig.hostUri (which carries the real LAN IP when using
+// Expo Go on a physical device) is guaranteed to be populated by the time
+// the first request fires — unlike a static export evaluated at module load.
+api.interceptors.request.use(
+  (config) => {
+    if (!config.baseURL && !config.url?.startsWith('http')) {
+      config.baseURL = resolveApiBaseUrl();
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 // Add request interceptor to include auth token (exclude auth endpoints)
 api.interceptors.request.use(

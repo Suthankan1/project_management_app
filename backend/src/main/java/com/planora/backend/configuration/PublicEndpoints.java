@@ -48,6 +48,10 @@ public class PublicEndpoints {
             "/ws-native/**",
             "/yjs/**",
 
+            // ── Platform health checks ────────────────────────────────────────
+            "/actuator/health/**",
+            "/actuator/info",
+
             // ── API documentation ─────────────────────────────────────────────
             "/v3/api-docs/**",
             "/swagger-ui/**",

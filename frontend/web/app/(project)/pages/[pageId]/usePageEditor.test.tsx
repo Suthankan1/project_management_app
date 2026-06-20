@@ -66,14 +66,38 @@ jest.mock('@/services/api-contract', () => ({
   },
 }));
 
+jest.mock('@/lib/axios', () => ({
+  __esModule: true,
+  default: {
+    get: jest.fn(async (url: string) => {
+      if (url === '/api/user/profile') {
+        return {
+          data: {
+            fullName: 'Test User',
+            username: 'testuser',
+            profilePicUrl: '',
+          },
+        };
+      }
+      return { data: {} };
+    }),
+    post: jest.fn(),
+    put: jest.fn(),
+    patch: jest.fn(),
+    delete: jest.fn(),
+  },
+}));
+
 const mockUsePageContent = usePageContent as jest.Mock;
 
 describe('usePageEditor Hook', () => {
   let mockSetSelectedPage: jest.Mock;
   let mockUpdatePage: jest.Mock;
+  let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     mockWebsocketProvider.mockImplementation(() => ({
       disconnect: jest.fn(),
       destroy: jest.fn(),
@@ -98,6 +122,10 @@ describe('usePageEditor Hook', () => {
       deletePage: jest.fn(),
       refetch: jest.fn(),
     });
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
   });
 
   it('connects Yjs without putting access tokens in URL params', async () => {

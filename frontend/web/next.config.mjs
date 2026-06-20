@@ -3,6 +3,41 @@ import path from 'path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const isProduction = process.env.NODE_ENV === 'production';
+const localBackendOrigin = 'http://localhost:8080';
+const localWebSocketOrigin = 'ws://localhost:8080';
+const awsRegion = process.env.AWS_REGION || 'eu-north-1';
+const awsS3Sources = [
+  'https://*.amazonaws.com',
+  'https://*.s3.amazonaws.com',
+  `https://*.s3.${awsRegion}.amazonaws.com`,
+  `https://*.s3-${awsRegion}.amazonaws.com`,
+];
+const githubAvatarImageSource = 'https://avatars.githubusercontent.com';
+
+function originFromUrl(rawUrl) {
+  if (!rawUrl) return null;
+
+  try {
+    return new URL(rawUrl).origin;
+  } catch {
+    return null;
+  }
+}
+
+function websocketOriginFromUrl(rawUrl) {
+  const origin = originFromUrl(rawUrl);
+  if (!origin) return null;
+
+  return origin
+    .replace(/^https:/i, 'wss:')
+    .replace(/^http:/i, 'ws:');
+}
+
+function uniqueSources(sources) {
+  return sources.filter(Boolean).filter((source, index, all) => all.indexOf(source) === index);
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
@@ -47,20 +82,55 @@ const nextConfig = {
   },
   async headers() {
     const backendHost = process.env.NEXT_PUBLIC_BACKEND_HOST;
-    const additionalFrameSources = backendHost ? `https://${backendHost}` : '';
+    const backendHostOrigin = backendHost ? `https://${backendHost}` : null;
+    const publicApiOrigin = originFromUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
+    const publicBackendOrigin = originFromUrl(process.env.NEXT_PUBLIC_BACKEND_URL);
+    const rewriteBackendOrigin = originFromUrl(process.env.BACKEND_URL);
+    const websocketOrigin = websocketOriginFromUrl(process.env.NEXT_PUBLIC_WS_BASE_URL);
+    const localSources = isProduction ? [] : [localBackendOrigin];
+    const localWebSocketSources = isProduction ? [] : [localWebSocketOrigin];
+
+    const backendSources = uniqueSources([
+      backendHostOrigin,
+      publicApiOrigin,
+      publicBackendOrigin,
+      rewriteBackendOrigin,
+      ...localSources,
+    ]);
+    const connectSources = uniqueSources([
+      "'self'",
+      ...backendSources,
+      websocketOrigin,
+      ...localWebSocketSources,
+      ...awsS3Sources,
+    ]);
+    const imageSources = uniqueSources([
+      "'self'",
+      'data:',
+      'blob:',
+      ...awsS3Sources,
+      githubAvatarImageSource,
+      ...backendSources,
+    ]);
+    const frameSources = uniqueSources([
+      "'self'",
+      ...awsS3Sources,
+      'blob:',
+      ...backendSources,
+    ]);
 
     const cspHeader = `
       default-src 'self';
       script-src 'self' 'unsafe-eval' 'unsafe-inline';
       style-src 'self' 'unsafe-inline';
-      img-src 'self' data: blob: http: https:;
-      connect-src 'self' ws: wss: http: https:;
+      img-src ${imageSources.join(' ')};
+      connect-src ${connectSources.join(' ')};
       font-src 'self' data:;
       object-src 'none';
       base-uri 'self';
       form-action 'self';
       frame-ancestors 'none';
-      frame-src 'self' http://localhost:8080 https://*.amazonaws.com blob: ${additionalFrameSources};
+      frame-src ${frameSources.join(' ')};
     `.replace(/\s{2,}/g, ' ').trim();
 
     return [
@@ -86,6 +156,12 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: '**.amazonaws.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'avatars.githubusercontent.com',
         port: '',
         pathname: '/**',
       },

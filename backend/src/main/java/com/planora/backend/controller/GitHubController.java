@@ -24,6 +24,31 @@ public class GitHubController {
     private final GitHubIntegrationService gitHubIntegrationService;
     private final GithubTokenService githubTokenService;
 
+    @GetMapping("/oauth-config")
+    public ResponseEntity<Map<String, Object>> getOAuthConfig(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String mobileClientId = gitHubIntegrationService.getMobileClientId();
+        String mobileRedirectUri = gitHubIntegrationService.getMobileRedirectUri();
+        boolean configured = mobileClientId != null && !mobileClientId.isBlank();
+        return ResponseEntity.ok(Map.of(
+                "configured", configured,
+                "clientId", configured ? mobileClientId : "",
+                "redirectUri", mobileRedirectUri == null ? "" : mobileRedirectUri));
+    }
+
+    @GetMapping("/status")
+    public ResponseEntity<Map<String, Boolean>> getStatus(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String token = githubTokenService.getToken(currentUser.getUserId());
+        return ResponseEntity.ok(Map.of("connected", token != null && !token.isBlank()));
+    }
+
     @GetMapping("/repositories")
     public ResponseEntity<List<GitHubRepositoryDTO>> getRepositories(
             @AuthenticationPrincipal UserPrincipal currentUser) {
@@ -48,9 +73,10 @@ public class GitHubController {
         if (code == null || code.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "No authorization code provided"));
         }
+        String redirectUri = body.getOrDefault("redirectUri", body.get("redirect_uri"));
 
         try {
-            gitHubIntegrationService.exchangeAndSaveToken(currentUser.getUserId(), currentUser.getUsername(), code);
+            gitHubIntegrationService.exchangeAndSaveToken(currentUser.getUserId(), currentUser.getUsername(), code, redirectUri);
             return ResponseEntity.ok(Map.of("success", true));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", e.getMessage()));
