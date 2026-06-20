@@ -55,6 +55,8 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, available
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskNameLength, setNewTaskNameLength] = useState(0);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [isDragOverCard, setIsDragOverCard] = useState(false);
+  const dragEnterCounterRef = useRef(0);
   const createTaskRef = useRef<HTMLFormElement | null>(null);
   const taskListRef = useRef<HTMLDivElement>(null);
 
@@ -100,8 +102,38 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, available
 
   // ── HTML5 Drag & Drop (desktop) ────────────────────────────────────────────
 
+  const handleCardDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragEnterCounterRef.current++;
+    setIsDragOverCard(true);
+  };
+
+  const handleCardDragLeave = () => {
+    dragEnterCounterRef.current--;
+    if (dragEnterCounterRef.current <= 0) {
+      dragEnterCounterRef.current = 0;
+      setIsDragOverCard(false);
+      setDropIndex(null);
+    }
+  };
+
+  const handleCardDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleCardDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragEnterCounterRef.current = 0;
+    setIsDragOverCard(false);
+    setDropIndex(null);
+    const taskId = Number(e.dataTransfer.getData('text/plain'));
+    if (!taskId) return;
+    onDropTask(taskId, sprint.id);
+  };
+
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    event.stopPropagation();
     setDropIndex(null);
     const taskId = Number(event.dataTransfer.getData('text/plain'));
     if (!taskId) return;
@@ -121,7 +153,15 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, available
 
   return (
     <>
-    <div className="rounded-xl border border-cu-border bg-cu-bg-secondary p-5 shadow-cu-sm">
+    <div
+      className={`rounded-xl border bg-cu-bg-secondary p-5 shadow-cu-sm transition-colors ${
+        isDragOverCard ? 'border-cu-primary bg-cu-primary/5' : 'border-cu-border'
+      }`}
+      onDragEnter={handleCardDragEnter}
+      onDragLeave={handleCardDragLeave}
+      onDragOver={handleCardDragOver}
+      onDrop={handleCardDrop}
+    >
       {/* Sprint Header */}
       <SprintHeader
         sprintName={sprint.name}
@@ -156,9 +196,16 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, available
         />
       )}
 
+      {/* Collapsed drop zone indicator */}
+      {!isOpen && isDragOverCard && (
+        <div className="mt-3 rounded-lg border-2 border-dashed border-cu-primary bg-cu-primary/5 px-4 py-6 text-center text-[13px] font-medium text-cu-primary">
+          Drop here to add to {sprint.name}
+        </div>
+      )}
+
       {/* Task List */}
       {isOpen && (
-        <div ref={taskListRef} onDragOver={(e) => { e.preventDefault(); setDropIndex(handlers.localTasks.length); }} onDrop={handleDrop}>
+        <div ref={taskListRef} onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDropIndex(handlers.localTasks.length); }} onDrop={handleDrop}>
           <motion.div layout className="flex flex-col gap-[5px]">
             <AnimatePresence initial={false}>
               {handlers.localTasks.length > 0 ? (
@@ -193,9 +240,12 @@ function BacklogCard({ sprint, projectId, projectKey, currentUserRole, available
                         onDragEnd={(e: React.DragEvent<HTMLDivElement>) => {
                           (e.target as HTMLElement).style.opacity = '1';
                           setDropIndex(null);
+                          setIsDragOverCard(false);
+                          dragEnterCounterRef.current = 0;
                         }}
                         onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
                           e.preventDefault();
+                          e.stopPropagation();
                           setDropIndex(index);
                         }}
                         onDrop={(e: React.DragEvent<HTMLDivElement>) => handleRowDrop(e, index)}
