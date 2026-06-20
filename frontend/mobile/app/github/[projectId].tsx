@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -861,6 +861,24 @@ export default function GitHubScreen() {
     return () => { alive = false; };
   }, [projectId]);
 
+  // Re-check connection on focus (Android: github-callback.tsx exchanges the code
+  // and navigates back here; we need to refresh to show the connected state).
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      void (async () => {
+        const [tok, conn] = await Promise.all([
+          getGitHubToken(),
+          getProjectGitHubRepo(projectId),
+        ]);
+        if (!alive) return;
+        setToken(tok);
+        setConnection(conn);
+      })();
+      return () => { alive = false; };
+    }, [projectId]),
+  );
+
   // ── Load GitHub data ─────────────────────────────────────────────────────
   const loadData = useCallback(async (tok: string, conn: ProjectGitHubConnection) => {
     setLoading(true);
@@ -887,6 +905,11 @@ export default function GitHubScreen() {
   }, [token, connection, loadData]);
 
   // ── OAuth connect ────────────────────────────────────────────────────────
+  // Platform split:
+  //   iOS  → ASWebAuthenticationSession intercepts mobile://github-callback before
+  //           Expo Router sees it, so the code comes back via result.url here.
+  //   Android → Chrome Custom Tab fires the deep link to the router which navigates
+  //           to app/github-callback.tsx; that page exchanges the code and comes back.
   const handleConnect = useCallback(async () => {
     setConnecting(true);
     setError(null);
@@ -900,21 +923,30 @@ export default function GitHubScreen() {
       const authUrl =
         `https://github.com/login/oauth/authorize` +
         `?client_id=${oauthConfig.clientId}&scope=repo&state=${projectId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
-      if (result.type === 'success' && result.url) {
-        const code = new URL(result.url).searchParams.get('code');
-        if (code) {
-          const accessToken = await exchangeCodeForToken(code, redirectUri);
-          if (accessToken) {
-            await saveGitHubToken(accessToken);
-            setToken(accessToken);
-            const data = await fetchRepositoriesWithToken(accessToken).catch(() => []);
-            setRepos(data);
-            setShowRepoPicker(true);
-          } else {
-            setError('GitHub token exchange failed. Check the backend GitHub OAuth configuration.');
+
+      if (Platform.OS === 'ios') {
+        // iOS: openAuthSessionAsync returns the redirect URL directly.
+        const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+        if (result.type === 'success' && result.url) {
+          const code = new URL(result.url).searchParams.get('code');
+          if (code) {
+            const accessToken = await exchangeCodeForToken(code, redirectUri);
+            if (accessToken) {
+              await saveGitHubToken(accessToken);
+              setToken(accessToken);
+              const data = await fetchRepositoriesWithToken(accessToken).catch(() => []);
+              setRepos(data);
+              setShowRepoPicker(true);
+            } else {
+              setError('GitHub token exchange failed. Check the backend GitHub OAuth configuration.');
+            }
           }
         }
+      } else {
+        // Android: open the browser; when GitHub redirects to mobile://github-callback
+        // the OS fires a deep link and Expo Router navigates to app/github-callback.tsx
+        // which handles the code exchange and navigates back here.
+        await WebBrowser.openBrowserAsync(authUrl);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -922,6 +954,7 @@ export default function GitHubScreen() {
       setConnecting(false);
     }
   }, [projectId]);
+
 
   const loadRepos = useCallback(async () => {
     if (!token) return;

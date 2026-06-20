@@ -52,6 +52,12 @@ public class GitHubIntegrationService {
     @Value("${github.client.secret:}")
     private String clientSecret;
 
+    @Value("${github.mobile.client.id:${github.client.id:}}")
+    private String mobileClientId;
+
+    @Value("${github.mobile.client.secret:${github.client.secret:}}")
+    private String mobileClientSecret;
+
     @Value("${github.mobile.redirect-uri:mobile://github-callback}")
     private String mobileRedirectUri;
 
@@ -64,6 +70,10 @@ public class GitHubIntegrationService {
 
     public String getClientId() {
         return clientId;
+    }
+
+    public String getMobileClientId() {
+        return (mobileClientId != null && !mobileClientId.isBlank()) ? mobileClientId : clientId;
     }
 
     public String getMobileRedirectUri() {
@@ -384,7 +394,12 @@ public class GitHubIntegrationService {
     }
 
     public void exchangeAndSaveToken(Long userId, String email, String code, String redirectUri) {
-        if (isBlank(clientId) || isBlank(clientSecret)) {
+        // Use mobile-specific credentials when the redirect URI is the mobile redirect URI.
+        boolean isMobile = redirectUri != null && redirectUri.equals(mobileRedirectUri);
+        String effectiveClientId     = isMobile ? getMobileClientId()     : clientId;
+        String effectiveClientSecret = isMobile ? mobileClientSecret : clientSecret;
+
+        if (isBlank(effectiveClientId) || isBlank(effectiveClientSecret)) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "GitHub OAuth is not configured on this server");
         }
@@ -395,8 +410,8 @@ public class GitHubIntegrationService {
         headers.set(HttpHeaders.CONTENT_TYPE, "application/json");
 
         Map<String, String> requestBody = new LinkedHashMap<>();
-        requestBody.put("client_id", clientId);
-        requestBody.put("client_secret", clientSecret);
+        requestBody.put("client_id", effectiveClientId);
+        requestBody.put("client_secret", effectiveClientSecret);
         requestBody.put("code", code);
         if (!isBlank(redirectUri)) {
             requestBody.put("redirect_uri", redirectUri);

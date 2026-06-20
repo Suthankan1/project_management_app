@@ -30,12 +30,12 @@ public class GitHubController {
         if (currentUser == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        String clientId = gitHubIntegrationService.getClientId();
+        String mobileClientId = gitHubIntegrationService.getMobileClientId();
         String mobileRedirectUri = gitHubIntegrationService.getMobileRedirectUri();
-        boolean configured = clientId != null && !clientId.isBlank();
+        boolean configured = mobileClientId != null && !mobileClientId.isBlank();
         return ResponseEntity.ok(Map.of(
                 "configured", configured,
-                "clientId", configured ? clientId : "",
+                "clientId", configured ? mobileClientId : "",
                 "redirectUri", mobileRedirectUri == null ? "" : mobileRedirectUri));
     }
 
