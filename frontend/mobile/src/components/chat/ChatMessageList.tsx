@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   FlatList,
+  Platform,
   View,
   Text,
   StyleSheet,
@@ -127,7 +128,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
       maxToRenderPerBatch={10}
       windowSize={10}
       keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
+      automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
       scrollEventThrottle={16}
       maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
       showsVerticalScrollIndicator={false}

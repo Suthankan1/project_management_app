@@ -14,13 +14,7 @@ import {
   TouchableOpacity,
   View,
   Image,
-  LayoutAnimation,
-  UIManager,
 } from 'react-native';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -437,7 +431,6 @@ function TaskCard({
   onAssign,
   onDateChange,
   projectMembers = [],
-  pan: propPan,
 }: {
   task: MobileTask;
   selected: boolean;
@@ -456,7 +449,6 @@ function TaskCard({
   onAssign?: (userId: number | null) => void;
   onDateChange?: (date: string | null) => void;
   projectMembers?: any[];
-  pan?: Animated.ValueXY;
 }) {
   const status = statusStyle(task.status);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -507,8 +499,7 @@ function TaskCard({
   };
 
   const dragEnabled = !!onDragStart && !!onDragMove && !!onDragEnd && !!onDragDrop;
-  const localPan = useRef(new Animated.ValueXY()).current;
-  const pan = propPan || localPan;
+  const pan = useRef(new Animated.ValueXY()).current;
   const [isDraggingLocal, setIsDraggingLocal] = useState(false);
   const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDraggingRef = useRef(false);
@@ -595,15 +586,15 @@ function TaskCard({
     ? {
         transform: [
           ...pan.getTranslateTransform(),
-          { scale: isDraggingLocal ? 1.04 : 1 },
+          { scale: isDraggingLocal ? 1.05 : 1 },
           { rotate: isDraggingLocal ? '1.5deg' : '0deg' },
         ],
         zIndex: isDraggingLocal ? 9999 : 1,
-        elevation: isDraggingLocal ? 12 : 0,
-        shadowOpacity: isDraggingLocal ? 0.3 : 0.08,
-        shadowRadius: isDraggingLocal ? 10 : 3,
+        elevation: isDraggingLocal ? 14 : 0,
+        shadowOpacity: isDraggingLocal ? 0.32 : 0.08,
+        shadowRadius: isDraggingLocal ? 14 : 3,
         shadowColor: '#0F172A',
-        opacity: isDraggingLocal ? 0.95 : 1,
+        shadowOffset: isDraggingLocal ? { width: 0, height: 8 } : { width: 0, height: 1 },
       }
     : {};
 
@@ -1168,15 +1159,18 @@ export default function MobileBacklogScreen({
   topOffset?: number;
 }) {
   const backlog = useMobileBacklog(projectId);
-  const pan = useRef(new Animated.ValueXY()).current;
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [createSprintOpen, setCreateSprintOpen] = useState(false);
   const [targetSprintId, setTargetSprintId] = useState<number | null>(null);
 
   const [draggingTaskId, setDraggingTaskId] = useState<number | null>(null);
+  const draggingTaskIdRef = useRef<number | null>(null);
   const [hoveredSectionKey, setHoveredSectionKey] = useState<string | null>(null);
+  const hoveredSectionKeyRef = useRef<string | null>(null);
   const [hoveredInsertIndex, setHoveredInsertIndex] = useState<number | null>(null);
+  const hoveredInsertIndexRef = useRef<number | null>(null);
 
+  // Store layout info per task and section, keyed so we can compute drop targets
   const layoutsRef = useRef<{
     sections: Record<string, { y: number; height: number; sprintId: number | null }>;
     tasks: Record<number, { relativeY: number; height: number; sprintId: number | null; sectionKey: string }>;
@@ -1203,51 +1197,22 @@ export default function MobileBacklogScreen({
     setCreateTaskOpen(true);
   };
 
-  const animateLayout = () => {
-    LayoutAnimation.configureNext({
-      duration: 200,
-      create: {
-        type: LayoutAnimation.Types.easeInEaseOut,
-        property: LayoutAnimation.Properties.opacity,
-      },
-      update: {
-        type: LayoutAnimation.Types.easeInEaseOut,
-      },
-      delete: {
-        type: LayoutAnimation.Types.easeInEaseOut,
-        property: LayoutAnimation.Properties.opacity,
-      },
-    });
-  };
-
-  const draggingCardHeight = useMemo(() => {
-    if (draggingTaskId === null) return 80;
-    return layoutsRef.current.tasks[draggingTaskId]?.height ?? 80;
-  }, [draggingTaskId]);
-
-  const draggingTaskStartY = useMemo(() => {
-    if (draggingTaskId === null) return 0;
-    const taskLayout = layoutsRef.current.tasks[draggingTaskId];
-    if (!taskLayout) return 0;
-    const sectionLayout = layoutsRef.current.sections[taskLayout.sectionKey];
-    if (!sectionLayout) return 0;
-    return sectionLayout.y + taskLayout.relativeY;
-  }, [draggingTaskId]);
-
-  const draggingTaskObj = useMemo(() => {
-    if (draggingTaskId === null) return null;
-    return backlog.tasks.find((t) => t.id === draggingTaskId) ?? null;
-  }, [draggingTaskId, backlog.tasks]);
+  const draggingCardHeightRef = useRef(80);
+  const [draggingCardHeight, setDraggingCardHeight] = useState(80);
 
   const handleDragStart = (taskId: number) => {
-    animateLayout();
+    draggingTaskIdRef.current = taskId;
+    const h = layoutsRef.current.tasks[taskId]?.height ?? 80;
+    draggingCardHeightRef.current = h;
+    setDraggingCardHeight(h);
     setDraggingTaskId(taskId);
   };
 
   const handleDragMove = (dy: number) => {
-    if (draggingTaskId === null) return;
+    const activeTaskId = draggingTaskIdRef.current;
+    if (activeTaskId === null) return;
 
-    const taskLayout = layoutsRef.current.tasks[draggingTaskId];
+    const taskLayout = layoutsRef.current.tasks[activeTaskId];
     if (!taskLayout) return;
 
     const sectionLayout = layoutsRef.current.sections[taskLayout.sectionKey];
@@ -1257,36 +1222,36 @@ export default function MobileBacklogScreen({
     const currentCenterY = startY + dy + taskLayout.height / 2;
 
     let hoveredKey: string | null = null;
-    let targetSprintId: number | null = null;
+    let targetSpId: number | null = null;
 
     for (const [key, section] of Object.entries(layoutsRef.current.sections)) {
       if (currentCenterY >= section.y && currentCenterY <= section.y + section.height) {
         hoveredKey = key;
-        targetSprintId = section.sprintId;
+        targetSpId = section.sprintId;
         break;
       }
     }
 
-    if (hoveredKey !== hoveredSectionKey) {
-      animateLayout();
+    if (hoveredKey !== hoveredSectionKeyRef.current) {
+      hoveredSectionKeyRef.current = hoveredKey;
       setHoveredSectionKey(hoveredKey);
     }
 
     if (!hoveredKey) {
-      if (hoveredInsertIndex !== null) {
-        animateLayout();
+      if (hoveredInsertIndexRef.current !== null) {
+        hoveredInsertIndexRef.current = null;
         setHoveredInsertIndex(null);
       }
       return;
     }
 
-    const sectionTasks = (targetSprintId === null)
-      ? backlog.filteredProductTasks.filter((t) => t.id !== draggingTaskId)
-      : (backlog.filteredSprints.find((s) => s.id === targetSprintId)?.tasks ?? []).filter((t) => t.id !== draggingTaskId);
+    const sectionTasks = (targetSpId === null)
+      ? backlog.filteredProductTasks.filter((t) => t.id !== activeTaskId)
+      : (backlog.filteredSprints.find((s) => s.id === targetSpId)?.tasks ?? []).filter((t) => t.id !== activeTaskId);
 
     if (sectionTasks.length === 0) {
-      if (hoveredInsertIndex !== 0) {
-        animateLayout();
+      if (hoveredInsertIndexRef.current !== 0) {
+        hoveredInsertIndexRef.current = 0;
         setHoveredInsertIndex(0);
       }
       return;
@@ -1313,9 +1278,7 @@ export default function MobileBacklogScreen({
     let found = false;
 
     for (let i = 0; i < taskLayouts.length; i++) {
-      const currentTaskY = taskLayouts[i].y;
-      const midpoint = currentTaskY + taskLayouts[i].height / 2;
-
+      const midpoint = taskLayouts[i].y + taskLayouts[i].height / 2;
       if (currentCenterY < midpoint) {
         insertIndex = i;
         found = true;
@@ -1327,45 +1290,53 @@ export default function MobileBacklogScreen({
       insertIndex = taskLayouts.length;
     }
 
-    if (insertIndex !== hoveredInsertIndex) {
-      animateLayout();
+    if (insertIndex !== hoveredInsertIndexRef.current) {
+      hoveredInsertIndexRef.current = insertIndex;
       setHoveredInsertIndex(insertIndex);
     }
   };
 
   const handleDragEnd = () => {
-    animateLayout();
+    draggingTaskIdRef.current = null;
+    hoveredSectionKeyRef.current = null;
+    hoveredInsertIndexRef.current = null;
     setDraggingTaskId(null);
     setHoveredSectionKey(null);
     setHoveredInsertIndex(null);
   };
 
   const handleDragDrop = (taskId: number) => {
-    animateLayout();
-    if (hoveredSectionKey && hoveredInsertIndex !== null) {
-      const section = layoutsRef.current.sections[hoveredSectionKey];
-      const targetSprintId = section ? section.sprintId : null;
+    const currentSection = hoveredSectionKeyRef.current;
+    const currentInsert = hoveredInsertIndexRef.current;
 
-      const sectionTasks = (targetSprintId === null)
+    if (currentSection && currentInsert !== null) {
+      const section = layoutsRef.current.sections[currentSection];
+      const targetSpId = section ? section.sprintId : null;
+
+      const sectionTasks = (targetSpId === null)
         ? backlog.filteredProductTasks
-        : (backlog.filteredSprints.find((s) => s.id === targetSprintId)?.tasks ?? []);
+        : (backlog.filteredSprints.find((s) => s.id === targetSpId)?.tasks ?? []);
 
       const otherTasks = sectionTasks.filter((t) => t.id !== taskId);
 
       const newTasksList = [...otherTasks];
-      const insertIdx = Math.max(0, Math.min(hoveredInsertIndex, newTasksList.length));
+      const insertIdx = Math.max(0, Math.min(currentInsert, newTasksList.length));
 
       const taskObj = backlog.tasks.find((t) => t.id === taskId);
       if (taskObj) {
-        const updatedTask = { ...taskObj, sprintId: targetSprintId };
+        const updatedTask = { ...taskObj, sprintId: targetSpId };
         newTasksList.splice(insertIdx, 0, updatedTask);
       }
 
       const newOrderedTaskIds = newTasksList.map((t) => t.id);
 
-      void backlog.reorderTasks(targetSprintId, newOrderedTaskIds);
+      void backlog.reorderTasks(targetSpId, newOrderedTaskIds);
       hapticSuccess();
     }
+
+    draggingTaskIdRef.current = null;
+    hoveredSectionKeyRef.current = null;
+    hoveredInsertIndexRef.current = null;
     setDraggingTaskId(null);
     setHoveredSectionKey(null);
     setHoveredInsertIndex(null);
@@ -1474,12 +1445,10 @@ export default function MobileBacklogScreen({
                               {showPlaceholderBefore && <DropPlaceholder height={draggingCardHeight} />}
                               <View
                                 collapsable={false}
-                                style={isDragging ? { position: 'absolute', opacity: 0, width: '100%', height: draggingCardHeight } : { width: '100%' }}
+                                style={{ width: '100%', opacity: isDragging ? 0 : 1 }}
                                 onLayout={(e) => {
                                   const { y, height } = e.nativeEvent.layout;
-                                  if (!isDragging) {
-                                    handleTaskLayout(task.id, sprint.id, y, height, `sprint-${sprint.id}`);
-                                  }
+                                  handleTaskLayout(task.id, sprint.id, y, height, `sprint-${sprint.id}`);
                                 }}
                               >
                                 <TaskCard
@@ -1500,7 +1469,6 @@ export default function MobileBacklogScreen({
                                   onAssign={(userId) => backlog.assignTask(task.id, userId)}
                                   onDateChange={(date) => backlog.updateTaskDueDate(task.id, date)}
                                   projectMembers={backlog.members}
-                                  pan={pan}
                                 />
                               </View>
                             </React.Fragment>
@@ -1551,12 +1519,10 @@ export default function MobileBacklogScreen({
                         {showPlaceholderBefore && <DropPlaceholder height={draggingCardHeight} />}
                         <View
                           collapsable={false}
-                          style={isDragging ? { position: 'absolute', opacity: 0, width: '100%', height: draggingCardHeight } : { width: '100%' }}
+                          style={{ width: '100%', opacity: isDragging ? 0 : 1 }}
                           onLayout={(e) => {
                             const { y, height } = e.nativeEvent.layout;
-                            if (!isDragging) {
-                              handleTaskLayout(task.id, null, y, height, 'backlog');
-                            }
+                            handleTaskLayout(task.id, null, y, height, 'backlog');
                           }}
                         >
                           <TaskCard
@@ -1577,7 +1543,6 @@ export default function MobileBacklogScreen({
                             onAssign={(userId) => backlog.assignTask(task.id, userId)}
                             onDateChange={(date) => backlog.updateTaskDueDate(task.id, date)}
                             projectMembers={backlog.members}
-                            pan={pan}
                           />
                         </View>
                       </React.Fragment>
@@ -1626,39 +1591,7 @@ export default function MobileBacklogScreen({
 
         <View style={styles.bottomPad} />
 
-        {draggingTaskId !== null && draggingTaskObj && (
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              left: 12,
-              right: 12,
-              top: draggingTaskStartY,
-              zIndex: 9999,
-              elevation: 16,
-              shadowColor: '#0F172A',
-              shadowOpacity: 0.35,
-              shadowRadius: 12,
-              shadowOffset: { width: 0, height: 10 },
-              backgroundColor: '#FFFFFF',
-              borderRadius: 12,
-              transform: [
-                ...pan.getTranslateTransform(),
-                { scale: 1.04 },
-                { rotate: '1.5deg' },
-              ],
-            }}
-          >
-            <TaskCard
-              task={draggingTaskObj}
-              selected={false}
-              sprints={[]}
-              onToggle={() => {}}
-              onStatus={() => {}}
-              onDelete={() => {}}
-            />
-          </Animated.View>
-        )}
+
       </ScrollView>
 
       <CreateSheet

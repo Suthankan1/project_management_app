@@ -188,7 +188,7 @@ export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenConten
       ) : (
         <KeyboardAvoidingView
           style={styles.chatArea}
-          behavior="padding"
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
           <ChatConnectionBanner
