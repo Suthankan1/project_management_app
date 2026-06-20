@@ -7,6 +7,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Task, Label } from '../types';
 import { Calendar, GitBranch, GitPullRequest, MessageSquare, Paperclip, Check, X, Tag, Plus, ChevronDown, ChevronRight, Lock, RefreshCw } from 'lucide-react';
 import { CIStatusBadge } from '@/components/ui';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 interface KanbanCardProps {
   task: Task;
@@ -33,8 +34,8 @@ const LABEL_COLORS = ['#6366F1', '#EF4444', '#F59E0B', '#22C55E', '#3B82F6', '#E
 
 export default function KanbanCard({ task, onDelete, onEdit: _onEdit, onOpenTask, onInlineUpdate, usersMap, labels: allLabels, onCreateLabel, isSyncing }: KanbanCardProps) {
   const avatarUrl =
-    (task.assigneePhotoUrl && task.assigneePhotoUrl.startsWith('http') ? task.assigneePhotoUrl : null) ??
-    (task.assigneeName && usersMap?.[task.assigneeName]?.startsWith('http') ? usersMap[task.assigneeName] : null);
+    resolveProfilePhotoUrl(task.assigneePhotoUrl, task.assigneeId) ??
+    (task.assigneeName ? resolveProfilePhotoUrl(usersMap?.[task.assigneeName]) : null);
   const completedSubtasks = task.subtasks?.filter((s) => s.status === 'DONE').length ?? 0;
   const totalSubtasks = task.subtasks?.length ?? 0;
   const subtaskPercent = totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0;

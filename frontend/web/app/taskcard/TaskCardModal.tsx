@@ -14,6 +14,7 @@ import api from '@/lib/axios';
 import { getApiErrorStatus, normalizeApiError } from '@/lib/api-error';
 import { labelsApi, projectsApi, sprintsApi, tasksApi } from '@/services/api-contract';
 import type { Task } from '@/types';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 interface MultiAssignee {
   memberId: number;
@@ -33,6 +34,7 @@ interface TaskData {
   storyPoint: number;
   reporterName: string;
   assigneeName: string;
+  assigneePhotoUrl: string | null;
   sprintName: string;
   milestoneId?: number | null;
   milestoneName?: string | null;
@@ -60,6 +62,7 @@ interface ProjectMemberOption {
   memberId: number;
   userId: number;
   name: string;
+  photoUrl?: string | null;
 }
 
 interface LabelOption {
@@ -95,6 +98,7 @@ const toTaskData = (task: Task & {
   storyPoint: task.storyPoint ?? 0,
   reporterName: task.reporterName ?? '',
   assigneeName: task.assigneeName ?? '',
+  assigneePhotoUrl: resolveProfilePhotoUrl(task.assigneePhotoUrl, task.assigneeId),
   sprintName: task.sprintName ?? '',
   milestoneId: task.milestoneId ?? null,
   milestoneName: task.milestoneName ?? null,
@@ -108,7 +112,7 @@ const toTaskData = (task: Task & {
     memberId: assignee.id,
     userId: assignee.id,
     name: assignee.name,
-    photoUrl: assignee.avatar ?? assignee.profilePicUrl ?? null,
+    photoUrl: resolveProfilePhotoUrl(assignee.avatar ?? assignee.profilePicUrl, assignee.id),
   })),
   recurrenceRule: task.recurrenceRule ?? null,
   recurrenceEnd: task.recurrenceEnd ?? null,
@@ -182,7 +186,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
       ]);
       const teamId = projectRes?.teamId as number | undefined;
       const currentUserId = currentUserRes?.userId as number | undefined;
-      const membersRaw = (membersRes || []) as Array<{ id: number; role?: string; user?: { userId: number; username: string } }>;
+      const membersRaw = (membersRes || []) as Array<{ id: number; role?: string; user?: { userId: number; username: string; profilePicUrl?: string | null } }>;
       const currentMember = membersRaw.find((member) => member.user?.userId === currentUserId);
       const role = currentMember?.role || 'MEMBER';
       setCanEdit(role !== 'VIEWER');
@@ -194,6 +198,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
             memberId: member.id,
             userId: member.user!.userId,
             name: member.user!.username,
+            photoUrl: resolveProfilePhotoUrl(member.user!.profilePicUrl, member.user!.userId),
           })),
       );
       const labelsRaw = (labelsRes || []) as Array<{ id: number; name: string }>;
@@ -439,6 +444,7 @@ export default function TaskCardModal({ taskId, onClose }: TaskCardModalProps) {
                   taskDescription={taskData.description}
                   status={taskData.status}
                   assignee={taskData.assigneeName}
+                  assigneePhotoUrl={taskData.assigneePhotoUrl}
                   reporter={taskData.reporterName}
                   labels={taskData.labels?.map((l) => l.name) || []}
                   labelIds={taskData.labels?.map((l) => l.id) || []}

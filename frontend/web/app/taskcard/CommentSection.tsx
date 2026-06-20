@@ -6,8 +6,8 @@ import ActivityFeed from './ActivityFeed';
 import CommentItem from './components/CommentItem';
 import { tasksApi, projectsApi } from '@/services/api-contract';
 import type { Member } from '@/services/projects-contract';
-import { getApiBaseUrl } from '@/lib/api-base-url';
 import { getOrFetchUserMap } from './sidebar/userMapCache';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 interface Comment {
   id: number;
@@ -30,14 +30,11 @@ interface UserProfile {
   fullName?: string;
 }
 
-// Relative profile picture URLs from the API need a host prefix; absolute CDN URLs are used as-is.
-const API_BASE_URL = getApiBaseUrl();
-
 function buildUsersMap(users: UserProfile[]): Record<string, string | null> {
   const map: Record<string, string | null> = {};
 
   users.forEach((u) => {
-    const pic = u.profilePicUrl || null;
+    const pic = resolveProfilePhotoUrl(u.profilePicUrl, u.userId);
     if (typeof u.userId === 'number') {
       map[`id:${u.userId}`] = pic;
     }
@@ -118,9 +115,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef, pro
   }, [projectId]);
 
   const resolveProfilePic = (url?: string | null) => {
-    if (!url) return '';
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    return `${API_BASE_URL}${url}`;
+    return resolveProfilePhotoUrl(url) || '';
   };
 
   const fetchComments = async () => {

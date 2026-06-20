@@ -3,9 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { UserCircle2 } from 'lucide-react';
-import { getApiBaseUrl } from '@/lib/api-base-url';
-
-const API_BASE_URL = getApiBaseUrl();
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 interface AssigneeAvatarProps {
   name?: string | null;
@@ -23,10 +21,7 @@ const resolveProfilePic = (url?: string | null, name?: string | null) => {
     // DiceBear fallback for a professional "profile picture" look instead of just initials
     return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=00319c,1e56a0,163172&fontFamily=Arial,sans-serif`;
   }
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
-  const path = url.startsWith('/') ? url : `/${url}`;
-  return `${baseUrl}${path}`;
+  return resolveProfilePhotoUrl(url) || '';
 };
 
 const getInitials = (name?: string | null) => {

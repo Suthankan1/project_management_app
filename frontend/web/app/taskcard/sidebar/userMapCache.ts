@@ -1,3 +1,5 @@
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
+
 type UserMapEntry = {
   userId?: number;
   email?: string;
@@ -36,7 +38,7 @@ function normalizeUsersMap(raw: unknown): Record<string, string | null> {
 function buildUserMap(users: UserMapEntry[]): Record<string, string | null> {
   const map: Record<string, string | null> = {};
   users.forEach((u) => {
-    const pic = u.profilePicUrl || null;
+    const pic = resolveProfilePhotoUrl(u.profilePicUrl, u.userId);
     if (typeof u.userId === 'number') {
       map[`id:${u.userId}`] = pic;
     }

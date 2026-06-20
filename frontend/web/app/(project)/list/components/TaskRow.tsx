@@ -7,6 +7,7 @@ import { AvatarStack } from '@/components/ui/Avatar';
 import { tasksApi } from '@/services/tasks-contract';
 import type { Label, MilestoneResponse, Task } from '@/types';
 import { PRIORITY_CONFIG, STATUS_CONFIG, STATUS_ORDER } from '../lib/list-config';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 
 const PRIORITY_ORDER = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];
@@ -69,9 +70,9 @@ const TaskRow = React.memo(function TaskRow({
   const labelsMenuRef = useRef<HTMLDivElement>(null);
   const milestoneMenuRef = useRef<HTMLDivElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
-  const assigneePhotoUrl = task.assigneePhotoUrl?.startsWith('http') ? task.assigneePhotoUrl : null;
+  const assigneePhotoUrl = resolveProfilePhotoUrl(task.assigneePhotoUrl, task.assigneeId);
   const assignedUsers = (task.assignees && task.assignees.length > 0)
-    ? task.assignees.map((person) => ({ name: person.name, src: person.avatar }))
+    ? task.assignees.map((person) => ({ name: person.name, src: resolveProfilePhotoUrl(person.avatar, person.id) }))
     : task.assigneeName
       ? [{ name: task.assigneeName, src: assigneePhotoUrl }]
       : [];

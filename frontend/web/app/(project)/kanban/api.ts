@@ -2,6 +2,7 @@ import { tasksApi, kanbanApi, projectsApi, labelsApi } from '@/services/api-cont
 import { normalizeTaskPriority } from '@/services/tasks-contract';
 import type { TaskListQueryParams, TaskListAllQueryParams } from '@/services/tasks-contract';
 import { Task, Label, KanbanColumnConfig } from './types';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 export type TaskResponseDTO = Task;
 
@@ -14,7 +15,9 @@ export interface KanbanBoardResponse {
 
 export interface TeamMemberOption {
   id: number;
+  userId?: number;
   name: string;
+  photoUrl?: string | null;
 }
 
 /**
@@ -346,6 +349,7 @@ export async function fetchTeamMembers(teamId: number): Promise<TeamMemberOption
     for (const entry of rawMembers) {
       const member = entry as Record<string, unknown> & { user?: Record<string, unknown> };
       const id = Number(member?.id);
+      const userId = Number(member?.userId ?? member?.user?.userId);
       const name =
         (member?.name as string) ??
         (member?.username as string) ??
@@ -356,7 +360,16 @@ export async function fetchTeamMembers(teamId: number): Promise<TeamMemberOption
         '';
 
       if (!Number.isFinite(id) || !name) continue;
-      results.push({ id, name });
+      results.push({
+        id,
+        userId: Number.isFinite(userId) ? userId : undefined,
+        name,
+        photoUrl: resolveProfilePhotoUrl(
+          (member?.profilePicUrl as string | null | undefined) ??
+            (member?.user?.profilePicUrl as string | null | undefined),
+          Number.isFinite(userId) ? userId : undefined,
+        ),
+      });
     }
     return results;
   } catch (error) {
