@@ -103,6 +103,7 @@ const token = `header.${btoa(JSON.stringify(tokenPayload))}.signature`;
 describe('useChat hook', () => {
   let phaseDEnabled = true;
   let consoleErrorSpy: jest.SpyInstance;
+  let consoleWarnSpy: jest.SpyInstance;
 
   jest.setTimeout(15000);
 
@@ -231,10 +232,12 @@ describe('useChat hook', () => {
     window.localStorage.setItem('token', token);
 
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   it('redirects to login when token is missing', async () => {

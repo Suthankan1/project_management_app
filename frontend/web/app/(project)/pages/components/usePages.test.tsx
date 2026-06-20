@@ -16,9 +16,16 @@ jest.mock('../../../../lib/axios', () => ({
 const mockedAxios = axiosInstance as jest.Mocked<typeof axiosInstance>;
 
 describe('usePages hook', () => {
+  let consoleErrorSpy: jest.SpyInstance;
+
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
   });
 
   it('loads pages and filters by search and tab', async () => {
@@ -28,6 +35,9 @@ describe('usePages hook', () => {
         { id: 2, title: 'Architecture' },
       ],
     });
+    mockedAxios.patch.mockResolvedValueOnce({
+      data: { id: 2, title: 'Architecture', isStarred: true },
+    });
 
     const { result } = renderHook(() => usePages(7));
 
@@ -35,8 +45,15 @@ describe('usePages hook', () => {
       expect(result.current.pages).toHaveLength(2);
     });
 
+    let promise;
     act(() => {
-      result.current.toggleStar(2);
+      promise = result.current.toggleStar(2);
+    });
+    await act(async () => {
+      await promise;
+    });
+
+    act(() => {
       result.current.setActiveTab('starred');
       result.current.setSearchQuery('arch');
     });
@@ -182,23 +199,25 @@ describe('usePages hook', () => {
       expect(result.current.pages).toHaveLength(1);
     });
 
+    let promise;
     act(() => {
-      result.current.toggleStar(1);
+      promise = result.current.toggleStar(1);
+    });
+    expect(result.current.pages[0].isStarred).toBe(true);
+    await act(async () => {
+      await promise;
     });
     expect(result.current.pages[0].isStarred).toBe(true);
 
-    await waitFor(() => {
-      expect(result.current.pages[0].isStarred).toBe(true);
-    });
-
+    let promise2;
     act(() => {
-      result.current.toggleStar(1);
+      promise2 = result.current.toggleStar(1);
     });
     expect(result.current.pages[0].isStarred).toBe(false);
-    
-    await waitFor(() => {
-      expect(result.current.pages[0].isStarred).toBe(true);
+    await act(async () => {
+      await promise2;
     });
+    expect(result.current.pages[0].isStarred).toBe(true);
   });
 
   it('moves page and updates parentPageId', async () => {
