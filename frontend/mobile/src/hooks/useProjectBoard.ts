@@ -49,6 +49,7 @@ export interface BoardMember {
   userId: number;
   name: string;
   role?: string | null;
+  profilePicUrl?: string | null;
 }
 
 export interface KanbanBoardColumn {
@@ -106,7 +107,7 @@ function applyQueuedMutations(
           dueDate: item.payload.dueDate,
           priority: item.payload.priority || 'MEDIUM',
           assigneeName: assignee ? assignee.name : null,
-          assigneePhotoUrl: null,
+          assigneePhotoUrl: assignee ? assignee.profilePicUrl : null,
           projectId,
           syncStatus: item.status,
           syncError: item.error,
@@ -128,6 +129,7 @@ function applyQueuedMutations(
         } else if (item.type === 'UPDATE_ASSIGNEE') {
           const assignee = members.find((m) => m.userId === item.payload.assigneeId);
           tasks[index].assigneeName = assignee ? assignee.name : null;
+          tasks[index].assigneePhotoUrl = assignee ? assignee.profilePicUrl : null;
         } else if (item.type === 'UPDATE_DUE_DATE') {
           tasks[index].dueDate = item.payload.dueDate;
         }
@@ -187,16 +189,19 @@ export function useProjectBoard(projectId: number) {
       id?: number;
       userId?: number;
       role?: string | null;
-      user?: { userId?: number; fullName?: string | null; username?: string | null };
+      user?: { userId?: number; fullName?: string | null; username?: string | null; profilePicUrl?: string | null };
       name?: string | null;
+      profilePicUrl?: string | null;
     }) => {
       const userId = member.user?.userId ?? member.userId ?? member.id ?? 0;
       const name = member.name || member.user?.fullName || member.user?.username || `Member ${userId}`;
+      const profilePicUrl = member.user?.profilePicUrl ?? member.profilePicUrl ?? null;
       return {
         id: member.id ?? userId,
         userId,
         name,
         role: member.role ?? null,
+        profilePicUrl,
       };
     }).filter((member: BoardMember) => member.userId > 0);
   }, []);

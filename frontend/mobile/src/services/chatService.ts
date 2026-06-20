@@ -28,9 +28,23 @@ export async function fetchProjectUsers(projectId: string): Promise<string[]> {
 }
 
 export async function fetchUserProfilePics(projectId: string): Promise<Record<string, string>> {
-  // Mock or actual implementation if backend supports it
-  // For now, returning empty record as placeholders
-  return {};
+  try {
+    const { data } = await api.get<any[]>(`/api/projects/${projectId}/members`);
+    const mapping: Record<string, string> = {};
+    if (Array.isArray(data)) {
+      data.forEach((member) => {
+        const username = member?.user?.username;
+        const pic = member?.user?.profilePicUrl;
+        if (username && pic) {
+          mapping[username] = pic;
+        }
+      });
+    }
+    return mapping;
+  } catch (error) {
+    console.error('Failed to fetch user profile pics', error);
+    return {};
+  }
 }
 
 export async function fetchTeamMessages(projectId: string): Promise<ChatMessage[]> {

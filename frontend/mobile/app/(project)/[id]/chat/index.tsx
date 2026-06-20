@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, GestureResponderEvent } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, StyleSheet, GestureResponderEvent, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useChat } from '@/src/hooks/chat/useChat';
 import { ChatSidebar }            from '@/src/components/chat/ChatSidebar';
@@ -29,6 +29,7 @@ interface ReactionTarget {
 }
 
 export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenContentProps) {
+  const insets = useSafeAreaInsets();
   const [showSidebar, setShowSidebar] = useState(true);
   const [showSearch, setShowSearch]   = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -103,13 +104,22 @@ export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenConten
     if (created) { selectRoom(created.id); setShowSidebar(false); }
   };
 
-  const roomTyping    = hasSelectedRoom && selectedRoomId != null ? (roomTypingUsers[selectedRoomId] || []) : [];
-  const privateTyping = selectedUser ? privateTypingUsers.filter(u => u === selectedUser.toLowerCase()) : [];
-  const activeTyping  = hasSelectedRoom ? roomTyping[0] : selectedUser ? privateTyping[0] : teamTypingUsers[0];
   const currentUserIdentitySet = new Set([
     currentUser.trim().toLowerCase(),
     ...currentUserAliases.map(alias => alias.trim().toLowerCase()),
   ]);
+
+  // Filter current user + all aliases out of every typing list so the user
+  // never sees their own "is typing" indicator (server echoes it back).
+  const roomTyping    = hasSelectedRoom && selectedRoomId != null
+    ? (roomTypingUsers[selectedRoomId] || []).filter(u => !currentUserIdentitySet.has(u.toLowerCase()))
+    : [];
+  const privateTyping = selectedUser
+    ? privateTypingUsers.filter(u => u === selectedUser.toLowerCase() && !currentUserIdentitySet.has(u.toLowerCase()))
+    : [];
+  const filteredTeamTyping = teamTypingUsers.filter(u => !currentUserIdentitySet.has(u.toLowerCase()));
+  const activeTyping  = hasSelectedRoom ? roomTyping[0] : selectedUser ? privateTyping[0] : filteredTeamTyping[0];
+
   const reactionMessage = reactionTarget?.message ?? null;
   const selectedReaction = reactionMessage?.id
     ? messageReactions[reactionMessage.id]?.find(reaction => reaction.reactedByCurrentUser)?.emoji
@@ -176,7 +186,11 @@ export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenConten
           teamMentionCount={teamMentionCount}
         />
       ) : (
-        <View style={styles.chatArea}>
+        <KeyboardAvoidingView
+          style={styles.chatArea}
+          behavior="padding"
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+        >
           <ChatConnectionBanner
             isConnected={isConnected}
             shouldShowErrorBanner={shouldShowErrorBanner}
@@ -263,7 +277,8 @@ export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenConten
             mentionCandidates={mentionCandidates}
             projectId={projectId as string}
           />
-        </View>
+        </KeyboardAvoidingView>
+
       )}
 
       {/* Modals */}

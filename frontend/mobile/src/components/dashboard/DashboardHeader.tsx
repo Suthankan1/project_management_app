@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Image } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { T } from '../../constants/tokens';
@@ -21,9 +21,10 @@ function BellIcon() {
 interface DashboardHeaderProps {
   username?: string;
   profileInitial?: string;
+  profilePicUrl?: string | null;
 }
 
-export default function DashboardHeader({ username = 'User', profileInitial }: DashboardHeaderProps) {
+export default function DashboardHeader({ username = 'User', profileInitial, profilePicUrl }: DashboardHeaderProps) {
   const router = useRouter();
   const initial = profileInitial ?? username.charAt(0).toUpperCase();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -79,7 +80,11 @@ export default function DashboardHeader({ username = 'User', profileInitial }: D
           onPress={() => router.push('/(tabs)/profile' as never)}
           activeOpacity={0.8}
         >
-          <Text style={styles.avatarText}>{initial}</Text>
+          {profilePicUrl ? (
+            <Image source={{ uri: profilePicUrl }} style={styles.avatarImg} />
+          ) : (
+            <Text style={styles.avatarText}>{initial}</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -180,5 +185,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '800',
+  },
+  avatarImg: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
   },
 });

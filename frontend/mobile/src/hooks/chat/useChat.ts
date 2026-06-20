@@ -96,7 +96,7 @@ export function useChat(projectId: string) {
   const [currentUser, setCurrentUser] = useState('');
   const [currentUserAliases, setCurrentUserAliases] = useState<string[]>([]);
   const [users, setUsers] = useState<string[]>([]);
-  const [userProfilePics] = useState<Record<string, string>>({});
+  const [userProfilePics, setUserProfilePics] = useState<Record<string, string>>({});
   const [featureFlags, setFeatureFlags] = useState<ChatFeatureFlags>({
     phaseDEnabled: false, phaseEEnabled: false,
     webhooksEnabled: false, telemetryEnabled: false,
@@ -656,11 +656,12 @@ export function useChat(projectId: string) {
       let initialized = false;
       const hadCachedMessages = await messagesHook.hydrateCachedMessages();
       try {
-        const [user, members, roomsData, flags] = await Promise.all([
+        const [user, members, roomsData, flags, profilePics] = await Promise.all([
           chatService.fetchCurrentUser(),
           chatService.fetchProjectUsers(projectId),
           chatService.fetchRooms(projectId),
           chatService.fetchFeatureFlags(projectId),
+          chatService.fetchUserProfilePics(projectId).catch(() => ({})),
         ]);
         if (cancelled) return;
 
@@ -669,6 +670,7 @@ export function useChat(projectId: string) {
         setCurrentUserAliases(user.aliases || []);
         setUsers(uniqueUsersByKey(members));
         setFeatureFlags(flags);
+        setUserProfilePics(profilePics);
         roomsHook.setRooms(roomsData);
         authenticatedProjectRef.current = true;
         initialized = true;
@@ -681,6 +683,7 @@ export function useChat(projectId: string) {
           users: uniqueUsersByKey(members),
           rooms: roomsData,
           featureFlags: flags,
+          userProfilePics: profilePics,
           teamMessages: messagesHook.messages,
           roomMessages: messagesHook.roomMessages,
           privateMessages: messagesHook.privateMessages,
@@ -701,6 +704,7 @@ export function useChat(projectId: string) {
           setCurrentUserAliases(cached?.currentUserAliases || []);
           setUsers(uniqueUsersByKey(cached?.users || []));
           setFeatureFlags(cached?.featureFlags || featureFlags);
+          setUserProfilePics(cached?.userProfilePics || {});
           roomsHook.setRooms(cached?.rooms || []);
           authenticatedProjectRef.current = true;
           initialized = false;

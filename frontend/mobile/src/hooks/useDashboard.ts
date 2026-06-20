@@ -132,7 +132,7 @@ async function fetchTabData(tab: TabKey): Promise<DashboardItem[]> {
 // ─── useDashboard Hook ────────────────────────────────────────────────────────
 
 interface UseDashboardReturn {
-  user: { username?: string; email?: string } | null;
+  user: { username?: string; email?: string; profilePicUrl?: string | null } | null;
   projects: { recent: ProjectSummary[]; favorites: ProjectSummary[] };
   tabItems: DashboardItem[];
   tabItemsByTab: TabItemsByKey;
@@ -153,7 +153,7 @@ interface UseDashboardReturn {
 export function useDashboard(): UseDashboardReturn {
   const router = useRouter();
 
-  const [user, setUser]                       = useState<{ username?: string; email?: string } | null>(null);
+  const [user, setUser]                       = useState<{ username?: string; email?: string; profilePicUrl?: string | null } | null>(null);
   const [projects, setProjects]               = useState<{ recent: ProjectSummary[]; favorites: ProjectSummary[] }>({ recent: [], favorites: [] });
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [activeTab, setActiveTab]             = useState<TabKey>('assigned-to-me');
@@ -199,7 +199,17 @@ export function useDashboard(): UseDashboardReturn {
       // Decode username from JWT payload
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
-        setUser({ username: payload.sub || payload.username, email: payload.email });
+        const username = payload.sub || payload.username;
+        setUser({ username, email: payload.email, profilePicUrl: null });
+        
+        // Fetch user profile to get the S3 presigned URL for the profile photo
+        api.get('/api/user/profile')
+          .then((res) => {
+            if (res.data && res.data.profilePicUrl) {
+              setUser(prev => prev ? { ...prev, profilePicUrl: res.data.profilePicUrl } : null);
+            }
+          })
+          .catch(() => {});
       } catch {
         setUser({});
       }

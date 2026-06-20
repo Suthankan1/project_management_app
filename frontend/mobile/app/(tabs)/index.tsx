@@ -84,6 +84,7 @@ export default function DashboardScreen() {
         <DashboardHeader
           username={user?.username}
           profileInitial={user?.username?.charAt(0).toUpperCase()}
+          profilePicUrl={user?.profilePicUrl}
         />
       </FadeSlideIn>
 
