@@ -177,13 +177,13 @@ function DisconnectedView({
           transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
           className="relative w-[88px] h-[88px] rounded-[28px] flex items-center justify-center"
           style={{
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 100%)',
+            background: 'linear-gradient(135deg, var(--cu-bg-secondary) 0%, var(--cu-bg) 100%)',
             backdropFilter: 'blur(24px) saturate(200%)',
-            border: '1px solid rgba(255,255,255,0.18)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.18)',
+            border: '1px solid var(--cu-border)',
+            boxShadow: 'var(--cu-shadow-lg), inset 0 1px 0 var(--cu-border)',
           }}
         >
-          <GitHubMark size={42} className="text-white" />
+          <GitHubMark size={42} className="text-cu-text-primary" />
         </motion.div>
       </div>
 
@@ -211,7 +211,7 @@ function DisconnectedView({
                 className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5"
                 style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)' }}
               >
-                <User size={11} className="text-indigo-300" />
+                <User size={11} className="text-indigo-600 dark:text-indigo-300" />
               </div>
               <span className="text-sm text-cu-text-secondary font-outfit text-left leading-relaxed">
                 Your previous account has been disconnected. Sign in with any GitHub account.
@@ -225,7 +225,7 @@ function DisconnectedView({
             whileTap={{ scale: 0.97 }}
             className="flex items-center gap-3 px-8 py-3.5 rounded-2xl font-outfit font-bold text-[15px] text-white w-full justify-center"
             style={{
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.7) 0%, rgba(168,85,247,0.6) 100%)',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.8) 0%, rgba(168,85,247,0.7) 100%)',
               backdropFilter: 'blur(16px)',
               border: '1px solid rgba(255,255,255,0.2)',
               boxShadow: '0 4px 28px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
@@ -249,10 +249,10 @@ function DisconnectedView({
           <div
             className="flex flex-col gap-3 w-full rounded-2xl p-5"
             style={{
-              background: 'rgba(255,255,255,0.03)',
+              background: 'var(--cu-bg-secondary)',
               backdropFilter: 'blur(16px)',
-              border: '1px solid rgba(255,255,255,0.07)',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+              border: '1px solid var(--cu-border)',
+              boxShadow: 'inset 0 1px 0 var(--cu-border)',
             }}
           >
             {[
@@ -262,13 +262,13 @@ function DisconnectedView({
             ].map(item => (
               <div key={item.text} className="flex items-center gap-3">
                 <div
-                  className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-emerald-400"
-                  style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)' }}
+                  className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-emerald-600 dark:text-emerald-400"
+                  style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}
                 >
                   {item.icon}
                 </div>
                 <span className="text-sm text-cu-text-secondary font-outfit flex-1 text-left">{item.text}</span>
-                <Check size={13} className="text-emerald-400 shrink-0" strokeWidth={2.5} />
+                <Check size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" strokeWidth={2.5} />
               </div>
             ))}
           </div>
@@ -279,10 +279,10 @@ function DisconnectedView({
             whileTap={{ scale: 0.97 }}
             className="flex items-center gap-3 px-8 py-3.5 rounded-2xl font-outfit font-bold text-[15px] text-white w-full justify-center"
             style={{
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.06) 100%)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255,255,255,0.22)',
-              boxShadow: '0 4px 28px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2)',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.8) 0%, rgba(168,85,247,0.7) 100%)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              boxShadow: '0 4px 28px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
             }}
           >
             <GitHubMark size={18} className="text-white" />
@@ -293,7 +293,7 @@ function DisconnectedView({
 
       <button
         onClick={onLogout}
-        className="flex items-center gap-1.5 text-xs font-outfit font-semibold text-red-400/70 hover:text-red-400 transition-colors"
+        className="flex items-center gap-1.5 text-xs font-outfit font-semibold text-red-500 dark:text-red-400/70 hover:text-red-600 dark:hover:text-red-400 transition-colors"
       >
         <LogOut size={12} />
         Logout from GitHub
@@ -301,11 +301,10 @@ function DisconnectedView({
 
       {!GITHUB_CLIENT_ID && (
         <div
-          className="w-full rounded-xl px-4 py-3"
-          style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)' }}
+          className="w-full rounded-xl px-4 py-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30"
         >
-          <p className="text-xs text-amber-300 font-outfit">
-            Set <code className="font-mono">NEXT_PUBLIC_GITHUB_CLIENT_ID</code> to enable GitHub OAuth.
+          <p className="text-xs text-amber-800 dark:text-amber-300 font-outfit">
+            Set <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 py-0.5 rounded">NEXT_PUBLIC_GITHUB_CLIENT_ID</code> to enable GitHub OAuth.
           </p>
         </div>
       )}
@@ -713,20 +712,19 @@ function AccountPickerModal({
       >
         <div
           className="flex items-center justify-between px-5 py-4"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+          style={{ borderBottom: '1px solid var(--cu-border)' }}
         >
           <div className="flex items-center gap-2.5">
             <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${iconSurfaceClass}`}
             >
-              <GitHubMark size={13} className="text-white" />
+              <GitHubMark size={13} className="text-cu-text-primary" />
             </div>
-            <h2 className="text-sm font-outfit font-bold text-slate-100">Choose a GitHub account</h2>
+            <h2 className="text-sm font-outfit font-bold text-cu-text-primary">Choose a GitHub account</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:bg-white/[0.06] hover:text-slate-200 transition-colors"
+            className="p-1.5 rounded-lg text-cu-text-secondary hover:bg-cu-hover hover:text-cu-text-primary transition-colors"
           >
             <X size={15} />
           </button>
@@ -737,38 +735,38 @@ function AccountPickerModal({
             <button
               key={account.login}
               onClick={() => onSelect(account.login)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors group text-left"
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-cu-hover transition-colors group text-left"
             >
               <Image
                 src={account.avatarUrl}
                 alt={account.login}
                 width={36}
                 height={36}
-                className="h-9 w-9 flex-shrink-0 rounded-full ring-2 ring-white/10"
+                className="h-9 w-9 flex-shrink-0 rounded-full ring-2 ring-cu-border/50"
                 unoptimized
               />
               <div className="flex flex-col min-w-0 flex-1">
                 {account.name && (
-                  <span className="text-sm font-outfit font-semibold text-slate-200 truncate leading-tight">
+                  <span className="text-sm font-outfit font-semibold text-cu-text-primary truncate leading-tight">
                     {account.name}
                   </span>
                 )}
-                <span className="text-xs text-slate-500 font-outfit truncate">@{account.login}</span>
+                <span className="text-xs text-cu-text-tertiary font-outfit truncate">@{account.login}</span>
               </div>
-              <span className="text-xs font-outfit font-semibold text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <span className="text-xs font-outfit font-semibold text-cu-primary opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                 Connect →
               </span>
             </button>
           ))}
         </div>
 
-        <div className="px-4 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="px-4 py-3" style={{ borderTop: '1px solid var(--cu-border)' }}>
           <button
             onClick={onAddAccount}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-outfit font-semibold text-slate-300 hover:text-slate-100 hover:bg-white/[0.06] transition-all"
-            style={{ border: '1px solid rgba(255,255,255,0.09)' }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-outfit font-semibold text-cu-text-secondary hover:text-cu-text-primary hover:bg-cu-hover transition-all"
+            style={{ border: '1px solid var(--cu-border)' }}
           >
-            <User size={13} className="text-slate-500" />
+            <User size={13} className="text-cu-text-tertiary" />
             Use a different account
           </button>
         </div>

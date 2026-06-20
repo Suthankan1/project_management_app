@@ -59,7 +59,7 @@ export default function GitHubCallbackScreen() {
 
 function navigateBack(router: ReturnType<typeof useRouter>, projectId: string) {
   if (projectId) {
-    router.replace(`/github/${projectId}` as never);
+    router.replace(`/github/${projectId}?select_repo=1` as never);
   } else {
     router.replace('/(tabs)' as never);
   }
