@@ -62,6 +62,30 @@ jest.mock('@/services/chat-service', () => ({
     );
     return res.json();
   },
+  postTeamMessage: async (projectId: string, content: string, localId?: string) => {
+    const res = await fetch(`/api/projects/${projectId}/chat/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, localId, formatType: 'PLAIN' }),
+    });
+    return res.json();
+  },
+  postPrivateMessage: async (projectId: string, recipient: string, content: string, localId?: string) => {
+    const res = await fetch(`/api/projects/${projectId}/chat/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, recipient, localId, formatType: 'PLAIN' }),
+    });
+    return res.json();
+  },
+  postRoomMessage: async (projectId: string, roomId: number, content: string, localId?: string) => {
+    const res = await fetch(`/api/projects/${projectId}/chat/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, roomId, localId, formatType: 'PLAIN' }),
+    });
+    return res.json();
+  },
 }));
 
 const fetchMock = jest.fn();
@@ -82,7 +106,7 @@ describe('useChat hook', () => {
 
   jest.setTimeout(15000);
 
-  const defaultFetchImplementation = (input: RequestInfo | URL) => {
+  const defaultFetchImplementation = (input: RequestInfo | URL, options?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString();
 
     if (url.includes('/api/user/me')) {
@@ -126,16 +150,20 @@ describe('useChat hook', () => {
       });
     }
 
-    if (url.includes('/api/projects/42/chat/messages?') || url.endsWith('/api/projects/42/chat/messages')) {
-      return jsonResponse([]);
+    if (url.includes('/api/projects/42/chat/messages/1/thread/replies')) {
+      return jsonResponse({ id: 51, sender: 'alice', content: 'thread reply', parentMessageId: 1 });
+    }
+
+    if (url.endsWith('/api/projects/42/chat/messages') && options?.method === 'POST') {
+      return jsonResponse({ id: 61, sender: 'alice', content: 'saved message', type: 'CHAT' }, true);
     }
 
     if (url.includes('/api/projects/42/chat/messages/1/thread')) {
       return jsonResponse([{ id: 1, sender: 'bob', content: 'root message', type: 'CHAT' }]);
     }
 
-    if (url.includes('/api/projects/42/chat/messages/1/thread/replies')) {
-      return jsonResponse({ id: 51, sender: 'alice', content: 'thread reply', parentMessageId: 1 });
+    if (url.includes('/api/projects/42/chat/messages?') || url.endsWith('/api/projects/42/chat/messages')) {
+      return jsonResponse([]);
     }
 
     if (url.includes('/api/search?')) {
@@ -265,7 +293,7 @@ describe('useChat hook', () => {
     expect(JSON.parse(roomBody).timestamp).toBeTruthy();
   });
 
-  it('rejects blank messages and sets reconnect error when socket is unavailable', async () => {
+  it('rejects blank messages and persists over HTTP when socket is unavailable', async () => {
     const hook = await renderInitializedHook();
     const { result, rerender } = hook;
 
@@ -285,8 +313,50 @@ describe('useChat hook', () => {
       result.current.sendMessage('message while reconnecting');
     });
 
-    expect(result.current.error).toBe('Realtime chat is reconnecting. Please wait a moment and try again.');
     expect(mockSendRealtime).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      const createCalls = fetchMock.mock.calls.filter(([url, options]) =>
+        String(url).endsWith('/api/projects/42/chat/messages') &&
+        (options as RequestInit)?.method === 'POST'
+      );
+      expect(createCalls).toHaveLength(1);
+      expect(JSON.parse((createCalls[0][1] as RequestInit).body as string)).toMatchObject({
+        content: 'message while reconnecting',
+        formatType: 'PLAIN',
+      });
+    });
+  });
+
+  it('persists private and room messages over HTTP when socket is unavailable', async () => {
+    const hook = await renderInitializedHook();
+    const { result, rerender } = hook;
+
+    act(() => {
+      mockRealtimeConnected = false;
+      rerender();
+    });
+
+    act(() => {
+      result.current.sendMessage('persist dm', 'bob');
+      result.current.sendRoomMessage('persist room', 1);
+    });
+
+    await waitFor(() => {
+      const createBodies = fetchMock.mock.calls
+        .filter(([url, options]) =>
+          String(url).endsWith('/api/projects/42/chat/messages') &&
+          (options as RequestInit)?.method === 'POST'
+        )
+        .map(([, options]) => JSON.parse((options as RequestInit).body as string));
+
+      expect(createBodies).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ content: 'persist dm', recipient: 'bob' }),
+          expect.objectContaining({ content: 'persist room', roomId: 1 }),
+        ]),
+      );
+    });
   });
 
   it('receives realtime team and private messages and updates local collections', async () => {

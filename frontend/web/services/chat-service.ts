@@ -91,6 +91,32 @@ export async function fetchTeamMessages(projectId: string): Promise<ChatMessage[
   return chatApi.getTeamMessages(projectId);
 }
 
+export async function postTeamMessage(
+  projectId: string,
+  content: string,
+  localId?: string,
+): Promise<ChatMessage> {
+  return chatApi.postTeamMessage(projectId, content, localId);
+}
+
+export async function postPrivateMessage(
+  projectId: string,
+  recipient: string,
+  content: string,
+  localId?: string,
+): Promise<ChatMessage> {
+  return chatApi.postPrivateMessage(projectId, recipient, content, localId);
+}
+
+export async function postRoomMessage(
+  projectId: string,
+  roomId: number,
+  content: string,
+  localId?: string,
+): Promise<ChatMessage> {
+  return chatApi.postRoomMessage(projectId, roomId, content, localId);
+}
+
 export async function fetchRoomMessages(
   projectId: string,
   roomId: number,
