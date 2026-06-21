@@ -236,7 +236,7 @@ export function ChatInput(props: ChatInputProps) {
 
       {/* Input bar — renders after emoji sheet so it sits on top */}
       <View
-        style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}
+        style={[styles.container, { paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 8) : (insets.bottom > 100 ? 8 : Math.max(insets.bottom, 8)) }]}
         onLayout={onContainerLayout}
       >
         {uploading && (
