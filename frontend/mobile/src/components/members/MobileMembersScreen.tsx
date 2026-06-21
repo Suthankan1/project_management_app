@@ -8,6 +8,7 @@ import {
   Text,
   TextInput,
   View,
+  Image,
 } from 'react-native';
 import api from '../../api/axios';
 import { T } from '../../constants/tokens';
@@ -156,7 +157,11 @@ function MemberCard({ member }: { member: MemberRow }) {
       <View style={styles.memberTopRow}>
         <View style={styles.identityRow}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initialsFor(member)}</Text>
+            {member.user.profilePicUrl ? (
+              <Image source={{ uri: member.user.profilePicUrl }} style={styles.avatarImg} />
+            ) : (
+              <Text style={styles.avatarText}>{initialsFor(member)}</Text>
+            )}
           </View>
           <View style={styles.identityText}>
             <Text style={styles.memberName} numberOfLines={1}>{memberName(member)}</Text>
@@ -493,6 +498,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: T.primary,
+    overflow: 'hidden',
+  },
+  avatarImg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   avatarText: {
     color: '#FFFFFF',

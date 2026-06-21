@@ -2,7 +2,7 @@
 
 // Renders the visual pie chart showing how tasks are distributed among team members.
 import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Sector, PieSectorShapeProps } from 'recharts';
+import { PieChart, Pie, Cell, Sector, PieSectorShapeProps } from 'recharts';
 import { UserPlus, Briefcase } from 'lucide-react';
 import Link from 'next/link';
 import { SafeChartFrame } from '@/components/shared/SafeChartFrame';
@@ -116,8 +116,8 @@ export function WorkloadPieChart({
           </div>
 
           <SafeChartFrame>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart onMouseLeave={() => setActiveIndex(-1)}>
+            {({ width, height }) => (
+              <PieChart width={width} height={height} onMouseLeave={() => setActiveIndex(-1)}>
                 <Pie
                   shape={renderPieShape}
                   data={activeWorkloadData}
@@ -128,12 +128,12 @@ export function WorkloadPieChart({
                   dataKey="value"
                   onMouseEnter={onPieEnter}
                 >
-                  {activeWorkloadData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} style={{ outline: 'none' }} />
+                  {activeWorkloadData.map((entry) => (
+                    <Cell key={`cell-${entry.key}`} fill={entry.color} style={{ outline: 'none' }} />
                   ))}
                 </Pie>
               </PieChart>
-            </ResponsiveContainer>
+            )}
           </SafeChartFrame>
         </div>
       ) : (

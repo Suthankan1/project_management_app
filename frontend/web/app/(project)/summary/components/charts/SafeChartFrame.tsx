@@ -2,13 +2,23 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 
+type ChartSize = {
+  width: number;
+  height: number;
+};
+
+type SafeChartFrameProps = {
+  children: React.ReactNode | ((size: ChartSize) => React.ReactNode);
+};
+
 /**
  * A wrapper component that ensures the chart only renders when its container has a valid size.
  * Prevents Recharts rendering errors in dynamic layouts like Bento grids.
  */
-export function SafeChartFrame({ children }: { children: React.ReactNode }) {
+export function SafeChartFrame({ children }: SafeChartFrameProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const [ready, setReady] = useState(false);
+  const frameRef = useRef<number | null>(null);
+  const [size, setSize] = useState<ChartSize | null>(null);
 
   useEffect(() => {
     const element = hostRef.current;
@@ -16,18 +26,43 @@ export function SafeChartFrame({ children }: { children: React.ReactNode }) {
 
     const evaluateSize = () => {
       const rect = element.getBoundingClientRect();
-      setReady(rect.width > 0 && rect.height > 0);
+      const nextWidth = Math.floor(rect.width);
+      const nextHeight = Math.floor(rect.height);
+
+      if (nextWidth <= 1 || nextHeight <= 1) {
+        setSize(null);
+        return;
+      }
+
+      setSize((current) => {
+        if (current?.width === nextWidth && current?.height === nextHeight) {
+          return current;
+        }
+        return { width: nextWidth, height: nextHeight };
+      });
     };
 
-    evaluateSize();
-    const observer = new ResizeObserver(evaluateSize);
+    const scheduleSizeCheck = () => {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+      }
+      frameRef.current = requestAnimationFrame(evaluateSize);
+    };
+
+    scheduleSizeCheck();
+    const observer = new ResizeObserver(scheduleSizeCheck);
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+      }
+    };
   }, []);
 
   return (
     <div ref={hostRef} className="h-full min-h-[220px] w-full">
-      {ready ? children : null}
+      {size ? (typeof children === 'function' ? children(size) : children) : null}
     </div>
   );
 }

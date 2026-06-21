@@ -12,7 +12,6 @@ import { useChatSearch } from './useChatSearch';
 import { useChatUnread } from './useChatUnread';
 import {
   DEFAULT_FEATURE_FLAGS,
-  CHAT_RECONNECT_ERROR,
   initializeChatState,
   restoreSelectionState,
 } from './useChat.internal';
@@ -182,29 +181,26 @@ export const useChat = (projectId: string) => {
     [currentUser, setMessages, setRoomMessages, setPrivateMessages, setThreadMessages],
   );
 
-  const canSendRealtime = useCallback((): boolean => {
+  const getRealtimeSender = useCallback(() => {
     if (realtimeConnected && !realtimeReconnecting) {
-      return true;
+      return stompSend;
     }
 
-    setError(CHAT_RECONNECT_ERROR);
-    return false;
-  }, [realtimeConnected, realtimeReconnecting]);
+    return undefined;
+  }, [realtimeConnected, realtimeReconnecting, stompSend]);
 
   const sendMessage = useCallback(
     (content: string, recipient?: string | null) => {
-      if (!canSendRealtime()) return;
-      msgSend(content, currentUser, stompSend, trackTelemetry, recipient);
+      void msgSend(content, currentUser, getRealtimeSender(), trackTelemetry, recipient);
     },
-    [currentUser, msgSend, stompSend, trackTelemetry, canSendRealtime],
+    [currentUser, msgSend, getRealtimeSender, trackTelemetry],
   );
 
   const sendRoomMessage = useCallback(
     (content: string, roomId: number) => {
-      if (!canSendRealtime()) return;
-      msgSendRoom(content, roomId, currentUser, stompSend, trackTelemetry);
+      void msgSendRoom(content, roomId, currentUser, getRealtimeSender(), trackTelemetry);
     },
-    [currentUser, msgSendRoom, stompSend, trackTelemetry, canSendRealtime],
+    [currentUser, msgSendRoom, getRealtimeSender, trackTelemetry],
   );
 
   const editMessage = useCallback(

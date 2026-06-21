@@ -192,7 +192,7 @@ export function useReport(projectId: number) {
       const [
         tasksData, springsData, metricsRes, projectData, milestonesRes, membersData,
       ] = await Promise.all([
-        taskService.listByProject(projectId).catch(() => []),
+        taskService.listAllByProject(projectId).catch(() => []),
         sprintService.listByProject(projectId).catch(() => []),
         projectService.getMetrics(projectId).catch(() => ({ totalTasks: 0, completedTasks: 0, overdueTasks: 0 })),
         projectService.get(projectId).catch(() => null),

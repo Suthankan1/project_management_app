@@ -1,11 +1,12 @@
 package com.planora.backend.controller;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.Map;
@@ -22,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.planora.backend.dto.ProjectInviteRequest;
+import com.planora.backend.exception.InvitationExpiredException;
 import com.planora.backend.model.TeamRole;
 import com.planora.backend.model.User;
 import com.planora.backend.model.UserPrincipal;
@@ -85,5 +87,21 @@ class ProjectInvitationControllerTest {
                 .andExpect(status().isOk());
 
         verify(projectInvitationService).acceptInvitation(eq("secret-token"), eq(1L));
+    }
+
+    @Test
+    void acceptInvitation_whenExpired_returnsGone() throws Exception {
+        Map<String, String> request = Map.of("token", "expired-token");
+        doThrow(new InvitationExpiredException("Invitation has expired"))
+                .when(projectInvitationService).acceptInvitation("expired-token", 1L);
+
+        mockMvc.perform(post("/api/projects/invitations/accept")
+                        .with(SecurityMockMvcRequestPostProcessors.user(principal))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.errorCode").value("INVITATION_EXPIRED"))
+                .andExpect(jsonPath("$.message").value("Invitation has expired"));
     }
 }

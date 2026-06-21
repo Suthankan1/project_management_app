@@ -26,10 +26,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 
+import java.lang.reflect.Method;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -214,6 +218,30 @@ class ProjectServiceTest {
     }
 
     @Test
+    void recentAndFavoriteProjectMethods_areCacheableWithExpectedKeys() throws Exception {
+        Method recent = ProjectService.class.getMethod("getRecentProjectsForUser", Long.class, int.class);
+        Cacheable recentCacheable = recent.getAnnotation(Cacheable.class);
+        assertArrayEquals(new String[]{"project-recent"}, recentCacheable.cacheNames());
+        assertEquals("#userId + ':' + #limit", recentCacheable.key());
+
+        Method favorites = ProjectService.class.getMethod("getFavoriteProjectsForUser", Long.class);
+        Cacheable favoritesCacheable = favorites.getAnnotation(Cacheable.class);
+        assertArrayEquals(new String[]{"project-favorites"}, favoritesCacheable.cacheNames());
+        assertEquals("#userId", favoritesCacheable.key());
+    }
+
+    @Test
+    void projectMutations_evictDashboardCaches() throws Exception {
+        for (String methodName : java.util.List.of("recordProjectAccess", "toggleFavorite")) {
+            Method method = ProjectService.class.getMethod(methodName, Long.class, Long.class);
+            assertProjectDashboardEviction(method);
+        }
+        assertProjectDashboardEviction(ProjectService.class.getMethod("createProject", ProjectDTO.class));
+        assertProjectDashboardEviction(ProjectService.class.getMethod("updateProject", Long.class, com.planora.backend.dto.UpdateProjectDTO.class));
+        assertProjectDashboardEviction(ProjectService.class.getMethod("deleteProject", Long.class, Long.class, Long.class));
+    }
+
+    @Test
     void deleteProject_removesSprintDependenciesBeforeDeletingProject() {
         Project project = new Project();
         project.setId(54L);
@@ -245,5 +273,11 @@ class ProjectServiceTest {
         verify(projectAccessRepository).deleteByProject_Id(54L);
         verify(projectFavoriteRepository).deleteByProject(project);
         verify(projectRepository).delete(project);
+    }
+
+    private void assertProjectDashboardEviction(Method method) {
+        CacheEvict cacheEvict = method.getAnnotation(CacheEvict.class);
+        assertArrayEquals(new String[]{"project-recent", "project-favorites"}, cacheEvict.cacheNames());
+        org.junit.jupiter.api.Assertions.assertTrue(cacheEvict.allEntries());
     }
 }

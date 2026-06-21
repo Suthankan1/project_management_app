@@ -47,11 +47,11 @@ export function WorkloadMembersList({
     <div className="w-full lg:w-8/12 p-6 relative" onMouseLeave={() => setActiveIndex(-1)}>
       <div className="grid grid-cols-1 gap-3 max-h-[310px] overflow-y-auto pr-3 custom-scrollbar relative z-10 w-full pb-8">
         {workloadData.map((member) => {
-          const actualPieIndex = activeWorkloadData.findIndex(d => d.name === member.name);
+          const actualPieIndex = activeWorkloadData.findIndex(d => d.key === member.key);
 
           return (
             <div
-              key={member.name}
+              key={member.key}
               onMouseEnter={() => setActiveIndex(actualPieIndex)}
               onClick={() => setActiveIndex(actualPieIndex)}
               className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border bg-cu-bg/70 backdrop-blur-md transition-all cursor-pointer ${actualPieIndex === activeIndex && actualPieIndex !== -1 ? 'border-cu-primary/35 shadow-cu-md ring-1 ring-cu-primary/20 scale-[1.01]' : 'border-cu-border hover:border-cu-primary/25 hover:bg-cu-hover'

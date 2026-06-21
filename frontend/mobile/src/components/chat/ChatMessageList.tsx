@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   FlatList,
+  Platform,
   View,
   Text,
   StyleSheet,
@@ -108,6 +109,7 @@ export function ChatMessageList(props: ChatMessageListProps) {
       ref={flatListRef}
       data={displayData}
       inverted
+      style={{ flex: 1 }}
       keyExtractor={(item, index) => {
         if (item.__typing) return 'typing-indicator';
         if (item.localId) return item.localId;
@@ -117,10 +119,19 @@ export function ChatMessageList(props: ChatMessageListProps) {
       renderItem={renderItem}
       extraData={reactionsByMessageId}
       contentContainerStyle={styles.listContent}
-      ListFooterComponent={isLoadingMore ? <ActivityIndicator color={Colors.primary} style={{ padding: 16 }} /> : null}
+      ListFooterComponent={
+        isLoadingMore
+          ? <ActivityIndicator color={Colors.primary} style={{ padding: 16 }} />
+          : null
+      }
       initialNumToRender={20}
       maxToRenderPerBatch={10}
       windowSize={10}
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+      scrollEventThrottle={16}
+      maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+      showsVerticalScrollIndicator={false}
     />
   );
 }
@@ -129,15 +140,19 @@ function TypingIndicator({ username }: { username: string }) {
   const dot1 = useSharedValue(0);
   const dot2 = useSharedValue(0);
   const dot3 = useSharedValue(0);
+  const fadeIn = useSharedValue(0);
 
   useEffect(() => {
+    // Fade in the whole indicator
+    fadeIn.value = withTiming(1, { duration: 250 });
+
     const animateDot = (dot: typeof dot1, delay: number) => {
       dot.value = withDelay(
         delay,
         withRepeat(
           withSequence(
-            withTiming(-6, { duration: 200 }),
-            withTiming(0, { duration: 200 }),
+            withTiming(-5, { duration: 220 }),
+            withTiming(0, { duration: 220 }),
           ),
           -1,
           false,
@@ -146,57 +161,68 @@ function TypingIndicator({ username }: { username: string }) {
     };
 
     animateDot(dot1, 0);
-    animateDot(dot2, 150);
-    animateDot(dot3, 300);
-  }, [dot1, dot2, dot3]);
+    animateDot(dot2, 160);
+    animateDot(dot3, 320);
+  }, [dot1, dot2, dot3, fadeIn]);
 
+  const containerStyle = useAnimatedStyle(() => ({ opacity: fadeIn.value }));
   const dot1Style = useAnimatedStyle(() => ({ transform: [{ translateY: dot1.value }] }));
   const dot2Style = useAnimatedStyle(() => ({ transform: [{ translateY: dot2.value }] }));
   const dot3Style = useAnimatedStyle(() => ({ transform: [{ translateY: dot3.value }] }));
 
   return (
-    <View style={styles.typingContainer}>
-      <Text style={styles.typingSender} numberOfLines={1}>{username}</Text>
+    <Animated.View style={[styles.typingContainer, containerStyle]}>
+      <Text style={styles.typingSender} numberOfLines={1}>
+        {username} <Text style={styles.typingLabel}>is typing</Text>
+      </Text>
       <View style={styles.typingBubble}>
         <Animated.View style={[styles.dot, dot1Style]} />
         <Animated.View style={[styles.dot, dot2Style]} />
         <Animated.View style={[styles.dot, dot3Style]} />
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  listContent: { paddingVertical: 10 },
+  listContent: {
+    paddingVertical: 10,
+    paddingHorizontal: 0,
+  },
   typingContainer: {
     alignItems: 'flex-start',
     paddingLeft: 54,
     paddingRight: 16,
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   typingSender: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 5,
     marginLeft: 4,
+  },
+  typingLabel: {
+    fontWeight: '400',
+    color: Colors.textMuted,
+    fontStyle: 'italic',
   },
   typingBubble: {
     flexDirection: 'row',
-    width: 64,
-    height: 32,
+    width: 60,
+    height: 30,
     backgroundColor: Colors.chatBubbleOther,
-    borderRadius: 16,
+    borderRadius: 15,
+    borderBottomLeftRadius: 4,
     padding: 8,
-    gap: 6,
+    gap: 5,
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomLeftRadius: 4,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
     backgroundColor: Colors.textMuted,
   },
 });

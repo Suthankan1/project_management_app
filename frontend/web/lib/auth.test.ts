@@ -1,4 +1,12 @@
-import { refreshAccessToken, saveRefreshToken } from './auth';
+import { clearTokens, ensureValidToken, getRefreshToken, getValidToken, refreshAccessToken, saveRefreshToken, saveToken, setRememberMe } from './auth';
+
+function createJwt(payload: Record<string, unknown>): string {
+  const encodedPayload = window.btoa(JSON.stringify(payload))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+  return `header.${encodedPayload}.signature`;
+}
 
 describe('auth requestRefreshAccessToken URL handling', () => {
   const originalEnv = process.env;
@@ -10,6 +18,10 @@ describe('auth requestRefreshAccessToken URL handling', () => {
     global.fetch = fetchMock as unknown as typeof fetch;
     window.localStorage.clear();
     window.sessionStorage.clear();
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'planora:auth_sync',
+      newValue: JSON.stringify({ type: 'logout' }),
+    }));
     fetchMock.mockReset();
   });
 
@@ -93,5 +105,91 @@ describe('auth requestRefreshAccessToken URL handling', () => {
     expect(token).toBe('new-access-token-build');
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe('/api/auth/refresh');
+  });
+
+  it('stores the refresh-cookie marker in localStorage so new tabs can refresh', () => {
+    setRememberMe(false);
+
+    saveRefreshToken('mock-refresh-token');
+
+    expect(window.localStorage.getItem('planora:has_refresh_token')).toBe('true');
+    expect(window.sessionStorage.getItem('planora:has_refresh_token')).toBeNull();
+    expect(getRefreshToken()).toBe('true');
+  });
+
+  it('clears the in-memory access token when another tab logs out', () => {
+    saveToken(createJwt({
+      sub: 'person@example.com',
+      exp: Math.floor(Date.now() / 1000) + 60 * 60,
+    }));
+    expect(getValidToken()).toBeTruthy();
+
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'planora:auth_sync',
+      newValue: JSON.stringify({ type: 'logout' }),
+    }));
+
+    expect(getValidToken()).toBeNull();
+  });
+
+  it('can refresh from the HttpOnly cookie when the local marker is missing', async () => {
+    saveRefreshToken('mock-refresh-token');
+    window.localStorage.removeItem('planora:has_refresh_token');
+
+    expect(getRefreshToken()).toBeNull();
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ token: 'cookie-only-access-token' }),
+    });
+
+    const token = await ensureValidToken({ allowCookieRefresh: true });
+
+    expect(token).toBe('cookie-only-access-token');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(window.localStorage.getItem('planora:has_refresh_token')).toBe('true');
+  });
+
+  it('does not refresh from cookies after explicit logout', async () => {
+    saveRefreshToken('mock-refresh-token');
+
+    fetchMock.mockResolvedValue({ ok: true, status: 200 });
+    clearTokens();
+    fetchMock.mockClear();
+
+    const token = await ensureValidToken({ allowCookieRefresh: true });
+
+    expect(token).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('ignores an in-flight refresh response after logout', async () => {
+    saveRefreshToken('mock-refresh-token');
+
+    let resolveRefresh!: (response: unknown) => void;
+    fetchMock.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveRefresh = resolve;
+    }));
+
+    const refreshPromise = refreshAccessToken({ allowCookieRefresh: true });
+    await Promise.resolve();
+
+    fetchMock.mockResolvedValue({ ok: true, status: 200 });
+    clearTokens();
+
+    resolveRefresh({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        token: createJwt({
+          sub: 'person@example.com',
+          exp: Math.floor(Date.now() / 1000) + 60 * 60,
+        }),
+      }),
+    });
+
+    await expect(refreshPromise).rejects.toThrow('Token refresh cancelled during logout');
+    expect(getValidToken()).toBeNull();
   });
 });

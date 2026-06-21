@@ -27,12 +27,7 @@ export default function Button({
       // SECURITY & UX: If the API call is in progress (isLoading), disable the button 
       // so the user can't spam the backend with 10 identical POST requests.
       disabled={isLoading || disabled}
-      // Dynamic Tailwind classes. If disabled/loading, we drop the opacity and kill the hover effects.
-      className={`w-full font-bold py-3.5 min-h-[44px] rounded-xl transition-all text-white shadow-blue-500/30 shadow-lg active:scale-[0.98] mt-4 flex justify-center items-center
-        ${isLoading || disabled
-          ? 'bg-cu-primary/60 cursor-not-allowed opacity-70'
-          : 'bg-cu-primary hover:opacity-90'
-        }`}
+      className="mt-4 flex w-full min-h-[44px] items-center justify-center rounded-xl bg-[#155DFC] py-3.5 font-bold text-white shadow-lg shadow-blue-500/30 transition-all hover:bg-[#0C4DDA] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#155DFC] disabled:text-white disabled:opacity-60"
     >
       {children}
     </button>

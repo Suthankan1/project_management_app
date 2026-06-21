@@ -149,7 +149,6 @@ class ProjectControllerTest {
         UpdateProjectDTO request = new UpdateProjectDTO();
         request.setName("Renamed Project");
         request.setDescription("Updated description");
-        request.setType("KANBAN");
 
         ProjectResponseDTO response = ProjectResponseDTO.builder()
                 .id(12L)
@@ -220,7 +219,7 @@ class ProjectControllerTest {
     @Test
     void updateProject_invalidPayload_returns400() throws Exception {
         UpdateProjectDTO invalidDto = new UpdateProjectDTO();
-        invalidDto.setType("INVALID"); // Invalid type pattern
+        invalidDto.setName("x".repeat(101)); // Exceeds 100-character name limit
 
         mockMvc.perform(put("/api/projects/12")
                         .with(SecurityMockMvcRequestPostProcessors.user(principal))

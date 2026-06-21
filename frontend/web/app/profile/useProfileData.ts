@@ -3,7 +3,7 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { AxiosError } from 'axios';
 import { useRouter } from 'next/navigation';
-import { getUserFromToken } from '@/lib/auth';
+import { ensureValidToken, getUserFromToken } from '@/lib/auth';
 import { authApi } from '@/services/api-contract';
 
 export function useProfileData() {
@@ -57,17 +57,27 @@ export function useProfileData() {
     };
 
     useEffect(() => {
-        const tokenUser = getUserFromToken();
-        if (!tokenUser) {
-            router.push('/login');
-            return;
-        }
-        setUsername(tokenUser.username || '');
-        setEmail(tokenUser.email || '');
+        let isMounted = true;
 
         const loadProfile = async () => {
+            const token = await ensureValidToken({ allowCookieRefresh: true });
+            if (!token || !isMounted) {
+                if (isMounted) router.push('/login');
+                return;
+            }
+
+            const tokenUser = getUserFromToken();
+            if (!tokenUser) {
+                router.push('/login');
+                return;
+            }
+
+            setUsername(tokenUser.username || '');
+            setEmail(tokenUser.email || '');
+
             try {
                 const p = await authApi.getProfile();
+                if (!isMounted) return;
                 setUsername(p.username || tokenUser.username || '');
                 setEmail(p.email || tokenUser.email || '');
                 setFullName(p.fullName || '');
@@ -82,12 +92,16 @@ export function useProfileData() {
                 setProfilePicUrl(p.profilePicUrl || '');
                 setLastActive(p.lastActive || null);
             } catch (error: unknown) {
-                setErrorMessage(getApiErrorMessage(error, 'Failed to load profile details.'));
+                if (isMounted) setErrorMessage(getApiErrorMessage(error, 'Failed to load profile details.'));
             } finally {
-                setIsLoading(false);
+                if (isMounted) setIsLoading(false);
             }
         };
         void loadProfile();
+
+        return () => {
+            isMounted = false;
+        };
     }, [router]);
 
     const handleSendOtp = async () => {

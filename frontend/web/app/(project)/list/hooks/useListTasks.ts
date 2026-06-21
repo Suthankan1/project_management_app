@@ -9,6 +9,7 @@ import type { CreateTaskData } from '@/components/shared/CreateTaskModal';
 import type { Label, MilestoneResponse, Task } from '@/types';
 import { authApi, labelsApi, projectsApi, tasksApi } from '@/services/api-contract';
 import { normalizeTaskPriority } from '@/services/tasks-contract';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 const MEMBERS_CACHE_TTL_MS = 1000 * 60 * 30;
 
@@ -19,6 +20,7 @@ type MembersCacheEntry = {
 
 type TaskEventPatch = {
   id: number;
+  assigneeId?: number | null;
   title: string;
   storyPoint: number;
   status: string;
@@ -38,12 +40,9 @@ export type ListProjectMember = {
   photoUrl?: string | null;
 };
 
-const isHttpUrl = (value: string | null | undefined): value is string =>
-  Boolean(value && (value.startsWith('http://') || value.startsWith('https://')));
-
 const sanitizeTaskPhoto = (task: Task): Task => ({
   ...task,
-  assigneePhotoUrl: isHttpUrl(task.assigneePhotoUrl) ? task.assigneePhotoUrl : undefined,
+  assigneePhotoUrl: resolveProfilePhotoUrl(task.assigneePhotoUrl, task.assigneeId) ?? undefined,
 });
 
 // The backend AssigneeDTO sends `userId` (not `id`). Normalise so that
@@ -57,7 +56,9 @@ const normalizeAssignees = (task: Task): Task => {
       return {
         id: raw.userId ?? a.id,
         name: a.name,
-        avatar: isHttpUrl(raw.photoUrl) ? raw.photoUrl : isHttpUrl(a.avatar) ? a.avatar : undefined,
+        avatar: resolveProfilePhotoUrl(raw.photoUrl, raw.userId ?? a.id) ??
+          resolveProfilePhotoUrl(a.avatar, raw.userId ?? a.id) ??
+          undefined,
       };
     }),
   };
@@ -71,12 +72,14 @@ const normalizeTaskPatch = (patch: TaskEventPatch): Partial<Task> => ({
   priority: patch.priority,
   sprintId: patch.sprintId ?? undefined,
   assigneeName: patch.assigneeName ?? undefined,
-  assigneePhotoUrl: isHttpUrl(patch.assigneePhotoUrl) ? patch.assigneePhotoUrl : undefined,
+  assigneePhotoUrl: resolveProfilePhotoUrl(patch.assigneePhotoUrl, patch.assigneeId) ?? undefined,
   assignees: Array.isArray(patch.assignees)
     ? patch.assignees.map((item) => ({
         id: Number(item.userId ?? item.id ?? 0),
         name: item.name ?? item.username ?? 'User',
-        avatar: isHttpUrl(item.photoUrl) ? item.photoUrl : isHttpUrl(item.avatar) ? item.avatar : undefined,
+        avatar: resolveProfilePhotoUrl(item.photoUrl, item.userId ?? item.id) ??
+          resolveProfilePhotoUrl(item.avatar, item.userId ?? item.id) ??
+          undefined,
       }))
     : undefined,
   startDate: patch.startDate ?? undefined,
@@ -112,10 +115,7 @@ export function useListTasks() {
             return parsed.data;
           }
         } else {
-          const legacyHasInvalidValue = Object.values(parsed).some((value) => value && !isHttpUrl(value));
-          if (!legacyHasInvalidValue) {
-            return parsed;
-          }
+          return parsed;
         }
       } catch {
         /* ignore */
@@ -124,8 +124,12 @@ export function useListTasks() {
     try {
       const res = await projectsApi.getMembers(projectId);
       const map: Record<number, string | null> = {};
-      (res as { user: { userId: number; profilePicUrl?: string } }[]).forEach((m) => {
-        map[m.user.userId] = isHttpUrl(m.user.profilePicUrl) ? m.user.profilePicUrl : null;
+      (res as { id?: number; user: { userId: number; profilePicUrl?: string } }[]).forEach((m) => {
+        const photoUrl = resolveProfilePhotoUrl(m.user.profilePicUrl, m.user.userId);
+        map[m.user.userId] = photoUrl;
+        if (m.id != null) {
+          map[m.id] = photoUrl;
+        }
       });
       const entry: MembersCacheEntry = {
         expiresAt: Date.now() + MEMBERS_CACHE_TTL_MS,
@@ -194,7 +198,7 @@ export function useListTasks() {
           id,
           memberId: item?.id,
           name,
-          photoUrl: isHttpUrl(item?.user?.profilePicUrl) ? item.user!.profilePicUrl : null,
+          photoUrl: resolveProfilePhotoUrl(item?.user?.profilePicUrl, id),
         };
       }).filter((m) => Number.isFinite(m.id));
       setMembers(normalizedMembers);

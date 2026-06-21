@@ -18,6 +18,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.SubProtocolCapable;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.BinaryWebSocketHandler;
 
@@ -31,7 +32,7 @@ import com.planora.backend.service.UserCacheService;
 import io.jsonwebtoken.JwtException;
 
 @Component
-public class YjsWebSocketHandler extends BinaryWebSocketHandler {
+public class YjsWebSocketHandler extends BinaryWebSocketHandler implements SubProtocolCapable {
 
     private static final String ACCESS_TOKEN_COOKIE = "planora_access_token";
     private static final String JWT_PROTOCOL_PREFIX = "planora.jwt.";
@@ -291,5 +292,10 @@ public class YjsWebSocketHandler extends BinaryWebSocketHandler {
     @PreDestroy
     void shutdownTokenExpiryScheduler() {
         tokenExpiryScheduler.shutdownNow();
+    }
+
+    @Override
+    public List<String> getSubProtocols() {
+        return List.of("planora-yjs");
     }
 }

@@ -5,6 +5,7 @@ import { Plus, X } from 'lucide-react';
 import api from '@/lib/axios';
 import { toast } from '@/components/ui';
 import SidebarField from './SidebarField';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 interface AssigneeRow {
   memberId: number;
@@ -54,7 +55,7 @@ const MultiAssigneeSection: React.FC<MultiAssigneeSectionProps> = ({
           memberId: m.id,
           userId: m.user.userId,
           name: m.user.username,
-          photoUrl: m.user.profilePicUrl ?? null,
+          photoUrl: resolveProfilePhotoUrl(m.user.profilePicUrl, m.user.userId),
         }))
       );
     }).catch(() => {});

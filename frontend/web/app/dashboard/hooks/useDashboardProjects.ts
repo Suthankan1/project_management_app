@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getUserFromToken, User } from '@/lib/auth';
+import { ensureValidToken, getUserFromToken, User } from '@/lib/auth';
 import {
   buildSessionCacheKey,
   getSessionCache,
@@ -38,22 +38,19 @@ export function useDashboardProjects(): UseDashboardProjectsReturn {
   const [loading, setLoading] = useState(true); // Loading indicator state
 
   useEffect(() => {
-    // Get user details from JWT token stored in cookies
-    const currentUser = getUserFromToken();
-    if (!currentUser) {
-      router.push('/login'); // If no user, redirect to login page
-      return;
-    }
-    setUser(currentUser);
+    let isMounted = true;
+    let currentUser: User | null = null;
 
     // Main function to fetch projects from API
     const fetchProjects = async (checkCache = false) => {
+      if (!currentUser) return;
       const cacheKey = buildSessionCacheKey('dashboard_projects', [currentUser.userId]);
 
       // Try to load data from local session cache first for instant UI response
       if (checkCache && cacheKey) {
         const cached = getSessionCache<{ recent: ProjectSummary[]; favorites: ProjectSummary[] }>(cacheKey, { allowStale: true });
         if (cached.data) {
+          if (!isMounted) return;
           setProjects(cached.data);
           setLoading(false);
           // If it's not stale (expired), we can stop here
@@ -95,6 +92,7 @@ export function useDashboardProjects(): UseDashboardProjectsReturn {
           recent: mergeMetrics(recent),
           favorites: mergeMetrics(favorites),
         };
+        if (!isMounted) return;
         setProjects(fresh);
 
         // Save fresh data to cache for next time
@@ -105,11 +103,28 @@ export function useDashboardProjects(): UseDashboardProjectsReturn {
         // Handle API errors silently if it's just a network issue on dashboard
         console.error("Dashboard data fetch failed", error);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
-    fetchProjects(true); // Initial fetch with cache check
+    const initializeProjects = async () => {
+      const token = await ensureValidToken({ allowCookieRefresh: true });
+      if (!token || !isMounted) {
+        if (isMounted) router.push('/login');
+        return;
+      }
+
+      currentUser = getUserFromToken();
+      if (!currentUser) {
+        router.push('/login');
+        return;
+      }
+
+      setUser(currentUser);
+      await fetchProjects(true);
+    };
+
+    void initializeProjects(); // Initial fetch with cache check
 
     // Listen for global events to refresh data when a project is updated elsewhere
     const handleFavToggled = () => { void fetchProjects(); };
@@ -119,6 +134,7 @@ export function useDashboardProjects(): UseDashboardProjectsReturn {
     
     // Clean up event listeners when component is removed
     return () => {
+      isMounted = false;
       window.removeEventListener('planora:favorite-toggled', handleFavToggled);
       window.removeEventListener('planora:project-accessed', handleProjectAccessed);
     };

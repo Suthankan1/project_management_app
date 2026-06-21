@@ -1,6 +1,5 @@
 package com.planora.backend.dto;
 
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -11,7 +10,4 @@ public class UpdateProjectDTO {
 
     @Size(max = 2000, message = "Description must be 2000 characters or fewer")
     private String description;
-
-    @Pattern(regexp = "^(AGILE|KANBAN)$", message = "Project type must be AGILE or KANBAN")
-    private String type;
 }

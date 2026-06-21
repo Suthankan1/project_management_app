@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -93,6 +94,21 @@ class ChatServiceTest {
         assertEquals(99L, savedDto.getRoomId());
         assertEquals(ChatMessage.ChatType.GROUP, savedDto.getChatType());
         verify(chatThreadRepository).save(any(ChatThread.class));
+    }
+
+    @Test
+    void saveMessage_appliesNonNullableDefaults() {
+        ChatMessage message = new ChatMessage();
+        message.setContent("hello");
+        message.setDeleted(null);
+        message.setFormatType(null);
+
+        when(chatMessageRepository.save(any(ChatMessage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var savedDto = chatService.saveMessage(message);
+
+        assertFalse(savedDto.getDeleted());
+        assertEquals(ChatMessage.FormatType.PLAIN, savedDto.getFormatType());
     }
 
     @Test

@@ -1,4 +1,4 @@
-import api from '@/lib/axios';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 type UserMapEntry = {
   userId?: number;
@@ -10,10 +10,9 @@ type UserMapEntry = {
 
 const USERS_MAP_STORAGE_KEY = 'planora:usersMap';
 
-// Module-level singletons so all callers in the same browser session share one fetch
-// and one in-memory copy — avoids a per-component API call on every task card open.
+// Module-level singleton so all callers in the same browser session share one
+// in-memory copy — avoids repeated work on every task card open.
 let userMapCache: Record<string, string | null> | null = null;
-let userMapFetchPromise: Promise<Record<string, string | null>> | null = null;
 
 function normalizeUsersMap(raw: unknown): Record<string, string | null> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
@@ -39,7 +38,7 @@ function normalizeUsersMap(raw: unknown): Record<string, string | null> {
 function buildUserMap(users: UserMapEntry[]): Record<string, string | null> {
   const map: Record<string, string | null> = {};
   users.forEach((u) => {
-    const pic = u.profilePicUrl || null;
+    const pic = resolveProfilePhotoUrl(u.profilePicUrl, u.userId);
     if (typeof u.userId === 'number') {
       map[`id:${u.userId}`] = pic;
     }
@@ -75,8 +74,8 @@ function writeUsersMapToLocalStorage(map: Record<string, string | null>): void {
   window.localStorage.setItem(USERS_MAP_STORAGE_KEY, JSON.stringify(map));
 }
 
-// forceRefresh bypasses both the in-memory cache and localStorage so an explicit
-// refresh (e.g. after profile picture update) fetches the latest data from the API.
+// forceRefresh bypasses both the in-memory cache and localStorage. Callers can
+// repopulate the map with upsertUserMapEntry when they already have user data.
 export function getOrFetchUserMap(options?: { forceRefresh?: boolean }): Promise<Record<string, string | null>> {
   const forceRefresh = Boolean(options?.forceRefresh);
 
@@ -91,29 +90,13 @@ export function getOrFetchUserMap(options?: { forceRefresh?: boolean }): Promise
   }
 
   if (!forceRefresh && userMapCache !== null) return Promise.resolve(userMapCache);
-  if (userMapFetchPromise !== null) return userMapFetchPromise;
 
-  userMapFetchPromise = api
-    .get<UserMapEntry[]>('/api/auth/users')
-    .then((response) => {
-      const map = buildUserMap(Array.isArray(response.data) ? response.data : []);
-      userMapCache = map;
-      writeUsersMapToLocalStorage(map);
-      userMapFetchPromise = null;
-      return map;
-    })
-    .catch(() => {
-      userMapCache = {};
-      userMapFetchPromise = null;
-      return {};
-    });
-
-  return userMapFetchPromise;
+  userMapCache = {};
+  return Promise.resolve(userMapCache);
 }
 
 export function invalidateUserMapCache(): void {
   userMapCache = null;
-  userMapFetchPromise = null;
 }
 
 export function upsertUserMapEntry(entry: UserMapEntry): void {

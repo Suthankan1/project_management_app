@@ -3,6 +3,9 @@ package com.planora.backend.repository;
 import com.planora.backend.model.User;
 import com.planora.backend.model.VerificationToken;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 
@@ -14,6 +17,10 @@ public interface TokenRepository extends JpaRepository<VerificationToken, Long> 
     VerificationToken findByToken(String token);
 
     VerificationToken findByUserAndTokenType(User user, VerificationToken.TokenType tokenType);
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from VerificationToken token where token.user = :user and token.tokenType = :tokenType")
+    int deleteByUserAndTokenType(@Param("user") User user, @Param("tokenType") VerificationToken.TokenType tokenType);
 
     /** Deletes all expired tokens and all tokens that have already been used. */
     void deleteByExpiryBeforeOrUsedTrue(Instant cutoff);

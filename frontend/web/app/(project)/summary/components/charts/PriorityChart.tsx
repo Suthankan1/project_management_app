@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { Task } from '@/types';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import { SafeChartFrame } from '@/components/shared/SafeChartFrame';
 
 const PRIORITY_COLORS = {
@@ -39,8 +39,8 @@ export function PriorityChart({ tasks }: { tasks: Task[] }) {
                <p className="text-[9px] font-bold text-cu-text-muted uppercase tracking-widest">Tasks</p>
             </div>
             <SafeChartFrame>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+              {({ width, height }) => (
+                <PieChart width={width} height={height}>
                   <Pie data={data} cx="50%" cy="50%" innerRadius="40%" outerRadius="68%" paddingAngle={2} dataKey="value">
                     {data.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={PRIORITY_COLORS[entry.name as keyof typeof PRIORITY_COLORS] || 'var(--cu-text-muted)'} />
@@ -49,7 +49,7 @@ export function PriorityChart({ tasks }: { tasks: Task[] }) {
                   <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--cu-border)', background: 'var(--cu-bg)', color: 'var(--cu-text-primary)', fontSize: '11px' }} />
                   <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px', color: 'var(--cu-text-secondary)' }} verticalAlign="bottom" />
                 </PieChart>
-              </ResponsiveContainer>
+              )}
             </SafeChartFrame>
           </div>
         ) : (

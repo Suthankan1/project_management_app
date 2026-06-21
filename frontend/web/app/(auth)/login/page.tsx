@@ -19,9 +19,14 @@ export default function LoginPage() {
     remember, setRemember,
     showPassword, setShowPassword,
     isLoading,
+    isCheckingSession,
     error,
     handleLogin,
   } = useLoginForm();
+
+  if (isCheckingSession) {
+    return <div className="min-h-screen" aria-label="Checking session" />;
+  }
 
     return (
 
@@ -158,7 +163,7 @@ export default function LoginPage() {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className={`w-full font-bold py-2 min-h-[44px] rounded-lg transition-colors text-white ${isLoading ? 'bg-cu-primary/60 cursor-not-allowed' : 'bg-cu-primary hover:opacity-90'}`}
+                        className="w-full rounded-lg bg-[#155DFC] py-2 min-h-[44px] font-bold text-white shadow-sm transition-colors hover:bg-[#0C4DDA] disabled:cursor-not-allowed disabled:bg-[#155DFC] disabled:text-white disabled:opacity-60"
                     >
                         {isLoading ? 'Signing in...' : 'Sign In'}
                     </button>

@@ -1,4 +1,4 @@
-import { chatApi, authApi } from './api-contract';
+import { authApi, chatApi } from './api-contract';
 import type {
   ChatFeatureFlags,
   ChatMessage,
@@ -64,7 +64,7 @@ export async function fetchChatMembers(projectId: string): Promise<string[]> {
 }
 
 export async function fetchAllUserProfiles(): Promise<AuthUserSummary[]> {
-  return authApi.getAllUsers();
+  return [];
 }
 
 export async function fetchCurrentUser(): Promise<{ username: string }> {
@@ -89,6 +89,32 @@ export async function fetchChatInbox(params?: {
 
 export async function fetchTeamMessages(projectId: string): Promise<ChatMessage[]> {
   return chatApi.getTeamMessages(projectId);
+}
+
+export async function postTeamMessage(
+  projectId: string,
+  content: string,
+  localId?: string,
+): Promise<ChatMessage> {
+  return chatApi.postTeamMessage(projectId, content, localId);
+}
+
+export async function postPrivateMessage(
+  projectId: string,
+  recipient: string,
+  content: string,
+  localId?: string,
+): Promise<ChatMessage> {
+  return chatApi.postPrivateMessage(projectId, recipient, content, localId);
+}
+
+export async function postRoomMessage(
+  projectId: string,
+  roomId: number,
+  content: string,
+  localId?: string,
+): Promise<ChatMessage> {
+  return chatApi.postRoomMessage(projectId, roomId, content, localId);
 }
 
 export async function fetchRoomMessages(

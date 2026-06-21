@@ -26,8 +26,18 @@ jest.mock('@/lib/axios', () => ({
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe('kanban api', () => {
+  let consoleErrorSpy: jest.SpyInstance;
+  let consoleWarnSpy: jest.SpyInstance;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   it('fetchTasksByProject returns task list', async () => {
@@ -126,13 +136,13 @@ describe('kanban api', () => {
   it('fetchTeamMembers supports wrapped payload shape', async () => {
     mockedAxios.get.mockResolvedValueOnce({
       data: {
-        members: [{ id: '8', user: { username: 'alice' } }, { id: 'x', name: '' }],
+        members: [{ id: '8', user: { userId: 12, username: 'alice', profilePicUrl: '/api/auth/users/12/photo' } }, { id: 'x', name: '' }],
       },
     });
 
     const result = await fetchTeamMembers(10);
 
     expect(mockedAxios.get).toHaveBeenCalledWith('/api/teams/10/members');
-    expect(result).toEqual([{ id: 8, name: 'alice' }]);
+    expect(result).toEqual([{ id: 8, userId: 12, name: 'alice', photoUrl: 'http://localhost:8080/api/auth/users/12/photo' }]);
   });
 });

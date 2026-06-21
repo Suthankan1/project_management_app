@@ -16,6 +16,11 @@ import { buildSessionCacheKey, getSessionCache, setSessionCache, removeSessionCa
 import { toast } from '@/components/ui';
 import { tasksApi } from '@/services/api-contract';
 import { normalizeTaskPriority } from '@/services/tasks-contract';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
+
+type TaskWithAssignees = Task & {
+    assignees?: Array<{ id?: number; avatar?: string | null }>;
+};
 
 export function useBacklogData(projectId: string | null, showArchived = false) {
 
@@ -68,6 +73,38 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         }
     }, [projectId]);
 
+    const memberPhotoById = useMemo(() => {
+        const map: Record<number, string | null> = {};
+        teamMembers.forEach((member) => {
+            map[member.id] = member.photoUrl ?? null;
+            if (member.userId != null) {
+                map[member.userId] = member.photoUrl ?? null;
+            }
+        });
+        return map;
+    }, [teamMembers]);
+
+    const enrichTaskAvatars = useCallback((items: Task[]): Task[] => {
+        return items.map((task) => {
+            const taskWithAssignees = task as TaskWithAssignees;
+            const assigneePhotoUrl =
+                resolveProfilePhotoUrl(task.assigneePhotoUrl, task.assigneeId) ||
+                (task.assigneeId != null ? memberPhotoById[task.assigneeId] : null) ||
+                null;
+
+            const assignees = taskWithAssignees.assignees?.map((assignee) => ({
+                ...assignee,
+                avatar: resolveProfilePhotoUrl(assignee.avatar, assignee.id) || assignee.avatar,
+            }));
+
+            return {
+                ...task,
+                assigneePhotoUrl,
+                ...(assignees ? { assignees } : {}),
+            };
+        });
+    }, [memberPhotoById]);
+
     // ── Dynamic Data (Periodic Sync) ──
     const fetchData = useCallback(async (options: { showSpinner?: boolean, forceNetwork?: boolean } = {}) => {
         if (!projectId) return;
@@ -90,15 +127,16 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         setError(null);
         try {
             const fetched = await fetchTasksByProject(pid, { archived: showArchived });
-            setTasks(fetched);
-            if (cKey) setSessionCache(cKey, fetched, 30 * 60_000);
+            const enriched = enrichTaskAvatars(fetched);
+            setTasks(enriched);
+            if (cKey) setSessionCache(cKey, enriched, 30 * 60_000);
         } catch (err) {
             console.error('Error loading backlog tasks:', err);
             if (showSpinner) setError(err instanceof Error ? err.message : 'Failed to load tasks');
         } finally {
             if (showSpinner && !hasCachedData) setLoading(false);
         }
-    }, [projectId, showArchived]);
+    }, [projectId, showArchived, enrichTaskAvatars]);
 
     const fetchArchivedData = useCallback(async () => {
         if (!projectId || !showArchived) {
@@ -114,14 +152,14 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         setArchivedLoading(true);
         try {
             const data = await getArchivedTasks(pid);
-            setArchivedTasks(data as Task[]);
+            setArchivedTasks(enrichTaskAvatars(data as Task[]));
         } catch (err) {
             console.error('Error loading archived backlog tasks:', err);
             toast('Failed to load archived tasks', 'error');
         } finally {
             setArchivedLoading(false);
         }
-    }, [projectId, showArchived]);
+    }, [projectId, showArchived, enrichTaskAvatars]);
 
     const forceRefresh = useCallback(() => void fetchData({ showSpinner: false, forceNetwork: true }), [fetchData]);
 
@@ -146,7 +184,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
     useTaskWebSocket(projectId, useCallback((event) => {
         if (event.type === 'TASK_CREATED' && event.task) {
             if (!event.task.archived) {
-                setTasks(prev => [...prev.filter(x => x.id !== event.task!.id), event.task as Task]);
+                setTasks(prev => enrichTaskAvatars([...prev.filter(x => x.id !== event.task!.id), event.task as Task]));
             }
         } else if (event.type === 'TASK_UPDATED' && event.task) {
             if (event.task.archived) {
@@ -156,15 +194,15 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
                 }
             } else {
                 setTasks(prev => prev.some(x => x.id === event.task!.id)
-                    ? prev.map(x => x.id === event.task!.id ? { ...x, ...event.task } as Task : x)
-                    : [...prev, event.task as Task]);
+                    ? enrichTaskAvatars(prev.map(x => x.id === event.task!.id ? { ...x, ...event.task } as Task : x))
+                    : enrichTaskAvatars([...prev, event.task as Task]));
                 setArchivedTasks(prev => prev.filter(x => x.id !== event.task!.id));
             }
         } else if (event.type === 'TASK_DELETED' && event.taskId) {
             setTasks(prev => prev.filter(x => x.id !== event.taskId));
             setArchivedTasks(prev => prev.filter(x => x.id !== event.taskId));
         }
-    }, [showArchived]));
+    }, [showArchived, enrichTaskAvatars]));
 
     const handleMarkDone = useCallback(async (id: number) => {
         const task = tasks.find(t => t.id === id);

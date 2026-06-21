@@ -1,5 +1,9 @@
 import api from '@/lib/axios';
-import { postTelemetry as postTelemetryBuilder, createRoom as createRoomBuilder } from '@planora/contracts';
+import {
+  postTelemetry as postTelemetryBuilder,
+  createRoom as createRoomBuilder,
+  createChatMessage as createChatMessageBuilder,
+} from '@planora/contracts';
 import type {
   ChatMessage,
   ChatReactionSummary,
@@ -189,6 +193,46 @@ export const chatApi = {
   },
   getTeamMessages: async (projectId: number | string): Promise<ChatMessage[]> => {
     const { data } = await api.get(`/api/projects/${projectId}/chat/messages`);
+    return data;
+  },
+  postTeamMessage: async (
+    projectId: number | string,
+    content: string,
+    localId?: string,
+  ): Promise<ChatMessage> => {
+    const { data } = await createChatMessageBuilder(api, projectId, {
+      content,
+      localId,
+      formatType: 'PLAIN',
+    });
+    return data;
+  },
+  postPrivateMessage: async (
+    projectId: number | string,
+    recipient: string,
+    content: string,
+    localId?: string,
+  ): Promise<ChatMessage> => {
+    const { data } = await createChatMessageBuilder(api, projectId, {
+      content,
+      recipient,
+      localId,
+      formatType: 'PLAIN',
+    });
+    return data;
+  },
+  postRoomMessage: async (
+    projectId: number | string,
+    roomId: number,
+    content: string,
+    localId?: string,
+  ): Promise<ChatMessage> => {
+    const { data } = await createChatMessageBuilder(api, projectId, {
+      content,
+      roomId,
+      localId,
+      formatType: 'PLAIN',
+    });
     return data;
   },
   getRoomMessages: async (projectId: number | string, roomId: number): Promise<ChatMessage[]> => {

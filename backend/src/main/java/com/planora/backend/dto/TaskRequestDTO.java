@@ -19,8 +19,9 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 public class TaskRequestDTO {
 
     public interface OnCreate {}
+    public interface OnSubTaskCreate {}
 
-    @NotBlank(message = "Task title is required", groups = OnCreate.class)
+    @NotBlank(message = "Task title is required", groups = {OnCreate.class, OnSubTaskCreate.class})
     @Size(max = 255, message = "Task title must be 255 characters or fewer")
     private String title;
 

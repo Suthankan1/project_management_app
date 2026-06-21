@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -17,13 +17,13 @@ import {
   getGitHubToken, saveGitHubToken, clearGitHubToken,
   getProjectGitHubRepo, setProjectGitHubRepo, clearProjectGitHubRepo,
   fetchGitHubUser, fetchRepositoriesWithToken, fetchPullRequests, fetchCommits, fetchIssues,
+  fetchGitHubOAuthConfig,
   exchangeCodeForToken,
   type ProjectGitHubConnection, type GitHubUser,
   type GitHubPullRequest, type GitHubCommit, type GitHubIssue, type GitHubRepository,
 } from '../../src/services/githubMobileService';
 
-const GITHUB_CLIENT_ID = process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID ?? '';
-const REDIRECT_URI = 'mobile://github-callback';
+const DEFAULT_REDIRECT_URI = 'mobile://github-callback';
 type ActiveTab = 'prs' | 'commits' | 'issues';
 type IssueFilter = 'open' | 'closed' | 'all';
 type NotificationType = 'pull-request' | 'issue' | 'security' | 'release';
@@ -822,7 +822,7 @@ function MobileGitHubGlassShell({
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function GitHubScreen() {
-  const { projectId } = useLocalSearchParams<{ projectId: string }>();
+  const { projectId, select_repo } = useLocalSearchParams<{ projectId: string; select_repo?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -850,16 +850,75 @@ export default function GitHubScreen() {
   useEffect(() => {
     let alive = true;
     void (async () => {
-      const [tok, conn] = await Promise.all([
-        getGitHubToken(),
-        getProjectGitHubRepo(projectId),
-      ]);
-      if (!alive) return;
-      setToken(tok);
-      setConnection(conn);
+      try {
+        const [tok, conn] = await Promise.all([
+          getGitHubToken(),
+          getProjectGitHubRepo(projectId),
+        ]);
+        if (!alive) return;
+        setToken(tok);
+        setConnection(conn);
+      } catch (err) {
+        console.error('Failed to load initial GitHub state:', err);
+      }
     })();
     return () => { alive = false; };
   }, [projectId]);
+
+  // Re-check connection on focus (Android: github-callback.tsx exchanges the code
+  // and navigates back here; we need to refresh to show the connected state).
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      void (async () => {
+        try {
+          const [tok, conn] = await Promise.all([
+            getGitHubToken(),
+            getProjectGitHubRepo(projectId),
+          ]);
+          if (!alive) return;
+          setToken(tok);
+          setConnection(conn);
+        } catch (err) {
+          console.error('Failed to load focus GitHub state:', err);
+        }
+      })();
+      return () => { alive = false; };
+    }, [projectId]),
+  );
+
+  // Load user profile when token is set/changes
+  useEffect(() => {
+    if (token) {
+      void fetchGitHubUser(token)
+        .then(user => setGhUser(user))
+        .catch(() => {});
+    }
+  }, [token]);
+
+  const loadRepos = useCallback(async () => {
+    if (!token) return;
+    setRepoLoading(true);
+    setError(null);
+    try {
+      const data = await fetchRepositoriesWithToken(token);
+      setRepos(data);
+    } catch (err) {
+      console.error('Failed to fetch repositories:', err);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRepoLoading(false);
+    }
+  }, [token]);
+
+  // Auto-open repo picker if redirected back with select_repo=1
+  useEffect(() => {
+    if (select_repo === '1' && token) {
+      router.replace(`/github/${projectId}`);
+      setShowRepoPicker(true);
+      void loadRepos();
+    }
+  }, [select_repo, token, projectId, router, loadRepos]);
 
   // ── Load GitHub data ─────────────────────────────────────────────────────
   const loadData = useCallback(async (tok: string, conn: ProjectGitHubConnection) => {
@@ -887,32 +946,48 @@ export default function GitHubScreen() {
   }, [token, connection, loadData]);
 
   // ── OAuth connect ────────────────────────────────────────────────────────
+  // Platform split:
+  //   iOS  → ASWebAuthenticationSession intercepts mobile://github-callback before
+  //           Expo Router sees it, so the code comes back via result.url here.
+  //   Android → Chrome Custom Tab fires the deep link to the router which navigates
+  //           to app/github-callback.tsx; that page exchanges the code and comes back.
   const handleConnect = useCallback(async () => {
-    if (!GITHUB_CLIENT_ID) {
-      setError('GitHub OAuth not configured (EXPO_PUBLIC_GITHUB_CLIENT_ID missing).');
-      return;
-    }
     setConnecting(true);
     setError(null);
     try {
+      const oauthConfig = await fetchGitHubOAuthConfig();
+      if (!oauthConfig.configured || !oauthConfig.clientId) {
+        setError('GitHub OAuth is not configured on the backend.');
+        return;
+      }
+      const redirectUri = oauthConfig.redirectUri || DEFAULT_REDIRECT_URI;
       const authUrl =
         `https://github.com/login/oauth/authorize` +
-        `?client_id=${GITHUB_CLIENT_ID}&scope=repo&state=${projectId}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
-      if (result.type === 'success' && result.url) {
-        const code = new URL(result.url).searchParams.get('code');
-        if (code) {
-          const accessToken = await exchangeCodeForToken(code);
-          if (accessToken) {
-            await saveGitHubToken(accessToken);
-            setToken(accessToken);
-            const data = await fetchRepositoriesWithToken(accessToken).catch(() => []);
-            setRepos(data);
-            setShowRepoPicker(true);
-          } else {
-            setError('Token exchange failed. Check EXPO_PUBLIC_WEB_URL points to the web frontend.');
+        `?client_id=${oauthConfig.clientId}&scope=repo&state=${projectId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+      if (Platform.OS === 'ios') {
+        // iOS: openAuthSessionAsync returns the redirect URL directly.
+        const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+        if (result.type === 'success' && result.url) {
+          const code = new URL(result.url).searchParams.get('code');
+          if (code) {
+            const accessToken = await exchangeCodeForToken(code, redirectUri);
+            if (accessToken) {
+              await saveGitHubToken(accessToken);
+              setToken(accessToken);
+              const data = await fetchRepositoriesWithToken(accessToken).catch(() => []);
+              setRepos(data);
+              setShowRepoPicker(true);
+            } else {
+              setError('GitHub token exchange failed. Check the backend GitHub OAuth configuration.');
+            }
           }
         }
+      } else {
+        // Android: open the browser; when GitHub redirects to mobile://github-callback
+        // the OS fires a deep link and Expo Router navigates to app/github-callback.tsx
+        // which handles the code exchange and navigates back here.
+        await WebBrowser.openBrowserAsync(authUrl);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -920,18 +995,6 @@ export default function GitHubScreen() {
       setConnecting(false);
     }
   }, [projectId]);
-
-  const loadRepos = useCallback(async () => {
-    if (!token) return;
-    setRepoLoading(true);
-    try {
-      const data = await fetchRepositoriesWithToken(token);
-      setRepos(data);
-    } finally {
-      setRepoLoading(false);
-    }
-  }, [token]);
-
   const handleSelectRepo = useCallback(async (repo: GitHubRepository) => {
     await setProjectGitHubRepo(projectId, repo);
     const conn = await getProjectGitHubRepo(projectId);
@@ -942,7 +1005,11 @@ export default function GitHubScreen() {
   }, [projectId, token, loadData]);
 
   const handleDisconnect = useCallback(async () => {
-    await clearGitHubToken();
+    try {
+      await clearGitHubToken();
+    } catch (err) {
+      console.error('Failed to revoke GitHub token:', err);
+    }
     await clearProjectGitHubRepo(projectId);
     setToken(null); setConnection(null); setGhUser(null);
     setPRs([]); setCommits([]); setIssues([]);
@@ -957,6 +1024,8 @@ export default function GitHubScreen() {
 
   // ── DISCONNECTED screen ──────────────────────────────────────────────────
   if (!connection || !token) {
+    const isGitHubConnected = !!token;
+
     return (
       <LinearGradient
         colors={['#050B1A', '#0C0921', '#120820', '#080E1C']}
@@ -981,27 +1050,53 @@ export default function GitHubScreen() {
             <MaterialCommunityIcons name="github" size={46} color="#fff" />
           </View>
 
-          <Text style={s.heroTitle}>Connect to GitHub</Text>
+          <Text style={s.heroTitle}>
+            {isGitHubConnected ? 'Link a Repository' : 'Connect to GitHub'}
+          </Text>
           <Text style={s.heroSub}>
-            Link this project to a repository to track pull requests, commits, and issues.
+            {isGitHubConnected 
+              ? 'Select a GitHub repository to track pull requests, commits, and issues for this project.'
+              : 'Link this project to a repository to track pull requests, commits, and issues.'}
           </Text>
 
-          {/* Feature list */}
-          <GlassCard style={{ width: '100%', marginTop: 4 }}>
-            {[
-              { icon: 'source-pull' as const, text: 'View pull requests in real time' },
-              { icon: 'source-commit' as const, text: 'Track commits and branch history' },
-              { icon: 'alert-circle-outline' as const, text: 'Monitor open and closed issues' },
-            ].map(f => (
-              <View key={f.text} style={s.featureRow}>
-                <View style={s.featureIcon}>
-                  <MaterialCommunityIcons name={f.icon} size={13} color="#34D399" />
+          {/* Connected User Profile Info (if connected) */}
+          {isGitHubConnected && ghUser ? (
+            <GlassCard style={{ width: '100%', marginTop: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 }}>
+                {ghUser.avatar_url ? (
+                  <Image source={{ uri: ghUser.avatar_url }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                ) : (
+                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' }}>
+                    <MaterialCommunityIcons name="account" size={20} color="rgba(255,255,255,0.6)" />
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>{ghUser.name || ghUser.login}</Text>
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>@{ghUser.login}</Text>
                 </View>
-                <Text style={s.featureText}>{f.text}</Text>
-                <MaterialCommunityIcons name="check" size={13} color="#34D399" />
+                <View style={{ backgroundColor: 'rgba(52,211,153,0.12)', borderWidth: 1, borderColor: 'rgba(52,211,153,0.3)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#34D399' }}>Connected</Text>
+                </View>
               </View>
-            ))}
-          </GlassCard>
+            </GlassCard>
+          ) : !isGitHubConnected ? (
+            /* Feature list (only show if not connected at all) */
+            <GlassCard style={{ width: '100%', marginTop: 4 }}>
+              {[
+                { icon: 'source-pull' as const, text: 'View pull requests in real time' },
+                { icon: 'source-commit' as const, text: 'Track commits and branch history' },
+                { icon: 'alert-circle-outline' as const, text: 'Monitor open and closed issues' },
+              ].map(f => (
+                <View key={f.text} style={s.featureRow}>
+                  <View style={s.featureIcon}>
+                    <MaterialCommunityIcons name={f.icon} size={13} color="#34D399" />
+                  </View>
+                  <Text style={s.featureText}>{f.text}</Text>
+                  <MaterialCommunityIcons name="check" size={13} color="#34D399" />
+                </View>
+              ))}
+            </GlassCard>
+          ) : null}
 
           {error ? (
             <View style={s.errorBox}>
@@ -1010,25 +1105,54 @@ export default function GitHubScreen() {
             </View>
           ) : null}
 
-          <TouchableOpacity
-            onPress={handleConnect}
-            disabled={connecting}
-            activeOpacity={0.85}
-            style={s.connectWrap}
-          >
-            <LinearGradient
-              colors={['rgba(99,102,241,0.75)', 'rgba(168,85,247,0.65)']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={s.connectBtn}
+          {isGitHubConnected ? (
+            <View style={{ width: '100%', gap: 14 }}>
+              <TouchableOpacity
+                onPress={() => { void loadRepos(); setShowRepoPicker(true); }}
+                activeOpacity={0.85}
+                style={s.connectWrap}
+              >
+                <LinearGradient
+                  colors={['rgba(99,102,241,0.75)', 'rgba(168,85,247,0.65)']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={s.connectBtn}
+                >
+                  <MaterialCommunityIcons name="link-variant" size={18} color="#fff" />
+                  <Text style={s.connectText}>Select Repository</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleDisconnect}
+                activeOpacity={0.8}
+                style={{ alignSelf: 'center', marginTop: 8 }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#F87171' }}>
+                  Disconnect Account
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={handleConnect}
+              disabled={connecting}
+              activeOpacity={0.85}
+              style={s.connectWrap}
             >
-              {connecting
-                ? <ActivityIndicator color="#fff" size="small" />
-                : <MaterialCommunityIcons name="github" size={18} color="#fff" />}
-              <Text style={s.connectText}>
-                {connecting ? 'Connecting…' : 'Connect to GitHub'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={['rgba(99,102,241,0.75)', 'rgba(168,85,247,0.65)']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={s.connectBtn}
+              >
+                {connecting
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <MaterialCommunityIcons name="github" size={18} color="#fff" />}
+                <Text style={s.connectText}>
+                  {connecting ? 'Connecting…' : 'Connect to GitHub'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </ScrollView>
 
         <RepoPickerModal

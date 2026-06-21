@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 const sizeClasses: Record<string, { container: string; text: string; pixels: number }> = {
   xs: { container: 'w-5 h-5', text: 'text-[8px]', pixels: 20 },
@@ -43,16 +44,18 @@ export interface AvatarProps {
 
 export function Avatar({ src, name = '?', size = 'md', className = '' }: AvatarProps) {
   const s = sizeClasses[size];
+  const resolvedSrc = resolveProfilePhotoUrl(src);
 
-  if (src) {
+  if (resolvedSrc) {
     return (
       <div className={`${s.container} rounded-full overflow-hidden shrink-0 ${className}`}>
         <Image
-          src={src}
+          src={resolvedSrc}
           alt={name}
           width={s.pixels}
           height={s.pixels}
           className="w-full h-full object-cover"
+          unoptimized
         />
       </div>
     );

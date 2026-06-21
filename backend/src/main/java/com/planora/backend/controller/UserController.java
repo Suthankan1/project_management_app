@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -34,6 +35,13 @@ public class UserController {
 
     private final UserService service;
     private final JWTService jwtService;
+
+    @Value("${app.cookie.secure:true}")
+    private boolean cookieSecure;
+
+    @Value("${app.cookie.samesite:None}")
+    private String cookieSameSite;
+
 
     //@Valid is used here to fail fast. It catches the bad data (like malformed emails or short passwords)
     //at the controller level before we waste resources hitting the database or service layer.
@@ -60,10 +68,10 @@ public class UserController {
         if (response.isSuccess()) {
             ResponseCookie cookie = ResponseCookie.from("planora_refresh_token", response.getRefreshToken())
                     .httpOnly(true)
-                    .secure(true)
+                    .secure(cookieSecure)
                     .path("/")
                     .maxAge(30 * 24 * 60 * 60) // 30 days
-                    .sameSite("None")
+                    .sameSite(cookieSameSite)
                     .build();
             response.setRefreshToken(null);
             return ResponseEntity.ok()
@@ -118,10 +126,10 @@ public class UserController {
         if (response != null && response.isSuccess()) {
             ResponseCookie cookie = ResponseCookie.from("planora_refresh_token", response.getRefreshToken())
                     .httpOnly(true)
-                    .secure(true)
+                    .secure(cookieSecure)
                     .path("/")
                     .maxAge(30 * 24 * 60 * 60)
-                    .sameSite("None")
+                    .sameSite(cookieSameSite)
                     .build();
             response.setRefreshToken(null);
             return ResponseEntity.ok()
@@ -147,10 +155,10 @@ public class UserController {
 
         ResponseCookie cookie = ResponseCookie.from("planora_refresh_token", "")
                 .httpOnly(true)
-                .secure(true)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(0) // immediately expire
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .build();
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())

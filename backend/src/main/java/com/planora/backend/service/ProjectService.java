@@ -6,6 +6,7 @@ import com.planora.backend.dto.UpdateProjectDTO;
 import com.planora.backend.dto.ProjectMetricsDTO;
 import com.planora.backend.exception.ConflictException;
 import com.planora.backend.exception.ForbiddenException;
+import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.*;
 import com.planora.backend.repository.ProjectAccessRepository;
 import com.planora.backend.repository.ProjectFavoriteRepository;
@@ -17,6 +18,8 @@ import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.TeamRepository;
 import com.planora.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +53,7 @@ public class ProjectService {
 
     // Creates a project, links it to a team, and assigns the logged-in user as owner.
     @Transactional
+    @CacheEvict(cacheNames = {"project-recent", "project-favorites"}, allEntries = true)
     public ProjectResponseDTO createProject(ProjectDTO dto) {
         Project project = new Project();
         project.setName(dto.getName());
@@ -59,7 +63,7 @@ public class ProjectService {
 
         // The controller sets ownerId from the authenticated user.
         User owner = userRepository.findById(dto.getOwnerId())
-                .orElseThrow(() -> new RuntimeException("Owner not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
 
         // Decide whether to use an existing team or create a new one.
         // existing team
@@ -196,11 +200,12 @@ public class ProjectService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"project-recent", "project-favorites"}, allEntries = true)
     public void recordProjectAccess(Long projectId, Long userId) {
         // Saves the latest access time so recent-project lists stay accurate.
         Project project = findProjectById(projectId);
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         ProjectAccess access = projectAccessRepository.findByProject_IdAndUser_UserId(projectId, userId)
                 .orElse(new ProjectAccess());
@@ -213,11 +218,12 @@ public class ProjectService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"project-recent", "project-favorites"}, allEntries = true)
     public void toggleFavorite(Long projectId, Long userId) {
         // Adds the project to favorites if missing, otherwise removes it.
         Project project = findProjectById(projectId);
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         projectFavoriteRepository.findByUserAndProject(user, project)
                 .ifPresentOrElse(
@@ -233,6 +239,7 @@ public class ProjectService {
 
     // Returns the most recently accessed projects for the user.
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = "project-recent", key = "#userId + ':' + #limit")
     public List<ProjectResponseDTO> getRecentProjectsForUser(Long userId, int limit) {
         // Find all teams the user belongs to.
         List<TeamMember> memberships = teamMemberRepository.findByUserUserId(userId);
@@ -269,9 +276,10 @@ public class ProjectService {
 
     // Returns only the user's favorite projects that are still accessible.
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = "project-favorites", key = "#userId")
     public List<ProjectResponseDTO> getFavoriteProjectsForUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         // Keep only favorites that belong to teams the user still has access to.
         List<TeamMember> memberships = teamMemberRepository.findByUserUserId(userId);
@@ -324,6 +332,7 @@ public class ProjectService {
 
     // Updates the fields provided in the request.
     @Transactional
+    @CacheEvict(cacheNames = {"project-recent", "project-favorites"}, allEntries = true)
     public ProjectResponseDTO updateProject(Long id, UpdateProjectDTO dto) {
         Project project = findProjectById(id);
 
@@ -331,8 +340,6 @@ public class ProjectService {
             project.setName(dto.getName());
         if (dto.getDescription() != null)
             project.setDescription(dto.getDescription());
-        if (dto.getType() != null)
-            project.setType(ProjectType.valueOf(dto.getType()));
 
         Project updatedProject = projectRepository.save(project);
         return convertToResponseDTO(updatedProject, null);
@@ -340,6 +347,7 @@ public class ProjectService {
 
     // Deletes a project after owner permission is verified.
     @Transactional
+    @CacheEvict(cacheNames = {"project-recent", "project-favorites"}, allEntries = true)
     public void deleteProject(Long projectId, Long teamId, Long userId) {
         Project project = findProjectById(projectId);
         validateOwnerPermission(teamId, userId);
@@ -367,7 +375,7 @@ public class ProjectService {
     // Loads a project entity or throws a clear error if it does not exist.
     private Project findProjectById(Long id) {
         return projectRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Project not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + id));
     }
 
     // Converts an entity into the response DTO used by the frontend.

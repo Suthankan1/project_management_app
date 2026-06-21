@@ -23,7 +23,7 @@ import {
   Minus, Undo2, Redo2, Type,
 } from 'lucide-react';
 import { Collaboration } from '@tiptap/extension-collaboration';
-import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
+import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import * as Y from 'yjs';
 import type { WebsocketProvider } from 'y-websocket';
 import SlashCommand, { slashSuggestion } from './slashCommand';
@@ -239,7 +239,7 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
       Collaboration.configure({ document: ydoc }),
     ] : []),
     ...(ydoc && provider && collaborationUser ? [
-      CollaborationCursor.configure({
+      CollaborationCaret.configure({
         provider,
         user: collaborationUser,
         render(user) {
@@ -294,7 +294,7 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
         class: 'prose prose-gray dark:prose-invert prose-base focus:outline-none max-w-none min-h-[400px] leading-relaxed',
       },
     },
-  });
+  }, [ydoc]);
 
   // Sync content on external changes (e.g. file import or initial load when ydoc wasn't ready yet).
   // We skip when the editor is focused (user is actively typing) and when content is truly identical.
@@ -312,10 +312,15 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
   useEffect(() => {
     if (!editor || !provider || !ydoc) return;
 
+    let fallbackTimeoutId: NodeJS.Timeout;
+
     const handleSync = (isSynced: boolean) => {
       if (isSynced) {
+        if (fallbackTimeoutId) clearTimeout(fallbackTimeoutId);
         const fragment = ydoc.getXmlFragment('default');
-        if (fragment.length === 0 && content) {
+        const editorHTML = editor.getHTML();
+        const isEditorEmpty = editorHTML === '<p></p>' || editorHTML === '';
+        if ((fragment.length === 0 || isEditorEmpty) && content) {
           editor.commands.setContent(content, { emitUpdate: false });
         }
       }
@@ -325,10 +330,21 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
 
     if (provider.synced) {
       handleSync(true);
+    } else {
+      // Fallback: If Yjs WebSocket doesn't sync in 1.5 seconds (offline or server issues),
+      // populate the editor with the DB content so the page isn't blank.
+      fallbackTimeoutId = setTimeout(() => {
+        const editorHTML = editor.getHTML();
+        const isEditorEmpty = editorHTML === '<p></p>' || editorHTML === '';
+        if (isEditorEmpty && content) {
+          editor.commands.setContent(content, { emitUpdate: false });
+        }
+      }, 1500);
     }
 
     return () => {
       provider.off('sync', handleSync);
+      if (fallbackTimeoutId) clearTimeout(fallbackTimeoutId);
     };
   }, [editor, provider, ydoc, content]);
 

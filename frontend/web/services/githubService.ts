@@ -23,6 +23,10 @@ export interface GitHubUser {
   followers: number;
 }
 
+export interface GitHubConnectionStatus {
+  connected: boolean;
+}
+
 export interface GitHubLabel {
   id?: number;
   name: string;
@@ -171,6 +175,11 @@ export async function fetchIssues(
 
 export async function fetchGitHubUser(): Promise<GitHubUser> {
   const { data } = await api.get<GitHubUser>('/api/github/user');
+  return data;
+}
+
+export async function fetchGitHubConnectionStatus(): Promise<GitHubConnectionStatus> {
+  const { data } = await api.get<GitHubConnectionStatus>('/api/github/status');
   return data;
 }
 

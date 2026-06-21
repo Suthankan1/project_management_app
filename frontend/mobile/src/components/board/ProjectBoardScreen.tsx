@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -375,7 +376,11 @@ function TaskCard({
             style={card.assigneeRow}
           >
             <View style={card.avatar}>
-              <Text style={card.avatarText}>{initialsFromName(task.assigneeName)}</Text>
+              {task.assigneePhotoUrl ? (
+                <Image source={{ uri: task.assigneePhotoUrl }} style={card.avatarImg} />
+              ) : (
+                <Text style={card.avatarText}>{initialsFromName(task.assigneeName)}</Text>
+              )}
             </View>
             <Text style={card.assigneeName} numberOfLines={1}>{task.assigneeName || 'Unassigned'}</Text>
           </TouchableOpacity>
@@ -677,7 +682,11 @@ function AssigneePickerModal({
                 }}
               >
                 <View style={[modal.assigneeAvatar, active && modal.assigneeAvatarActive]}>
-                  <Text style={[modal.assigneeAvatarText, active && modal.assigneeAvatarTextActive]}>{initialsFromName(member.name)}</Text>
+                  {member.profilePicUrl ? (
+                    <Image source={{ uri: member.profilePicUrl }} style={modal.avatarImg} />
+                  ) : (
+                    <Text style={[modal.assigneeAvatarText, active && modal.assigneeAvatarTextActive]}>{initialsFromName(member.name)}</Text>
+                  )}
                 </View>
                 <Text style={modal.optionText} numberOfLines={1}>{member.name}</Text>
                 {active && <Text style={modal.currentText}>Selected</Text>}
@@ -1801,8 +1810,10 @@ const card = StyleSheet.create({
     backgroundColor: T.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   avatarText: { fontSize: 9, color: '#FFFFFF', fontWeight: '900' },
+  avatarImg: { width: 23, height: 23, borderRadius: 11.5 },
   assigneeName: { fontSize: 11, fontWeight: '800', color: '#64748B', flex: 1 },
   subtaskWrap: { alignItems: 'flex-end', gap: 4, minWidth: 70 },
   subtaskCount: { fontSize: 10, fontWeight: '900', color: '#64748B' },
@@ -1853,12 +1864,14 @@ const modal = StyleSheet.create({
     backgroundColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   assigneeAvatarActive: {
     backgroundColor: T.primary,
   },
   assigneeAvatarText: { fontSize: 10, fontWeight: '900', color: '#64748B' },
   assigneeAvatarTextActive: { color: '#FFFFFF' },
+  avatarImg: { width: 28, height: 28, borderRadius: 14 },
   emptyOption: {
     minHeight: 48,
     borderRadius: 12,

@@ -2,8 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ensureValidToken, saveToken, saveRefreshToken, setRememberMe } from '@/lib/auth';
+import { AUTH_TOKEN_CHANGED_EVENT, ensureValidToken, saveToken, saveRefreshToken, setRememberMe } from '@/lib/auth';
 import { authApi } from '@/services/api-contract';
+
+const PENDING_INVITE_TOKEN_KEY = 'pendingInviteToken';
+
+interface LoginResponse {
+  success?: boolean;
+  token?: string;
+  accessToken?: string;
+  message?: string;
+}
 
 /*
  * Headless Business Logic Hook for Login.
@@ -20,6 +29,7 @@ export function useLoginForm() {
   const [showPassword, setShowPassword] = useState(false);
 
   // ── Network State ──
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -31,17 +41,31 @@ export function useLoginForm() {
   useEffect(() => {
     let isMounted = true;
 
+    const getAuthenticatedRedirect = () => {
+      const pendingInviteToken = localStorage.getItem(PENDING_INVITE_TOKEN_KEY);
+      return searchParams.get('redirect')
+        || (pendingInviteToken ? `/accept-invite?token=${encodeURIComponent(pendingInviteToken)}` : '/dashboard');
+    };
+
     const redirectIfAuthenticated = async () => {
-      if (await ensureValidToken()) {
+      if (await ensureValidToken({ allowCookieRefresh: true })) {
         // Use replace() instead of push() so the user can't hit the "Back" button
         // and end up stuck on the login page again.
-        if (isMounted) router.replace('/dashboard');
+        if (isMounted) router.replace(getAuthenticatedRedirect());
+      } else if (isMounted) {
+        setIsCheckingSession(false);
       }
     };
 
+    const handleAuthTokenChanged = () => {
+      void redirectIfAuthenticated();
+    };
+
     void redirectIfAuthenticated();
+    window.addEventListener(AUTH_TOKEN_CHANGED_EVENT, handleAuthTokenChanged);
     return () => {
       isMounted = false;
+      window.removeEventListener(AUTH_TOKEN_CHANGED_EVENT, handleAuthTokenChanged);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -71,23 +95,31 @@ export function useLoginForm() {
         password,
       });
 
-      if ((response as { success?: boolean }).success) {
+      const loginResponse = response as LoginResponse;
+      const accessToken = loginResponse.token || loginResponse.accessToken || '';
+
+      if (accessToken || loginResponse.success) {
+        if (!accessToken) {
+          setError(loginResponse.message || 'Login succeeded, but no access token was returned.');
+          return;
+        }
+
         // Step 1: Tell our local auth utility how long to keep these tokens alive based on user preference.
         setRememberMe(remember);
 
         // Step 2: Persist the Access JWT.
-        saveToken((response as { token?: string }).token || (response as { accessToken?: string }).accessToken || '');
+        saveToken(accessToken);
 
-        // Step 3: Persist the Refresh Token (if the backend issues them).
-        if ((response as { refreshToken?: string }).refreshToken) {
-          saveRefreshToken((response as { refreshToken?: string }).refreshToken!);
-        }
+        // Step 3: Persist the Refresh Token presence (HttpOnly cookie is set by backend).
+        saveRefreshToken('true', { broadcast: true });
 
         // Step 4: Route to the authenticated app (or back to the deep link they came from).
-        const redirectTo = searchParams.get('redirect') || '/dashboard';
+        const pendingInviteToken = localStorage.getItem(PENDING_INVITE_TOKEN_KEY);
+        const redirectTo = searchParams.get('redirect')
+          || (pendingInviteToken ? `/accept-invite?token=${encodeURIComponent(pendingInviteToken)}` : '/dashboard');
         router.push(redirectTo);
       } else {
-        setError((response as { message?: string }).message || 'Login failed. Please try again.');
+        setError(loginResponse.message || 'Login failed. Please try again.');
       }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
@@ -126,6 +158,7 @@ export function useLoginForm() {
     remember, setRemember,
     showPassword, setShowPassword,
     isLoading,
+    isCheckingSession,
     error,
     handleLogin,
   };

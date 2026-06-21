@@ -15,7 +15,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -27,16 +29,16 @@ import org.springframework.stereotype.Service;
 import com.planora.backend.dto.LoginResponse;
 import com.planora.backend.dto.UpdateProfileRequest;
 import com.planora.backend.dto.UserResponseDTO;
+import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.User;
 import com.planora.backend.model.VerificationToken;
 import com.planora.backend.repository.TokenRepository;
 import com.planora.backend.repository.UserRepository;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Cache;
 
 import jakarta.transaction.Transactional;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -65,6 +67,7 @@ public class UserService {
 
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Value("${aws.s3.profile-bucket}")
     private String profileBucket;
@@ -79,10 +82,6 @@ public class UserService {
     private UserService getSelf() {
         return self != null ? self : this;
     }
-
-    private final Cache<String, LoginAttemptRecord> loginAttemptCache = Caffeine.newBuilder()
-            .expireAfterWrite(Duration.ofMinutes(20))
-            .build();
 
     // Note: OTP-issuance rate limiting (forgot / resend / resend-otp) is enforced upstream by
     // RateLimitingFilter, which uses a Redis-backed IP+email keyed counter shared across all
@@ -100,7 +99,7 @@ public class UserService {
         }
     }
 
-    public UserService(UserRepository userRepository, JWTService jwtService, AuthenticationManager authenticationManager, TokenRepository tokenRepository, EmailService emailService, S3Client s3Client, S3Presigner s3Presigner) {
+    public UserService(UserRepository userRepository, JWTService jwtService, AuthenticationManager authenticationManager, TokenRepository tokenRepository, EmailService emailService, S3Client s3Client, S3Presigner s3Presigner, StringRedisTemplate stringRedisTemplate) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
@@ -108,6 +107,7 @@ public class UserService {
         this.emailService = emailService;
         this.s3Client = s3Client;
         this.s3Presigner = s3Presigner;
+        this.stringRedisTemplate = stringRedisTemplate;
     }
 
     /*
@@ -204,7 +204,7 @@ public class UserService {
     @Transactional
     public LoginResponse loginUser(User user) {
         String email = user.getEmail().toLowerCase();
-        LoginAttemptRecord loginAttemptRecord = loginAttemptCache.getIfPresent(email);
+        LoginAttemptRecord loginAttemptRecord = getLoginAttemptRecord(email);
 
         if (loginAttemptRecord != null && loginAttemptRecord.isLocked(Instant.now())) {
             LoginResponse response = new LoginResponse();
@@ -223,7 +223,7 @@ public class UserService {
 
             // Step 2. If auth succeeds, generate JWT.
             if (authentication.isAuthenticated()) {
-                loginAttemptCache.invalidate(email);
+                clearLoginAttemptRecord(email);
                 User authenticatedUser = userRepository.findFirstByEmailIgnoreCase(email).orElse(null);
 
                 // Create short-lived access token and long-lived refresh token.
@@ -259,10 +259,7 @@ public class UserService {
 
         } catch (AuthenticationException e) {
             // Exception caught: Password does not match hash.
-            LoginAttemptRecord updatedLoginAttemptRecord = loginAttemptCache.asMap().compute(email, (key, record) -> {
-                LoginAttemptRecord currentRecord = record == null ? new LoginAttemptRecord(0, null) : record;
-                return currentRecord.recordFailedAttempt(Instant.now());
-            });
+            LoginAttemptRecord updatedLoginAttemptRecord = recordFailedLoginAttempt(email, Instant.now());
             if (updatedLoginAttemptRecord.failedAttempts() == 5) {
                 logger.warn("Account locked for email: {}", email);
             }
@@ -275,62 +272,129 @@ public class UserService {
         }
     }
 
-    // Handles refresh token rotation.
-    @Transactional
-    public LoginResponse refreshTokens(String refreshToken) {
+    private LoginAttemptRecord getLoginAttemptRecord(String email) {
+        if (stringRedisTemplate == null) {
+            return null;
+        }
         try {
-            // Step 1. Cryptographically validate the incoming token and extract the subject (email).
-            String email = jwtService.validateRefreshToken(refreshToken);
-            User user = userRepository.findFirstByEmailIgnoreCase(email).orElse(null);
-            if (user == null || !user.isVerified()) {
-                return null; // Token is structurally valid, but user is gone/disabled.
-            }
+            String encoded = stringRedisTemplate.opsForValue().get(loginAttemptKey(email));
+            return parseLoginAttemptRecord(encoded);
+        } catch (RuntimeException ex) {
+            logger.warn("Redis unavailable while reading login lockout for {}: {}", email, ex.getMessage());
+            return null;
+        }
+    }
 
-            // Step 2. Verify this specific refresh token's JTI was issued and not yet used
-            String jti = jwtService.extractJti(refreshToken);
-            if (jti == null) {
-                logger.warn("Refresh token missing JTI claim for user: {}", email);
-                return null;
-            }
+    private LoginAttemptRecord recordFailedLoginAttempt(String email, Instant now) {
+        LoginAttemptRecord currentRecord = getLoginAttemptRecord(email);
+        LoginAttemptRecord updatedRecord = (currentRecord == null
+                ? new LoginAttemptRecord(0, null)
+                : currentRecord).recordFailedAttempt(now);
+        if (stringRedisTemplate == null) {
+            return updatedRecord;
+        }
+        try {
+            stringRedisTemplate.opsForValue().set(
+                    loginAttemptKey(email),
+                    encodeLoginAttemptRecord(updatedRecord),
+                    Duration.ofMinutes(20));
+        } catch (RuntimeException ex) {
+            logger.warn("Redis unavailable while writing login lockout for {}: {}", email, ex.getMessage());
+        }
+        return updatedRecord;
+    }
 
-            // Step 3. Look up the expected JTI in our database for this user.
-            VerificationToken storedToken = tokenRepository.findByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN);
+    private void clearLoginAttemptRecord(String email) {
+        if (stringRedisTemplate == null) {
+            return;
+        }
+        try {
+            stringRedisTemplate.delete(loginAttemptKey(email));
+        } catch (RuntimeException ex) {
+            logger.warn("Redis unavailable while clearing login lockout for {}: {}", email, ex.getMessage());
+        }
+    }
 
-            // Step 4. Validate DB record state.
-            if (storedToken == null || storedToken.isUsed() || storedToken.isExpired()) {
-                logger.warn("Refresh token JTI not found or already used for user: {}", email);
-                return null;
-            }
+    private String loginAttemptKey(String email) {
+        return "login-attempt:" + email;
+    }
 
-            // Step 5. Check for Replay Attacks. Compare JTI with DB JTI.
-            if (!jti.equals(storedToken.getToken())) {
-                logger.warn("Refresh token JTI mismatch for user: {} — possible token reuse attack", email);
-                // Invalidate all refresh tokens for this user as a security measure
-                tokenRepository.delete(storedToken);
-                return null;
-            }
+    private String encodeLoginAttemptRecord(LoginAttemptRecord record) {
+        long lockedUntilEpochMillis = record.lockedUntil() == null ? 0L : record.lockedUntil().toEpochMilli();
+        return record.failedAttempts() + ":" + lockedUntilEpochMillis;
+    }
 
-            // Step 6. Mark the current token as used so it can't be submitted again.
-            storedToken.setUsed(true);
-            tokenRepository.save(storedToken);
+    private LoginAttemptRecord parseLoginAttemptRecord(String encoded) {
+        if (encoded == null || encoded.isBlank()) {
+            return null;
+        }
+        String[] parts = encoded.split(":", 2);
+        if (parts.length != 2) {
+            return null;
+        }
+        try {
+            int failedAttempts = Integer.parseInt(parts[0]);
+            long lockedUntilEpochMillis = Long.parseLong(parts[1]);
+            Instant lockedUntil = lockedUntilEpochMillis > 0 ? Instant.ofEpochMilli(lockedUntilEpochMillis) : null;
+            return new LoginAttemptRecord(failedAttempts, lockedUntil);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
 
-            // Step 7. Issue new tokens (rotate refresh token on every use to prevent replay attacks)
-            String newAccessToken  = jwtService.generateToken(email, user.getUsername(), user.getUserId());
-            String newRefreshToken = jwtService.generateRefreshToken(email);
-
-            // Step 8. Store the new refresh token JTI
-            storeRefreshTokenJti(user, newRefreshToken);
-
-            LoginResponse response = new LoginResponse();
-            response.setSuccess(true);
-            response.setMessage("Token refreshed");
-            response.setToken(newAccessToken);
-            response.setRefreshToken(newRefreshToken);
-            return response;
+    // Handles refresh token rotation.
+    public LoginResponse refreshTokens(String refreshToken) {
+        String email;
+        String jti;
+        try {
+            email = jwtService.validateRefreshToken(refreshToken);
+            jti = jwtService.extractJti(refreshToken);
         } catch (Exception e) {
             logger.warn("Refresh token validation failed: {}", e.getMessage());
             return null;
         }
+
+        if (jti == null) {
+            logger.warn("Refresh token missing JTI claim for user: {}", email);
+            return null;
+        }
+
+        return getSelf().rotateRefreshTokens(email, jti);
+    }
+
+    @Transactional
+    public LoginResponse rotateRefreshTokens(String email, String jti) {
+        User user = userRepository.findFirstByEmailIgnoreCase(email).orElse(null);
+        if (user == null || !user.isVerified()) {
+            return null; // Token is structurally valid, but user is gone/disabled.
+        }
+
+        // Look up the expected JTI in our database for this user.
+        VerificationToken storedToken = tokenRepository.findByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN);
+
+        if (storedToken == null || storedToken.isUsed() || storedToken.isExpired()) {
+            logger.warn("Refresh token JTI not found or already used for user: {}", email);
+            return null;
+        }
+
+        if (!jti.equals(storedToken.getToken())) {
+            logger.warn("Refresh token JTI mismatch for user: {} — possible token reuse attack", email);
+            tokenRepository.deleteByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN);
+            return null;
+        }
+
+        // Rotate refresh token on every use. The old JTI disappears from storage,
+        // so replaying the old cookie no longer matches an active record.
+        String newAccessToken  = jwtService.generateToken(email, user.getUsername(), user.getUserId());
+        String newRefreshToken = jwtService.generateRefreshToken(email);
+        storeRefreshTokenJti(user, newRefreshToken);
+
+        LoginResponse response = new LoginResponse();
+        response.setSuccess(true);
+        response.setMessage("Token refreshed");
+        response.setToken(newAccessToken);
+        response.setRefreshToken(newRefreshToken);
+        return response;
     }
 
     /**
@@ -341,13 +405,9 @@ public class UserService {
         String jti = jwtService.extractJti(refreshToken);
         if (jti == null) return;
 
-        // Step 1. Remove the existing REFRESH_TOKEN record
-        // This enforces a strict 1-to-1 relationship (one active refresh session per user).
-        VerificationToken existing = tokenRepository.findByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN);
-        if (existing != null) {
-            tokenRepository.delete(existing);
-            tokenRepository.flush();
-        }
+        // Step 1. Remove the existing REFRESH_TOKEN record. The bulk delete is
+        // idempotent, so stale cleanup/logout races do not poison this transaction.
+        tokenRepository.deleteByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN);
 
         // Step 2. Build and save the new record tracking this specific JTI.
         VerificationToken jtiRecord = new VerificationToken();
@@ -365,13 +425,8 @@ public class UserService {
             return;
         }
 
-        userRepository.findFirstByEmailIgnoreCase(email).ifPresent(user -> {
-            VerificationToken existing = tokenRepository.findByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN);
-            if (existing != null) {
-                tokenRepository.delete(existing);
-                tokenRepository.flush();
-            }
-        });
+        userRepository.findFirstByEmailIgnoreCase(email)
+                .ifPresent(user -> tokenRepository.deleteByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN));
     }
 
     // Generates and dispatches a new OTP for account verification.
@@ -594,11 +649,7 @@ public class UserService {
     @Transactional
     public void logoutAllSessions(String email) {
         User user = getUserByEmail(email);
-        VerificationToken existing = tokenRepository.findByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN);
-        if (existing != null) {
-            tokenRepository.delete(existing);
-            tokenRepository.flush();
-        }
+        tokenRepository.deleteByUserAndTokenType(user, VerificationToken.TokenType.REFRESH_TOKEN);
     }
 
     private void validateGithubUsernameUniqueness(User currentUser, String githubUsername) {
@@ -638,11 +689,11 @@ public class UserService {
      */
     public User getUserByEmail(String email) {
         if (email == null || email.isBlank()) {
-            throw new RuntimeException("User email is required");
+            throw new IllegalArgumentException("User email is required");
         }
 
         return userRepository.findFirstByEmailIgnoreCase(email.toLowerCase())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
     // Updates specific user details (specifically fullName for now).
@@ -651,7 +702,7 @@ public class UserService {
         // Step 1. Fetch the user.
         User user = userRepository.findFirstByEmailIgnoreCase(email.toLowerCase()).orElse(null);
         if (user == null) {
-            throw new RuntimeException("User not found");
+            throw new ResourceNotFoundException("User not found");
         }
 
         // Step 2. Validate incoming data.
@@ -676,7 +727,7 @@ public class UserService {
     public User updateUserProfile(String email, UpdateProfileRequest request) {
         // Step 1. Fetch user.
         User user = userRepository.findFirstByEmailIgnoreCase(email.toLowerCase())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         // Step 2. Selectively apply updates. Null checks ensure we don't overwrite existing data with null.
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
@@ -718,11 +769,15 @@ public class UserService {
      * Automatically handles the cleanup of the user's old profile picture to save AWS storage costs.
      */
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "userProfile", key = "#email"),
+            @CacheEvict(value = "userPhotoUrls", allEntries = true)
+    })
     public String uploadProfilePicture(String email, MultipartFile file) {
         // Step 1. Validate User exists.
         User user = userRepository.findFirstByEmailIgnoreCase(email.toLowerCase()).orElse(null);
         if (user == null) {
-            throw new RuntimeException("User not found");
+            throw new ResourceNotFoundException("User not found");
         }
 
         // Step 2. Hard validation on file size (25MB limit).

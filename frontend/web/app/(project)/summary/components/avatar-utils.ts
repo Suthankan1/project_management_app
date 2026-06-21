@@ -1,25 +1,7 @@
-import { getApiBaseUrl } from '@/lib/api-base-url';
-
-const API_BASE_URL = getApiBaseUrl();
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 export function resolveSummaryAvatarUrl(profilePicUrl?: string | null): string | null {
-  const value = typeof profilePicUrl === 'string' ? profilePicUrl.trim() : '';
-
-  if (!value) return null;
-
-  if (
-    value.startsWith('http://') ||
-    value.startsWith('https://') ||
-    value.startsWith('data:') ||
-    value.startsWith('blob:')
-  ) {
-    return value;
-  }
-
-  const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
-  const path = value.startsWith('/') ? value : `/${value}`;
-
-  return `${baseUrl}${path}`;
+  return resolveProfilePhotoUrl(profilePicUrl);
 }
 
 export function getInitials(name?: string | null): string {

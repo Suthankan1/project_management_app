@@ -6,7 +6,7 @@ import { Task, TeamMemberInfo } from '@/types';
 import MotionWrapper from '../MotionWrapper';
 import { Briefcase } from 'lucide-react';
 import useSWR from 'swr';
-import { projectsApi, authApi } from '@/services/api-contract';
+import { projectsApi } from '@/services/api-contract';
 
 import { WorkloadEntry } from './types';
 import { WorkloadPieChart } from './WorkloadPieChart';
@@ -25,14 +25,6 @@ const COLORS = [
   'var(--cu-primary-light)',
   'var(--cu-warning)',
 ];
-interface UserProfileItem {
-  userId: number;
-  email?: string;
-  username?: string;
-  fullName?: string;
-  profilePicUrl?: string;
-}
-
 export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: number | string; tasks: Task[] }) {
   const [activeIndex, setActiveIndex] = useState(-1);
   // Fetch members
@@ -40,27 +32,6 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
     projectId ? `project-members:${projectId}` : null,
     () => projectsApi.getMembers(projectId) as unknown as Promise<TeamMemberInfo[]>
   );
-
-  // Fetch user profiles globally to resolve mis-mapped avatars
-  const { data: usersData = [] } = useSWR<UserProfileItem[]>(
-    members.length > 0 ? 'auth-users' : null,
-    () => authApi.getAllUsers() as unknown as Promise<UserProfileItem[]>
-  );
-
-  const userProfiles = useMemo<Record<string, string>>(() => {
-    if (!usersData || usersData.length === 0) return {};
-    const profilesMap: Record<string, string> = {};
-    usersData.forEach((u) => {
-      const fullUrl = resolveSummaryAvatarUrl(u.profilePicUrl);
-      if (!fullUrl) return;
-
-      profilesMap[`id:${profileLookupKey(u.userId)}`] = fullUrl;
-      if (u.email) profilesMap[`email:${profileLookupKey(u.email)}`] = fullUrl;
-      if (u.username) profilesMap[`username:${profileLookupKey(u.username)}`] = fullUrl;
-      if (u.fullName) profilesMap[`fullname:${profileLookupKey(u.fullName)}`] = fullUrl;
-    });
-    return profilesMap;
-  }, [usersData]);
 
   const workloadData = useMemo(() => {
     const workloads: Record<string, Omit<WorkloadEntry, 'value' | 'color'>> = {};
@@ -71,13 +42,7 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
     members.forEach(m => {
       const memberName = m.user.fullName || m.user.username || 'Unknown member';
       const workloadKey = `M_${m.id}`;
-      const profileUrl =
-        resolveSummaryAvatarUrl(m.user.profilePicUrl) ||
-        userProfiles[`id:${profileLookupKey(m.user.userId)}`] ||
-        userProfiles[`email:${profileLookupKey(m.user.email)}`] ||
-        userProfiles[`username:${profileLookupKey(m.user.username)}`] ||
-        userProfiles[`fullname:${profileLookupKey(memberName)}`] ||
-        null;
+      const profileUrl = resolveSummaryAvatarUrl(m.user.profilePicUrl);
 
       workloadByMemberId[profileLookupKey(m.id)] = workloadKey;
       workloadByUserId[profileLookupKey(m.user.userId)] = workloadKey;
@@ -87,6 +52,7 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
       });
 
       workloads[workloadKey] = {
+        key: workloadKey,
         isMember: true,
         id: m.id,
         name: memberName,
@@ -113,9 +79,10 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
       } else if (assigneeNameKey && workloadByName[assigneeNameKey]) {
         key = workloadByName[assigneeNameKey];
       } else if (displayAssigneeName) {
-        key = `O_${displayAssigneeName}`;
+        key = assigneeIdKey ? `O_ID_${assigneeIdKey}` : `O_${assigneeNameKey || displayAssigneeName}`;
         if (!workloads[key]) {
           workloads[key] = {
+            key,
             isMember: false,
             name: displayAssigneeName,
             avatar: resolveSummaryAvatarUrl(t.assigneePhotoUrl || t.assignee?.avatar || t.assignee?.profilePicUrl),
@@ -126,6 +93,7 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
       } else {
         if (!workloads["UNASSIGNED"]) {
           workloads["UNASSIGNED"] = {
+            key: "UNASSIGNED",
             isMember: false,
             name: 'Unassigned',
             tasks: 0, completed: 0, overdue: 0
@@ -148,7 +116,7 @@ export function WorkloadDistribution({ projectId, tasks = [] }: { projectId: num
         value: data.tasks,
         color: COLORS[index % COLORS.length]
       }));
-  }, [members, tasks, userProfiles]);
+  }, [members, tasks]);
 
   const activeWorkloadData = useMemo(() => workloadData.filter(d => d.value > 0), [workloadData]);
 

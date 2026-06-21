@@ -28,6 +28,7 @@ import {
   clearProjectGitHubRepo,
   hasConnectedGitHubAccount,
   fetchRepositories,
+  fetchGitHubConnectionStatus,
   fetchGitHubUser,
   fetchPullRequest,
   fetchPullRequests,
@@ -61,38 +62,41 @@ const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
 // ── Shared glass style tokens ─────────────────────────────────────────────────
 const glass = {
   card: {
-    background: 'rgba(255,255,255,0.04)',
-    backdropFilter: 'blur(20px) saturate(180%)',
-    border: '1px solid rgba(255,255,255,0.09)',
-    boxShadow: '0 4px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07)',
+    background: 'var(--cu-bg)',
+    border: '1px solid var(--cu-border)',
+    boxShadow: 'var(--cu-shadow-sm)',
   },
   cardHover: {
-    boxShadow: '0 12px 40px rgba(99,102,241,0.18), inset 0 1px 0 rgba(255,255,255,0.1)',
+    boxShadow: 'var(--cu-shadow-md)',
   },
   modal: {
-    background: 'rgba(10,15,35,0.88)',
+    background: 'var(--cu-bg)',
     backdropFilter: 'blur(28px) saturate(180%)',
-    border: '1px solid rgba(255,255,255,0.11)',
-    boxShadow: '0 24px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)',
+    border: '1px solid var(--cu-border)',
+    boxShadow: 'var(--cu-shadow-xl)',
   },
   button: {
-    background: 'rgba(255,255,255,0.06)',
-    backdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'var(--cu-bg)',
+    border: '1px solid var(--cu-border)',
+    boxShadow: 'var(--cu-shadow-sm)',
   },
   buttonActive: {
-    background: 'rgba(99,102,241,0.22)',
-    backdropFilter: 'blur(12px)',
-    border: '1px solid rgba(99,102,241,0.32)',
-    boxShadow: '0 0 18px rgba(99,102,241,0.2), inset 0 1px 0 rgba(255,255,255,0.12)',
+    background: 'var(--cu-primary)',
+    border: '1px solid var(--cu-primary)',
+    boxShadow: 'var(--cu-shadow-sm)',
   },
   input: {
-    background: 'rgba(255,255,255,0.05)',
-    backdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'var(--cu-bg-secondary)',
+    border: '1px solid var(--cu-border)',
   },
-  divider: { borderColor: 'rgba(255,255,255,0.07)' },
+  divider: { borderBottom: '1px solid var(--cu-border)' },
 } as const;
+
+const iconSurfaceClass = 'bg-cu-bg-secondary text-cu-text-secondary border border-cu-border shadow-cu-sm';
+const panelClass = 'rounded-2xl border border-cu-border bg-cu-bg px-4 py-4 shadow-cu-sm';
+const secondaryButtonClass = 'rounded-xl border border-cu-border bg-cu-bg px-3 py-2 font-outfit font-semibold text-cu-text-secondary shadow-cu-sm transition-colors hover:bg-cu-hover hover:text-cu-text-primary disabled:opacity-40';
+const iconButtonClass = 'rounded-xl border border-cu-border bg-cu-bg p-2 text-cu-text-secondary shadow-cu-sm transition-colors hover:bg-cu-hover hover:text-cu-text-primary disabled:opacity-40';
+const githubConnectRequiredMessage = 'Connect your GitHub account to load repository activity.';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function timeAgo(dateStr: string): string {
@@ -173,23 +177,23 @@ function DisconnectedView({
           transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
           className="relative w-[88px] h-[88px] rounded-[28px] flex items-center justify-center"
           style={{
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 100%)',
+            background: 'linear-gradient(135deg, var(--cu-bg-secondary) 0%, var(--cu-bg) 100%)',
             backdropFilter: 'blur(24px) saturate(200%)',
-            border: '1px solid rgba(255,255,255,0.18)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.18)',
+            border: '1px solid var(--cu-border)',
+            boxShadow: 'var(--cu-shadow-lg), inset 0 1px 0 var(--cu-border)',
           }}
         >
-          <GitHubMark size={42} className="text-white" />
+          <GitHubMark size={42} className="text-cu-text-primary" />
         </motion.div>
       </div>
 
       {isPostLogout ? (
         <>
           <div className="flex flex-col gap-2.5">
-            <h2 className="text-[22px] font-outfit font-black text-white tracking-tight">
+            <h2 className="text-[22px] font-outfit font-black text-cu-text-primary tracking-tight">
               Choose a GitHub account
             </h2>
-            <p className="text-sm text-slate-400 font-outfit leading-relaxed">
+            <p className="text-sm text-cu-text-secondary font-outfit leading-relaxed">
               You&apos;ll be redirected to GitHub to sign in. If you have multiple accounts you&apos;ll see a picker.
             </p>
           </div>
@@ -207,9 +211,9 @@ function DisconnectedView({
                 className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5"
                 style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)' }}
               >
-                <User size={11} className="text-indigo-300" />
+                <User size={11} className="text-indigo-600 dark:text-indigo-300" />
               </div>
-              <span className="text-sm text-slate-300 font-outfit text-left leading-relaxed">
+              <span className="text-sm text-cu-text-secondary font-outfit text-left leading-relaxed">
                 Your previous account has been disconnected. Sign in with any GitHub account.
               </span>
             </div>
@@ -221,7 +225,7 @@ function DisconnectedView({
             whileTap={{ scale: 0.97 }}
             className="flex items-center gap-3 px-8 py-3.5 rounded-2xl font-outfit font-bold text-[15px] text-white w-full justify-center"
             style={{
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.7) 0%, rgba(168,85,247,0.6) 100%)',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.8) 0%, rgba(168,85,247,0.7) 100%)',
               backdropFilter: 'blur(16px)',
               border: '1px solid rgba(255,255,255,0.2)',
               boxShadow: '0 4px 28px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
@@ -234,10 +238,10 @@ function DisconnectedView({
       ) : (
         <>
           <div className="flex flex-col gap-2.5">
-            <h2 className="text-[22px] font-outfit font-black text-white tracking-tight">
+            <h2 className="text-[22px] font-outfit font-black text-cu-text-primary tracking-tight">
               Connect to GitHub
             </h2>
-            <p className="text-sm text-slate-400 font-outfit leading-relaxed">
+            <p className="text-sm text-cu-text-secondary font-outfit leading-relaxed">
               Link this project to a GitHub repository to track pull requests, commits, and issues.
             </p>
           </div>
@@ -245,10 +249,10 @@ function DisconnectedView({
           <div
             className="flex flex-col gap-3 w-full rounded-2xl p-5"
             style={{
-              background: 'rgba(255,255,255,0.03)',
+              background: 'var(--cu-bg-secondary)',
               backdropFilter: 'blur(16px)',
-              border: '1px solid rgba(255,255,255,0.07)',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+              border: '1px solid var(--cu-border)',
+              boxShadow: 'inset 0 1px 0 var(--cu-border)',
             }}
           >
             {[
@@ -258,13 +262,13 @@ function DisconnectedView({
             ].map(item => (
               <div key={item.text} className="flex items-center gap-3">
                 <div
-                  className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-emerald-400"
-                  style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)' }}
+                  className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-emerald-600 dark:text-emerald-400"
+                  style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}
                 >
                   {item.icon}
                 </div>
-                <span className="text-sm text-slate-300 font-outfit flex-1 text-left">{item.text}</span>
-                <Check size={13} className="text-emerald-400 shrink-0" strokeWidth={2.5} />
+                <span className="text-sm text-cu-text-secondary font-outfit flex-1 text-left">{item.text}</span>
+                <Check size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" strokeWidth={2.5} />
               </div>
             ))}
           </div>
@@ -275,10 +279,10 @@ function DisconnectedView({
             whileTap={{ scale: 0.97 }}
             className="flex items-center gap-3 px-8 py-3.5 rounded-2xl font-outfit font-bold text-[15px] text-white w-full justify-center"
             style={{
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.06) 100%)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255,255,255,0.22)',
-              boxShadow: '0 4px 28px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2)',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.8) 0%, rgba(168,85,247,0.7) 100%)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              boxShadow: '0 4px 28px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
             }}
           >
             <GitHubMark size={18} className="text-white" />
@@ -289,7 +293,7 @@ function DisconnectedView({
 
       <button
         onClick={onLogout}
-        className="flex items-center gap-1.5 text-xs font-outfit font-semibold text-red-400/70 hover:text-red-400 transition-colors"
+        className="flex items-center gap-1.5 text-xs font-outfit font-semibold text-red-500 dark:text-red-400/70 hover:text-red-600 dark:hover:text-red-400 transition-colors"
       >
         <LogOut size={12} />
         Logout from GitHub
@@ -297,11 +301,10 @@ function DisconnectedView({
 
       {!GITHUB_CLIENT_ID && (
         <div
-          className="w-full rounded-xl px-4 py-3"
-          style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)' }}
+          className="w-full rounded-xl px-4 py-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30"
         >
-          <p className="text-xs text-amber-300 font-outfit">
-            Set <code className="font-mono">NEXT_PUBLIC_GITHUB_CLIENT_ID</code> to enable GitHub OAuth.
+          <p className="text-xs text-amber-800 dark:text-amber-300 font-outfit">
+            Set <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 py-0.5 rounded">NEXT_PUBLIC_GITHUB_CLIENT_ID</code> to enable GitHub OAuth.
           </p>
         </div>
       )}
@@ -338,15 +341,15 @@ function PRCard({ pr }: { pr: GitHubPullRequest }) {
         </span>
       </div>
 
-      <p className="text-sm font-outfit font-semibold text-slate-100 leading-snug line-clamp-2 group-hover:text-indigo-300 transition-colors">
+      <p className="text-sm font-outfit font-semibold text-cu-text-primary leading-snug line-clamp-2 group-hover:text-cu-primary transition-colors">
         {pr.title}
       </p>
 
-      <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-outfit">
+      <div className="flex items-center gap-1.5 text-[11px] text-cu-text-muted font-outfit">
         <GitBranch size={11} />
-        <span className="font-semibold text-slate-400">{pr.head.ref}</span>
-        <span className="text-slate-700">→</span>
-        <span className="text-slate-500">{pr.base.ref}</span>
+        <span className="font-semibold text-cu-text-secondary">{pr.head.ref}</span>
+        <span className="text-cu-text-muted">→</span>
+        <span className="text-cu-text-secondary">{pr.base.ref}</span>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
@@ -356,10 +359,10 @@ function PRCard({ pr }: { pr: GitHubPullRequest }) {
             alt={pr.user.login}
             width={18}
             height={18}
-            className="rounded-full ring-1 ring-white/10"
+            className="h-[18px] w-[18px] rounded-full ring-1 ring-white/10"
             unoptimized
           />
-          <span className="text-[11px] text-slate-500 font-outfit">@{pr.user.login}</span>
+          <span className="text-[11px] text-cu-text-tertiary font-outfit">@{pr.user.login}</span>
         </div>
         {pr.labels.slice(0, 3).map(label => (
           <span
@@ -400,8 +403,7 @@ function CommitCard({ commit }: { commit: GitHubCommit }) {
     >
       <div className="flex items-center gap-2">
         <span
-          className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-slate-400 px-2 py-0.5 rounded-lg"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+          className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-cu-text-secondary px-2 py-0.5 rounded-lg bg-cu-bg-secondary border border-cu-border"
         >
           <GitCommit size={11} />
           {shortSha}
@@ -411,22 +413,22 @@ function CommitCard({ commit }: { commit: GitHubCommit }) {
         </span>
       </div>
 
-      <p className="text-sm font-outfit font-semibold text-slate-100 leading-snug line-clamp-2 group-hover:text-indigo-300 transition-colors">
+      <p className="text-sm font-outfit font-semibold text-cu-text-primary leading-snug line-clamp-2 group-hover:text-cu-primary transition-colors">
         {firstLine}
       </p>
 
       <div className="flex items-center gap-1.5">
         {avatarUrl ? (
-          <Image src={avatarUrl} alt={authorName} width={18} height={18} className="rounded-full ring-1 ring-white/10" unoptimized />
+          <Image src={avatarUrl} alt={authorName} width={18} height={18} className="h-[18px] w-[18px] rounded-full ring-1 ring-white/10" unoptimized />
         ) : (
           <div
             className="w-[18px] h-[18px] rounded-full flex items-center justify-center shrink-0"
             style={{ background: 'rgba(255,255,255,0.08)' }}
           >
-            <User size={10} className="text-slate-400" />
+            <User size={10} className="text-cu-text-tertiary" />
           </div>
         )}
-        <span className="text-[11px] text-slate-500 font-outfit">@{authorName}</span>
+        <span className="text-[11px] text-cu-text-tertiary font-outfit">@{authorName}</span>
       </div>
     </motion.a>
   );
@@ -460,20 +462,20 @@ function AccountDropdown({
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(p => !p)}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all hover:bg-white/[0.06]"
+        className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all hover:bg-cu-hover"
         style={glass.button}
       >
         {user?.avatar_url ? (
-          <Image src={user.avatar_url} alt={user.login} width={20} height={20} className="rounded-full ring-1 ring-white/15" unoptimized />
+          <Image src={user.avatar_url} alt={user.login} width={20} height={20} className="h-5 w-5 rounded-full ring-1 ring-white/15" unoptimized />
         ) : (
           <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center">
-            <User size={11} className="text-slate-300" />
+            <User size={11} className="text-cu-text-tertiary" />
           </div>
         )}
-        <span className="text-xs font-outfit font-semibold text-slate-200 hidden sm:inline">
+        <span className="text-xs font-outfit font-semibold text-cu-text-primary hidden sm:inline">
           {user?.login ?? 'Account'}
         </span>
-        <ChevronDown size={12} className={`text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown size={12} className={`text-cu-text-tertiary transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
 
       <AnimatePresence>
@@ -486,20 +488,20 @@ function AccountDropdown({
             className="absolute right-0 top-full mt-2 w-64 rounded-2xl overflow-hidden z-[300]"
             style={glass.modal}
           >
-            <div className="px-4 py-3.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="px-4 py-3.5" style={glass.divider}>
               <div className="flex items-center gap-3">
                 {user?.avatar_url ? (
-                  <Image src={user.avatar_url} alt={user.login} width={38} height={38} className="rounded-full ring-2 ring-white/10" unoptimized />
+                  <Image src={user.avatar_url} alt={user.login} width={38} height={38} className="h-[38px] w-[38px] rounded-full ring-2 ring-white/10" unoptimized />
                 ) : (
                   <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
-                    <User size={16} className="text-slate-300" />
+                    <User size={16} className="text-cu-text-tertiary" />
                   </div>
                 )}
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-outfit font-bold text-slate-100 truncate">
+                  <span className="text-sm font-outfit font-bold text-cu-text-primary truncate">
                     {user?.name ?? user?.login ?? '—'}
                   </span>
-                  <span className="text-xs text-slate-500 font-outfit truncate">@{user?.login}</span>
+                  <span className="text-xs text-cu-text-tertiary font-outfit truncate">@{user?.login}</span>
                 </div>
               </div>
               {user && (
@@ -519,9 +521,9 @@ function AccountDropdown({
               {canChangeRepo && (
                 <button
                   onClick={() => { setOpen(false); onChangeRepo(); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-outfit font-semibold text-slate-300 hover:bg-white/[0.05] transition-colors text-left"
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-outfit font-semibold text-cu-text-secondary hover:bg-cu-hover hover:text-cu-text-primary transition-colors text-left"
                 >
-                  <Link2 size={14} className="text-slate-500" />
+                  <Link2 size={14} className="text-cu-text-tertiary" />
                   Change repository
                 </button>
               )}
@@ -572,36 +574,33 @@ function RepoModal({
       >
         <div
           className="flex items-center justify-between px-5 py-4"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+          style={glass.divider}
         >
           <div className="flex items-center gap-2.5">
-            <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
-            >
-              <GitHubMark size={15} className="text-white" />
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${iconSurfaceClass}`}>
+              <GitHubMark size={15} className="text-cu-text-primary" />
             </div>
-            <span className="font-outfit font-bold text-slate-100 text-base">Select a repository</span>
+            <span className="font-outfit font-bold text-cu-text-primary text-base">Select a repository</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={onRefresh}
               disabled={loading}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.06] transition-colors disabled:opacity-40"
+              className="p-1.5 rounded-lg text-cu-text-secondary hover:text-cu-text-primary hover:bg-cu-hover transition-colors disabled:opacity-40"
               title="Refresh"
             >
               <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.06] transition-colors"
+              className="p-1.5 rounded-lg text-cu-text-secondary hover:text-cu-text-primary hover:bg-cu-hover transition-colors"
             >
               <X size={15} />
             </button>
           </div>
         </div>
 
-        <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="px-4 py-3" style={glass.divider}>
           <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={glass.input}>
             <Search size={14} className="text-slate-500 shrink-0" />
             <input
@@ -610,7 +609,7 @@ function RepoModal({
               placeholder="Search repositories…"
               value={search}
               onChange={e => onSearch(e.target.value)}
-              className="flex-1 text-sm font-outfit bg-transparent outline-none text-slate-200 placeholder:text-slate-600"
+              className="flex-1 text-sm font-outfit bg-transparent outline-none text-cu-text-primary placeholder:text-cu-text-muted"
             />
             {search && (
               <button onClick={() => onSearch('')} className="text-slate-500 hover:text-slate-300 transition-colors">
@@ -652,16 +651,15 @@ function RepoModal({
                 <li key={repo.id}>
                   <button
                     onClick={() => onSelect(repo)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors text-left group"
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-cu-hover transition-colors text-left group"
                   >
                     <div
-                      className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-white/[0.1] transition-colors"
-                      style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${iconSurfaceClass}`}
                     >
-                      <GitHubMark size={14} className="text-slate-300" />
+                      <GitHubMark size={14} className="text-cu-text-secondary" />
                     </div>
                     <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-sm font-outfit font-semibold text-slate-200 truncate">{repo.full_name}</span>
+                      <span className="text-sm font-outfit font-semibold text-cu-text-primary truncate">{repo.full_name}</span>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="flex items-center gap-1 text-[11px] text-slate-500 font-outfit">
                           <GitBranch size={10} />{repo.default_branch}
@@ -714,20 +712,19 @@ function AccountPickerModal({
       >
         <div
           className="flex items-center justify-between px-5 py-4"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+          style={{ borderBottom: '1px solid var(--cu-border)' }}
         >
           <div className="flex items-center gap-2.5">
             <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${iconSurfaceClass}`}
             >
-              <GitHubMark size={13} className="text-white" />
+              <GitHubMark size={13} className="text-cu-text-primary" />
             </div>
-            <h2 className="text-sm font-outfit font-bold text-slate-100">Choose a GitHub account</h2>
+            <h2 className="text-sm font-outfit font-bold text-cu-text-primary">Choose a GitHub account</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:bg-white/[0.06] hover:text-slate-200 transition-colors"
+            className="p-1.5 rounded-lg text-cu-text-secondary hover:bg-cu-hover hover:text-cu-text-primary transition-colors"
           >
             <X size={15} />
           </button>
@@ -738,38 +735,38 @@ function AccountPickerModal({
             <button
               key={account.login}
               onClick={() => onSelect(account.login)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors group text-left"
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-cu-hover transition-colors group text-left"
             >
               <Image
                 src={account.avatarUrl}
                 alt={account.login}
                 width={36}
                 height={36}
-                className="rounded-full flex-shrink-0 ring-2 ring-white/10"
+                className="h-9 w-9 flex-shrink-0 rounded-full ring-2 ring-cu-border/50"
                 unoptimized
               />
               <div className="flex flex-col min-w-0 flex-1">
                 {account.name && (
-                  <span className="text-sm font-outfit font-semibold text-slate-200 truncate leading-tight">
+                  <span className="text-sm font-outfit font-semibold text-cu-text-primary truncate leading-tight">
                     {account.name}
                   </span>
                 )}
-                <span className="text-xs text-slate-500 font-outfit truncate">@{account.login}</span>
+                <span className="text-xs text-cu-text-tertiary font-outfit truncate">@{account.login}</span>
               </div>
-              <span className="text-xs font-outfit font-semibold text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <span className="text-xs font-outfit font-semibold text-cu-primary opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                 Connect →
               </span>
             </button>
           ))}
         </div>
 
-        <div className="px-4 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="px-4 py-3" style={{ borderTop: '1px solid var(--cu-border)' }}>
           <button
             onClick={onAddAccount}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-outfit font-semibold text-slate-300 hover:text-slate-100 hover:bg-white/[0.06] transition-all"
-            style={{ border: '1px solid rgba(255,255,255,0.09)' }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-outfit font-semibold text-cu-text-secondary hover:text-cu-text-primary hover:bg-cu-hover transition-all"
+            style={{ border: '1px solid var(--cu-border)' }}
           >
-            <User size={13} className="text-slate-500" />
+            <User size={13} className="text-cu-text-tertiary" />
             Use a different account
           </button>
         </div>
@@ -868,7 +865,7 @@ function IssueFilterDropdown({
         <button
           type="button"
           aria-label={ariaLabel}
-          className="flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-left text-xs font-outfit font-medium text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-white focus:border-blue-400 focus:outline-none sm:px-3 sm:py-2.5 sm:text-sm"
+          className="flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-cu-border bg-cu-bg-secondary px-2.5 py-2 text-left text-xs font-outfit font-medium text-cu-text-secondary shadow-cu-sm transition-colors hover:bg-cu-hover hover:text-cu-text-primary focus:border-cu-primary focus:outline-none sm:px-3 sm:py-2.5 sm:text-sm"
         >
           <span className="min-w-0 truncate">
             {selected?.label ?? label}
@@ -890,8 +887,8 @@ function IssueFilterDropdown({
                 setOpen(false);
               }}
               className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${isSelected
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  ? 'bg-cu-primary text-white'
+                  : 'text-cu-text-secondary hover:bg-cu-hover hover:text-cu-text-primary'
                 }`}
             >
               <span className="min-w-0 truncate">{option.label}</span>
@@ -970,9 +967,9 @@ function IssuesPanel({
     <div className="flex flex-col gap-4 min-w-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-outfit font-bold text-slate-300">Issues</h2>
+          <h2 className="text-sm font-outfit font-bold text-cu-text-primary">Issues</h2>
           {!loading && !error && (
-            <span className="text-sm text-slate-400 font-outfit">
+            <span className="text-sm text-cu-text-secondary font-outfit">
               ({filtersActive ? `${filteredIssues.length} of ` : ''}{issues.length})
             </span>
           )}
@@ -981,17 +978,17 @@ function IssuesPanel({
           type="button"
           onClick={onRefresh}
           disabled={loading}
-          className="inline-flex items-center justify-center self-start rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:opacity-40 sm:self-auto"
+          className={`${iconButtonClass} inline-flex items-center justify-center self-start sm:self-auto`}
           title="Refresh issues"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+      <div className="rounded-2xl border border-cu-border bg-cu-bg px-3 py-3 shadow-cu-sm">
         <div className="flex items-center gap-2">
-          <SlidersHorizontal size={14} className="text-slate-400" />
-          <span className="text-xs font-outfit font-semibold uppercase tracking-wide text-slate-500">Filters</span>
+          <SlidersHorizontal size={14} className="text-cu-text-tertiary" />
+          <span className="text-xs font-outfit font-semibold uppercase tracking-wide text-cu-text-tertiary">Filters</span>
           {filtersActive && (
             <button
               type="button"
@@ -1036,7 +1033,7 @@ function IssuesPanel({
                   setStateFilter('all');
                   setLabelFilter('');
                 }}
-                className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-outfit font-semibold text-slate-600 transition-colors hover:bg-slate-50 sm:min-w-[5rem]"
+              className={`${secondaryButtonClass} inline-flex w-full items-center justify-center py-2.5 text-sm sm:min-w-[5rem]`}
               >
                 Clear
               </button>
@@ -1080,8 +1077,8 @@ function IssuesPanel({
 
       {!loading && !error && issues.length === 0 && (
         <div className="flex flex-col items-center gap-2 py-10">
-          <AlertCircle size={20} className="text-slate-700" />
-          <p className="text-xs text-slate-500 font-outfit">No issues found</p>
+          <AlertCircle size={20} className="text-cu-text-tertiary" />
+          <p className="text-xs text-cu-text-secondary font-outfit">No issues found</p>
         </div>
       )}
 
@@ -1182,6 +1179,7 @@ function ConnectedDashboard({
   canChangeRepo: boolean;
 }) {
   const { notifications: globalNotifications, markAsRead } = useGlobalNotifications();
+  const needsGitHubConnect = !hasConnectedGitHubAccount();
   type LiveNotice = {
     id: string;
     message: string;
@@ -1307,16 +1305,16 @@ function ConnectedDashboard({
             boxShadow: '0 0 24px rgba(99,102,241,0.12), inset 0 1px 0 rgba(255,255,255,0.08)',
           }}
         >
-          <GitHubMark size={14} className="text-white" />
-          <span className="text-xs font-outfit font-bold text-slate-100 truncate max-w-[180px] sm:max-w-[240px]">
+          <GitHubMark size={14} className="text-cu-text-primary" />
+          <span className="text-xs font-outfit font-bold text-cu-text-primary truncate max-w-[180px] sm:max-w-[240px]">
             {connection.repoFullName}
           </span>
-          <span className={`flex items-center gap-1 text-[10px] font-outfit px-1.5 py-0.5 rounded-full ${connection.private ? 'bg-slate-700 text-slate-300' : 'bg-blue-500/20 text-blue-300'
+          <span className={`flex items-center gap-1 text-[10px] font-outfit px-1.5 py-0.5 rounded-full ${connection.private ? 'bg-cu-bg-tertiary text-cu-text-secondary' : 'bg-cu-primary/10 text-cu-primary'
             }`}>
             {connection.private ? <Lock size={8} /> : <Globe size={8} />}
             {connection.private ? 'Private' : 'Public'}
           </span>
-          <span className="hidden sm:flex items-center gap-1 text-[10px] font-outfit text-slate-600">
+          <span className="hidden sm:flex items-center gap-1 text-[10px] font-outfit text-cu-text-tertiary">
             <GitBranch size={10} />
             {connection.defaultBranch}
           </span>
@@ -1330,7 +1328,7 @@ function ConnectedDashboard({
             onClick={onRefresh}
             disabled={loading}
             title="Refresh"
-            className="p-2 rounded-xl transition-all text-slate-400 hover:text-slate-200 hover:bg-white/[0.07] disabled:opacity-40"
+            className="p-2 rounded-xl transition-all text-cu-text-secondary hover:text-cu-text-primary hover:bg-cu-hover disabled:opacity-40"
             style={glass.button}
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -1338,7 +1336,7 @@ function ConnectedDashboard({
           {canChangeRepo && (
             <button
               onClick={onChangeRepo}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-outfit font-semibold text-slate-300 hover:text-slate-100 hover:bg-white/[0.07] transition-all"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-outfit font-semibold text-cu-text-secondary hover:text-cu-text-primary hover:bg-cu-hover transition-all"
               style={glass.button}
             >
               <Link2 size={13} />
@@ -1350,13 +1348,13 @@ function ConnectedDashboard({
       </div>
 
       {activityError && (
-        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
           <div className="mt-0.5 rounded-lg bg-amber-100 p-1.5 text-amber-600">
             <AlertCircle size={15} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-outfit font-semibold text-slate-800">GitHub notifications need attention</p>
-            <p className="text-xs font-outfit text-slate-500">{activityError}</p>
+            <p className="text-sm font-outfit font-semibold text-cu-text-primary">GitHub notifications need attention</p>
+            <p className="text-xs font-outfit text-cu-text-secondary">{activityError}</p>
           </div>
           <button
             type="button"
@@ -1369,11 +1367,11 @@ function ConnectedDashboard({
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-4 sm:py-4">
+      <div className={panelClass}>
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="flex items-center gap-2">
-            <Bell size={15} className="text-slate-500" />
-            <span className="text-sm font-outfit font-bold text-slate-800">GitHub notifications</span>
+            <Bell size={15} className="text-cu-text-secondary" />
+            <span className="text-sm font-outfit font-bold text-cu-text-primary">GitHub notifications</span>
             {unreadGithubNotificationCount > 0 && (
               <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-sm">
                 {unreadGithubNotificationCount > 9 ? '9+' : unreadGithubNotificationCount}
@@ -1385,7 +1383,7 @@ function ConnectedDashboard({
               type="button"
               onClick={() => void markAllGitHubNotificationsRead()}
               disabled={unreadGithubNotificationCount === 0}
-              className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-outfit font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40 sm:flex-none"
+              className={`${secondaryButtonClass} flex-1 text-xs sm:flex-none`}
             >
               Mark all as read
             </button>
@@ -1394,7 +1392,7 @@ function ConnectedDashboard({
 
         <div className="mt-4 grid gap-2">
           {recentGithubNotifications.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm text-slate-400 font-outfit">
+            <div className="rounded-2xl border border-dashed border-cu-border bg-cu-bg-secondary px-4 py-5 text-center text-sm text-cu-text-tertiary font-outfit">
               No unread GitHub notifications yet.
             </div>
           ) : (
@@ -1403,11 +1401,11 @@ function ConnectedDashboard({
               return (
                 <div
                   key={notification.id}
-                  className={`flex flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-start ${isUnread ? 'border-blue-100 bg-blue-50/60' : 'border-slate-200 bg-slate-50'}`}
+                  className={`flex flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-start ${isUnread ? 'border-cu-primary/20 bg-cu-primary/10' : 'border-cu-border bg-cu-bg-secondary'}`}
                 >
                   <div className={`mt-1 h-2.5 w-2.5 rounded-full ${isUnread ? 'bg-blue-600' : 'bg-slate-300'}`} />
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-outfit ${isUnread ? 'font-semibold text-slate-800' : 'font-medium text-slate-600'}`}>
+                    <p className={`text-sm font-outfit ${isUnread ? 'font-semibold text-cu-text-primary' : 'font-medium text-cu-text-secondary'}`}>
                       {notification.message}
                     </p>
                     <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -1423,7 +1421,7 @@ function ConnectedDashboard({
                       <button
                         type="button"
                         onClick={() => void markGitHubNotificationRead(notification.id)}
-                        className="text-xs font-outfit font-semibold text-slate-500 hover:text-slate-700"
+                        className="text-xs font-outfit font-semibold text-cu-text-secondary hover:text-cu-text-primary"
                       >
                         Mark read
                       </button>
@@ -1459,13 +1457,13 @@ function ConnectedDashboard({
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 shadow-sm"
+            className="flex items-start gap-3 rounded-2xl border border-cu-primary/20 bg-cu-primary/10 px-4 py-3 shadow-sm"
           >
             <div className="mt-0.5 rounded-lg bg-blue-100 p-1.5 text-blue-600">
               <GitPullRequest size={15} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-outfit font-semibold text-slate-800">
+              <p className="text-sm font-outfit font-semibold text-cu-text-primary">
                 New PR opened: #{newPRNotice.prNumber} {newPRNotice.prTitle}
               </p>
               <a
@@ -1498,14 +1496,14 @@ function ConnectedDashboard({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             className={`flex items-start gap-3 rounded-2xl border px-4 py-3 shadow-sm ${notice.tone === 'danger'
-                ? 'border-red-100 bg-red-50'
+                ? 'border-red-200 bg-red-50 dark:border-red-500/30 dark:bg-red-500/10'
                 : notice.tone === 'success'
-                  ? 'border-emerald-100 bg-emerald-50'
-                  : 'border-slate-200 bg-white'
+                  ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10'
+                  : 'border-cu-border bg-cu-bg'
               }`}
           >
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-outfit font-semibold text-slate-800">{notice.message}</p>
+              <p className="text-sm font-outfit font-semibold text-cu-text-primary">{notice.message}</p>
               <a
                 href={notice.href}
                 target="_blank"
@@ -1527,7 +1525,7 @@ function ConnectedDashboard({
         ))}
       </AnimatePresence>
 
-      <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+      <div className="flex items-center gap-1 rounded-2xl border border-cu-border bg-cu-bg p-1 shadow-cu-sm">
         {([
           { id: 'pullRequests', label: 'Pull Requests', short: 'PRs', icon: <GitPullRequest size={13} /> },
           { id: 'commits', label: 'Commits', short: 'Commits', icon: <GitCommit size={13} /> },
@@ -1543,8 +1541,8 @@ function ConnectedDashboard({
             type="button"
             onClick={() => setActiveTab(tab.id)}
             className={`rounded-xl px-4 py-2 text-sm font-outfit font-semibold transition-colors ${activeTab === tab.id
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                ? 'bg-cu-primary text-white shadow-sm'
+                : 'text-cu-text-secondary hover:bg-cu-hover hover:text-cu-text-primary'
               }`}
           >
             <span className="inline-flex items-center gap-2">
@@ -1567,8 +1565,8 @@ function ConnectedDashboard({
         {activeTab === 'pullRequests' && (
           <div className="flex flex-col gap-3 min-w-0">
             <div className="flex items-center gap-2">
-              <GitPullRequest size={15} className="text-slate-500 shrink-0" />
-              <h2 className="text-sm font-outfit font-bold text-slate-700">
+              <GitPullRequest size={15} className="text-cu-text-secondary shrink-0" />
+              <h2 className="text-sm font-outfit font-bold text-cu-text-primary">
                 Pull Requests
                 {!loading && !prError && (
                   <span className="ml-1.5 text-slate-400 font-normal">({prs.length})</span>
@@ -1592,7 +1590,11 @@ function ConnectedDashboard({
                   <AlertCircle size={16} className="text-red-500" />
                 </div>
                 <p className="text-xs text-slate-500 font-outfit">{prError}</p>
-                <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
+                {needsGitHubConnect || prError.toLowerCase().includes('connect') ? (
+                  <button onClick={onChangeRepo} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Connect to GitHub</button>
+                ) : (
+                  <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
+                )}
               </div>
             )}
 
@@ -1629,8 +1631,8 @@ function ConnectedDashboard({
         {activeTab === 'commits' && (
           <div className="flex flex-col gap-3 min-w-0">
             <div className="flex items-center gap-2">
-              <GitCommit size={15} className="text-slate-500 shrink-0" />
-              <h2 className="text-sm font-outfit font-bold text-slate-700">
+              <GitCommit size={15} className="text-cu-text-secondary shrink-0" />
+              <h2 className="text-sm font-outfit font-bold text-cu-text-primary">
                 Commits
                 {!loading && !commitError && (
                   <span className="ml-1.5 text-slate-400 font-normal">({commits.length})</span>
@@ -1654,7 +1656,11 @@ function ConnectedDashboard({
                   <AlertCircle size={16} className="text-red-500" />
                 </div>
                 <p className="text-xs text-slate-500 font-outfit">{commitError}</p>
-                <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
+                {needsGitHubConnect || commitError.toLowerCase().includes('connect') ? (
+                  <button onClick={onChangeRepo} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Connect to GitHub</button>
+                ) : (
+                  <button onClick={onRefresh} className="text-xs text-blue-600 font-outfit font-semibold hover:underline">Retry</button>
+                )}
               </div>
             )}
 
@@ -1774,6 +1780,26 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     setCommitError(null);
     setIssueError(null);
 
+    let isGitHubConnected = false;
+    try {
+      const status = await fetchGitHubConnectionStatus();
+      isGitHubConnected = status.connected;
+    } catch {
+      isGitHubConnected = false;
+    }
+
+    if (!isGitHubConnected) {
+      setPRs([]);
+      setCommits([]);
+      setIssues([]);
+      setUser(null);
+      setPRError(githubConnectRequiredMessage);
+      setCommitError(githubConnectRequiredMessage);
+      setIssueError(githubConnectRequiredMessage);
+      setLoading(false);
+      return;
+    }
+
     const [prResult, commitResult, issueResult, userResult] = await Promise.allSettled([
       fetchPullRequests(conn.ownerLogin, conn.repoName),
       fetchCommits(conn.ownerLogin, conn.repoName),
@@ -1800,6 +1826,20 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   }, []);
 
   const loadIssues = useCallback(async (conn: ProjectGitHubConnection) => {
+    let isGitHubConnected = false;
+    try {
+      const status = await fetchGitHubConnectionStatus();
+      isGitHubConnected = status.connected;
+    } catch {
+      isGitHubConnected = false;
+    }
+
+    if (!isGitHubConnected) {
+      setIssues([]);
+      setIssueError(githubConnectRequiredMessage);
+      return;
+    }
+
     try {
       const latestIssues = await fetchIssues(conn.repoFullName);
       setIssues(latestIssues);
@@ -1861,6 +1901,12 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
     setLoadingRepos(true);
     setRepoError(null);
     try {
+      const status = await fetchGitHubConnectionStatus();
+      if (!status.connected) {
+        setAllRepos([]);
+        setRepoError(githubConnectRequiredMessage);
+        return;
+      }
       const data = await fetchRepositories();
       setAllRepos(data);
     } catch (err) {
@@ -1900,7 +1946,15 @@ export default function GitHubProjectPage({ projectId }: { projectId: string }) 
   };
 
   const handleOpenModal = async () => {
-    if (!hasConnectedGitHubAccount()) {
+    let isGitHubConnected = false;
+    try {
+      const status = await fetchGitHubConnectionStatus();
+      isGitHubConnected = status.connected;
+    } catch {
+      isGitHubConnected = false;
+    }
+
+    if (!isGitHubConnected) {
       if (savedAccounts.length > 0) setShowAccountPicker(true);
       else handleConnectGitHub();
       return;

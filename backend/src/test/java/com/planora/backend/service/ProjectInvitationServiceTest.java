@@ -25,6 +25,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import com.planora.backend.controller.ProjectMemberController;
 import com.planora.backend.dto.ProjectInviteRequest;
+import com.planora.backend.exception.InvitationExpiredException;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Team;
 import com.planora.backend.model.TeamInvitation;
@@ -145,7 +146,7 @@ class ProjectInvitationServiceTest {
         invitee.setUserId(20L);
         invitee.setEmail("invitee@example.com");
 
-        when(teamInvitationRepository.findByToken("token-1")).thenReturn(Optional.of(invitation));
+        when(teamInvitationRepository.findByTokenWithLock("token-1")).thenReturn(Optional.of(invitation));
         when(userRepository.findById(20L)).thenReturn(Optional.of(invitee));
         when(teamMemberRepository.findByTeamIdAndUserUserId(11L, 20L)).thenReturn(Optional.empty());
 
@@ -156,15 +157,56 @@ class ProjectInvitationServiceTest {
     }
 
     @Test
+    void acceptInvitation_isIdempotentWhenUserAlreadyJoined() {
+        Team team = new Team();
+        team.setId(11L);
+
+        Project project = project(77L, 10L, "creator@example.com");
+        project.setTeam(team);
+        team.setProjects(Set.of(project));
+
+        TeamInvitation invitation = new TeamInvitation();
+        invitation.setToken("token-1");
+        invitation.setEmail("invitee@example.com");
+        invitation.setTeam(team);
+        invitation.setRole("ADMIN");
+        invitation.setStatus("PENDING");
+        invitation.setExpiresAt(LocalDateTime.now().plusDays(1));
+
+        User invitee = new User();
+        invitee.setUserId(20L);
+        invitee.setEmail("invitee@example.com");
+
+        TeamMember existingMember = new TeamMember();
+        existingMember.setTeam(team);
+        existingMember.setUser(invitee);
+        existingMember.setRole(TeamRole.ADMIN);
+
+        when(teamInvitationRepository.findByTokenWithLock("token-1")).thenReturn(Optional.of(invitation));
+        when(userRepository.findById(20L)).thenReturn(Optional.of(invitee));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(11L, 20L)).thenReturn(Optional.of(existingMember));
+
+        projectInvitationService.acceptInvitation("token-1", 20L);
+
+        assertEquals("ACCEPTED", invitation.getStatus());
+        verify(teamInvitationRepository).save(invitation);
+        verify(teamMemberRepository, never()).save(any(TeamMember.class));
+        verify(notificationService, never()).createNotification(any(User.class), anyString(), anyString());
+        verify(simpMessagingTemplate, never()).convertAndSend(anyString(), any(ProjectMemberController.MemberEvent.class));
+    }
+
+    @Test
     void acceptInvitation_rejectsExpired() {
         TeamInvitation invitation = new TeamInvitation();
         invitation.setToken("expired-token");
         invitation.setExpiresAt(LocalDateTime.now().minusDays(1));
         invitation.setTeam(new Team());
 
-        when(teamInvitationRepository.findByToken("expired-token")).thenReturn(Optional.of(invitation));
+        when(teamInvitationRepository.findByTokenWithLock("expired-token")).thenReturn(Optional.of(invitation));
 
-        assertThrows(RuntimeException.class, () -> projectInvitationService.acceptInvitation("expired-token", 20L));
+        assertThrows(InvitationExpiredException.class, () -> projectInvitationService.acceptInvitation("expired-token", 20L));
+        assertEquals("EXPIRED", invitation.getStatus());
+        verify(teamInvitationRepository).save(invitation);
     }
 
     @Test
@@ -179,7 +221,7 @@ class ProjectInvitationServiceTest {
         actualUser.setUserId(20L);
         actualUser.setEmail("actual@example.com");
 
-        when(teamInvitationRepository.findByToken("token-1")).thenReturn(Optional.of(invitation));
+        when(teamInvitationRepository.findByTokenWithLock("token-1")).thenReturn(Optional.of(invitation));
         when(userRepository.findById(20L)).thenReturn(Optional.of(actualUser));
 
         assertThrows(RuntimeException.class, () -> projectInvitationService.acceptInvitation("token-1", 20L));

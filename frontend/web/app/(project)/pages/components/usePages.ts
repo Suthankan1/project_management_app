@@ -19,7 +19,7 @@ interface UsePagesReturn {
   updatePage: (pageId: string | number, title: string, content: string) => Promise<PageItem>;
   deletePage: (pageId: string | number) => Promise<void>;
   refetch: () => Promise<void>;
-  toggleStar: (pageId: string | number) => void;
+  toggleStar: (pageId: string | number) => Promise<void>;
   movePage: (pageId: string | number, parentPageId: string | number | null) => Promise<void>;
 }
 

@@ -48,15 +48,12 @@ export function IssueCard({ issue, onImport, isImported = false }: IssueCardProp
       animate={{ opacity: 1, y: 0 }}
       whileHover={{
         y: -3,
-        boxShadow: '0 12px 40px rgba(99,102,241,0.18), inset 0 1px 0 rgba(255,255,255,0.1)',
+        boxShadow: 'var(--cu-shadow-md)',
       }}
       transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-      className="group relative flex flex-col gap-3 p-4 rounded-2xl transition-all"
+      className="group relative flex flex-col gap-3 p-4 rounded-2xl border border-cu-border bg-cu-bg shadow-cu-sm transition-all"
       style={{
-        background: 'rgba(255,255,255,0.04)',
         backdropFilter: 'blur(20px) saturate(180%)',
-        border: '1px solid rgba(255,255,255,0.09)',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07)',
       }}
     >
       {isImported && (
@@ -81,7 +78,7 @@ export function IssueCard({ issue, onImport, isImported = false }: IssueCardProp
           <Circle size={10} className={stateStyle.icon} fill="currentColor" strokeWidth={0} />
           #{issue.number}
         </a>
-        <span className="ml-auto text-[11px] text-slate-600 font-outfit shrink-0">
+        <span className="ml-auto text-[11px] text-cu-text-tertiary font-outfit shrink-0">
           {timeAgo(issue.updatedAt)}
         </span>
       </div>
@@ -90,7 +87,7 @@ export function IssueCard({ issue, onImport, isImported = false }: IssueCardProp
         href={issue.htmlUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-sm font-outfit font-semibold text-slate-100 leading-snug line-clamp-2 hover:text-indigo-300 transition-colors"
+        className="text-sm font-outfit font-semibold text-cu-text-primary leading-snug line-clamp-2 hover:text-cu-primary transition-colors"
       >
         {issue.title}
       </a>
@@ -113,7 +110,7 @@ export function IssueCard({ issue, onImport, isImported = false }: IssueCardProp
         </div>
       )}
 
-      <div className="flex items-center gap-3 text-[11px] text-slate-500 font-outfit">
+      <div className="flex items-center gap-3 text-[11px] text-cu-text-tertiary font-outfit">
         <div className="flex items-center">
           {visibleAssignees.length > 0 ? (
             visibleAssignees.map((assignee, index) => {
@@ -133,15 +130,14 @@ export function IssueCard({ issue, onImport, isImported = false }: IssueCardProp
                       alt={login}
                       width={20}
                       height={20}
-                      className="rounded-full ring-2 ring-[rgba(10,15,35,0.9)]"
+                      className="h-5 w-5 rounded-full ring-2 ring-cu-bg"
                       unoptimized
                     />
                   ) : (
                     <div
-                      className="w-5 h-5 rounded-full flex items-center justify-center ring-2 ring-[rgba(10,15,35,0.9)]"
-                      style={{ background: 'rgba(255,255,255,0.08)' }}
+                      className="w-5 h-5 rounded-full flex items-center justify-center ring-2 ring-cu-bg bg-cu-bg-secondary"
                     >
-                      <User size={10} className="text-slate-400" />
+                      <User size={10} className="text-cu-text-tertiary" />
                     </div>
                   )}
                 </div>
@@ -149,15 +145,14 @@ export function IssueCard({ issue, onImport, isImported = false }: IssueCardProp
             })
           ) : (
             <div
-              className="w-5 h-5 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
+              className="w-5 h-5 rounded-full flex items-center justify-center border border-cu-border bg-cu-bg-secondary"
             >
-              <User size={10} className="text-slate-500" />
+              <User size={10} className="text-cu-text-tertiary" />
             </div>
           )}
         </div>
 
-        <span className="flex items-center gap-1.5 text-slate-600">
+        <span className="flex items-center gap-1.5 text-cu-text-tertiary">
           <MessageSquare size={11} />
           {issue.comments}
         </span>

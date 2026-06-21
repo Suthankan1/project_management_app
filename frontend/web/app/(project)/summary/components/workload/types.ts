@@ -1,5 +1,6 @@
 // Defines the data types and formatting logic used across the workload components.
 export interface WorkloadEntry {
+  key: string;
   isMember: boolean;
   id?: number;
   name: string;
