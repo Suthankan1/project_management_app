@@ -32,7 +32,7 @@ export async function toggleFavorite(projectId: number | string): Promise<void> 
   return projectsApi.toggleFavorite(projectId);
 }
 
-export async function updateProjectDetails(projectId: number | string, data: { name?: string; description?: string; type?: string }): Promise<ProjectSummary> {
+export async function updateProjectDetails(projectId: number | string, data: { name?: string; description?: string }): Promise<ProjectSummary> {
   return projectsApi.update(projectId, data);
 }
 
