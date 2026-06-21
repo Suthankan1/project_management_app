@@ -357,6 +357,13 @@ Start the backend and private Redis container:
 docker compose -f docker-compose.ec2.yml --env-file .env.production up -d --build
 ```
 
+For CI/CD image deploys, set `BACKEND_IMAGE` at runtime or in `.env.production` to the pushed image tag, for example:
+
+```bash
+BACKEND_IMAGE=ghcr.io/<github-owner>/planora-backend:<git-sha> \
+  docker compose -f docker-compose.ec2.yml --env-file .env.production up -d --no-build backend redis
+```
+
 Check container health:
 
 ```bash
@@ -402,9 +409,23 @@ The frontend is deployed to Netlify via the `netlify.toml` configuration. Set th
 - `NEXT_PUBLIC_BACKEND_HOST` — the backend hostname for Next.js image patterns
 - `NEXT_PUBLIC_WS_BASE_URL` — the backend's direct WebSocket absolute URL (e.g., `wss://api.yourapp.com`)
 
+### Backend CI/CD
+
+The `Backend Deploy` GitHub Actions workflow builds `./backend`, pushes the Docker image to GitHub Container Registry, then SSHes into EC2 and restarts the backend using `docker-compose.ec2.yml`.
+
+Required GitHub repository secrets:
+
+- `EC2_HOST` — EC2 public hostname or IP.
+- `EC2_USER` — SSH user, for example `ubuntu` or `ec2-user`.
+- `EC2_SSH_PRIVATE_KEY` — private key allowed to SSH into the EC2 host.
+- `EC2_APP_DIR` — absolute path to this repository on EC2.
+- `GHCR_READ_TOKEN` — GitHub token with permission to read the GHCR package from EC2.
+
+The EC2 host must already have Docker, Docker Compose, this repository, and a real `.env.production` file. Netlify deploys the frontend separately from `frontend/web/netlify.toml`.
+
 ### CI/CD
 
-GitHub Actions runs on every push and pull request to `main`, `master`, `test`, and `responsive-pages*` branches:
+GitHub Actions CI runs on every push and pull request to `main`, `master`, `test`, and `responsive-pages*` branches:
 
 1. **Backend job:** `./mvnw verify` (build + test + coverage)
 2. **Frontend job:** lint → test → build

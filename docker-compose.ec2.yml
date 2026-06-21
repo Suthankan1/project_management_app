@@ -1,7 +1,7 @@
 services:
   backend:
     build: ./backend
-    image: planora-backend:ec2
+    image: ${BACKEND_IMAGE:-planora-backend:ec2}
     container_name: planora-backend
     restart: unless-stopped
     env_file:
