@@ -15,14 +15,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class KanbanService {
 
-    @Autowired
-    private KanbanRepository kanbanRepository;
+    private final KanbanRepository kanbanRepository;
 
-    @Autowired
-    private KanbanColumnRepository kanbanColumnRepository;
+    private final KanbanColumnRepository kanbanColumnRepository;
 
     public Kanban createKanban(KanbanRequestDTO dto) {
         Kanban kanban = new Kanban();

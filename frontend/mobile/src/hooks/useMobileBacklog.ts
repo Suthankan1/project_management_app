@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
-import api from '../api/axios';
+import { taskService, sprintService } from '../services/task-service';
+import { projectService } from '../services/project-service';
 import { apiErrorMessage } from '../utils/apiError';
 
 export type BacklogGroupBy = 'none' | 'status' | 'priority' | 'assignee';
@@ -74,6 +75,7 @@ function sprintName(sprint: MobileSprint) {
 export function useMobileBacklog(projectId: number) {
   const [tasks, setTasks] = useState<MobileTask[]>([]);
   const [sprints, setSprints] = useState<MobileSprint[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
   const [projectKey, setProjectKey] = useState('');
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [filters, setFilters] = useState<MobileBacklogFilters>(DEFAULT_FILTERS);
@@ -88,17 +90,17 @@ export function useMobileBacklog(projectId: number) {
     setError(null);
 
     try {
-      const [tasksRes, sprintsRes, projectRes, membersRes] = await Promise.all([
-        api.get(`/api/tasks/project/${projectId}`),
-        api.get(`/api/sprints/project/${projectId}`).catch(() => ({ data: [] })),
-        api.get(`/api/projects/${projectId}`).catch(() => ({ data: null })),
-        api.get(`/api/projects/${projectId}/members`).catch(() => ({ data: [] })),
+      const [tasksData, sprintsData, projectData, membersData] = await Promise.all([
+        taskService.listAllByProject(projectId),
+        sprintService.listByProject(projectId).catch(() => []),
+        projectService.get(projectId).catch(() => null),
+        projectService.getMembers(projectId).catch(() => []),
       ]);
 
-      const normalizedTasks = Array.isArray(tasksRes.data)
-        ? (tasksRes.data as MobileTask[]).map(normalizeTask)
+      const normalizedTasks = Array.isArray(tasksData)
+        ? (tasksData as MobileTask[]).map(normalizeTask)
         : [];
-      const rawSprints = Array.isArray(sprintsRes.data) ? sprintsRes.data as MobileSprint[] : [];
+      const rawSprints = Array.isArray(sprintsData) ? sprintsData as MobileSprint[] : [];
 
       const tasksBySprint = new Map<number, MobileTask[]>();
       normalizedTasks.forEach((task) => {
@@ -107,15 +109,28 @@ export function useMobileBacklog(projectId: number) {
         tasksBySprint.get(task.sprintId)!.push(task);
       });
 
+      const parsedMembers = (Array.isArray(membersData) ? membersData : []).map((m: any) => {
+        const userId = m.user?.userId ?? m.userId ?? m.id ?? 0;
+        const name = m.name || m.user?.fullName || m.user?.username || `Member ${userId}`;
+        const profilePicUrl = m.user?.profilePicUrl ?? m.profilePicUrl ?? null;
+        return {
+          id: m.id ?? userId,
+          userId,
+          name,
+          role: m.role ?? null,
+          profilePicUrl,
+          currentUser: m.currentUser || m.me || false,
+        };
+      }).filter((m) => m.userId > 0);
       setTasks(normalizedTasks);
       setSprints(rawSprints.map((sprint) => ({
         ...sprint,
         tasks: tasksBySprint.get(sprint.id) ?? [],
       })));
-      setProjectKey(projectRes.data?.projectKey || projectRes.data?.key || '');
+      setMembers(parsedMembers);
+      setProjectKey(projectData?.projectKey || projectData?.key || '');
 
-      const members = Array.isArray(membersRes.data) ? membersRes.data : [];
-      const role = members.find((member: { currentUser?: boolean; me?: boolean }) => member.currentUser || member.me)?.role;
+      const role = parsedMembers.find((member: any) => member.currentUser)?.role;
       if (role) setCurrentUserRole(role);
     } catch (err) {
       setError(apiErrorMessage(err, 'Failed to load backlog. Pull down to retry.'));
@@ -225,7 +240,7 @@ export function useMobileBacklog(projectId: number) {
     const cleanTitle = title.trim();
     if (!cleanTitle) return;
     try {
-      await api.post('/api/tasks', {
+      await taskService.create({
         projectId,
         title: cleanTitle,
         sprintId: sprintId ?? undefined,
@@ -242,7 +257,7 @@ export function useMobileBacklog(projectId: number) {
     const fallback = projectKey ? `${projectKey} Sprint ${sprints.length + 1}` : `Sprint ${sprints.length + 1}`;
     const cleanName = (name || fallback).trim();
     try {
-      await api.post('/api/sprints', { proId: projectId, name: cleanName });
+      await sprintService.create({ proId: projectId, name: cleanName });
       await fetchBacklog(true);
     } catch (err) {
       Alert.alert('Sprint not created', apiErrorMessage(err, 'Please try again.'));
@@ -250,86 +265,151 @@ export function useMobileBacklog(projectId: number) {
   }, [fetchBacklog, projectId, projectKey, sprints.length]);
 
   const updateStatus = useCallback(async (taskId: number, status: string) => {
-    const previous = tasks;
+    const previousTasks = tasks;
+    const previousSprints = sprints;
     setTasks((current) => current.map((task) => task.id === taskId ? { ...task, status } : task));
+    setSprints((current) => current.map((sprint) => ({
+      ...sprint,
+      tasks: sprint.tasks.map((task) => task.id === taskId ? { ...task, status } : task)
+    })));
     try {
-      await api.patch(`/api/tasks/${taskId}/status`, { status });
+      await taskService.updateStatus(taskId, status);
       await fetchBacklog(true);
     } catch (err) {
-      setTasks(previous);
+      setTasks(previousTasks);
+      setSprints(previousSprints);
       Alert.alert('Status not updated', apiErrorMessage(err, 'Please try again.'));
     }
-  }, [fetchBacklog, tasks]);
+  }, [fetchBacklog, tasks, sprints]);
 
   const updateStoryPoints = useCallback(async (taskId: number, storyPoint: number) => {
     const value = Math.max(0, Number.isNaN(storyPoint) ? 0 : storyPoint);
-    const previous = tasks;
+    const previousTasks = tasks;
+    const previousSprints = sprints;
     setTasks((current) => current.map((task) => task.id === taskId ? { ...task, storyPoint: value } : task));
+    setSprints((current) => current.map((sprint) => ({
+      ...sprint,
+      tasks: sprint.tasks.map((task) => task.id === taskId ? { ...task, storyPoint: value } : task)
+    })));
     try {
-      await api.put(`/api/tasks/${taskId}`, { storyPoint: value });
+      await taskService.update(taskId, { storyPoint: value });
       await fetchBacklog(true);
     } catch (err) {
-      setTasks(previous);
+      setTasks(previousTasks);
+      setSprints(previousSprints);
       Alert.alert('Points not updated', apiErrorMessage(err, 'Please try again.'));
     }
-  }, [fetchBacklog, tasks]);
+  }, [fetchBacklog, tasks, sprints]);
 
   const moveTaskToSprint = useCallback(async (taskId: number, sprintId: number | null) => {
-    const previous = tasks;
+    const previousTasks = tasks;
+    const previousSprints = sprints;
     setTasks((current) => current.map((task) => task.id === taskId ? { ...task, sprintId, selected: false } : task));
+    setSprints((current) => {
+      const taskToMove = tasks.find((t) => t.id === taskId);
+      if (!taskToMove) return current;
+      const updatedTask = { ...taskToMove, sprintId, selected: false };
+      return current.map((sprint) => {
+        let sprintTasks = sprint.tasks.filter((t) => t.id !== taskId);
+        if (sprint.id === sprintId) {
+          sprintTasks = [...sprintTasks, updatedTask];
+        }
+        return { ...sprint, tasks: sprintTasks };
+      });
+    });
     try {
-      await api.put(`/api/tasks/${taskId}`, { sprintId });
+      await taskService.update(taskId, { sprintId });
       await fetchBacklog(true);
     } catch (err) {
-      setTasks(previous);
+      setTasks(previousTasks);
+      setSprints(previousSprints);
       Alert.alert('Task not moved', apiErrorMessage(err, 'Please try again.'));
     }
-  }, [fetchBacklog, tasks]);
+  }, [fetchBacklog, tasks, sprints]);
 
   const deleteTask = useCallback(async (taskId: number) => {
-    const previous = tasks;
+    const previousTasks = tasks;
+    const previousSprints = sprints;
     setTasks((current) => current.filter((task) => task.id !== taskId));
+    setSprints((current) => current.map((sprint) => ({
+      ...sprint,
+      tasks: sprint.tasks.filter((task) => task.id !== taskId)
+    })));
     try {
-      await api.delete(`/api/tasks/${taskId}`);
+      await taskService.delete(taskId);
       await fetchBacklog(true);
     } catch (err) {
-      setTasks(previous);
+      setTasks(previousTasks);
+      setSprints(previousSprints);
       Alert.alert('Delete failed', apiErrorMessage(err, 'Only Project Owners or Admins can delete tasks.'));
     }
-  }, [fetchBacklog, tasks]);
+  }, [fetchBacklog, tasks, sprints]);
 
   const bulkStatus = useCallback(async (status: string) => {
     if (!selectedIds.length) return;
+    const previousTasks = tasks;
+    const previousSprints = sprints;
+    setTasks((current) => current.map((task) => selectedIds.includes(task.id) ? { ...task, status, selected: false } : task));
+    setSprints((current) => current.map((sprint) => ({
+      ...sprint,
+      tasks: sprint.tasks.map((task) => selectedIds.includes(task.id) ? { ...task, status, selected: false } : task)
+    })));
     try {
-      await api.patch('/api/tasks/bulk/status', { taskIds: selectedIds, status });
+      await taskService.bulkUpdateStatus({ taskIds: selectedIds, status });
       clearSelection();
       await fetchBacklog(true);
     } catch (err) {
+      setTasks(previousTasks);
+      setSprints(previousSprints);
       Alert.alert('Bulk update failed', apiErrorMessage(err, 'Please try again.'));
     }
-  }, [clearSelection, fetchBacklog, selectedIds]);
+  }, [clearSelection, fetchBacklog, selectedIds, tasks, sprints]);
 
   const bulkDelete = useCallback(async () => {
     if (!selectedIds.length) return;
+    const previousTasks = tasks;
+    const previousSprints = sprints;
+    setTasks((current) => current.filter((task) => !selectedIds.includes(task.id)));
+    setSprints((current) => current.map((sprint) => ({
+      ...sprint,
+      tasks: sprint.tasks.filter((task) => !selectedIds.includes(task.id))
+    })));
     try {
-      await api.delete('/api/tasks/bulk', { data: { taskIds: selectedIds } });
+      await taskService.bulkDelete({ taskIds: selectedIds });
       clearSelection();
       await fetchBacklog(true);
     } catch (err) {
+      setTasks(previousTasks);
+      setSprints(previousSprints);
       Alert.alert('Bulk delete failed', apiErrorMessage(err, 'Only Project Owners or Admins can delete tasks.'));
     }
-  }, [clearSelection, fetchBacklog, selectedIds]);
+  }, [clearSelection, fetchBacklog, selectedIds, tasks, sprints]);
 
   const bulkMoveToSprint = useCallback(async (sprintId: number | null) => {
     if (!selectedIds.length) return;
+    const previousTasks = tasks;
+    const previousSprints = sprints;
+    setTasks((current) => current.map((task) => selectedIds.includes(task.id) ? { ...task, sprintId, selected: false } : task));
+    setSprints((current) => {
+      const movedTasks = tasks.filter((t) => selectedIds.includes(t.id)).map((t) => ({ ...t, sprintId, selected: false }));
+      return current.map((sprint) => {
+        let sprintTasks = sprint.tasks.filter((t) => !selectedIds.includes(t.id));
+        if (sprint.id === sprintId) {
+          sprintTasks = [...sprintTasks, ...movedTasks];
+        }
+        return { ...sprint, tasks: sprintTasks };
+      });
+    });
     try {
-      await Promise.all(selectedIds.map((taskId) => api.put(`/api/tasks/${taskId}`, { sprintId })));
+      await Promise.all(selectedIds.map((taskId) => taskService.update(taskId, { sprintId })));
       clearSelection();
       await fetchBacklog(true);
     } catch (err) {
+      setTasks(previousTasks);
+      setSprints(previousSprints);
       Alert.alert('Bulk move failed', apiErrorMessage(err, 'Please try again.'));
     }
-  }, [clearSelection, fetchBacklog, selectedIds]);
+  }, [clearSelection, fetchBacklog, selectedIds, tasks, sprints]);
 
   const stats = useMemo(() => {
     const visible = [...filteredProductTasks, ...filteredSprints.flatMap((sprint) => sprint.tasks)];
@@ -339,9 +419,105 @@ export function useMobileBacklog(projectId: number) {
     return { total, done, points, sprints: filteredSprints.length };
   }, [filteredProductTasks, filteredSprints]);
 
+  const assignTask = useCallback(async (taskId: number, userId: number | null) => {
+    const previousTasks = tasks;
+    const previousSprints = sprints;
+    const memberName = userId ? members.find((m) => m.userId === userId)?.name ?? 'Assigned' : 'Unassigned';
+    setTasks((current) => current.map((task) => task.id === taskId ? { ...task, assigneeName: memberName } : task));
+    setSprints((current) => current.map((sprint) => ({
+      ...sprint,
+      tasks: sprint.tasks.map((task) => task.id === taskId ? { ...task, assigneeName: memberName } : task)
+    })));
+    try {
+      if (userId === null) {
+        await taskService.unassignTask(taskId);
+      } else {
+        await taskService.assignTaskSingle(taskId, userId);
+      }
+      await fetchBacklog(true);
+    } catch (err) {
+      setTasks(previousTasks);
+      setSprints(previousSprints);
+      Alert.alert('Assignment failed', apiErrorMessage(err, 'Please try again.'));
+    }
+  }, [fetchBacklog, tasks, sprints, members]);
+
+  const updateTaskDueDate = useCallback(async (taskId: number, dueDate: string | null) => {
+    const previousTasks = tasks;
+    const previousSprints = sprints;
+    setTasks((current) => current.map((task) => task.id === taskId ? { ...task, dueDate } : task));
+    setSprints((current) => current.map((sprint) => ({
+      ...sprint,
+      tasks: sprint.tasks.map((task) => task.id === taskId ? { ...task, dueDate } : task)
+    })));
+    try {
+      await taskService.updateDates(taskId, { dueDate, startDate: null });
+      await fetchBacklog(true);
+    } catch (err) {
+      setTasks(previousTasks);
+      setSprints(previousSprints);
+      Alert.alert('Date update failed', apiErrorMessage(err, 'Please try again.'));
+    }
+  }, [fetchBacklog, tasks, sprints]);
+
+  const reorderTasks = useCallback(async (sprintId: number | null, orderedTaskIds: number[]) => {
+    const previousTasks = tasks;
+    const previousSprints = sprints;
+
+    setTasks((current) => {
+      const taskMap = new Map(current.map((t) => [t.id, t]));
+      const otherTasks = current.filter((t) => t.sprintId !== sprintId);
+      const reordered = orderedTaskIds
+        .map((id) => {
+          const task = taskMap.get(id);
+          if (task) {
+            return { ...task, sprintId };
+          }
+          return null;
+        })
+        .filter(Boolean) as MobileTask[];
+
+      return [...otherTasks, ...reordered];
+    });
+
+    setSprints((current) => current.map((sprint) => {
+      if (sprint.id === sprintId) {
+        const taskMap = new Map(sprint.tasks.map((t) => [t.id, t]));
+        const reordered = orderedTaskIds
+          .map((id) => {
+            const task = taskMap.get(id);
+            if (task) {
+              return { ...task, sprintId };
+            }
+            return null;
+          })
+          .filter(Boolean) as MobileTask[];
+        return { ...sprint, tasks: reordered };
+      }
+      if (sprint.id !== sprintId && sprint.tasks.some((t) => orderedTaskIds.includes(t.id))) {
+        return { ...sprint, tasks: sprint.tasks.filter((t) => !orderedTaskIds.includes(t.id)) };
+      }
+      return sprint;
+    }));
+
+    try {
+      await taskService.reorderTasks({
+        projectId,
+        sprintId,
+        orderedTaskIds,
+      });
+      await fetchBacklog(true);
+    } catch (err) {
+      setTasks(previousTasks);
+      setSprints(previousSprints);
+      Alert.alert('Reordering failed', apiErrorMessage(err, 'Please try again.'));
+    }
+  }, [fetchBacklog, projectId, tasks, sprints]);
+
   return {
     tasks,
     sprints,
+    members,
     filteredSprints,
     filteredProductTasks,
     groupedProductTasks,
@@ -369,5 +545,8 @@ export function useMobileBacklog(projectId: number) {
     bulkDelete,
     bulkMoveToSprint,
     sprintName,
+    assignTask,
+    updateTaskDueDate,
+    reorderTasks,
   };
 }

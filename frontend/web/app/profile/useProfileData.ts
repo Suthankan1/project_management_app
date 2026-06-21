@@ -3,33 +3,8 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { AxiosError } from 'axios';
 import { useRouter } from 'next/navigation';
-import api from '@/lib/axios';
-import { getUserFromToken } from '@/lib/auth';
-
-type UserResponse = {
-    userId: number;
-    username: string;
-    fullName: string | null;
-    email: string;
-    verified: boolean;
-    profilePicUrl: string | null;
-    lastActive: string | null;
-    firstName: string | null;
-    lastName: string | null;
-    contactNumber: string | null;
-    countryCode: string | null;
-    jobTitle: string | null;
-    company: string | null;
-    position: string | null;
-    bio: string | null;
-};
-
-type PhotoUploadResponse = {
-    success: boolean;
-    message: string;
-    fileUrl: string | null;
-    errorCode: string | null;
-};
+import { ensureValidToken, getUserFromToken } from '@/lib/auth';
+import { authApi } from '@/services/api-contract';
 
 export function useProfileData() {
     const router = useRouter();
@@ -82,18 +57,27 @@ export function useProfileData() {
     };
 
     useEffect(() => {
-        const tokenUser = getUserFromToken();
-        if (!tokenUser) {
-            router.push('/login');
-            return;
-        }
-        setUsername(tokenUser.username || '');
-        setEmail(tokenUser.email || '');
+        let isMounted = true;
 
         const loadProfile = async () => {
+            const token = await ensureValidToken({ allowCookieRefresh: true });
+            if (!token || !isMounted) {
+                if (isMounted) router.push('/login');
+                return;
+            }
+
+            const tokenUser = getUserFromToken();
+            if (!tokenUser) {
+                router.push('/login');
+                return;
+            }
+
+            setUsername(tokenUser.username || '');
+            setEmail(tokenUser.email || '');
+
             try {
-                const response = await api.get<UserResponse>('/api/user/profile');
-                const p = response.data;
+                const p = await authApi.getProfile();
+                if (!isMounted) return;
                 setUsername(p.username || tokenUser.username || '');
                 setEmail(p.email || tokenUser.email || '');
                 setFullName(p.fullName || '');
@@ -108,12 +92,16 @@ export function useProfileData() {
                 setProfilePicUrl(p.profilePicUrl || '');
                 setLastActive(p.lastActive || null);
             } catch (error: unknown) {
-                setErrorMessage(getApiErrorMessage(error, 'Failed to load profile details.'));
+                if (isMounted) setErrorMessage(getApiErrorMessage(error, 'Failed to load profile details.'));
             } finally {
-                setIsLoading(false);
+                if (isMounted) setIsLoading(false);
             }
         };
         void loadProfile();
+
+        return () => {
+            isMounted = false;
+        };
     }, [router]);
 
     const handleSendOtp = async () => {
@@ -122,7 +110,7 @@ export function useProfileData() {
         if (!email) { setErrorMessage('Email not found.'); return; }
         try {
             setIsSendingOtp(true);
-            await api.post('/api/auth/forgot', { email });
+            await authApi.forgotPassword({ email });
             setPwStep('sent');
             setSuccessMessage('Reset code sent to your email.');
         } catch (error: unknown) {
@@ -141,7 +129,7 @@ export function useProfileData() {
         if (newPassword !== confirmPassword) { setErrorMessage('Passwords do not match.'); return; }
         try {
             setIsResettingPw(true);
-            await api.post('/api/auth/reset', { token: otp.trim(), newPassword });
+            await authApi.resetPassword({ email, token: otp.trim(), newPassword });
             setPwStep('done');
             setOtp('');
             setNewPassword('');
@@ -160,7 +148,7 @@ export function useProfileData() {
         setSuccessMessage('');
         try {
             setIsSavingName(true);
-            const response = await api.put<UserResponse>('/api/user/profile/update', {
+            const response = await authApi.updateProfile({
                 fullName: fullName.trim() || null,
                 firstName: firstName.trim() || null,
                 lastName: lastName.trim() || null,
@@ -171,7 +159,7 @@ export function useProfileData() {
                 position: position.trim() || null,
                 bio: bio.trim() || null,
             });
-            const p = response.data;
+            const p = response;
             setFullName(p.fullName || '');
             setFirstName(p.firstName || '');
             setLastName(p.lastName || '');
@@ -198,14 +186,12 @@ export function useProfileData() {
         formData.append('file', file);
         try {
             setIsUploadingPhoto(true);
-            const response = await api.post<PhotoUploadResponse>('/api/user/profile/photo', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
-            if (!response.data.success) {
-                setErrorMessage(response.data.message || 'Failed to upload profile picture.');
+            const response = await authApi.uploadProfilePhoto(formData);
+            if (!response.success) {
+                setErrorMessage(response.message || 'Failed to upload profile picture.');
                 return;
             }
-            setProfilePicUrl(response.data.fileUrl || '');
+            setProfilePicUrl(response.fileUrl || '');
             setImageKey(Date.now());
             setSuccessMessage('Profile picture updated successfully.');
         } catch (error: unknown) {

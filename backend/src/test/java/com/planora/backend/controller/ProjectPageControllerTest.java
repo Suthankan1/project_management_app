@@ -3,9 +3,11 @@ package com.planora.backend.controller;
 import com.planora.backend.annotation.WithMockUserPrincipal;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.planora.backend.dto.MovePageRequestDto;
 import com.planora.backend.dto.PageDetailResponseDto;
 import com.planora.backend.dto.PageRequestDto;
 import com.planora.backend.dto.PageSummaryResponseDto;
+import com.planora.backend.dto.PageVersionResponseDto;
 import com.planora.backend.service.JWTService;
 import com.planora.backend.service.ProjectPageService;
 import org.junit.jupiter.api.BeforeEach;
@@ -121,5 +123,99 @@ class ProjectPageControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(service).deletePage(eq(1L), any());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void toggleStar_returns200WithUpdatedPage() throws Exception {
+        pageDetail.setIsStarred(true);
+        when(service.toggleStar(eq(10L), eq(1L), any())).thenReturn(pageDetail);
+
+        mockMvc.perform(patch("/api/projects/10/pages/1/star").with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isStarred").value(true));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void movePage_returns200WithUpdatedPage() throws Exception {
+        MovePageRequestDto moveReq = new MovePageRequestDto();
+        moveReq.setParentPageId(5L);
+        pageDetail.setParentPageId(5L);
+        when(service.movePage(eq(10L), eq(1L), eq(5L), any())).thenReturn(pageDetail);
+
+        mockMvc.perform(patch("/api/projects/10/pages/1/move")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(moveReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.parentPageId").value(5));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void markViewed_returns204NoContent() throws Exception {
+        doNothing().when(service).markViewed(eq(10L), eq(1L), any());
+
+        mockMvc.perform(post("/api/projects/10/pages/1/viewed").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(service).markViewed(eq(10L), eq(1L), any());
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void getRecentPages_returnsPageSummaryList() throws Exception {
+        when(service.getRecentPages(eq(10L), any())).thenReturn(List.of(pageSummary));
+
+        mockMvc.perform(get("/api/projects/10/pages/recent"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].title").value("My First Page"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void createPage_invalidPayload_returns400() throws Exception {
+        PageRequestDto invalidReq = new PageRequestDto();
+        invalidReq.setTitle(""); // Blank title (fails @NotBlank)
+
+        mockMvc.perform(post("/api/projects/10/pages")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void getPageVersions_returnsPageVersionResponseList() throws Exception {
+        PageVersionResponseDto version = PageVersionResponseDto.builder()
+                .id(100L)
+                .pageId(1L)
+                .title("Version Title")
+                .content("Version Content")
+                .versionNumber(1)
+                .authorName("User")
+                .build();
+
+        when(service.getPageVersions(eq(10L), eq(1L), any())).thenReturn(List.of(version));
+
+        mockMvc.perform(get("/api/projects/10/pages/1/versions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(100))
+                .andExpect(jsonPath("$[0].title").value("Version Title"))
+                .andExpect(jsonPath("$[0].versionNumber").value(1));
+    }
+
+    @Test
+    @WithMockUserPrincipal
+    void restorePageVersion_returnsRestoredPage() throws Exception {
+        when(service.restorePageVersion(eq(10L), eq(1L), eq(100L), any())).thenReturn(pageDetail);
+
+        mockMvc.perform(post("/api/projects/10/pages/1/versions/100/restore").with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.title").value("My First Page"));
     }
 }

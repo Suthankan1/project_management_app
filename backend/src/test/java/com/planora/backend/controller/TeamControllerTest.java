@@ -128,4 +128,39 @@ public class TeamControllerTest {
                 .with(csrf()))
                 .andExpect(status().isNoContent());
     }
+
+    @Test
+    void routeResolution_getTeams_success() throws Exception {
+        TeamSummaryDTO summary = new TeamSummaryDTO(10L, "Test Team", "Owner Name");
+        when(teamService.getMyTeams(anyLong())).thenReturn(List.of(summary));
+
+        mockMvc.perform(get("/api/teams")
+                .with(user(principal)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void routeResolution_deleteTeam_success() throws Exception {
+        mockMvc.perform(delete("/api/teams/10")
+                .with(user(principal))
+                .with(csrf()))
+                .andExpect(status().isNoContent());
+    }
+
+
+    @Test
+    void createTeam_invalidPayload_returns400() throws Exception {
+        TeamCreationDTO invalidDto = new TeamCreationDTO();
+        invalidDto.setName(""); // Blank name
+        invalidDto.setInviteEmails(List.of("not-an-email")); // Invalid email
+
+        mockMvc.perform(post("/api/teams")
+                        .with(user(principal))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidDto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
 }

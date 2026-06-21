@@ -19,9 +19,14 @@ export default function LoginPage() {
     remember, setRemember,
     showPassword, setShowPassword,
     isLoading,
+    isCheckingSession,
     error,
     handleLogin,
   } = useLoginForm();
+
+  if (isCheckingSession) {
+    return <div className="min-h-screen" aria-label="Checking session" />;
+  }
 
     return (
 
@@ -29,7 +34,7 @@ export default function LoginPage() {
 
             {/* ── 1. Navigation ── */}
             <div className="w-full max-w-[420px] mb-4">
-                <Link href={"/"} className='inline-flex items-center text-sm text-gray-500 hover:text-gray-900 transition-colors'>
+                <Link href={"/"} className='inline-flex items-center text-sm text-cu-text-muted hover:text-cu-text-primary transition-colors'>
                     {/* Accessibility: aria-hidden="true" tells screen readers to ignore this decorative icon */}
                     <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
@@ -46,11 +51,11 @@ export default function LoginPage() {
 
                 {/* ── Tab Switcher ── */}
                 {/* Accessibility: role="tablist" and "tab" help screen readers understand this UI paradigm */}
-                <div className='flex bg-gray-100 p-1.5 rounded-xl mb-8' role="tablist">
+                <div className='flex bg-cu-bg-secondary p-1.5 rounded-xl mb-8' role="tablist">
                     <button
                         role="tab"
                         aria-selected="true"
-                        className='flex-1 bg-white text-gray-900 shadow-sm rounded-lg py-2.5 text-sm font-semibold'
+                        className='flex-1 bg-cu-bg text-cu-text-primary shadow-sm rounded-lg py-2.5 text-sm font-semibold'
                     >
                         Sign In
                     </button>
@@ -58,7 +63,7 @@ export default function LoginPage() {
                         href="/register"
                         role="tab"
                         aria-selected="false"
-                        className="flex-1 flex items-center justify-center text-gray-500 hover:text-gray-900 py-2.5 text-sm font-medium transition-colors"
+                        className="flex-1 flex items-center justify-center text-cu-text-muted hover:text-cu-text-primary py-2.5 text-sm font-medium transition-colors"
                     >
                         Register
                     </Link>
@@ -71,9 +76,9 @@ export default function LoginPage() {
                         id="login-error"
                         role="alert"
                         aria-live="polite"
-                        className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg"
+                        className="mb-4 p-3 bg-cu-danger/10 border border-cu-danger/30 rounded-lg"
                     >
-                        <p className="text-sm text-red-700">{error}</p>
+                        <p className="text-sm text-cu-danger">{error}</p>
                     </div>
                 )}
 
@@ -84,7 +89,7 @@ export default function LoginPage() {
                     {/* Email Input */}
                     <div>
                         {/* Accessibility: htmlFor matches the input ID, making the label clickable */}
-                        <label htmlFor="login-email" className="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">
+                        <label htmlFor="login-email" className="block text-xs font-semibold text-cu-text-muted mb-1.5 ml-1">
                             Email Address
                         </label>
                         <input
@@ -96,7 +101,7 @@ export default function LoginPage() {
                             autoCorrect="off"
                             inputMode="email"
                             // The text-[16px] prevents iOS Safari from auto-zooming
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-[16px] sm:text-sm"
+                            className="w-full px-4 py-3 rounded-xl border border-cu-border bg-cu-bg text-cu-text-primary placeholder:text-cu-text-muted focus:border-cu-primary focus:ring-4 focus:ring-cu-primary/10 outline-none transition-all text-[16px] sm:text-sm"
                             placeholder="Enter your email"
                             value={email}
                             // Data Normalization: Force lowercase immediately to prevent case-sensitive login bugs later.
@@ -115,7 +120,7 @@ export default function LoginPage() {
                                 id="login-password"
                                 type={showPassword ? 'text' : 'password'}
                                 autoComplete="current-password"
-                                className="w-full px-4 py-3 pr-11 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-[16px] sm:text-sm"
+                                className="w-full px-4 py-3 pr-11 rounded-xl border border-cu-border bg-cu-bg text-cu-text-primary placeholder:text-cu-text-muted focus:border-cu-primary focus:ring-4 focus:ring-cu-primary/10 outline-none transition-all text-[16px] sm:text-sm"
                                 placeholder="Enter your password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -127,7 +132,7 @@ export default function LoginPage() {
                             <button
                                 type="button"
                                 onClick={() => setShowPassword((v) => !v)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-cu-text-muted hover:text-cu-text-primary"
                                 tabIndex={-1}
                                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                             >
@@ -144,11 +149,11 @@ export default function LoginPage() {
                                 type="checkbox"
                                 checked={remember}
                                 onChange={(e) => setRemember(e.target.checked)}
-                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                className="w-4 h-4 rounded border-cu-border accent-cu-primary"
                             />
-                            <span className="text-gray-500 text-xs">Remember me for 30 days</span>
+                            <span className="text-cu-text-muted text-xs">Remember me for 30 days</span>
                         </label>
-                        <Link href="/forgot-password" className="text-blue-600 hover:text-blue-700 font-semibold text-xs">
+                        <Link href="/forgot-password" className="text-cu-primary hover:opacity-80 font-semibold text-xs">
                             Forgot password?
                         </Link>
                     </div>
@@ -158,14 +163,14 @@ export default function LoginPage() {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className={`w-full font-bold py-2 min-h-[44px] rounded-lg transition-colors text-white ${isLoading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                        className="w-full rounded-lg bg-[#155DFC] py-2 min-h-[44px] font-bold text-white shadow-sm transition-colors hover:bg-[#0C4DDA] disabled:cursor-not-allowed disabled:bg-[#155DFC] disabled:text-white disabled:opacity-60"
                     >
                         {isLoading ? 'Signing in...' : 'Sign In'}
                     </button>
                 </form>
 
                 {/* ── Footer ── */}
-                <p className="mt-8 text-center text-xs text-gray-400">
+                <p className="mt-8 text-center text-xs text-cu-text-muted">
                     © 2026 Planora. All rights reserved.
                 </p>
             </div>

@@ -2,11 +2,13 @@ package com.planora.backend.repository;
 
 import com.planora.backend.model.Project;
 import com.planora.backend.model.Team;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -30,6 +32,13 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     @EntityGraph(attributePaths = {"owner", "team"})
     List<Project> findAll();
 
+    @EntityGraph(attributePaths = {"team"})
+    List<Project> findByGithubRepoFullNameIgnoreCase(String githubRepoFullName);
+
     @Query("SELECT p.team.id FROM Project p WHERE p.id = :projectId")
     Long findTeamIdByProjectId(@Param("projectId") Long projectId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Project p WHERE p.id = :id")
+    Optional<Project> findByIdWithLock(@Param("id") Long id);
 }

@@ -4,16 +4,16 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { SprintboardTask } from '../types';
-import { Calendar, GripVertical } from 'lucide-react';
+import { Calendar, GripVertical, Lock } from 'lucide-react';
 import AssigneeAvatar from '../../sprint-backlog/components/AssigneeAvatar';
 import { hexToLabelStyle } from '@/components/shared/LabelPicker';
 import { SprintTeamMemberOption } from '../api';
 
 const PRIORITY_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  HIGH:   { bg: 'bg-[#FEF3F2]', text: 'text-[#B42318]', label: 'High' },
-  URGENT: { bg: 'bg-[#FEF3F2]', text: 'text-[#B42318]', label: 'Urgent' },
-  MEDIUM: { bg: 'bg-[#FFFAEB]', text: 'text-[#B54708]', label: 'Medium' },
-  LOW:    { bg: 'bg-[#F2F4F7]', text: 'text-[#344054]', label: 'Low' },
+  HIGH:   { bg: 'bg-red-500/10',    text: 'text-red-500',    label: 'High' },
+  URGENT: { bg: 'bg-red-500/10',    text: 'text-red-500',    label: 'Urgent' },
+  MEDIUM: { bg: 'bg-amber-400/10',  text: 'text-amber-500',  label: 'Medium' },
+  LOW:    { bg: 'bg-cu-bg-tertiary', text: 'text-cu-text-secondary', label: 'Low' },
 };
 
 interface SprintCardProps {
@@ -116,37 +116,37 @@ export default function SprintCard({
       {...attributes}
       {...listeners}
       className={`
-        rounded-xl border bg-white shadow-sm
-        hover:shadow-md hover:border-blue-200 transition-all duration-200 cursor-grab active:cursor-grabbing
-        focus-within:ring-2 focus-within:ring-blue-100
+        rounded-xl border bg-cu-bg shadow-cu-sm
+        hover:shadow-cu-md hover:border-cu-primary/30 transition-all duration-200 cursor-grab active:cursor-grabbing
+        focus-within:ring-2 focus-within:ring-cu-primary/20
         ${dense ? 'p-2.5' : 'p-3'}
-        ${selected ? 'border-[#155DFC] ring-2 ring-[#155DFC]/20' : 'border-gray-200/80'}
-        ${isDragging ? 'ring-2 ring-[#155DFC] z-50 scale-[1.02]' : ''}
+        ${selected ? 'border-cu-primary ring-2 ring-cu-primary/20' : 'border-cu-border'}
+        ${isDragging ? 'ring-2 ring-cu-primary z-50 scale-[1.02]' : ''}
       `}
     >
       <div className="mb-2 flex items-center justify-between">
         <label
-          className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#667085]"
+          className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-cu-text-muted"
           onPointerDown={(e) => e.stopPropagation()}
         >
           <input
             type="checkbox"
             checked={selected}
             onChange={(e) => onToggleSelect?.(task.taskId, e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-[#D0D5DD] text-[#155DFC] focus:ring-[#155DFC]"
+            className="h-3.5 w-3.5 rounded border-cu-border text-cu-primary focus:ring-cu-primary"
           />
         </label>
-        <div className="flex items-center gap-1 text-[10px] text-[#667085]">
-          <span className="rounded-md border border-[#E4E7EC] bg-[#F8FAFC] px-1.5 py-0.5 font-semibold text-[#475467]">
+        <div className="flex items-center gap-1 text-[10px] text-cu-text-muted">
+          <span className="rounded-md border border-cu-border bg-cu-bg-secondary px-1.5 py-0.5 font-semibold text-cu-text-secondary">
             {displayKey}
           </span>
         </div>
       </div>
       {/* Title — click to open task modal */}
       <div className={`flex items-start gap-1.5 ${dense ? 'mb-2' : 'mb-2.5'}`}>
-        <GripVertical size={14} className="text-gray-300 mt-0.5 flex-shrink-0" />
+        <GripVertical size={14} className="text-cu-text-muted/40 mt-0.5 flex-shrink-0" />
         <h3
-          className={`font-semibold text-[#101828] leading-tight cursor-pointer hover:text-[#155DFC] transition-colors flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-blue-100 rounded ${dense ? 'text-[13px]' : 'text-[14px]'}`}
+          className={`font-semibold text-cu-text-primary leading-tight cursor-pointer hover:text-cu-primary transition-colors flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-cu-primary/20 rounded ${dense ? 'text-[13px]' : 'text-[14px]'}`}
           onClick={(e) => { e.stopPropagation(); onOpenTask?.(task.taskId); }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -172,28 +172,28 @@ export default function SprintCard({
       </div>
 
       {/* Date */}
-      <div className={`relative flex items-center gap-2 text-[11px] font-medium text-[#475467] ${dense ? 'mb-2' : 'mb-3'}`}>
+      <div className={`relative flex items-center gap-2 text-[11px] font-medium text-cu-text-secondary ${dense ? 'mb-2' : 'mb-3'}`}>
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             setDateOpen((prev) => !prev);
           }}
-          className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-[#EEF4FF]"
+          className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-cu-primary/10"
           aria-label="Edit due date"
         >
-          <Calendar size={14} className={isOverdue ? 'text-[#F04438]' : 'text-[#98A2B3]'} />
-          <span className={isOverdue ? 'text-[#F04438]' : ''}>{dueDateFormatted ?? 'Set due date'}</span>
+          <Calendar size={14} className={isOverdue ? 'text-red-500' : 'text-cu-text-muted'} />
+          <span className={isOverdue ? 'text-red-500' : ''}>{dueDateFormatted ?? 'Set due date'}</span>
         </button>
         {dateOpen && (
           <div
-            className="absolute top-6 left-0 z-20 rounded-lg border border-[#D0D5DD] bg-white p-2 shadow-xl"
+            className="absolute top-6 left-0 z-20 rounded-lg border border-cu-border bg-cu-bg p-2 shadow-cu-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <input
               type="date"
               defaultValue={task.dueDate?.slice(0, 10)}
-              className="rounded-md border border-[#D0D5DD] px-2 py-1 text-xs"
+              className="rounded-md border border-cu-border px-2 py-1 text-xs bg-cu-bg text-cu-text-primary"
               onChange={(e) => {
                 void onUpdateDueDate?.(task.taskId, e.target.value || null);
                 setDateOpen(false);
@@ -205,7 +205,12 @@ export default function SprintCard({
 
       {/* Bottom row: Priority badge, Story points & Assignee */}
       <div className={`flex items-center justify-between mt-auto ${dense ? 'pt-1' : 'pt-1.5'}`}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {task.blocked && (
+            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-500">
+              <Lock size={10} className="flex-shrink-0" /> Blocked
+            </span>
+          )}
           {priorityStyle && (
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${priorityStyle.bg} ${priorityStyle.text}`}>
               {priorityStyle.label}
@@ -216,7 +221,7 @@ export default function SprintCard({
         <div className="relative">
           <button
             type="button"
-            className="rounded-full focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
+            className="rounded-full focus:outline-none focus:ring-2 focus:ring-cu-primary/20"
             onClick={(e) => {
               e.stopPropagation();
               setAssigneeOpen((prev) => !prev);
@@ -228,23 +233,23 @@ export default function SprintCard({
                 name={task.assigneeName}
                 profilePicUrl={task.assigneePhotoUrl}
                 size={24}
-                className="border-2 border-white ring-1 ring-[#EAECF0]"
+                className="border-2 border-cu-bg ring-1 ring-cu-border"
               />
             ) : (
-              <span className="text-[10px] text-gray-400 font-medium">Unassigned</span>
+              <span className="text-[10px] text-cu-text-muted font-medium">Unassigned</span>
             )}
           </button>
           {assigneeOpen && (
             <div
-              className="absolute right-0 top-7 z-20 w-64 rounded-xl border border-[#D0D5DD] bg-white p-2 shadow-xl"
+              className="absolute right-0 top-7 z-20 w-64 rounded-xl border border-cu-border bg-cu-bg p-2 shadow-cu-xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-[#667085]">Assignees</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-cu-text-muted">Assignees</p>
                 <div className="flex gap-1">
                 <button
                   type="button"
-                  className={`rounded-md px-2 py-1 text-[10px] ${assignMode === 'single' ? 'bg-[#EEF4FF] text-[#155DFC]' : 'bg-[#F2F4F7] text-[#344054]'}`}
+                  className={`rounded-md px-2 py-1 text-[10px] ${assignMode === 'single' ? 'bg-cu-primary/10 text-cu-primary' : 'bg-cu-bg-secondary text-cu-text-primary'}`}
                   onClick={() => {
                     setAssignMode('single');
                     setMultiSelected([]);
@@ -254,7 +259,7 @@ export default function SprintCard({
                 </button>
                 <button
                   type="button"
-                  className={`rounded-md px-2 py-1 text-[10px] ${assignMode === 'multi' ? 'bg-[#EEF4FF] text-[#155DFC]' : 'bg-[#F2F4F7] text-[#344054]'}`}
+                  className={`rounded-md px-2 py-1 text-[10px] ${assignMode === 'multi' ? 'bg-cu-primary/10 text-cu-primary' : 'bg-cu-bg-secondary text-cu-text-primary'}`}
                   onClick={() => setAssignMode('multi')}
                 >
                   Multi
@@ -266,10 +271,10 @@ export default function SprintCard({
                   <button
                     key={member.id}
                     type="button"
-                    className={`w-full rounded-md px-2 py-1 text-left text-xs hover:bg-[#F9FAFB] ${
+                    className={`w-full rounded-md px-2 py-1 text-left text-xs hover:bg-cu-hover ${
                       assignMode === 'multi' && multiSelected.includes(member.userId ?? member.id)
-                        ? 'bg-[#EFF8FF] text-[#155DFC]'
-                        : 'text-[#101828]'
+                        ? 'bg-cu-primary/5 text-cu-primary'
+                        : 'text-cu-text-primary'
                     }`}
                     onClick={async () => {
                       if (assignMode === 'single') {
@@ -294,7 +299,7 @@ export default function SprintCard({
               {assignMode === 'multi' && (
                 <button
                   type="button"
-                  className="mt-2 w-full rounded-md bg-[#155DFC] px-2 py-1 text-xs font-semibold text-white disabled:opacity-60"
+                  className="mt-2 w-full rounded-md bg-cu-primary px-2 py-1 text-xs font-semibold text-white disabled:opacity-60"
                   onClick={() => void applyMultiAssign()}
                   disabled={assigning}
                 >

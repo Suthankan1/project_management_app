@@ -18,7 +18,7 @@ interface ChatInputProps {
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), {
   ssr: false,
   loading: () => (
-    <div className="w-[320px] h-[400px] flex items-center justify-center"><Loader2 className="animate-spin text-gray-400" size={20} /></div>
+    <div className="w-[320px] h-[400px] flex items-center justify-center bg-cu-bg"><Loader2 className="animate-spin text-cu-text-muted" size={20} /></div>
   ),
 });
 
@@ -137,13 +137,13 @@ export const ChatInput = ({
 
   return (
     <div
-      className="relative flex-shrink-0 border-t border-gray-100/80 bg-white/95 px-2 sm:px-4 py-3 mb-[calc(3.75rem+env(safe-area-inset-bottom,0px))] md:mb-0 z-30 shadow-[0_-6px_18px_rgba(0,0,0,0.04)] supports-[backdrop-filter]:backdrop-blur"
+      className="relative flex-shrink-0 border-t border-cu-border bg-cu-bg/95 px-2 sm:px-4 py-3 mb-[calc(3.75rem+env(safe-area-inset-bottom,0px))] md:mb-0 z-30 shadow-cu-sm supports-[backdrop-filter]:backdrop-blur"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       {/* Mention dropdown */}
       {showMentionList && filteredMentionCandidates.length > 0 && (
-        <div className="absolute bottom-full left-2 right-2 sm:left-4 sm:right-4 mb-2 bg-white border border-gray-100 rounded-2xl shadow-lg overflow-hidden z-20">
-          <div className="px-3 pt-2.5 pb-1 text-[10.5px] font-bold text-gray-400 uppercase tracking-wider">
+        <div className="absolute bottom-full left-2 right-2 sm:left-4 sm:right-4 mb-2 bg-cu-bg border border-cu-border rounded-2xl shadow-cu-lg overflow-hidden z-20">
+          <div className="px-3 pt-2.5 pb-1 text-[10.5px] font-bold text-cu-text-muted uppercase tracking-wider">
             Mention a teammate
           </div>
           {filteredMentionCandidates.map((candidate) => (
@@ -152,26 +152,26 @@ export const ChatInput = ({
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyMention(candidate)}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] hover:bg-gray-50 transition-colors text-left"
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] hover:bg-cu-bg-secondary transition-colors text-left"
               aria-label={`Mention ${candidate}`}
             >
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                 {candidate.charAt(0).toUpperCase()}
               </div>
-              <span className="text-[13px] font-medium text-gray-700">@{candidate}</span>
+              <span className="text-[13px] font-medium text-cu-text-primary">@{candidate}</span>
             </button>
           ))}
         </div>
       )}
 
       {/* Input row */}
-      <div className={`flex items-center gap-2 bg-gray-50 border rounded-2xl px-3 py-2.5 sm:py-2 transition-all
-        ${disabled ? 'opacity-60 cursor-not-allowed' : 'focus-within:bg-white focus-within:border-blue-200 focus-within:ring-2 focus-within:ring-blue-50'}
-        border-gray-200 shadow-[0_6px_22px_rgba(0,0,0,0.03)]`}>
+      <div className={`flex items-center gap-2 bg-cu-bg-secondary border rounded-2xl px-3 py-2.5 sm:py-2 transition-all
+        ${disabled ? 'opacity-60 cursor-not-allowed' : 'focus-within:bg-cu-bg-tertiary focus-within:border-cu-primary/40 focus-within:ring-2 focus-within:ring-cu-primary/10'}
+        border-cu-border shadow-cu-sm`}>
 
         {/* Emoji Picker Dropdown */}
         {showEmojiPicker && !disabled && (
-          <div className="absolute bottom-[calc(100%+12px)] left-4 z-50 shadow-2xl rounded-2xl overflow-hidden border border-gray-100">
+          <div className="absolute bottom-[calc(100%+12px)] left-4 z-50 shadow-cu-lg rounded-2xl overflow-hidden border border-cu-border bg-cu-bg">
             <EmojiPicker
               onEmojiClick={(emojiData) => {
                 const nextValue = input + emojiData.emoji;
@@ -181,7 +181,7 @@ export const ChatInput = ({
                 textareaRef.current?.focus();
               }}
               lazyLoadEmojis={true}
-              theme={Theme.LIGHT}
+              theme={Theme.DARK}
               searchDisabled={true}
               previewConfig={{ showPreview: false }}
               height={350}
@@ -196,7 +196,7 @@ export const ChatInput = ({
           onClick={() => setShowEmojiPicker((prev) => !prev)}
           disabled={disabled}
           className={`w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl transition-all flex-shrink-0
-            ${showEmojiPicker ? 'text-blue-500 bg-blue-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200'}`}
+            ${showEmojiPicker ? 'text-cu-primary bg-cu-primary/10' : 'text-cu-text-muted hover:text-cu-text-primary hover:bg-cu-bg-tertiary'}`}
           title="Emoji Picker"
           aria-label="Toggle emoji picker"
         >
@@ -218,12 +218,12 @@ export const ChatInput = ({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || uploading}
-          className="w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-all flex-shrink-0"
+          className="w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl text-cu-text-muted hover:text-cu-text-primary hover:bg-cu-bg-tertiary transition-all flex-shrink-0"
           title="Attach file"
           aria-label="Attach file"
         >
           {uploading ? (
-            <span className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+            <span className="w-4 h-4 border-2 border-cu-border border-t-cu-primary rounded-full animate-spin" />
           ) : (
             <Paperclip size={17} strokeWidth={2} />
           )}
@@ -241,10 +241,10 @@ export const ChatInput = ({
           }}
           onBlur={() => onTypingChange?.(false)}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder || 'Type a message…'}
+          placeholder={placeholder || 'Type a message...'}
           disabled={disabled}
           rows={1}
-          className="flex-1 bg-transparent text-[16px] sm:text-[14px] text-gray-800 placeholder:text-gray-400 outline-none resize-none leading-relaxed py-1 max-h-32 overflow-y-auto"
+          className="flex-1 bg-transparent text-[16px] sm:text-[14px] text-cu-text-primary placeholder:text-cu-text-muted outline-none resize-none leading-relaxed py-1 max-h-32 overflow-y-auto"
           aria-label="Message input"
           aria-multiline="true"
           aria-autocomplete="list"
@@ -258,8 +258,8 @@ export const ChatInput = ({
           disabled={!canSend}
           className={`w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl flex-shrink-0 transition-all duration-150
             ${canSend
-              ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-sm shadow-blue-200 active:scale-95'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+              ? 'bg-cu-primary text-white hover:bg-cu-primary-dark shadow-cu-sm active:scale-95'
+              : 'bg-cu-bg-tertiary text-cu-text-muted cursor-not-allowed'}`}
           aria-label="Send message"
           title="Send (Enter)"
         >
@@ -269,8 +269,8 @@ export const ChatInput = ({
 
       {/* Hint */}
       {!disabled && (
-        <p className="hidden sm:block text-[10px] text-gray-400 text-center mt-1.5">
-          <span className="font-medium">Enter</span> to send · <span className="font-medium">Shift+Enter</span> for new line
+        <p className="hidden sm:block text-[10px] text-cu-text-muted text-center mt-1.5">
+          <span className="font-medium">Enter</span> to send &middot; <span className="font-medium">Shift+Enter</span> for new line
         </p>
       )}
     </div>

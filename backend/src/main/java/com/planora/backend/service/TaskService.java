@@ -12,9 +12,10 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,8 @@ import com.planora.backend.dto.TaskResponseDTO.SubtaskDTO;
 import com.planora.backend.exception.ForbiddenException;
 import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.Comment;
+import com.planora.backend.model.Kanban;
+import com.planora.backend.model.KanbanColumn;
 import com.planora.backend.model.Label;
 import com.planora.backend.model.Milestone;
 import com.planora.backend.model.Priority;
@@ -40,6 +43,8 @@ import com.planora.backend.model.TeamMember;
 import com.planora.backend.model.TeamRole;
 import com.planora.backend.model.User;
 import com.planora.backend.repository.CommentRepository;
+import com.planora.backend.repository.KanbanColumnRepository;
+import com.planora.backend.repository.KanbanRepository;
 import com.planora.backend.repository.LabelRepository;
 import com.planora.backend.repository.MilestoneRepository;
 import com.planora.backend.repository.ProjectRepository;
@@ -48,54 +53,65 @@ import com.planora.backend.repository.TaskAccessRepository;
 import com.planora.backend.repository.TaskRepository;
 import com.planora.backend.repository.UserRepository;
 
+import lombok.RequiredArgsConstructor;
+
 /*
  * Handles the complete lifecycle of tasks, including Agile metrics (sprints, story points),
  * complex relationships (dependencies, subtasks), and strict Role-Based Access Control.
  */
 @Service
+@RequiredArgsConstructor
 public class TaskService {
 
-    @Autowired
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
-    @Autowired
-    private ProjectRepository projectRepository;
+    private final KanbanColumnRepository kanbanColumnRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final KanbanRepository kanbanRepository;
 
-    @Autowired
-    private LabelRepository labelRepository;
+    private final ProjectRepository projectRepository;
 
-    @Autowired
-    private CommentRepository commentRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private SprintRepository sprintRepository;
+    private final LabelRepository labelRepository;
 
-    @Autowired
-    private NotificationService notificationService;
+    private final CommentRepository commentRepository;
 
-    @Autowired
-    private TaskAccessRepository taskAccessRepository;
+    private final SprintRepository sprintRepository;
 
-    @Autowired
-    private TaskActivityService taskActivityService;
+    private final NotificationService notificationService;
 
-    @Autowired
-    private MilestoneRepository milestoneRepository;
+    private final TaskAccessRepository taskAccessRepository;
 
-    @Autowired
-    private UserService userService;
+    private final TaskActivityService taskActivityService;
 
-    @Autowired
-    private TeamMembershipLookupService teamMembershipLookupService;
+    private final MilestoneRepository milestoneRepository;
 
-    @Autowired
-    private TaskGithubService taskGithubService;
+    private final UserService userService;
 
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    public static final List<String> ALLOWED_SORT_FIELDS = List.of(
+            "createdAt",
+            "updatedAt",
+            "dueDate",
+            "priority",
+            "status",
+            "title",
+            "projectTaskNumber"
+    );
+
+    public static boolean isAllowedTaskSortField(String sortBy) {
+        return sortBy != null && ALLOWED_SORT_FIELDS.contains(sortBy);
+    }
+
+    public static boolean isAllowedTaskSortDirection(String sortDir) {
+        return sortDir != null && ("asc".equalsIgnoreCase(sortDir) || "desc".equalsIgnoreCase(sortDir));
+    }
+
+    private final TeamMembershipLookupService teamMembershipLookupService;
+
+    private final TaskGithubService taskGithubService;
+
+    private final SimpMessagingTemplate messagingTemplate;
 
     // ── 1. CREATE TASK ──────────────────────────────────────────────────────────
 
@@ -134,10 +150,12 @@ public class TaskService {
                     .orElseThrow(()-> new ResourceNotFoundException("Sprint not found"));
             task.setSprint(sprint);
             // Append to the bottom of the Sprint board.
+            projectRepository.findByIdWithLock(project.getId()); // serialise concurrent position assignments
             task.setSprintPosition(taskRepository.findMaxSprintPositionBySprintId(sprint.getId()) + 1);
             task.setBacklogPosition(null);
         } else {
             // Append to the bottom of the Backlog.
+            projectRepository.findByIdWithLock(project.getId()); // serialise concurrent position assignments
             task.setBacklogPosition(taskRepository.findMaxBacklogPositionByProjectId(project.getId()) + 1);
             task.setSprintPosition(null);
         }
@@ -183,7 +201,10 @@ public class TaskService {
         if (request.getRecurrenceRule() != null) {
             task.setRecurrenceRule(request.getRecurrenceRule());
             task.setRecurrenceEnd(request.getRecurrenceEnd());
-            task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule()));
+            task.setRecurrenceActive(request.getRecurrenceActive() != null ? request.getRecurrenceActive() : true);
+            task.setCustomInterval(request.getCustomInterval());
+            task.setRecurrenceLimit(request.getRecurrenceLimit());
+            task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule(), request.getCustomInterval()));
         }
 
         Task savedTask = taskRepository.save(task);
@@ -204,6 +225,49 @@ public class TaskService {
 
         return getTaskById(savedTask.getId());
 
+    }
+
+    @Transactional
+    public Task createAutomationTask(Project project, String title, String description, Priority priority) {
+        if (project == null || project.getId() == null) {
+            throw new ResourceNotFoundException("Project not found");
+        }
+
+        Task task = new Task();
+        task.setTitle(title);
+        task.setDescription(description);
+        task.setProject(project);
+        task.setProjectTaskNumber(taskRepository.findMaxProjectTaskNumberByProjectId(project.getId()) + 1L);
+        task.setStoryPoint(0);
+        task.setPriority(priority != null ? priority : Priority.HIGH);
+
+        if (project.getOwner() != null) {
+            task.setLastModifiedBy(project.getOwner());
+            if (project.getTeam() != null) {
+                TeamMember reporter = teamMembershipLookupService.getTeamMember(
+                        project.getTeam().getId(), project.getOwner().getUserId());
+                if (reporter != null) {
+                    task.setReporter(reporter);
+                }
+            }
+        }
+
+        List<Kanban> kanbans = kanbanRepository.findByProjectId(project.getId());
+        if (!kanbans.isEmpty()) {
+            List<KanbanColumn> columns = kanbanColumnRepository.findByKanbanIdOrderByPosition(kanbans.get(0).getId());
+            if (!columns.isEmpty()) {
+                KanbanColumn firstColumn = columns.get(0);
+                task.setKanbanColumn(firstColumn);
+                task.setStatus(firstColumn.getStatus());
+                task.setBacklogPosition(null);
+                task.setSprintPosition(null);
+                return taskRepository.save(task);
+            }
+        }
+
+        task.setBacklogPosition(taskRepository.findMaxBacklogPositionByProjectId(project.getId()) + 1);
+        task.setSprintPosition(null);
+        return taskRepository.save(task);
     }
 
     // ── 2. GET TASK BY ID ───────────────────────────────────────────────────────
@@ -274,6 +338,7 @@ public class TaskService {
                 // Sent to Backlog
                 task.setSprint(null);
                 task.setSprintPosition(null);
+                projectRepository.findByIdWithLock(task.getProject().getId()); // serialise concurrent position assignments
                 task.setBacklogPosition(taskRepository.findMaxBacklogPositionByProjectId(task.getProject().getId()) + 1);
             } else {
                 // Sent to a new Sprint
@@ -281,6 +346,7 @@ public class TaskService {
                         .orElseThrow(()->new ResourceNotFoundException("Sprint not found"));
                 task.setSprint(sprint);
                 task.setBacklogPosition(null);
+                projectRepository.findByIdWithLock(task.getProject().getId()); // serialise concurrent position assignments
                 task.setSprintPosition(taskRepository.findMaxSprintPositionBySprintId(sprint.getId()) + 1);
             }
         }
@@ -312,9 +378,49 @@ public class TaskService {
 
         // update recurrence (V7)
         if (request.getRecurrenceRule() != null) {
-            task.setRecurrenceRule(request.getRecurrenceRule());
-            task.setRecurrenceEnd(request.getRecurrenceEnd());
-            task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule()));
+            if (request.getRecurrenceRule().trim().isEmpty() || "NONE".equalsIgnoreCase(request.getRecurrenceRule())) {
+                task.setRecurrenceRule(null);
+                task.setRecurrenceEnd(null);
+                task.setNextOccurrence(null);
+                task.setCustomInterval(null);
+                task.setRecurrenceLimit(null);
+                task.setRecurrenceActive(false);
+            } else {
+                task.setRecurrenceRule(request.getRecurrenceRule());
+                task.setRecurrenceEnd(request.getRecurrenceEnd());
+                if (request.getRecurrenceActive() != null) {
+                    task.setRecurrenceActive(request.getRecurrenceActive());
+                }
+                task.setCustomInterval(request.getCustomInterval());
+                task.setRecurrenceLimit(request.getRecurrenceLimit());
+                task.setNextOccurrence(computeNextOccurrence(task.getDueDate(), request.getRecurrenceRule(), request.getCustomInterval()));
+            }
+        } else if (request.getRecurrenceActive() != null) {
+            task.setRecurrenceActive(request.getRecurrenceActive());
+        }
+
+        // Handle archiving/unarchiving
+        if (request.getArchived() != null) {
+            if (request.getArchived() != task.isArchived()) {
+                task.setArchived(request.getArchived());
+                User actor = userRepository.findById(currentUserId).orElseThrow();
+                task.setLastModifiedBy(actor);
+                if (request.getArchived()) {
+                    task.setArchivedAt(LocalDateTime.now());
+                    taskActivityService.logActivity(
+                            taskId,
+                            TaskActivityType.UPDATED,
+                            actor.getUsername(),
+                            "Task archived");
+                } else {
+                    task.setArchivedAt(null);
+                    taskActivityService.logActivity(
+                            taskId,
+                            TaskActivityType.UPDATED,
+                            actor.getUsername(),
+                            "Task unarchived");
+                }
+            }
         }
 
         task.setLastModifiedBy(userRepository.findById(currentUserId).orElseThrow());
@@ -372,7 +478,7 @@ public class TaskService {
 
     // ── 4. DELETE TASK ──────────────────────────────────────────────────────────
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long deleteTask(Long taskId, Long currentUserId) {
         Task task = taskRepository.findByIdWithDetails(taskId)
                 .orElseThrow(()-> new ResourceNotFoundException("Task not found"));
@@ -434,24 +540,63 @@ public class TaskService {
 
     // ── 5. GET TASKS BY PROJECT (Highly Optimized Fetch) ────────────────────────
     @Transactional(readOnly = true)
-    public List<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId,
-                                                   String status, Long assigneeId,
-                                                   String priority, Long sprintId, Long milestoneId) {
+    public Page<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId, Pageable pageable) {
+        return getTasksByProject(projectId, currentUserId, pageable, false);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId, Pageable pageable, Boolean archived) {
+        validateTaskSort(pageable.getSort());
+
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
         requireMinimumRole(project.getTeam().getId(), currentUserId, null);
 
-        /*
-         * PERFORMANCE OPTIMIZATION (The "Two-Phase Fetch"):
-         * Fetching a Task + Labels + Subtasks + Attachments + Assignees all in one SQL query
-         * creates a massive "Cartesian Product" (multiplying rows), which crashes the database memory.
-         * * Solution:
-         * 1. Query just the IDs of the tasks we need.
-         * 2. Use those IDs to execute a secondary, batched fetch that safely loads collections.
-         */
+        boolean isArchived = archived != null && archived;
+        Page<Task> taskPage = taskRepository.findByProjectIdAndArchived(projectId, isArchived, pageable);
+        if (taskPage.isEmpty()) {
+            return taskPage.map(t -> mapToDTO(t, java.util.Map.of()));
+        }
+
+        List<Long> ids = taskPage.getContent().stream().map(Task::getId).toList();
+        List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
+        java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(ids);
+        java.util.Map<Long, Task> enrichedMap = enriched.stream()
+                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
+
+        return taskPage.map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap));
+    }
+
+    private void validateTaskSort(Sort sort) {
+        for (Sort.Order order : sort) {
+            String property = order.getProperty();
+            if (!isAllowedTaskSortField(property)) {
+                throw new IllegalArgumentException(
+                        "Invalid task sort field '" + property + "'. Allowed values: " + String.join(", ", ALLOWED_SORT_FIELDS));
+            }
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId,
+                                                   String status, Long assigneeId,
+                                                   String priority, Long sprintId, Long milestoneId) {
+        return getTasksByProject(projectId, currentUserId, status, assigneeId, priority, sprintId, milestoneId, false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaskResponseDTO> getTasksByProject(Long projectId, Long currentUserId,
+                                                   String status, Long assigneeId,
+                                                   String priority, Long sprintId, Long milestoneId,
+                                                   Boolean archived) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+        requireMinimumRole(project.getTeam().getId(), currentUserId, null);
+
+        boolean isArchived = archived != null && archived;
         boolean hasFilters = status != null || assigneeId != null || priority != null || sprintId != null || milestoneId != null;
         if (hasFilters) {
-            List<Task> filteredTasks = taskRepository.findByProjectIdFiltered(projectId, status, assigneeId, priority, sprintId, milestoneId)
+            List<Task> filteredTasks = taskRepository.findByProjectIdFilteredAndArchived(projectId, status, assigneeId, priority, sprintId, milestoneId, isArchived)
                     .stream()
                     .distinct()
                     .toList();
@@ -462,20 +607,20 @@ public class TaskService {
             List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
             java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(ids);
             java.util.Map<Long, Task> enrichedMap = enriched.stream()
-                    .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t));
+                    .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
             return filteredTasks.stream()
                     .map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap))
                     .collect(Collectors.toList());
         }
 
-        // Standard unfiltered fetch
-        List<Task> tasks = taskRepository.findByProjectIdWithScalars(projectId);
+        // Standard fetch
+        List<Task> tasks = taskRepository.findByProjectIdWithScalarsAndArchived(projectId, isArchived);
         if (tasks.isEmpty()) return List.of();
         List<Long> ids = tasks.stream().map(Task::getId).collect(Collectors.toList());
         List<Task> enriched = taskRepository.findByIdInWithCollections(ids);
         java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(ids);
         java.util.Map<Long, Task> enrichedMap = enriched.stream()
-                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t));
+                .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
         return tasks.stream()
                 .map(t -> mapToDTO(enrichedMap.getOrDefault(t.getId(), t), dependencyMap))
                 .collect(Collectors.toList());
@@ -571,6 +716,11 @@ public class TaskService {
             throw new IllegalArgumentException("A task cannot depend on itself");
         }
 
+        Task blocker = findTaskWithProjectTeam(blockerId);
+
+        // Prevent dependency across inaccessible projects
+        requireMinimumRole(blocker.getProject().getTeam().getId(), currentUserId, null);
+
         // Check: would adding (taskId -> blockerId) create a cycle?
         // i.e., is taskId already reachable from blockerId through existing dependencies?
         if (wouldCreateCycle(blockerId, taskId)) {
@@ -579,7 +729,6 @@ public class TaskService {
             );
         }
 
-        Task blocker = findTaskWithProjectTeam(blockerId);
         task.getDependencies().add(blocker);
         task.setLastModifiedBy(userRepository.findById(currentUserId).orElseThrow());
         taskRepository.save(task);
@@ -726,8 +875,8 @@ public class TaskService {
     // ── 12. ASSIGNEE MANAGEMENT ─────────────────────────────────────────────────
 
     @Transactional
-    public void assignUser(Long taskID, Long userId, Long currentUserId) {
-        Task task = findTaskWithProjectTeam(taskID);
+    public void assignUser(Long taskId, Long userId, Long currentUserId) {
+        Task task = findTaskWithProjectTeam(taskId);
 
         //permission check
         requireMinimumRole(task.getProject().getTeam().getId(), currentUserId, TeamRole.MEMBER);
@@ -911,6 +1060,17 @@ public class TaskService {
         return getTaskById(saved.getId());
     }
 
+    @Transactional
+    public void updateTaskColumn(Long taskId, Long columnId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
+        KanbanColumn column = kanbanColumnRepository.findById(columnId)
+                .orElseThrow(() -> new ResourceNotFoundException("Kanban column not found"));
+        task.setKanbanColumn(column);
+        task.setStatus(column.getStatus());
+        taskRepository.save(task);
+    }
+
     /**
      * If the just-updated task is a subtask, checks whether all siblings are DONE.
      * If yes, auto-moves the parent to DONE and logs the activity.
@@ -972,6 +1132,17 @@ public class TaskService {
         String actorName = actor != null ? actor.getUsername() : "Unknown";
         taskActivityService.logActivity(task.getId(), TaskActivityType.ASSIGNEE_CHANGED,
                 actorName, actorName + " unassigned the task");
+    }
+
+    @Transactional
+    public void linkGithubIssue(Long taskId, Long githubIssueNumber, String githubRepoFullName, Long currentUserId) {
+        Task task = findTaskWithProjectTeam(taskId);
+        requireMinimumRole(task.getProject().getTeam().getId(), currentUserId, TeamRole.MEMBER);
+
+        task.setGithubIssueNumber(githubIssueNumber);
+        task.setGithubRepoFullName(githubRepoFullName);
+        task.setLastModifiedBy(userRepository.findById(currentUserId).orElseThrow());
+        taskRepository.save(task);
     }
 
     //19. BULK UPDATE STATUS
@@ -1219,10 +1390,8 @@ public class TaskService {
         // Map dependencies
         if (dependencyMap != null) {
             dto.setDependencies(dependencyMap.getOrDefault(task.getId(), List.of()));
-        } else if(task.getDependencies() != null){
-            dto.setDependencies(new ArrayList<>(task.getDependencies()).stream()
-                .map(d -> new DependencyDTO(d.getId(), d.getTitle(), "BLOCKED_BY"))
-                .collect(Collectors.toList()));
+        } else {
+            dto.setDependencies(buildDependencyMap(List.of(task.getId())).getOrDefault(task.getId(), List.of()));
         }
 
         // Map attachments
@@ -1238,12 +1407,18 @@ public class TaskService {
         dto.setRecurrenceRule(task.getRecurrenceRule());
         dto.setRecurrenceEnd(task.getRecurrenceEnd());
         dto.setNextOccurrence(task.getNextOccurrence());
+        dto.setRecurrenceActive(task.isRecurrenceActive());
+        dto.setCustomInterval(task.getCustomInterval());
+        dto.setRecurrenceLimit(task.getRecurrenceLimit());
+        dto.setRecurrenceCount(task.getRecurrenceCount());
         if (task.getRecurrenceParent() != null) {
             dto.setRecurrenceParentId(task.getRecurrenceParent().getId());
         }
 
         // Map GitHub integration fields (V8)
-        // githubBranch is persisted on the task entity; the rest come from TaskGithubService.
+        // Issue linkage and branch are persisted on the task entity; the rest come from TaskGithubService.
+        dto.setGithubIssueNumber(task.getGithubIssueNumber());
+        dto.setGithubRepoFullName(task.getGithubRepoFullName());
         dto.setGithubBranch(task.getGithubBranch());
         if (githubSummary != null) {
             dto.setGithubPrCount(githubSummary.getPrCount());
@@ -1277,18 +1452,33 @@ public class TaskService {
         }
         java.util.Map<Long, List<DependencyDTO>> map = new java.util.HashMap<>();
         List<Object[]> rows = taskRepository.findDependencyRowsByTaskIds(taskIds);
-        if (rows == null) {
-            return map;
-        }
-        for (Object[] row : rows) {
-            Long blockedTaskId = (Long) row[0];
-            Long blockerTaskId = (Long) row[1];
-            String blockerTitle = (String) row[2];
-            if (blockedTaskId == null || blockerTaskId == null) {
-                continue;
+        if (rows != null) {
+            for (Object[] row : rows) {
+                Long blockedTaskId = (Long) row[0];
+                Long blockerTaskId = (Long) row[1];
+                String blockerTitle = (String) row[2];
+                String blockerStatus = (String) row[3];
+                if (blockedTaskId == null || blockerTaskId == null) {
+                    continue;
+                }
+                map.computeIfAbsent(blockedTaskId, ignored -> new ArrayList<>())
+                        .add(new DependencyDTO(blockerTaskId, blockerTitle, "BLOCKED_BY", blockerStatus));
             }
-            map.computeIfAbsent(blockedTaskId, ignored -> new ArrayList<>())
-                    .add(new DependencyDTO(blockerTaskId, blockerTitle, "BLOCKED_BY"));
+        }
+
+        List<Object[]> depRows = taskRepository.findDependentRowsByTaskIds(taskIds);
+        if (depRows != null) {
+            for (Object[] row : depRows) {
+                Long blockerTaskId = (Long) row[0];
+                Long blockedTaskId = (Long) row[1];
+                String blockedTitle = (String) row[2];
+                String blockedStatus = (String) row[3];
+                if (blockerTaskId == null || blockedTaskId == null) {
+                    continue;
+                }
+                map.computeIfAbsent(blockerTaskId, ignored -> new ArrayList<>())
+                        .add(new DependencyDTO(blockedTaskId, blockedTitle, "BLOCKS", blockedStatus));
+            }
         }
         return map;
     }
@@ -1305,9 +1495,9 @@ public class TaskService {
         }
         List<Task> enrichedTasks = taskRepository.findByIdInWithCollections(taskIds);
         java.util.Map<Long, Task> scalarById = scalarTasks.stream()
-                .collect(Collectors.toMap(Task::getId, t -> t));
+                .collect(Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
         java.util.Map<Long, Task> enrichedById = enrichedTasks.stream()
-                .collect(Collectors.toMap(Task::getId, t -> t));
+                .collect(Collectors.toMap(Task::getId, t -> t, (t1, t2) -> t1));
         java.util.Map<Long, List<DependencyDTO>> dependencyMap = buildDependencyMap(taskIds);
 
         return taskIds.stream()
@@ -1337,7 +1527,7 @@ public class TaskService {
     // Handles the complex math of rearranging rows when a user drags and drops a task in the UI.
     @Transactional
     public void reorderTasks(Long projectId, Long sprintId, List<Long> orderedTaskIds, Long currentUserId) {
-        Project project = projectRepository.findById(projectId)
+        Project project = projectRepository.findByIdWithLock(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
         requireMinimumRole(project.getTeam().getId(), currentUserId, TeamRole.MEMBER);
         if (orderedTaskIds == null || orderedTaskIds.isEmpty()) {
@@ -1355,7 +1545,7 @@ public class TaskService {
         }
         User actor = userRepository.findById(currentUserId).orElseThrow();
         java.util.Map<Long, Task> taskById = tasks.stream()
-                .collect(Collectors.toMap(Task::getId, task -> task));
+                .collect(Collectors.toMap(Task::getId, task -> task, (t1, t2) -> t1));
 
         // Iterate through the newly provided list and rewrite the position index integers
         for (int index = 0; index < orderedTaskIds.size(); index++) {
@@ -1379,15 +1569,16 @@ public class TaskService {
     }
 
     // Computes the next occurrence date after today based on recurrence rule.
-    private LocalDate computeNextOccurrence(LocalDate base, String rule) {
+    private LocalDate computeNextOccurrence(LocalDate base, String rule, Integer customInterval) {
         LocalDate from = (base != null && base.isAfter(LocalDate.now())) ? base : LocalDate.now();
         if (rule == null) return null;
+        int delta = (customInterval != null && customInterval > 0) ? customInterval : 1;
         return switch (rule.toUpperCase()) {
-            case "DAILY"   -> from.plusDays(1);
-            case "WEEKLY"  -> from.plusWeeks(1);
-            case "MONTHLY" -> from.plusMonths(1);
-            case "YEARLY"  -> from.plusYears(1);
-            default        -> null;
+            case "DAILY", "CUSTOM_DAYS"     -> from.plusDays(delta);
+            case "WEEKLY", "CUSTOM_WEEKS"   -> from.plusWeeks(delta);
+            case "MONTHLY", "CUSTOM_MONTHS" -> from.plusMonths(delta);
+            case "YEARLY", "CUSTOM_YEARS"   -> from.plusYears(delta);
+            default                         -> null;
         };
     }
 }

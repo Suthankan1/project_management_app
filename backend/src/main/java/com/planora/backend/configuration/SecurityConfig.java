@@ -24,32 +24,20 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
+
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Autowired
-    private JwtFilter jwtFilter;
+    private final JwtFilter jwtFilter;
 
     @Value("${cors.allowed-origins:http://localhost:3000}")
     private String corsAllowedOrigins;
 
-    private static final List<String> PUBLIC_ENDPOINTS = List.of(
-            "/api/auth/register",
-            "/api/auth/reg/verify",
-            "/api/auth/login",
-            "/api/auth/resend",
-            "/api/auth/forgot",
-            "/api/auth/reset",
-            "/api/auth/refresh",
-            "/api/github/webhooks",   // GitHub webhook deliveries carry no JWT
-            "/ws/**",
-            "/ws-native/**",
-            "/v3/api-docs/**",
-            "/swagger-ui/**",
-            "/swagger-ui.html"
-        );
+    // Single source of truth — see PublicEndpoints for the canonical list.
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -58,11 +46,13 @@ public class SecurityConfig {
             })
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(request -> request
-                .requestMatchers(PUBLIC_ENDPOINTS.toArray(new String[0]))
+                .requestMatchers(PublicEndpoints.PATTERNS.toArray(new String[0]))
                         .permitAll()
                 .requestMatchers("/api/github/issues/**")
                         .authenticated()
-                        .anyRequest().authenticated())
+                .requestMatchers("/api/auth/users")
+                        .hasAuthority("ADMIN")
+                .anyRequest().authenticated())
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
             .logout(AbstractHttpConfigurer::disable)
@@ -72,7 +62,15 @@ public class SecurityConfig {
                         .authenticationEntryPoint((req, res, authException) -> {
                             res.setContentType("application/json");
                             res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            res.getWriter().write("{\"error\": \"Unauthorized\"}");
+                            com.planora.backend.dto.ApiErrorResponse errorResponse = new com.planora.backend.dto.ApiErrorResponse(
+                                java.time.LocalDateTime.now().toString(),
+                                HttpServletResponse.SC_UNAUTHORIZED,
+                                "UNAUTHORIZED",
+                                "Unauthorized",
+                                req.getRequestURI(),
+                                null
+                            );
+                            res.getWriter().write(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(errorResponse));
                         })
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

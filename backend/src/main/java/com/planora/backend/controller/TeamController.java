@@ -6,6 +6,7 @@ import com.planora.backend.dto.TeamSummaryDTO;
 import com.planora.backend.model.Team;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.service.TeamService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,12 +15,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
-@RequestMapping("api/teams")
+@RequestMapping("/api/teams")
+@RequiredArgsConstructor
 public class TeamController {
 
-    @Autowired
-    TeamService service;
+    private final TeamService service;
 
     // 0. CHECK TEAM NAME
     @GetMapping("/check-name")
@@ -32,7 +35,7 @@ public class TeamController {
     // 1. CREATE TEAM
     @PostMapping
     public ResponseEntity<TeamSummaryDTO> createTeam(
-            @RequestBody TeamCreationDTO creationDTO,
+            @Valid @RequestBody TeamCreationDTO creationDTO,
             @AuthenticationPrincipal UserPrincipal currentUser) {
 
         Long currentUserId = currentUser.getUserId();
@@ -66,7 +69,7 @@ public class TeamController {
     // 4. UPDATE TEAM
     @PutMapping("/{id}")
     public ResponseEntity<TeamSummaryDTO> updateTeam(
-            @RequestBody TeamCreationDTO teamCreationDTO,
+            @Valid @RequestBody TeamCreationDTO teamCreationDTO,
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal currentUser) {
         Long currentUserId = currentUser.getUserId();
@@ -81,7 +84,7 @@ public class TeamController {
     }
 
     // 5. DELETE TEAM
-    @DeleteMapping("{id}")
+    @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTeam(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal currentUser) {

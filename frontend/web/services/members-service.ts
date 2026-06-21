@@ -1,33 +1,14 @@
-import api from '@/lib/axios';
+import { projectsApi } from './api-contract';
+import type { Member, PendingInvite } from './api-contract';
 
-// ── Types ──
-
-export interface Member {
-  id: number;
-  userId: number;
-  username: string;
-  email: string;
-  role: string;
-  joinedAt: string;
-}
-
-export interface PendingInvite {
-  id: number;
-  email: string;
-  role: string;
-  invitedAt: string;
-}
-
-// ── API ──
+export type { Member, PendingInvite };
 
 export async function fetchMembers(projectId: string): Promise<Member[]> {
-  const { data } = await api.get<Member[]>(`/api/projects/${projectId}/members`);
-  return data;
+  return projectsApi.getMembers(projectId);
 }
 
 export async function fetchPendingInvites(projectId: string): Promise<PendingInvite[]> {
-  const { data } = await api.get<PendingInvite[]>(`/api/projects/${projectId}/pending-invites`);
-  return data;
+  return projectsApi.getPendingInvites(projectId);
 }
 
 export async function changeRole(
@@ -35,14 +16,14 @@ export async function changeRole(
   userId: number,
   role: string,
 ): Promise<void> {
-  await api.patch(`/api/projects/${projectId}/members/${userId}/role`, { role, userId });
+  return projectsApi.changeMemberRole(projectId, userId, role);
 }
 
 export async function removeMember(
   projectId: string,
   userId: number,
 ): Promise<void> {
-  await api.delete(`/api/projects/${projectId}/members/${userId}`);
+  return projectsApi.removeMember(projectId, userId);
 }
 
 export async function sendInvite(
@@ -50,5 +31,5 @@ export async function sendInvite(
   email: string,
   role: string,
 ): Promise<void> {
-  await api.post(`/api/projects/${projectId}/invitations`, { email, role });
+  return projectsApi.sendInvite(projectId, email, role);
 }

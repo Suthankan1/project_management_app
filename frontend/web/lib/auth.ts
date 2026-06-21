@@ -1,4 +1,5 @@
 import { initializeSessionCacheForCurrentAuth } from '@/lib/session-cache';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
 export interface User {
     email: string;
@@ -12,6 +13,12 @@ export const AUTH_TOKEN_CHANGED_EVENT = 'planora-auth-token-changed';
 
 const TOKEN_KEY = 'planora:access_token';
 const REFRESH_TOKEN_KEY = 'planora:refresh_token';
+const REFRESH_TOKEN_MARKER_KEY = 'planora:has_refresh_token';
+const AUTH_SYNC_KEY = 'planora:auth_sync';
+const REFRESH_LOCK_KEY = 'planora:refresh_lock';
+const REFRESH_LOCK_TIMEOUT_MS = 10_000;
+const REFRESH_LOCK_POLL_MS = 75;
+const AUTH_BROADCAST_CHANNEL = 'planora-auth';
 
 interface JwtPayload {
     sub?: string;
@@ -20,6 +27,26 @@ interface JwtPayload {
 }
 
 let refreshAccessTokenPromise: Promise<string> | null = null;
+let authSyncListenerInstalled = false;
+let authBroadcastChannel: BroadcastChannel | null = null;
+let authLogoutInProgress = false;
+let authStateGeneration = 0;
+const authTabId = Math.random().toString(36).slice(2);
+
+type AuthSyncType = 'login' | 'logout';
+
+interface RefreshAccessTokenOptions {
+    allowCookieRefresh?: boolean;
+}
+
+type EnsureValidTokenOptions = RefreshAccessTokenOptions;
+
+interface AuthSyncMessage {
+    type?: AuthSyncType;
+    token?: string | null;
+    sourceTabId?: string;
+    issuedAt?: number;
+}
 
 function emitAuthTokenChanged(): void {
     if (typeof window !== 'undefined') {
@@ -27,12 +54,196 @@ function emitAuthTokenChanged(): void {
     }
 }
 
+function markAuthActive(): void {
+    authLogoutInProgress = false;
+}
+
+function markAuthLoggedOut(): void {
+    authLogoutInProgress = true;
+    authStateGeneration += 1;
+}
+
+function setMemoryAccessToken(token: string): void {
+    markAuthActive();
+    memoryToken = token;
+    initializeSessionCacheForCurrentAuth(token);
+    emitAuthTokenChanged();
+}
+
+function handleAuthBroadcastMessage(event: MessageEvent<AuthSyncMessage>): void {
+    const message = event.data;
+    if (!message || message.sourceTabId === authTabId) return;
+
+    if (message.type === 'logout') {
+        markAuthLoggedOut();
+        clearLocalAuthState();
+        emitAuthTokenChanged();
+        return;
+    }
+
+    if (message.type === 'login' && message.token) {
+        localStorage.setItem(REFRESH_TOKEN_MARKER_KEY, 'true');
+        sessionStorage.removeItem(REFRESH_TOKEN_MARKER_KEY);
+        setMemoryAccessToken(message.token);
+    }
+}
+
+function getAuthBroadcastChannel(): BroadcastChannel | null {
+    if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') {
+        return null;
+    }
+
+    if (!authBroadcastChannel) {
+        authBroadcastChannel = new BroadcastChannel(AUTH_BROADCAST_CHANNEL);
+        authBroadcastChannel.onmessage = handleAuthBroadcastMessage;
+    }
+
+    return authBroadcastChannel;
+}
+
+function broadcastAuthSync(type: AuthSyncType, token?: string | null): void {
+    if (typeof window === 'undefined') return;
+    const message: AuthSyncMessage = {
+        type,
+        token: token || null,
+        sourceTabId: authTabId,
+        issuedAt: Date.now(),
+    };
+
+    try {
+        getAuthBroadcastChannel()?.postMessage(message);
+    } catch {
+        // BroadcastChannel sync is best-effort; storage sync remains as fallback.
+    }
+
+    try {
+        localStorage.setItem(AUTH_SYNC_KEY, JSON.stringify({
+            type,
+            issuedAt: message.issuedAt,
+            id: Math.random().toString(36).slice(2),
+        }));
+    } catch {
+        // Storage sync is best-effort; same-tab auth still works without it.
+    }
+}
+
+function clearLocalAuthState(): void {
+    memoryToken = null;
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem('userProfile');
+    localStorage.removeItem('rememberMe');
+    localStorage.removeItem(REFRESH_TOKEN_MARKER_KEY);
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('refreshToken');
+    sessionStorage.removeItem(REFRESH_TOKEN_MARKER_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+
+    Object.keys(localStorage)
+        .filter((k) => k.startsWith('planora:') && k !== AUTH_SYNC_KEY)
+        .forEach((k) => localStorage.removeItem(k));
+    Object.keys(sessionStorage)
+        .filter((k) => k.startsWith('planora:'))
+        .forEach((k) => sessionStorage.removeItem(k));
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function tryAcquireRefreshLock(): boolean {
+    const now = Date.now();
+    try {
+        const rawLock = localStorage.getItem(REFRESH_LOCK_KEY);
+        if (rawLock) {
+            const lock = JSON.parse(rawLock) as { owner?: string; issuedAt?: number };
+            const lockIsFresh = typeof lock.issuedAt === 'number'
+                && now - lock.issuedAt < REFRESH_LOCK_TIMEOUT_MS;
+            if (lock.owner && lock.owner !== authTabId && lockIsFresh) {
+                return false;
+            }
+        }
+    } catch {
+        // A malformed lock should not block auth recovery.
+    }
+
+    try {
+        localStorage.setItem(REFRESH_LOCK_KEY, JSON.stringify({ owner: authTabId, issuedAt: now }));
+        const lock = JSON.parse(localStorage.getItem(REFRESH_LOCK_KEY) || '{}') as { owner?: string };
+        return lock.owner === authTabId;
+    } catch {
+        return true;
+    }
+}
+
+async function acquireRefreshLock(): Promise<() => void> {
+    if (typeof window === 'undefined') return () => undefined;
+
+    const startedAt = Date.now();
+    while (!tryAcquireRefreshLock()) {
+        if (Date.now() - startedAt > REFRESH_LOCK_TIMEOUT_MS * 2) {
+            throw new Error('Timed out waiting for refresh lock');
+        }
+        await sleep(REFRESH_LOCK_POLL_MS);
+    }
+
+    return () => {
+        try {
+            const lock = JSON.parse(localStorage.getItem(REFRESH_LOCK_KEY) || '{}') as { owner?: string };
+            if (lock.owner === authTabId) {
+                localStorage.removeItem(REFRESH_LOCK_KEY);
+            }
+        } catch {
+            localStorage.removeItem(REFRESH_LOCK_KEY);
+        }
+    };
+}
+
+function handleCrossTabAuthEvent(event: StorageEvent): void {
+    if (event.key === REFRESH_TOKEN_MARKER_KEY && event.newValue === null) {
+        markAuthLoggedOut();
+        clearLocalAuthState();
+        emitAuthTokenChanged();
+        return;
+    }
+
+    if (event.key !== AUTH_SYNC_KEY || !event.newValue) return;
+
+    try {
+        const message = JSON.parse(event.newValue) as { type?: string };
+        if (message.type === 'logout') {
+            markAuthLoggedOut();
+            clearLocalAuthState();
+            emitAuthTokenChanged();
+        } else if (message.type === 'login') {
+            markAuthActive();
+            window.setTimeout(emitAuthTokenChanged, 100);
+        }
+    } catch {
+        // Ignore malformed messages from storage.
+    }
+}
+
+function ensureAuthSyncListener(): void {
+    if (typeof window === 'undefined' || authSyncListenerInstalled) return;
+    window.addEventListener('storage', handleCrossTabAuthEvent);
+    getAuthBroadcastChannel();
+    authSyncListenerInstalled = true;
+}
+
+ensureAuthSyncListener();
+
 // Remember-me helpers
 
 /** Persist the user's "remember me" preference (stored in localStorage itself so
  *  it survives a browser restart and controls where the tokens are kept). */
 export function setRememberMe(remember: boolean): void {
     if (typeof window === 'undefined') return;
+    ensureAuthSyncListener();
+    markAuthActive();
     if (remember) {
         localStorage.setItem('rememberMe', 'true');
     } else {
@@ -42,25 +253,48 @@ export function setRememberMe(remember: boolean): void {
 
 export function getRememberMe(): boolean {
     if (typeof window === 'undefined') return false;
+    ensureAuthSyncListener();
     return localStorage.getItem('rememberMe') === 'true';
 }
 
-/** Always use localStorage so auth tokens are shared across browser tabs.
- *  sessionStorage is tab-isolated, which causes new tabs to redirect to login.
- *  Both localStorage and sessionStorage are JS-accessible, so there is no
- *  meaningful security difference — HTTP-only cookies would be needed for that.
- *  The rememberMe flag is kept for UX preference tracking only. */
-function tokenStorage(): Storage {
-    return localStorage;
+/**
+ * ARCHITECTURE DECISION RECORD (ADR): Token Storage Strategy
+ * 
+ * - Refresh Token: Stored in a secure, HttpOnly cookie on the backend.
+ * - Access Token: Stored in an in-memory module variable (`memoryToken`) to close the XSS
+ *   vulnerability storage exposure window. The token is lost on page reload and re-minted
+ *   via the HttpOnly refresh token cookie on app boot or tab load.
+ * - localStorage: Kept only for a non-sensitive refresh-cookie marker and auth event
+ *   marker so tabs can silently mint their own access token and react to logout.
+ */
+let memoryToken: string | null = null;
+
+function getOrMigrateToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    ensureAuthSyncListener();
+    if (!memoryToken) {
+        const legacyToken = localStorage.getItem(TOKEN_KEY)
+            || localStorage.getItem('token')
+            || sessionStorage.getItem(TOKEN_KEY)
+            || sessionStorage.getItem('token');
+        if (legacyToken) {
+            memoryToken = legacyToken;
+            localStorage.removeItem('planora:access_token');
+            localStorage.removeItem('token');
+            sessionStorage.removeItem('planora:access_token');
+            sessionStorage.removeItem('token');
+        }
+    }
+    return memoryToken;
 }
 
 // Token helpers
 
 export function getUserFromToken(): User | null {
     if (typeof window === 'undefined') return null;
+    ensureAuthSyncListener();
 
-    const token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem('token')
-        || sessionStorage.getItem(TOKEN_KEY) || sessionStorage.getItem('token');
+    const token = getOrMigrateToken();
     if (!token) return null;
 
     try {
@@ -128,52 +362,54 @@ export function getUserIdFromToken(): number | null {
 
 export function saveToken(token: string): void {
     if (typeof window !== 'undefined') {
+        ensureAuthSyncListener();
         localStorage.removeItem('token');
         sessionStorage.removeItem('token');
         localStorage.removeItem(TOKEN_KEY);
         sessionStorage.removeItem(TOKEN_KEY);
-        tokenStorage().setItem(TOKEN_KEY, token);
-        initializeSessionCacheForCurrentAuth(token);
-        emitAuthTokenChanged();
+        setMemoryAccessToken(token);
     }
 }
 
-export function saveRefreshToken(token: string): void {
+export function saveRefreshToken(_token: string, options: { broadcast?: boolean } = {}): void {
     if (typeof window !== 'undefined') {
+        ensureAuthSyncListener();
+        markAuthActive();
         localStorage.removeItem('refreshToken');
         sessionStorage.removeItem('refreshToken');
         localStorage.removeItem(REFRESH_TOKEN_KEY);
         sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-        tokenStorage().setItem(REFRESH_TOKEN_KEY, token);
+        localStorage.setItem(REFRESH_TOKEN_MARKER_KEY, 'true');
+        sessionStorage.removeItem(REFRESH_TOKEN_MARKER_KEY);
+
+        if (options.broadcast) {
+            broadcastAuthSync('login', memoryToken);
+        }
     }
 }
 
 export function getRefreshToken(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(REFRESH_TOKEN_KEY) || localStorage.getItem('refreshToken')
-        || sessionStorage.getItem(REFRESH_TOKEN_KEY) || sessionStorage.getItem('refreshToken');
+    ensureAuthSyncListener();
+    return localStorage.getItem(REFRESH_TOKEN_MARKER_KEY) === 'true'
+        || sessionStorage.getItem(REFRESH_TOKEN_MARKER_KEY) === 'true'
+        ? 'true'
+        : null;
 }
 
 export function clearTokens(): void {
     if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(REFRESH_TOKEN_KEY);
-        localStorage.removeItem('userProfile');
-        localStorage.removeItem('rememberMe');
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('refreshToken');
-        sessionStorage.removeItem(TOKEN_KEY);
-        sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-        // Wipe all planora: prefixed data caches so the next user session
-        // starts with a clean slate
-        Object.keys(localStorage)
-            .filter((k) => k.startsWith('planora:'))
-            .forEach((k) => localStorage.removeItem(k));
-        Object.keys(sessionStorage)
-            .filter((k) => k.startsWith('planora:'))
-            .forEach((k) => sessionStorage.removeItem(k));
+        ensureAuthSyncListener();
+        markAuthLoggedOut();
+        clearLocalAuthState();
+
+        // Non-blocking logout call to clear HttpOnly cookie
+        fetch(`${getApiBaseUrl()}/api/auth/logout`, {
+            method: 'POST',
+            credentials: 'include',
+        }).catch((err) => console.error('Failed to logout backend session', err));
+
+        broadcastAuthSync('logout');
         emitAuthTokenChanged();
     }
 }
@@ -184,9 +420,9 @@ export function clearTokens(): void {
  */
 export function getValidToken(): string | null {
     if (typeof window === 'undefined') return null;
+    ensureAuthSyncListener();
     if (getUserFromToken()) {
-        return localStorage.getItem(TOKEN_KEY) || localStorage.getItem('token')
-            || sessionStorage.getItem(TOKEN_KEY) || sessionStorage.getItem('token');
+        return memoryToken;
     }
     return null;
 }
@@ -197,30 +433,49 @@ export function getValidToken(): string | null {
  * access token (and refresh token if rotated), and returns the new access token.
  * On failure it clears all tokens and throws.
  */
-async function requestRefreshAccessToken(): Promise<string> {
+async function requestRefreshAccessToken(options: RefreshAccessTokenOptions = {}): Promise<string> {
+    if (authLogoutInProgress) {
+        throw new Error('Token refresh cancelled during logout');
+    }
+
     const rt = getRefreshToken();
-    if (!rt) {
+    if (!rt && !options.allowCookieRefresh) {
         clearTokens();
         throw new Error('No refresh token available');
     }
-    const res = await fetch('/api/auth/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: rt }),
-    });
-    if (!res.ok) {
-        clearTokens();
-        throw new Error('Token refresh failed');
+    const refreshGeneration = authStateGeneration;
+    const releaseRefreshLock = await acquireRefreshLock();
+    try {
+        if (authLogoutInProgress || refreshGeneration !== authStateGeneration) {
+            throw new Error('Token refresh cancelled during logout');
+        }
+
+        const res = await fetch(`${getApiBaseUrl()}/api/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+        });
+        if (!res.ok) {
+            clearTokens();
+            throw new Error('Token refresh failed');
+        }
+        const data = await res.json();
+
+        if (authLogoutInProgress || refreshGeneration !== authStateGeneration) {
+            throw new Error('Token refresh cancelled during logout');
+        }
+
+        saveToken(data.token);
+        saveRefreshToken('true', { broadcast: true });
+        return data.token;
+    } finally {
+        releaseRefreshLock();
     }
-    const data = await res.json();
-    saveToken(data.token);
-    if (data.refreshToken) saveRefreshToken(data.refreshToken);
-    return data.token;
 }
 
-export function refreshAccessToken(): Promise<string> {
+export function refreshAccessToken(options: RefreshAccessTokenOptions = {}): Promise<string> {
     if (!refreshAccessTokenPromise) {
-        refreshAccessTokenPromise = requestRefreshAccessToken().finally(() => {
+        refreshAccessTokenPromise = requestRefreshAccessToken(options).finally(() => {
             refreshAccessTokenPromise = null;
         });
     }
@@ -231,14 +486,16 @@ export function refreshAccessToken(): Promise<string> {
  * Returns a usable access token, refreshing it first when the short-lived token
  * has expired but the 30-day refresh token is still available.
  */
-export async function ensureValidToken(): Promise<string | null> {
+export async function ensureValidToken(options: EnsureValidTokenOptions = {}): Promise<string | null> {
     const token = getValidToken();
     if (token) return token;
 
-    if (!getRefreshToken()) return null;
+    if (authLogoutInProgress) return null;
+
+    if (!getRefreshToken() && !options.allowCookieRefresh) return null;
 
     try {
-        return await refreshAccessToken();
+        return await refreshAccessToken(options);
     } catch {
         return null;
     }

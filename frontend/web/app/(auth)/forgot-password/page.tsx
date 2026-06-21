@@ -8,6 +8,7 @@ export default function ForgotPasswordPage() {
   // Destructure the state and handlers from our custom hook.
   const {
     email, setEmail,
+    submittedEmail,
     isLoading,
     submitted, setSubmitted,
     error,
@@ -21,7 +22,7 @@ export default function ForgotPasswordPage() {
 
       {/* ── Top Navigation ── */}
       <div className="w-full max-w-[420px] mb-4">
-        <Link href="/login" className='inline-flex items-center text-sm text-gray-500 hover:text-gray-900 transition-colors'>
+        <Link href="/login" className='inline-flex items-center text-sm text-cu-text-muted hover:text-cu-text-primary transition-colors'>
           <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
           </svg>
@@ -42,35 +43,35 @@ export default function ForgotPasswordPage() {
 
           /* ── SUCCESS STATE ── */
           <div className="text-center py-8">
-            <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="mx-auto w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-6 h-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Check your email</h2>
-            <p className="text-gray-500 text-sm mb-4">
+            <h2 className="text-lg font-semibold text-cu-text-primary mb-2">Check your email</h2>
+            <p className="text-cu-text-muted text-sm mb-4">
               We&apos;ve sent a password reset code to <br />
-              <span className="font-semibold text-gray-900">{email}</span>
+              <span className="font-semibold text-cu-text-primary">{submittedEmail}</span>
             </p>
-            <p className="text-xs text-gray-400 mb-6">
+            <p className="text-xs text-cu-text-muted mb-6">
               Go to the reset password page and enter the 6-digit code you received. The code will expire in 10 minutes.
             </p>
             {cooldown > 0 ? (
-              <p className="text-sm text-gray-500 mb-4">
+              <p className="text-sm text-cu-text-muted mb-4">
                 Check your inbox. You can request another reset in{' '}
-                <span className="font-semibold text-blue-600">{cooldown}s</span>.
+                <span className="font-semibold text-cu-primary">{cooldown}s</span>.
               </p>
             ) : null}
             <button
               onClick={() => setSubmitted(false)}
               disabled={cooldown > 0}
               className={`w-full font-semibold py-2.5 rounded-xl transition-colors mb-2 text-white ${
-                cooldown > 0 ? 'bg-blue-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                cooldown > 0 ? 'bg-cu-primary/40 cursor-not-allowed' : 'bg-cu-primary hover:opacity-90'
               }`}
             >
               Send code to another email
             </button>
-            <Link href="/reset-password" className='block text-blue-600 hover:text-blue-700 font-semibold text-sm text-center'>
+            <Link href={`/reset-password?email=${encodeURIComponent(submittedEmail)}`} className='block text-cu-primary hover:opacity-80 font-semibold text-sm text-center'>
               I already have a code
             </Link>
           </div>
@@ -81,21 +82,21 @@ export default function ForgotPasswordPage() {
 
             {/* Accessibility: aria-live="polite" ensures screen readers announce errors immediately */}
             {error && (
-              <div id="forgot-error" role="alert" aria-live="polite" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div id="forgot-error" role="alert" aria-live="polite" className="bg-cu-danger/10 border border-cu-danger/30 text-cu-danger px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
 
             {/* Success Message */}
             {success && (
-              <div role="status" aria-live="polite" className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+              <div role="status" aria-live="polite" className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 px-4 py-3 rounded-lg text-sm">
                 {success}
               </div>
             )}
 
             {/* Email Input */}
             <div>
-              <label htmlFor="forgot-email" className="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">
+              <label htmlFor="forgot-email" className="block text-xs font-semibold text-cu-text-muted mb-1.5 ml-1">
                 Email Address
               </label>
               <input
@@ -110,7 +111,7 @@ export default function ForgotPasswordPage() {
 
                 // Note: The text-[16px] on mobile prevents iOS Safari from automatically 
                 // zooming the viewport when the user taps the input.
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-[16px] sm:text-sm"
+                className="w-full px-4 py-3 rounded-xl border border-cu-border bg-cu-bg text-cu-text-primary placeholder:text-cu-text-muted focus:border-cu-primary focus:ring-4 focus:ring-cu-primary/10 outline-none transition-all text-[16px] sm:text-sm"
                 placeholder="Enter your email"
                 value={email}
 
@@ -126,7 +127,7 @@ export default function ForgotPasswordPage() {
               type="submit"
               disabled={isLoading}
               className={`w-full font-bold py-2.5 min-h-[44px] rounded-lg transition-colors text-white ${
-                isLoading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                isLoading ? 'bg-cu-primary/60 cursor-not-allowed' : 'bg-cu-primary hover:opacity-90'
               }`}
             >
               {isLoading ? 'Sending...' : 'Send Reset Link'}
@@ -135,7 +136,7 @@ export default function ForgotPasswordPage() {
         )}
 
         {/* ── Footer ── */}
-        <p className="mt-8 text-center text-xs text-gray-400">
+        <p className="mt-8 text-center text-xs text-cu-text-muted">
           © 2026 Planora. All rights reserved.
         </p>
       </div>

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,23 +7,23 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Animated,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import Animated, { FadeInUp, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { useForgotPassword } from '@/src/hooks/useForgotPassword';
 import BrandHeader from '@/src/components/ui/BrandHeader';
 import TextInputField from '@/src/components/ui/TextInputField';
 import PrimaryButton from '@/src/components/ui/PrimaryButton';
-import ErrorBanner from '@/src/components/ui/ErrorBanner';
+import Toast from '@/src/components/ui/Toast';
 import { Colors } from '@/src/constants/colors';
-import { shouldUseNativeDriver } from '@/src/lib/platform';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const {
     email, setEmail,
     isLoading,
@@ -34,39 +34,28 @@ export default function ForgotPasswordScreen() {
     handleReset,
   } = useForgotPassword();
 
-  const cardAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.spring(cardAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      tension: 60,
-      friction: 10,
-      delay: 80,
-    }).start();
-  }, [cardAnim]);
-
-  const cardStyle = {
-    opacity: cardAnim,
-    transform: [{
-      translateY: cardAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [24, 0],
-      }),
-    }],
-  };
-
-  const scaleAnim = useRef(new Animated.Value(0.5)).current;
+  const [toastVisible, setToastVisible] = useState(false);
+  const scale = useSharedValue(0.5);
 
   useEffect(() => {
     if (submitted) {
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 80,
-        friction: 10,
-        useNativeDriver: shouldUseNativeDriver,
-      }).start();
+      scale.value = withSpring(1, { damping: 10, stiffness: 80 });
+    } else {
+      scale.value = 0.5;
     }
-  }, [submitted]);
+  }, [submitted, scale]);
+
+  const scaleStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
+
+  useEffect(() => {
+    if (error) {
+      setToastVisible(true);
+    }
+  }, [error]);
 
   return (
     <LinearGradient
@@ -75,14 +64,21 @@ export default function ForgotPasswordScreen() {
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
     >
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+        <Toast
+          message={error}
+          visible={toastVisible}
+          onDismiss={() => setToastVisible(false)}
+          type="error"
+        />
+
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <ScrollView
             style={styles.flex}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -112,34 +108,32 @@ export default function ForgotPasswordScreen() {
             </View>
 
             {/* Card */}
-            <Animated.View style={cardStyle}>
-            <BlurView intensity={20} tint="light" style={styles.card}>
-              {!submitted ? (
-                /* Input State */
-                <View style={styles.formGap}>
-                  <ErrorBanner message={error} visible={!!error} />
+            <Animated.View entering={FadeInUp.duration(600).springify().damping(15)}>
+              <BlurView intensity={20} tint="light" style={styles.card}>
+                {!submitted ? (
+                  /* Input State */
+                  <View style={styles.formGap}>
+                    <TextInputField
+                      label="Email Address"
+                      value={email}
+                      onChangeText={t => setEmail(t.toLowerCase())}
+                      placeholder="Enter your email"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      returnKeyType="done"
+                      onSubmitEditing={handleSubmit}
+                    />
 
-                  <TextInputField
-                    label="Email Address"
-                    value={email}
-                    onChangeText={t => setEmail(t.toLowerCase())}
-                    placeholder="Enter your email"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    returnKeyType="done"
-                    onSubmitEditing={handleSubmit}
-                  />
-
-                  <PrimaryButton
-                    label={isLoading ? 'Sending...' : 'Send Reset Code'}
-                    loading={isLoading}
-                    onPress={handleSubmit}
-                  />
-                </View>
+                    <PrimaryButton
+                      label={isLoading ? 'Sending...' : 'Send Reset Code'}
+                      loading={isLoading}
+                      onPress={handleSubmit}
+                    />
+                  </View>
               ) : (
                 /* Success State */
                 <View style={styles.successContainer}>
-                  <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                  <Animated.View style={scaleStyle}>
                     <LinearGradient
                       colors={['#34D399', '#10B981']}
                       start={{ x: 0, y: 0 }}
@@ -169,7 +163,7 @@ export default function ForgotPasswordScreen() {
 
                   <PrimaryButton
                     label="Enter Reset Code"
-                    onPress={() => router.push('/(auth)/reset-password')}
+                    onPress={() => router.push({ pathname: '/(auth)/reset-password', params: { email } })}
                   />
 
                   {countdown > 0 ? (

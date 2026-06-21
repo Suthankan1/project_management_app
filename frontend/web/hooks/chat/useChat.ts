@@ -11,7 +11,6 @@ import { useChatReactions } from './useChatReactions';
 import { useChatSearch } from './useChatSearch';
 import { useChatUnread } from './useChatUnread';
 import {
-  CHAT_RECONNECT_ERROR,
   DEFAULT_FEATURE_FLAGS,
   initializeChatState,
   restoreSelectionState,
@@ -43,7 +42,13 @@ export const useChat = (projectId: string) => {
   const [error, setError] = useState('');
   const [hasRestoredSelection, setHasRestoredSelection] = useState(false);
   const hasRestoredSelectionRef = useRef(false);
-  const { realtimeConnected, subscribeRealtime, sendRealtime } = useGlobalNotifications();
+  const {
+    realtimeConnected,
+    realtimeReconnecting,
+    subscribeRealtime,
+    sendRealtime,
+    retryRealtimeConnection,
+  } = useGlobalNotifications();
   const msg = useChatMessages(projectId);
   const rm = useChatRooms(projectId);
   const presence = useChatPresence(projectId);
@@ -87,7 +92,7 @@ export const useChat = (projectId: string) => {
   const isStompConnected = useCallback(() => realtimeConnected, [realtimeConnected]);
   const stompSend = useCallback(
     (destination: string, body: string) => {
-      sendRealtime(destination, body);
+      sendRealtime(destination, body, { queueWhenDisconnected: true });
     },
     [sendRealtime],
   );
@@ -176,26 +181,26 @@ export const useChat = (projectId: string) => {
     [currentUser, setMessages, setRoomMessages, setPrivateMessages, setThreadMessages],
   );
 
+  const getRealtimeSender = useCallback(() => {
+    if (realtimeConnected && !realtimeReconnecting) {
+      return stompSend;
+    }
+
+    return undefined;
+  }, [realtimeConnected, realtimeReconnecting, stompSend]);
+
   const sendMessage = useCallback(
     (content: string, recipient?: string | null) => {
-      if (!isStompConnected()) {
-        setError(CHAT_RECONNECT_ERROR);
-        return;
-      }
-      msgSend(content, currentUser, stompSend, trackTelemetry, recipient);
+      void msgSend(content, currentUser, getRealtimeSender(), trackTelemetry, recipient);
     },
-    [currentUser, msgSend, stompSend, trackTelemetry, isStompConnected],
+    [currentUser, msgSend, getRealtimeSender, trackTelemetry],
   );
 
   const sendRoomMessage = useCallback(
     (content: string, roomId: number) => {
-      if (!isStompConnected()) {
-        setError(CHAT_RECONNECT_ERROR);
-        return;
-      }
-      msgSendRoom(content, roomId, currentUser, stompSend, trackTelemetry);
+      void msgSendRoom(content, roomId, currentUser, getRealtimeSender(), trackTelemetry);
     },
-    [currentUser, msgSendRoom, stompSend, trackTelemetry, isStompConnected],
+    [currentUser, msgSendRoom, getRealtimeSender, trackTelemetry],
   );
 
   const editMessage = useCallback(
@@ -489,9 +494,10 @@ export const useChat = (projectId: string) => {
     addTeam,
     isLoading,
     isSocketConnected,
+    isSocketReconnecting: realtimeReconnecting,
     error,
     roomMentionCounts: unread.roomMentionCounts,
     teamMentionCount: unread.teamMentionCount,
-    retryConnection: () => window.location.reload(),
+    retryConnection: retryRealtimeConnection,
   };
 };

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getUserFromToken, User } from '@/lib/auth';
-import api from '@/lib/axios';
+import { projectsApi } from '@/services/api-contract';
 import RecentProjectCard from '../dashboard/components/recentspaces/RecentProjectCard';
 
 import Link from 'next/link';
@@ -39,8 +39,8 @@ export default function SpacesPage() {
 
     const fetchProjects = async () => {
         try {
-            const response = await api.get('/api/projects');
-            setProjects(response.data);
+            const response = await projectsApi.list();
+            setProjects(response as SpaceProject[]);
         } catch (error) {
             console.error('Failed to fetch projects:', error);
         } finally {
@@ -101,21 +101,20 @@ export default function SpacesPage() {
             <div className="flex items-center gap-2 py-3 md:hidden">
                 <button
                     onClick={() => window.dispatchEvent(new CustomEvent('planora:sidebar:toggle'))}
-                    className="p-2 -ml-1 rounded-xl text-[#6B6F7B] hover:bg-[#F0F0F5] transition-colors"
+                    className="p-2 -ml-1 rounded-xl text-cu-text-secondary hover:bg-cu-hover transition-colors"
                     aria-label="Toggle Sidebar"
                 >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
                     </svg>
                 </button>
-                <div className="flex-1 font-outfit text-[17px] font-extrabold tracking-tight text-[#1A1A2E] flex items-center gap-2">
-                    <span className="w-1.5 h-4 bg-[#155DFC] rounded-full" />
+                <div className="flex-1 font-outfit text-[17px] font-extrabold tracking-tight text-cu-text-primary flex items-center gap-2">
+                    <span className="w-1.5 h-4 bg-cu-primary rounded-full" />
                     PLANORA
                 </div>
                 <Link
                     href="/createProject"
-                    className="flex items-center justify-center w-8 h-8 rounded-xl text-white"
-                    style={{ background: '#155DFC' }}
+                    className="flex items-center justify-center w-8 h-8 rounded-xl bg-cu-primary text-white"
                     aria-label="Create project"
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
@@ -125,8 +124,8 @@ export default function SpacesPage() {
             {/* ── Desktop header ──────────────────────────────────────────── */}
             <div className="hidden sm:flex items-center justify-between mb-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-[#1A1A2E] leading-tight">All Projects</h1>
-                    <p className="text-[#6B6F7B] text-sm mt-0.5">
+                    <h1 className="text-2xl font-bold text-cu-text-primary leading-tight">All Projects</h1>
+                    <p className="text-cu-text-secondary text-sm mt-0.5">
                         {projects.length > 0
                             ? `${projects.length} project${projects.length !== 1 ? 's' : ''}`
                             : 'Create and manage your projects'}
@@ -136,8 +135,8 @@ export default function SpacesPage() {
 
             {/* ── Mobile page title (compact) ─────────────────────────────── */}
             <div className="md:hidden mb-3">
-                <h1 className="text-xl font-bold text-[#1A1A2E] leading-tight">All Projects</h1>
-                <p className="text-[#6B6F7B] text-xs mt-0.5">
+                <h1 className="text-xl font-bold text-cu-text-primary leading-tight">All Projects</h1>
+                <p className="text-cu-text-secondary text-xs mt-0.5">
                     {projects.length > 0
                         ? `${projects.length} project${projects.length !== 1 ? 's' : ''}`
                         : 'Create and manage your projects'}
@@ -145,13 +144,13 @@ export default function SpacesPage() {
             </div>
 
             {/* ── View tabs ───────────────────────────────────────────────── */}
-            <div className="flex gap-1 mb-4 bg-[#F0F0F5] p-1 rounded-xl w-full sm:w-fit">
-                <span className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 rounded-lg text-[13px] font-semibold bg-white text-[#155DFC] shadow-sm cursor-default">
+            <div className="flex gap-1 mb-4 bg-cu-bg-secondary p-1 rounded-xl w-full sm:w-fit border border-cu-border">
+                <span className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 rounded-lg text-[13px] font-semibold bg-cu-bg text-cu-primary shadow-cu-sm cursor-default">
                     All Projects
                 </span>
                 <Link
                     href="/portfolios"
-                    className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 rounded-lg text-[13px] font-medium text-[#6B6F7B] hover:text-[#1A1A2E] transition-colors"
+                    className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 rounded-lg text-[13px] font-medium text-cu-text-secondary hover:text-cu-text-primary hover:bg-cu-hover transition-colors"
                 >
                     Portfolios
                 </Link>
@@ -160,14 +159,14 @@ export default function SpacesPage() {
             {/* ── Search (both) ───────────────────────────────────────────── */}
             <div className="relative mb-3">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+                    <svg className="text-cu-text-muted" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
                 </div>
                 <input
                     type="text"
                     placeholder="Search projects"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="block w-full pl-9 pr-3 py-2.5 border border-[#E8E8ED] rounded-xl bg-white placeholder-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] text-sm transition-all text-[#1A1A2E]"
+                    className="block w-full pl-9 pr-3 py-2.5 border border-cu-border rounded-xl bg-cu-bg placeholder-cu-text-muted focus:outline-none focus:ring-2 focus:ring-cu-primary/20 focus:border-cu-primary text-sm transition-all text-cu-text-primary shadow-cu-sm"
                 />
             </div>
 
@@ -179,14 +178,14 @@ export default function SpacesPage() {
                         onClick={() => setFilterBy(tab)}
                         className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                             filterBy === tab
-                                ? 'bg-[#155DFC] text-white'
-                                : 'bg-[#F0F0F5] text-[#6B6F7B]'
+                                ? 'bg-cu-primary text-white'
+                                : 'bg-cu-bg-secondary text-cu-text-secondary'
                         }`}
                     >
                         {tab === 'all' ? 'All' : '⭐ Starred'}
                     </button>
                 ))}
-                <div className="w-px h-4 bg-[#E8E8ED] flex-shrink-0" />
+                <div className="w-px h-4 bg-cu-border flex-shrink-0" />
                 {([
                     { key: 'recent', label: 'Recent' },
                     { key: 'alphabetical', label: 'A–Z' },
@@ -197,25 +196,25 @@ export default function SpacesPage() {
                         onClick={() => setSortBy(tab.key)}
                         className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                             sortBy === tab.key
-                                ? 'bg-[#155DFC] text-white'
-                                : 'bg-[#F0F0F5] text-[#6B6F7B]'
+                                ? 'bg-cu-primary text-white'
+                                : 'bg-cu-bg-secondary text-cu-text-secondary'
                         }`}
                     >
                         {tab.label}
                     </button>
                 ))}
-                <div className="w-px h-4 bg-[#E8E8ED] flex-shrink-0" />
-                <div className="flex-shrink-0 flex items-center bg-[#F0F0F5] p-0.5 rounded-lg">
+                <div className="w-px h-4 bg-cu-border flex-shrink-0" />
+                <div className="flex-shrink-0 flex items-center bg-cu-bg-secondary p-0.5 rounded-lg border border-cu-border">
                     <button
                         onClick={() => setAndPersistView('grid')}
-                        className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white text-[#155DFC] shadow-sm' : 'text-[#6B6F7B]'}`}
+                        className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-cu-bg text-cu-primary shadow-cu-sm' : 'text-cu-text-secondary'}`}
                         aria-label="Grid view"
                     >
                         <LayoutGrid size={14} />
                     </button>
                     <button
                         onClick={() => setAndPersistView('list')}
-                        className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white text-[#155DFC] shadow-sm' : 'text-[#6B6F7B]'}`}
+                        className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-cu-bg text-cu-primary shadow-cu-sm' : 'text-cu-text-secondary'}`}
                         aria-label="List view"
                     >
                         <List size={14} />
@@ -224,22 +223,22 @@ export default function SpacesPage() {
             </div>
 
             {/* ── Desktop filter bar ──────────────────────────────────────── */}
-            <div className="hidden sm:flex justify-between items-center gap-3 pb-4 border-b border-[#E8E8ED] mb-6">
+            <div className="hidden sm:flex justify-between items-center gap-3 pb-4 border-b border-cu-border mb-6">
                 <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1 bg-[#F0F0F5] p-1 rounded-xl">
+                    <div className="flex items-center gap-1 bg-cu-bg-secondary p-1 rounded-xl border border-cu-border">
                         {(['all', 'starred'] as const).map(tab => (
                             <button
                                 key={tab}
                                 onClick={() => setFilterBy(tab)}
                                 className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-                                    filterBy === tab ? 'bg-white text-[#155DFC] shadow-sm' : 'text-[#6B6F7B] hover:text-[#1A1A2E]'
+                                    filterBy === tab ? 'bg-cu-bg text-cu-primary shadow-cu-sm' : 'text-cu-text-secondary hover:text-cu-text-primary'
                                 }`}
                             >
                                 {tab === 'all' ? 'All' : 'Starred'}
                             </button>
                         ))}
                     </div>
-                    <div className="flex items-center gap-1 bg-[#F0F0F5] p-1 rounded-xl">
+                    <div className="flex items-center gap-1 bg-cu-bg-secondary p-1 rounded-xl border border-cu-border">
                         {([
                             { key: 'recent', label: 'Recent' },
                             { key: 'alphabetical', label: 'A-Z' },
@@ -249,7 +248,7 @@ export default function SpacesPage() {
                                 key={tab.key}
                                 onClick={() => setSortBy(tab.key)}
                                 className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-                                    sortBy === tab.key ? 'bg-white text-[#155DFC] shadow-sm' : 'text-[#6B6F7B] hover:text-[#1A1A2E]'
+                                    sortBy === tab.key ? 'bg-cu-bg text-cu-primary shadow-cu-sm' : 'text-cu-text-secondary hover:text-cu-text-primary'
                                 }`}
                             >
                                 {tab.label}
@@ -258,17 +257,17 @@ export default function SpacesPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="flex items-center bg-[#F0F0F5] p-1 rounded-xl">
+                    <div className="flex items-center bg-cu-bg-secondary p-1 rounded-xl border border-cu-border">
                         <button
                             onClick={() => setAndPersistView('grid')}
-                            className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${viewMode === 'grid' ? 'bg-white text-[#155DFC] shadow-sm' : 'text-[#6B6F7B] hover:text-[#1A1A2E]'}`}
+                            className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${viewMode === 'grid' ? 'bg-cu-bg text-cu-primary shadow-cu-sm' : 'text-cu-text-secondary hover:text-cu-text-primary'}`}
                             aria-label="Grid view"
                         >
                             <LayoutGrid size={16} />
                         </button>
                         <button
                             onClick={() => setAndPersistView('list')}
-                            className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${viewMode === 'list' ? 'bg-white text-[#155DFC] shadow-sm' : 'text-[#6B6F7B] hover:text-[#1A1A2E]'}`}
+                            className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${viewMode === 'list' ? 'bg-cu-bg text-cu-primary shadow-cu-sm' : 'text-cu-text-secondary hover:text-cu-text-primary'}`}
                             aria-label="List view"
                         >
                             <List size={16} />
@@ -302,9 +301,9 @@ export default function SpacesPage() {
                         ))}
                     </div>
                 ) : (
-                    <div className="overflow-x-auto rounded-xl border border-[#E8E8ED] bg-white">
+                    <div className="overflow-x-auto rounded-xl border border-cu-border bg-cu-bg shadow-cu-sm">
                         <table className="min-w-full text-sm">
-                            <thead className="bg-[#F7F8FA] text-[#6B6F7B]">
+                            <thead className="bg-cu-bg-secondary text-cu-text-secondary">
                                 <tr>
                                     <th className="text-left px-4 py-3 font-semibold">Project Name</th>
                                     <th className="text-left px-4 py-3 font-semibold">Type</th>
@@ -315,20 +314,20 @@ export default function SpacesPage() {
                             </thead>
                             <tbody>
                                 {filteredAndSortedProjects.map((project) => (
-                                    <tr key={project.id} className="border-t border-[#F0F0F5] hover:bg-[#F7F8FA]">
-                                        <td className="px-4 py-3 font-semibold text-[#1A1A2E]">
+                                    <tr key={project.id} className="border-t border-cu-border hover:bg-cu-hover">
+                                        <td className="px-4 py-3 font-semibold text-cu-text-primary">
                                             <div>{project.name}</div>
                                             {project.projectKey && (
-                                                <div className="text-xs text-[#9CA3AF] mt-0.5">{project.projectKey}</div>
+                                                <div className="text-xs text-cu-text-muted mt-0.5">{project.projectKey}</div>
                                             )}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-[#EBF2FF] text-[#155DFC]">
+                                            <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-cu-primary/10 text-cu-primary">
                                                 {project.type === 'AGILE' ? 'Agile' : 'Kanban'}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-[#6B6F7B] hidden md:table-cell">{project.memberCount ?? '-'}</td>
-                                        <td className="px-4 py-3 text-[#6B6F7B] hidden md:table-cell">
+                                        <td className="px-4 py-3 text-cu-text-secondary hidden md:table-cell">{project.memberCount ?? '-'}</td>
+                                        <td className="px-4 py-3 text-cu-text-secondary hidden md:table-cell">
                                             {project.updatedAt ? new Date(project.updatedAt).toLocaleDateString() : '-'}
                                         </td>
                                         <td className="px-4 py-3">
@@ -336,14 +335,14 @@ export default function SpacesPage() {
                                                 <button
                                                     onClick={async () => {
                                                         try {
-                                                            await api.post(`/api/projects/${project.id}/favorite`);
+                                                            await projectsApi.toggleFavorite(project.id);
                                                             window.dispatchEvent(new CustomEvent('planora:favorite-toggled'));
                                                             void fetchProjects();
                                                         } catch (error) {
                                                             console.error('Failed to toggle favorite:', error);
                                                         }
                                                     }}
-                                                    className={`p-2 rounded-md border transition-colors ${project.isFavorite ? 'text-[#F59E0B] border-[#FDE68A] bg-[#FFFBEB]' : 'text-[#9CA3AF] border-[#E8E8ED] hover:text-[#F59E0B]'}`}
+                                                    className={`p-2 rounded-md border transition-colors ${project.isFavorite ? 'text-cu-warning border-cu-warning/30 bg-cu-warning/10' : 'text-cu-text-muted border-cu-border hover:text-cu-warning hover:bg-cu-hover'}`}
                                                     aria-label={project.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                                                 >
                                                     <svg width="15" height="15" viewBox="0 0 24 24" fill={project.isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -352,7 +351,7 @@ export default function SpacesPage() {
                                                 </button>
                                                 <Link
                                                     href={`/summary/${project.id}`}
-                                                    className="px-3 py-1.5 rounded-lg bg-[#155DFC] text-white text-xs font-semibold hover:bg-[#0E4FCC] transition-colors"
+                                                    className="px-3 py-1.5 rounded-lg bg-cu-primary text-white text-xs font-semibold hover:bg-cu-primary-hover transition-colors"
                                                 >
                                                     Open
                                                 </Link>
@@ -366,18 +365,17 @@ export default function SpacesPage() {
                 )
             ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <div className="w-16 h-16 rounded-2xl bg-[#EBF2FF] flex items-center justify-center mb-4 text-3xl">
+                    <div className="w-16 h-16 rounded-2xl bg-cu-primary/10 flex items-center justify-center mb-4 text-3xl">
                         📋
                     </div>
-                    <h3 className="text-base font-semibold text-[#1A1A2E]">No projects found</h3>
-                    <p className="text-[#6B6F7B] text-sm mt-1 max-w-xs">
+                    <h3 className="text-base font-semibold text-cu-text-primary">No projects found</h3>
+                    <p className="text-cu-text-secondary text-sm mt-1 max-w-xs">
                         {searchQuery ? 'Try a different search term' : 'Create your first project to get started.'}
                     </p>
                     {!searchQuery && (
                         <Link
                             href="/createProject"
-                            className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
-                            style={{ background: '#155DFC' }}
+                            className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 bg-cu-primary"
                         >
                             Create Project
                         </Link>

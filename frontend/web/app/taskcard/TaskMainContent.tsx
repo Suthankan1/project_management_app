@@ -14,6 +14,7 @@ interface Dependency {
   id: number;
   title: string;
   relation: string;
+  status?: string;
 }
 
 interface TaskMainContentProps {
@@ -65,7 +66,7 @@ const TaskMainContent: React.FC<TaskMainContentProps> = ({
   };
 
   return (
-    <div className="flex-1 min-h-0 overflow-visible md:overflow-y-auto p-4 sm:p-5 md:p-6 border-r-0 md:border-r border-[#EAECF0] scrollbar-thin scrollbar-thumb-[#E5E7EB]">
+    <div className="flex-1 min-h-0 overflow-visible md:overflow-y-auto p-4 sm:p-5 md:p-6 border-r-0 md:border-r border-cu-border scrollbar-thin scrollbar-thumb-cu-border">
       
       {/* Title */}
       <div className="group mb-6">
@@ -83,12 +84,12 @@ const TaskMainContent: React.FC<TaskMainContentProps> = ({
               }
             }}
             autoFocus
-            className="w-full text-[22px] font-bold text-[#101828] bg-white border-2 border-[#155DFC] rounded-lg px-2 py-1 focus:outline-none font-outfit tracking-tight"
+            className="w-full text-[22px] font-bold text-cu-text-primary bg-cu-bg border-2 border-cu-primary rounded-lg px-2 py-1 focus:outline-none font-outfit tracking-tight"
           />
         ) : (
           <h1 
             onClick={() => !readOnly && setIsEditingTitle(true)}
-            className="text-[22px] font-bold text-[#101828] tracking-tight hover:bg-[#F8FAFF] px-2 py-1 rounded-lg -ml-2 cursor-text transition-colors font-outfit"
+            className="text-[22px] font-bold text-cu-text-primary tracking-tight hover:bg-cu-hover px-2 py-1 rounded-lg -ml-2 cursor-text transition-colors font-outfit"
           >
             {title}
           </h1>
@@ -122,7 +123,7 @@ const TaskMainContent: React.FC<TaskMainContentProps> = ({
         <TaskActionButton icon={<Link2 size={14} />} label="Link issue" onClick={() => !readOnly && setShowDependencyPicker(true)} />
       </div>
       {attachError && (
-        <p className="text-xs text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded mb-4">{attachError}</p>
+        <p className="text-xs text-cu-danger bg-cu-danger/10 border border-cu-danger/20 px-3 py-1.5 rounded mb-4">{attachError}</p>
       )}
 
       <AttachmentsPanel attachments={attachments} onRemove={removeFile} />
@@ -139,34 +140,34 @@ const TaskMainContent: React.FC<TaskMainContentProps> = ({
 
       {/* Linked Issues (Dependencies) */}
       {(dependencies.length > 0 || showDependencyPicker) && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-[#344054]">Linked Issues</h3>
+        <div className="mb-8 space-y-6">
+          <div className="flex items-center justify-between pb-2 border-b border-cu-border">
+            <h3 className="text-sm font-bold text-cu-text-primary tracking-tight font-outfit">Task Dependencies</h3>
             {dependencies.length > 0 && (
-              <span className="text-xs text-[#667085]">{dependencies.length} link{dependencies.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-cu-text-muted bg-cu-bg-secondary px-2 py-0.5 rounded-full font-semibold">{dependencies.length} link{dependencies.length !== 1 ? 's' : ''}</span>
             )}
           </div>
-          {dependencies.length > 0 && (
-            <div className="rounded-xl border border-[#EAECF0] bg-white overflow-hidden divide-y divide-[#F2F4F7] mb-3">
-              {dependencies.map((dep) => {
-                const relationColors: Record<string, string> = {
-                  BLOCKS:     'bg-red-100 text-red-700',
-                  BLOCKED_BY: 'bg-orange-100 text-orange-700',
-                  DUPLICATES: 'bg-purple-100 text-purple-700',
-                  RELATES_TO: 'bg-blue-100 text-blue-700',
-                };
-                const badgeClass = relationColors[dep.relation] ?? 'bg-[#F2F4F7] text-[#344054]';
-                return (
-                  <div key={dep.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-[#F8FAFF] transition-colors group">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${badgeClass}`}>
-                      {dep.relation.replace(/_/g, ' ')}
+
+          {/* Blocked By List */}
+          {dependencies.filter((d) => d.relation === 'BLOCKED_BY').length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="w-1.5 h-3 rounded-full bg-amber-500" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-amber-500 font-sans">Blocked By</h4>
+                <span className="text-[10px] text-cu-text-muted bg-amber-500/10 text-amber-600 px-1.5 py-0.2 rounded-full font-bold">
+                  {dependencies.filter((d) => d.relation === 'BLOCKED_BY').length}
+                </span>
+              </div>
+              <div className="rounded-xl border border-cu-border bg-cu-bg overflow-hidden divide-y divide-cu-border shadow-sm">
+                {dependencies.filter((d) => d.relation === 'BLOCKED_BY').map((dep) => (
+                  <div key={dep.id} className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-cu-hover transition-colors group">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 bg-amber-500/10 text-amber-500">
+                      BLOCKED BY
                     </span>
-                    <Link2 size={13} className="text-[#98A2B3] flex-shrink-0" />
+                    <Link2 size={13} className="text-cu-text-muted flex-shrink-0" />
                     <button
-                      className="text-xs font-semibold text-[#155DFC] hover:underline flex-shrink-0"
+                      className="text-xs font-bold text-cu-primary hover:underline flex-shrink-0 font-mono"
                       onClick={() => {
-                        // Manually fire a popstate event after pushState so React Router / the
-                        // modal layer picks up the new taskId without a full page navigation.
                         const url = new URL(window.location.href);
                         url.searchParams.set('taskId', String(dep.id));
                         window.history.pushState({}, '', url.toString());
@@ -175,7 +176,14 @@ const TaskMainContent: React.FC<TaskMainContentProps> = ({
                     >
                       TASK-{dep.id}
                     </button>
-                    <span className="text-sm text-[#667085] flex-1 min-w-0 truncate">{dep.title}</span>
+                    <span className="text-xs text-cu-text-secondary flex-1 min-w-0 truncate font-medium">{dep.title}</span>
+                    {dep.status && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
+                        dep.status === 'DONE' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-cu-bg-tertiary text-cu-text-secondary'
+                      }`}>
+                        {dep.status}
+                      </span>
+                    )}
                     <button
                       onClick={async () => {
                         if (readOnly) return;
@@ -183,21 +191,77 @@ const TaskMainContent: React.FC<TaskMainContentProps> = ({
                         try {
                           await api.delete(`/api/tasks/${taskId}/dependencies/${dep.id}`);
                           onDependencyChanged?.();
-                        } catch {
-                          // silently fail; parent will keep current deps
-                        }
+                        } catch { /* ignore */ }
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-[#98A2B3] hover:text-red-500 transition-all"
-                      title="Remove link"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-cu-danger/10 text-cu-text-muted hover:text-cu-danger transition-all"
+                      title="Remove blocker"
                       disabled={readOnly}
                     >
                       <X size={13} />
                     </button>
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
           )}
+
+          {/* Blocking List */}
+          {dependencies.filter((d) => d.relation === 'BLOCKS').length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="w-1.5 h-3 rounded-full bg-blue-500" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-500 font-sans">Blocking</h4>
+                <span className="text-[10px] text-cu-text-muted bg-blue-500/10 text-blue-600 px-1.5 py-0.2 rounded-full font-bold">
+                  {dependencies.filter((d) => d.relation === 'BLOCKS').length}
+                </span>
+              </div>
+              <div className="rounded-xl border border-cu-border bg-cu-bg overflow-hidden divide-y divide-cu-border shadow-sm">
+                {dependencies.filter((d) => d.relation === 'BLOCKS').map((dep) => (
+                  <div key={dep.id} className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-cu-hover transition-colors group">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 bg-blue-500/10 text-blue-500">
+                      BLOCKS
+                    </span>
+                    <Link2 size={13} className="text-cu-text-muted flex-shrink-0" />
+                    <button
+                      className="text-xs font-bold text-cu-primary hover:underline flex-shrink-0 font-mono"
+                      onClick={() => {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('taskId', String(dep.id));
+                        window.history.pushState({}, '', url.toString());
+                        window.dispatchEvent(new PopStateEvent('popstate'));
+                      }}
+                    >
+                      TASK-{dep.id}
+                    </button>
+                    <span className="text-xs text-cu-text-secondary flex-1 min-w-0 truncate font-medium">{dep.title}</span>
+                    {dep.status && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
+                        dep.status === 'DONE' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-cu-bg-tertiary text-cu-text-secondary'
+                      }`}>
+                        {dep.status}
+                      </span>
+                    )}
+                    <button
+                      onClick={async () => {
+                        if (readOnly) return;
+                        if (!taskId) return;
+                        try {
+                          await api.delete(`/api/tasks/${dep.id}/dependencies/${taskId}`);
+                          onDependencyChanged?.();
+                        } catch { /* ignore */ }
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-cu-danger/10 text-cu-text-muted hover:text-cu-danger transition-all"
+                      title="Remove blocked link"
+                      disabled={readOnly}
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {showDependencyPicker && taskId && projectId && (
             <DependencyPicker
               taskId={taskId}
@@ -211,7 +275,7 @@ const TaskMainContent: React.FC<TaskMainContentProps> = ({
       )}
 
       {/* Comments Component */}
-      <CommentSection taskId={taskId} />
+      <CommentSection taskId={taskId} projectId={projectId} />
     </div>
   );
 };

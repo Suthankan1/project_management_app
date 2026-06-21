@@ -1,16 +1,23 @@
 import axios from "axios";
-import { clearTokens, getRefreshToken, getValidToken, getUserFromToken, refreshAccessToken } from "@/lib/auth";
+import { clearTokens, getValidToken, getUserFromToken, refreshAccessToken } from "@/lib/auth";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || '',
     headers: {
         'Content-Type': 'application/json'
     },
+    withCredentials: true,
 });
+
+function resolveBaseUrl(configBaseUrl?: string): string {
+    return configBaseUrl || getApiBaseUrl();
+}
 
 // Add request interceptor to include auth token (exclude auth endpoints)
 api.interceptors.request.use(
     (config) => {
+        config.baseURL = resolveBaseUrl(config.baseURL);
+
         // Don't add token to auth endpoints
         const authEndpoints = ['/api/auth/login', '/api/auth/register', '/api/auth/forgot', '/api/auth/reset', '/api/auth/reg/verify', '/api/auth/resend', '/api/auth/refresh'];
         const isAuthEndpoint = authEndpoints.some(endpoint => config.url?.includes(endpoint));
@@ -30,19 +37,21 @@ api.interceptors.request.use(
 
 // Proactively refresh the access token if it expires within 60 seconds
 api.interceptors.request.use(async (config) => {
+    config.baseURL = resolveBaseUrl(config.baseURL);
+
     const authEndpoints = ['/api/auth/login', '/api/auth/register', '/api/auth/forgot', '/api/auth/reset', '/api/auth/reg/verify', '/api/auth/resend', '/api/auth/refresh'];
     const isAuthEndpoint = authEndpoints.some(endpoint => config.url?.includes(endpoint));
     if (!isAuthEndpoint && typeof window !== 'undefined') {
         try {
-            if (!getValidToken() && getRefreshToken()) {
-                const newToken = await refreshAccessToken();
+            if (!getValidToken()) {
+                const newToken = await refreshAccessToken({ allowCookieRefresh: true });
                 config.headers['Authorization'] = `Bearer ${newToken}`;
                 return config;
             }
 
             const user = getUserFromToken();
             if (user?.exp && (user.exp - Date.now() / 1000) < 60) {
-                const newToken = await refreshAccessToken();
+                const newToken = await refreshAccessToken({ allowCookieRefresh: true });
                 config.headers['Authorization'] = `Bearer ${newToken}`;
                 return config;
             }
@@ -90,19 +99,8 @@ api.interceptors.response.use(
             originalRequest._retry = true;
             isRefreshing = true;
 
-            const refreshToken = getRefreshToken();
-            if (!refreshToken) {
-                isRefreshing = false;
-                clearTokens();
-                if (typeof window !== 'undefined') {
-                    // 500ms delay lets toast notifications render before reload
-                    setTimeout(() => { window.location.href = '/login'; }, 500);
-                }
-                return Promise.reject(error);
-            }
-
             try {
-                const newAccessToken = await refreshAccessToken();
+                const newAccessToken = await refreshAccessToken({ allowCookieRefresh: true });
                 processQueue(null, newAccessToken);
                 originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
                 return api(originalRequest);

@@ -42,10 +42,10 @@ export default function SortableColumn({ column, children, width = '320px' }: So
         {...attributes}
         {...listeners}
         suppressHydrationWarning={true}
-        className="absolute top-2 left-0.5 z-10 opacity-0 group-hover/col:opacity-100 transition-opacity cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-gray-200/60"
+        className="absolute top-2 left-0.5 z-10 opacity-0 group-hover/col:opacity-100 transition-opacity cursor-grab active:cursor-grabbing p-0.5 rounded text-cu-text-muted hover:bg-cu-hover hover:text-cu-text-secondary"
         title="Drag to reorder columns"
       >
-        <GripVertical size={14} className="text-gray-400" />
+        <GripVertical size={14} />
       </div>
       {children}
     </div>

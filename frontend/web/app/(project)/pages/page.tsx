@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { PanelLeft } from 'lucide-react';
+import { PanelLeft, RefreshCw } from 'lucide-react';
 import DocumentSidebar from './components/DocumentSidebar';
-import TemplateSelector from './components/TemplateSelector';
+import TemplateSelector, { predefinedTemplates } from './components/TemplateSelector';
 import { usePages } from './components/usePages';
 import { Template } from './components/types';
 
@@ -17,8 +17,11 @@ export default function PagesPage() {
   const projectId = searchParams.get('projectId') || (typeof window !== 'undefined' ? localStorage.getItem('currentProjectId') : null);
 
   const {
+    pages,
+    loading,
     filteredPages,
     error,
+    refetch,
     setSearchQuery,
   } = usePages(projectId);
 
@@ -40,9 +43,32 @@ export default function PagesPage() {
 
   if (!projectId) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-[#F7F8FA]">
+      <div className="flex h-full w-full items-center justify-center bg-cu-bg-secondary">
         <div className="text-center">
           <p className="text-gray-500 font-outfit text-sm">Loading project information...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading && pages.length === 0) {
+    return (
+      <div className="flex h-full w-full flex-col bg-cu-bg-secondary p-4 md:p-6 gap-4">
+        <div className="h-10 w-56 rounded-2xl bg-cu-bg-tertiary animate-pulse" />
+        <div className="grid flex-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <div className="rounded-2xl border border-cu-border bg-cu-bg p-4 shadow-cu-sm space-y-3 animate-pulse">
+            <div className="h-4 w-32 rounded bg-cu-bg-tertiary" />
+            {Array.from({ length: 6 }).map((_, item) => (
+              <div key={item} className="h-12 rounded-xl bg-cu-bg-secondary" />
+            ))}
+          </div>
+          <div className="rounded-2xl border border-cu-border bg-cu-bg p-5 shadow-cu-sm space-y-3 animate-pulse">
+            <div className="h-5 w-48 rounded bg-cu-bg-tertiary" />
+            <div className="h-3 w-80 rounded bg-cu-bg-secondary" />
+            {Array.from({ length: 4 }).map((_, item) => (
+              <div key={item} className="h-16 rounded-2xl bg-cu-bg-secondary" />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -70,9 +96,7 @@ export default function PagesPage() {
             onSearchChange={setSearchInput}
             projectId={projectId}
             selectedPageId={null}
-            onCreateClick={() => {
-              // Already showing template selector here in root, but just in case
-            }}
+            onCreateClick={() => handleTemplateSelect(predefinedTemplates[0])}
           />
         </div>
 
@@ -86,8 +110,23 @@ export default function PagesPage() {
 
       {/* Error Toast */}
       {error && (
-        <div className="fixed bottom-4 right-4 p-4 bg-red-50 border border-red-200 rounded-md shadow-md z-40">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="fixed bottom-4 right-4 z-[10000] max-w-sm rounded-xl border border-cu-danger/20 bg-cu-bg p-4 shadow-cu-xl">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cu-danger/10 text-cu-danger">
+              <RefreshCw size={15} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-cu-text-primary">Failed to load pages</p>
+              <p className="mt-1 text-xs text-cu-text-secondary">{error}</p>
+              <button
+                type="button"
+                onClick={() => void refetch()}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-cu-primary px-3 py-2 text-xs font-semibold text-white hover:bg-cu-primary-hover transition-colors"
+              >
+                Retry fetch
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>

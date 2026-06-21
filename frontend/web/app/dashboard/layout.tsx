@@ -16,7 +16,7 @@ export default function DashboardLayout({
         let isMounted = true;
 
         const ensureAuthenticated = async () => {
-            const token = await ensureValidToken();
+            const token = await ensureValidToken({ allowCookieRefresh: true });
             if (token || !isMounted) return;
             router.replace('/login');
         };
@@ -26,6 +26,7 @@ export default function DashboardLayout({
                 event.key === 'token'
                 || event.key === 'planora:access_token'
                 || event.key === 'planora:refresh_token'
+                || event.key === 'planora:has_refresh_token'
                 || event.key === 'rememberMe'
                 || event.key === null
             ) {
@@ -49,7 +50,7 @@ export default function DashboardLayout({
 
     return (
         <FullLayout>
-            <main className="flex-1 flex flex-col min-h-full bg-white px-4 md:px-8 pt-4 pb-0 md:pb-8">
+            <main className="flex-1 flex flex-col min-h-full bg-cu-bg px-4 md:px-8 pt-4 pb-0 md:pb-8">
                 {children}
             </main>
         </FullLayout>

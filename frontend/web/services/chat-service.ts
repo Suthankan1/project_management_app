@@ -1,83 +1,34 @@
-﻿import api from '@/lib/axios';
+import { authApi, chatApi } from './api-contract';
 import type {
   ChatFeatureFlags,
   ChatMessage,
   ChatReactionSummary,
   ChatRoom,
   ChatSearchResult,
-  DirectChatSummary,
   PresenceResponse,
-  RoomChatSummary,
-  TeamChatSummary,
   UnreadBadgeSummary,
 } from '@/app/(project)/project/[id]/chat/components/chat';
+import type { ChatSummaries, ChatInboxResponse, AuthUserSummary, ChatInboxActivity, ChatInboxProjectGroup } from './api-contract';
 
-// â”€â”€ Types â”€â”€
-
-export interface ChatSummaries {
-  directSummaries: DirectChatSummary[];
-  roomSummaries: RoomChatSummary[];
-  teamSummary: TeamChatSummary | null;
-}
-
+export type { ChatSummaries, ChatInboxResponse, AuthUserSummary, ChatInboxActivity, ChatInboxProjectGroup };
 export type InboxChatType = 'TEAM' | 'ROOM' | 'DIRECT';
 
-export interface ChatInboxActivity {
-  projectId: number;
-  projectName: string;
-  chatType: InboxChatType;
-  roomId?: number | null;
-  roomName?: string | null;
-  username?: string | null;
-  participantLabel?: string | null;
-  lastMessage?: string | null;
-  lastMessageSender?: string | null;
-  lastMessageTimestamp?: string | null;
-  unseenCount: number;
-  unread: boolean;
-  activityStatus: 'UNREAD' | 'READ';
-}
-
-export interface ChatInboxProjectGroup {
-  projectId: number;
-  projectName: string;
-  unreadCount: number;
-  totalItems: number;
-  activities: ChatInboxActivity[];
-}
-
-export interface ChatInboxResponse {
-  recentActivities: ChatInboxActivity[];
-  projects: ChatInboxProjectGroup[];
-  totalProjects: number;
-  totalActivities: number;
-  totalUnread: number;
-}
-
-export interface AuthUserSummary {
-  email?: string;
-  username?: string;
-}
-
-// â”€â”€ Team / General â”€â”€
+// ── Team / General ──
 
 export async function markTeamAsRead(projectId: string): Promise<void> {
-  await api.post(`/api/projects/${projectId}/chat/team/read`);
+  return chatApi.markTeamRead(projectId);
 }
 
 export async function markRoomAsRead(projectId: string, roomId: number): Promise<void> {
-  await api.post(`/api/projects/${projectId}/chat/rooms/${roomId}/read`);
+  return chatApi.markRoomRead(projectId, roomId);
 }
 
 export async function markDirectConversationAsRead(projectId: string, withUser: string): Promise<void> {
-  await api.post(`/api/projects/${projectId}/chat/direct/read`, null, {
-    params: { with: withUser },
-  });
+  return chatApi.markDirectRead(projectId, withUser);
 }
 
 export async function fetchPresence(projectId: string): Promise<PresenceResponse> {
-  const { data } = await api.get<PresenceResponse>(`/api/projects/${projectId}/chat/presence`);
-  return data;
+  return chatApi.getPresence(projectId);
 }
 
 export async function postTelemetry(
@@ -86,57 +37,44 @@ export async function postTelemetry(
   target: string,
   details?: string,
 ): Promise<void> {
-  await api.post(`/api/projects/${projectId}/chat/telemetry`, { action, target, details });
+  return chatApi.postTelemetry(projectId, { action, target, details });
 }
 
 export async function fetchFeatureFlags(projectId: string): Promise<ChatFeatureFlags> {
-  const { data } = await api.get<ChatFeatureFlags>(`/api/projects/${projectId}/chat/features`);
-  return data;
+  return chatApi.getFeatureFlags(projectId);
 }
 
 export async function fetchUnreadBadge(projectId: string): Promise<UnreadBadgeSummary> {
-  const { data } = await api.get<UnreadBadgeSummary>(`/api/projects/${projectId}/chat/unread-badge`);
-  return data;
+  return chatApi.getUnreadBadge(projectId);
 }
 
-// â”€â”€ Search â”€â”€
+// ── Search ──
 
 export async function searchChatMessages(
   projectId: string,
   query: string,
 ): Promise<ChatSearchResult[]> {
-  const { data } = await api.get<ChatSearchResult[]>(
-    `/api/projects/${projectId}/chat/search`,
-    { params: { q: query } },
-  );
-  return data;
+  return chatApi.searchMessages(projectId, query);
 }
 
-// â”€â”€ Members / Users â”€â”€
+// ── Members / Users ──
 
 export async function fetchChatMembers(projectId: string): Promise<string[]> {
-  const { data } = await api.get<string[]>(`/api/projects/${projectId}/chat/members`);
-  return data;
+  return chatApi.getMembers(projectId);
 }
 
 export async function fetchAllUserProfiles(): Promise<AuthUserSummary[]> {
-  const { data } = await api.get<AuthUserSummary[]>('/api/auth/users');
-  return data;
+  return [];
 }
 
 export async function fetchCurrentUser(): Promise<{ username: string }> {
-  const { data } = await api.get<{ username: string }>('/api/user/me');
-  return data;
+  return authApi.getCurrentUser();
 }
 
-// â”€â”€ Summaries â”€â”€
+// ── Summaries ──
 
 export async function fetchChatSummaries(projectId: string): Promise<ChatSummaries> {
-  const { data } = await api.get(`/api/projects/${projectId}/chat/summaries`);
-  const directSummaries: DirectChatSummary[] = data.directSummaries || data.directMessages || [];
-  const roomSummaries: RoomChatSummary[] = data.roomSummaries || data.rooms || [];
-  const teamSummary: TeamChatSummary | null = data.teamSummary || data.team || null;
-  return { directSummaries, roomSummaries, teamSummary };
+  return chatApi.getSummaries(projectId);
 }
 
 export async function fetchChatInbox(params?: {
@@ -144,39 +82,46 @@ export async function fetchChatInbox(params?: {
   activityLimit?: number;
   status?: 'all' | 'unread';
 }): Promise<ChatInboxResponse> {
-  const { data } = await api.get<ChatInboxResponse>('/api/chat/inbox', {
-    params: {
-      projectLimit: params?.projectLimit,
-      activityLimit: params?.activityLimit,
-      status: params?.status,
-    },
-  });
-
-  return {
-    recentActivities: data.recentActivities || [],
-    projects: data.projects || [],
-    totalProjects: Number(data.totalProjects) || 0,
-    totalActivities: Number(data.totalActivities) || 0,
-    totalUnread: Number(data.totalUnread) || 0,
-  };
+  return chatApi.getInbox(params);
 }
 
-// â”€â”€ Messages â”€â”€
+// ── Messages ──
 
 export async function fetchTeamMessages(projectId: string): Promise<ChatMessage[]> {
-  const { data } = await api.get<ChatMessage[]>(`/api/projects/${projectId}/chat/messages`);
-  return data;
+  return chatApi.getTeamMessages(projectId);
+}
+
+export async function postTeamMessage(
+  projectId: string,
+  content: string,
+  localId?: string,
+): Promise<ChatMessage> {
+  return chatApi.postTeamMessage(projectId, content, localId);
+}
+
+export async function postPrivateMessage(
+  projectId: string,
+  recipient: string,
+  content: string,
+  localId?: string,
+): Promise<ChatMessage> {
+  return chatApi.postPrivateMessage(projectId, recipient, content, localId);
+}
+
+export async function postRoomMessage(
+  projectId: string,
+  roomId: number,
+  content: string,
+  localId?: string,
+): Promise<ChatMessage> {
+  return chatApi.postRoomMessage(projectId, roomId, content, localId);
 }
 
 export async function fetchRoomMessages(
   projectId: string,
   roomId: number,
 ): Promise<ChatMessage[]> {
-  const { data } = await api.get<ChatMessage[]>(
-    `/api/projects/${projectId}/chat/messages`,
-    { params: { roomId } },
-  );
-  return data;
+  return chatApi.getRoomMessages(projectId, roomId);
 }
 
 export async function fetchPrivateMessages(
@@ -184,11 +129,7 @@ export async function fetchPrivateMessages(
   currentUser: string,
   withUser: string,
 ): Promise<ChatMessage[]> {
-  const { data } = await api.get<ChatMessage[]>(
-    `/api/projects/${projectId}/chat/messages`,
-    { params: { recipient: currentUser, with: withUser } },
-  );
-  return data;
+  return chatApi.getPrivateMessages(projectId, currentUser, withUser);
 }
 
 export async function editMessageRest(
@@ -196,33 +137,23 @@ export async function editMessageRest(
   messageId: number,
   content: string,
 ): Promise<ChatMessage> {
-  const { data } = await api.patch<ChatMessage>(
-    `/api/projects/${projectId}/chat/messages/${messageId}`,
-    { content, formatType: 'PLAIN' },
-  );
-  return data;
+  return chatApi.editMessage(projectId, messageId, content);
 }
 
 export async function deleteMessageRest(
   projectId: string,
   messageId: number,
 ): Promise<ChatMessage> {
-  const { data } = await api.delete<ChatMessage>(
-    `/api/projects/${projectId}/chat/messages/${messageId}`,
-  );
-  return data;
+  return chatApi.deleteMessage(projectId, messageId);
 }
 
-// â”€â”€ Threads â”€â”€
+// ── Threads ──
 
 export async function fetchThreadMessages(
   projectId: string,
   parentMessageId: number,
 ): Promise<ChatMessage[]> {
-  const { data } = await api.get<ChatMessage[]>(
-    `/api/projects/${projectId}/chat/messages/${parentMessageId}/thread`,
-  );
-  return data;
+  return chatApi.getThreadMessages(projectId, parentMessageId);
 }
 
 export async function postThreadReply(
@@ -230,23 +161,16 @@ export async function postThreadReply(
   parentMessageId: number,
   content: string,
 ): Promise<ChatMessage> {
-  const { data } = await api.post<ChatMessage>(
-    `/api/projects/${projectId}/chat/messages/${parentMessageId}/thread/replies`,
-    { content, formatType: 'PLAIN' },
-  );
-  return data;
+  return chatApi.postThreadReply(projectId, parentMessageId, content);
 }
 
-// â”€â”€ Reactions â”€â”€
+// ── Reactions ──
 
 export async function fetchMessageReactions(
   projectId: string,
   messageId: number,
 ): Promise<ChatReactionSummary[]> {
-  const { data } = await api.get<ChatReactionSummary[]>(
-    `/api/projects/${projectId}/chat/messages/${messageId}/reactions`,
-  );
-  return data;
+  return chatApi.getMessageReactions(projectId, messageId);
 }
 
 export async function toggleReactionRest(
@@ -254,18 +178,13 @@ export async function toggleReactionRest(
   messageId: number,
   emoji: string,
 ): Promise<ChatReactionSummary[]> {
-  const { data } = await api.post<ChatReactionSummary[]>(
-    `/api/projects/${projectId}/chat/messages/${messageId}/reactions/toggle`,
-    { emoji },
-  );
-  return data;
+  return chatApi.toggleReaction(projectId, messageId, emoji);
 }
 
-// â”€â”€ Rooms â”€â”€
+// ── Rooms ──
 
 export async function fetchRooms(projectId: string): Promise<ChatRoom[]> {
-  const { data } = await api.get<ChatRoom[]>(`/api/projects/${projectId}/chat/rooms`);
-  return data;
+  return chatApi.getRooms(projectId);
 }
 
 export async function createRoomRest(
@@ -273,18 +192,14 @@ export async function createRoomRest(
   name: string,
   members: string[],
 ): Promise<ChatRoom> {
-  const { data } = await api.post<ChatRoom>(
-    `/api/projects/${projectId}/chat/rooms`,
-    { name, members },
-  );
-  return data;
+  return chatApi.createRoom(projectId, { name, members });
 }
 
 export async function deleteRoomRest(
   projectId: string,
   roomId: number,
 ): Promise<void> {
-  await api.delete(`/api/projects/${projectId}/chat/rooms/${roomId}`);
+  return chatApi.deleteRoom(projectId, roomId);
 }
 
 export async function updateRoomMetaRest(
@@ -292,11 +207,7 @@ export async function updateRoomMetaRest(
   roomId: number,
   updates: { name?: string; topic?: string; description?: string },
 ): Promise<ChatRoom> {
-  const { data } = await api.patch<ChatRoom>(
-    `/api/projects/${projectId}/chat/rooms/${roomId}/meta`,
-    updates,
-  );
-  return data;
+  return chatApi.updateRoomMeta(projectId, roomId, updates);
 }
 
 export async function pinRoomMessageRest(
@@ -304,10 +215,5 @@ export async function pinRoomMessageRest(
   roomId: number,
   messageId: number | null,
 ): Promise<ChatRoom> {
-  const { data } = await api.patch<ChatRoom>(
-    `/api/projects/${projectId}/chat/rooms/${roomId}/pin`,
-    { messageId },
-  );
-  return data;
+  return chatApi.pinRoomMessage(projectId, roomId, messageId);
 }
-

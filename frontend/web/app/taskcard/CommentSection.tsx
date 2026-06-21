@@ -1,10 +1,13 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import api from '@/lib/axios';
 import { getUserFromToken } from '@/lib/auth';
 import ActivityFeed from './ActivityFeed';
 import CommentItem from './components/CommentItem';
+import { tasksApi, projectsApi } from '@/services/api-contract';
+import type { Member } from '@/services/projects-contract';
+import { getOrFetchUserMap } from './sidebar/userMapCache';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 interface Comment {
   id: number;
@@ -16,12 +19,42 @@ interface Comment {
 interface CommentSectionProps {
   taskId?: number;
   onFetchRef?: (fn: () => void) => void;
+  projectId?: number;
 }
 
-// Relative profile picture URLs from the API need a host prefix; absolute CDN URLs are used as-is.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+interface UserProfile {
+  userId?: number;
+  username?: string;
+  email?: string;
+  profilePicUrl?: string | null;
+  fullName?: string;
+}
 
-const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) => {
+function buildUsersMap(users: UserProfile[]): Record<string, string | null> {
+  const map: Record<string, string | null> = {};
+
+  users.forEach((u) => {
+    const pic = resolveProfilePhotoUrl(u.profilePicUrl, u.userId);
+    if (typeof u.userId === 'number') {
+      map[`id:${u.userId}`] = pic;
+    }
+    if (u.email) {
+      map[`email:${u.email.toLowerCase()}`] = pic;
+    }
+    if (u.username) {
+      map[u.username] = pic;
+      map[`username:${u.username.toLowerCase()}`] = pic;
+    }
+    if (u.fullName) {
+      map[u.fullName] = pic;
+      map[`fullname:${u.fullName.toLowerCase()}`] = pic;
+    }
+  });
+
+  return map;
+}
+
+const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef, projectId }) => {
   const [activeTab, setActiveTab] = useState<'Comments' | 'History'>('Comments');
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -33,41 +66,63 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
     const user = getUserFromToken();
     if (user) {
       setCurrentUser(user);
-      
-      // Fetch users to populate profile pictures and map them by username
+
+      let isActive = true;
+
+      // Avatar enrichment is optional; comments should still work if this lookup is unauthorized.
       const fetchUsers = async () => {
         try {
-          const response = await api.get('/api/auth/users');
-          const uidMap: Record<string, string | null> = {};
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          response.data.forEach((u: any) => {
-             if (u.username) {
-               uidMap[u.username] = u.profilePicUrl || null;
-             }
-             if (u.email === user.email && u.profilePicUrl) {
-               setCurrentUser(prev => prev ? { ...prev, profilePicUrl: u.profilePicUrl } : null);
-             }
-          });
+          let uidMap: Record<string, string | null>;
+          if (projectId) {
+            const members = await projectsApi.getMembers(projectId);
+            uidMap = buildUsersMap(members.map((m: Member) => m.user ? {
+              userId: m.user.userId,
+              username: m.user.username,
+              email: m.user.email,
+              profilePicUrl: m.user.profilePicUrl
+            } : {
+              userId: m.userId,
+              username: m.username,
+              email: m.email,
+              profilePicUrl: null
+            }));
+          } else {
+            uidMap = await getOrFetchUserMap();
+          }
+
+          if (!isActive) return;
+
+          const currentUserPic = uidMap[`email:${user.email.toLowerCase()}`]
+            || (user.userId ? uidMap[`id:${user.userId}`] : null)
+            || (user.username ? uidMap[user.username] || uidMap[`username:${user.username.toLowerCase()}`] : null);
+
+          if (currentUserPic) {
+            setCurrentUser(prev => prev ? { ...prev, profilePicUrl: currentUserPic } : null);
+          }
           setUsersMap(uidMap);
-        } catch (error) {
-          console.error('Failed to fetch users:', error);
+        } catch {
+          if (isActive) {
+            setUsersMap({});
+          }
         }
       };
       void fetchUsers();
+
+      return () => {
+        isActive = false;
+      };
     }
-  }, []);
+  }, [projectId]);
 
   const resolveProfilePic = (url?: string | null) => {
-    if (!url) return '';
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    return `${API_BASE_URL}${url}`;
+    return resolveProfilePhotoUrl(url) || '';
   };
 
   const fetchComments = async () => {
     if (!taskId) return;
     try {
-      const response = await api.get(`/api/tasks/${taskId}/comments`);
-      setComments(response.data);
+      const response = await tasksApi.getComments(taskId);
+      setComments(response);
     } catch (error) {
       console.error('Failed to fetch comments:', error);
     }
@@ -90,7 +145,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
 
     try {
       setIsSubmitting(true);
-      await api.post(`/api/tasks/${taskId}/comments`, {
+      await tasksApi.postComment(taskId, {
         content: newComment
       });
       setNewComment('');
@@ -109,15 +164,15 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
 
   return (
     <div className="mt-8">
-      <div className="flex items-center gap-6 border-b border-[#EAECF0] mb-4">
+      <div className="flex items-center gap-6 border-b border-cu-border mb-4">
         {['Comments', 'History'].map((tab) => (
-          <button 
+          <button
             key={tab}
             onClick={() => setActiveTab(tab as 'Comments' | 'History')}
             className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === tab 
-                ? 'border-[#155DFC] text-[#155DFC]' 
-                : 'border-transparent text-[#667085] hover:text-[#344054]'
+              activeTab === tab
+                ? 'border-cu-primary text-cu-primary'
+                : 'border-transparent text-cu-text-muted hover:text-cu-text-primary'
             }`}
           >
             {tab}
@@ -126,7 +181,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
       </div>
       
       <div className="flex gap-3">
-        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden bg-[#155DFC]">
+        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden bg-cu-primary">
           {currentUser?.profilePicUrl ? (
              <Image 
                src={resolveProfilePic(currentUser.profilePicUrl)} 
@@ -154,13 +209,13 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
               }
             }}
             disabled={isSubmitting}
-            className="w-full border border-[#D0D5DD] rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] focus:outline-none transition-all placeholder:text-[#98A2B3] disabled:bg-[#F2F4F7] resize-none"
+            className="w-full border border-cu-border bg-cu-bg text-cu-text-primary rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-cu-primary/20 focus:border-cu-primary focus:outline-none transition-all placeholder:text-cu-text-muted disabled:bg-cu-bg-secondary resize-none"
           />
           <div className="flex items-center justify-between mt-1">
-            <p className="text-xs text-[#98A2B3]">
-              <strong>Pro tip:</strong> press <span className="bg-[#F2F4F7] border border-[#D0D5DD] px-1 rounded text-[#667085] font-mono">Enter</span> to comment
+            <p className="text-xs text-cu-text-muted">
+              <strong>Pro tip:</strong> press <span className="bg-cu-bg-secondary border border-cu-border px-1 rounded text-cu-text-secondary font-mono">Enter</span> to comment
             </p>
-            <p className="text-xs text-gray-400">{newComment.length}/2000</p>
+            <p className="text-xs text-cu-text-muted">{newComment.length}/2000</p>
           </div>
         </div>
       </div>
@@ -179,8 +234,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({ taskId, onFetchRef }) =
               ))}
             </div>
           ) : (
-            <div className="mt-6 text-center py-8 bg-[#F9FAFB] rounded-xl border border-dashed border-[#D0D5DD]">
-              <p className="text-[#98A2B3] text-sm">No comments yet.</p>
+            <div className="mt-6 text-center py-8 bg-cu-bg-secondary rounded-xl border border-dashed border-cu-border">
+              <p className="text-cu-text-muted text-sm">No comments yet.</p>
             </div>
           )}
         </div>

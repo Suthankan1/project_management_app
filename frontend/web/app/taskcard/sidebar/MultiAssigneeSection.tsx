@@ -3,7 +3,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import { Plus, X } from 'lucide-react';
 import api from '@/lib/axios';
+import { toast } from '@/components/ui';
 import SidebarField from './SidebarField';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 interface AssigneeRow {
   memberId: number;
@@ -28,8 +30,21 @@ const MultiAssigneeSection: React.FC<MultiAssigneeSectionProps> = ({
   readOnly = false,
 }) => {
   const [members, setMembers] = useState<{ memberId: number; userId: number; name: string; photoUrl: string | null }[]>([]);
+  const [assigneeState, setAssigneeState] = useState({ source: assignees, value: assignees });
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  if (assigneeState.source !== assignees) {
+    setAssigneeState({ source: assignees, value: assignees });
+  }
+
+  const localAssignees = assigneeState.source === assignees ? assigneeState.value : assignees;
+  const setLocalAssignees = (updater: React.SetStateAction<AssigneeRow[]>) => {
+    setAssigneeState((prev) => ({
+      source: prev.source,
+      value: typeof updater === 'function' ? updater(prev.value) : updater,
+    }));
+  };
 
   useEffect(() => {
     // Lazy-load members only when the dropdown opens — avoids an API call for every task card that renders
@@ -40,7 +55,7 @@ const MultiAssigneeSection: React.FC<MultiAssigneeSectionProps> = ({
           memberId: m.id,
           userId: m.user.userId,
           name: m.user.username,
-          photoUrl: m.user.profilePicUrl ?? null,
+          photoUrl: resolveProfilePhotoUrl(m.user.profilePicUrl, m.user.userId),
         }))
       );
     }).catch(() => {});
@@ -60,26 +75,55 @@ const MultiAssigneeSection: React.FC<MultiAssigneeSectionProps> = ({
     if (readOnly) return;
     const member = members.find((m) => m.memberId === memberId);
     if (!member) return;
-    const updated = [...assignees.map((a) => a.userId), member.userId];
-    await api.patch(`/api/tasks/${taskId}/assignees`, { assigneeIds: updated });
-    onChanged();
+    const updated = [...localAssignees.map((a) => a.userId), member.userId];
+    // Optimistic update
+    const previous = localAssignees;
+    setLocalAssignees(prev => [...prev, { memberId: member.memberId, userId: member.userId, name: member.name, photoUrl: member.photoUrl }]);
     setOpen(false);
+    try {
+      await api.patch(`/api/tasks/${taskId}/assignees`, { assigneeIds: updated });
+      onChanged();
+    } catch {
+      setLocalAssignees(previous);
+      toast('Failed to add assignee', 'error', 8000, 'Retry', async () => {
+        try {
+          await api.patch(`/api/tasks/${taskId}/assignees`, { assigneeIds: updated });
+          onChanged();
+        } catch {
+          toast('Retry failed', 'error');
+        }
+      });
+    }
   };
 
   const removeAssignee = async (memberId: number) => {
     if (readOnly) return;
-    const updated = assignees.filter((a) => a.memberId !== memberId).map((a) => a.userId);
-    await api.patch(`/api/tasks/${taskId}/assignees`, { assigneeIds: updated });
-    onChanged();
+    const updated = localAssignees.filter((a) => a.memberId !== memberId).map((a) => a.userId);
+    const previous = localAssignees;
+    setLocalAssignees(prev => prev.filter((a) => a.memberId !== memberId));
+    try {
+      await api.patch(`/api/tasks/${taskId}/assignees`, { assigneeIds: updated });
+      onChanged();
+    } catch {
+      setLocalAssignees(previous);
+      toast('Failed to remove assignee', 'error', 8000, 'Retry', async () => {
+        try {
+          await api.patch(`/api/tasks/${taskId}/assignees`, { assigneeIds: updated });
+          onChanged();
+        } catch {
+          toast('Retry failed', 'error');
+        }
+      });
+    }
   };
 
   return (
     <SidebarField label="Assignees">
       <div className="space-y-1" ref={ref}>
-        {assignees.length === 0 && (
+        {localAssignees.length === 0 && (
           <span className="text-xs text-gray-400 italic">No assignees</span>
         )}
-        {assignees.map((a) => (
+        {localAssignees.map((a) => (
           <div
             key={a.memberId}
             className="flex items-center gap-2 hover:bg-gray-50 p-1 min-h-[44px] sm:min-h-0 -ml-1 rounded group"

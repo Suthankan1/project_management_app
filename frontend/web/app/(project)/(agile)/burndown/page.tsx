@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TrendingDown, BarChart2 } from 'lucide-react';
-import api from '@/lib/axios';
+import { sprintsApi } from '@/services/api-contract';
 import { toast } from '@/components/ui';
 import BurndownChart, { type BurndownPoint } from './components/BurndownChart';
 import SprintSelector, { type BurndownSprint } from './components/SprintSelector';
@@ -65,8 +65,7 @@ function BurndownContent() {
     }
     const fetchSprints = async () => {
       try {
-        const res = await api.get<BurndownSprint[]>(`/api/sprints/project/${projectId}`);
-        const list = res.data;
+        const list = await sprintsApi.listByProject(projectId);
         setSprints(list);
         if (list.length > 0) {
           // default to the first ACTIVE sprint, or the first one
@@ -99,10 +98,8 @@ function BurndownContent() {
       const params = new URLSearchParams();
       if (filterFrom) params.set('from', filterFrom);
       if (filterTo)   params.set('to',   filterTo);
-      const res = await api.get<BurndownResponse>(
-        `/api/burndown/sprint/${selectedSprintId}?${params.toString()}`
-      );
-      setBurndown(res.data);
+      const data = await sprintsApi.getBurndown(selectedSprintId, params);
+      setBurndown(data);
       setError(null);
     } catch {
       setError('Failed to load burndown data.');
@@ -130,7 +127,7 @@ function BurndownContent() {
     if (!selectedSprint) return;
     const normalized = val ? String(val).slice(0, 10) : null;
     try {
-      await api.put(`/api/sprints/${selectedSprint.id}`, {
+      await sprintsApi.update(selectedSprint.id, {
         name: selectedSprint.name,
         startDate: field === 'start' ? normalized : (selectedSprint.startDate || null),
         endDate: field === 'end' ? normalized : (selectedSprint.endDate || null)
@@ -167,36 +164,36 @@ function BurndownContent() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-full bg-[#F4F5F7] p-4 sm:p-5 pb-6 font-[var(--font-inter)]">
+    <div className="min-h-full bg-cu-bg-secondary p-4 pb-6 font-[var(--font-inter)] sm:p-5">
       {/* Page header */}
       <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#175CD3] shadow">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cu-primary shadow-cu-sm">
           <TrendingDown size={18} className="text-white" />
         </div>
         <div>
-          <h1 className="text-[20px] font-bold text-[#101828] leading-tight">Burndown Chart</h1>
-          <p className="text-[13px] text-[#667085]">Track story point progress across sprint days</p>
+          <h1 className="text-[20px] font-bold leading-tight text-cu-text-primary">Burndown Chart</h1>
+          <p className="text-[13px] text-cu-text-secondary">Track story point progress across sprint days</p>
         </div>
       </div>
 
       {/* Loading sprints */}
       {loadingSprints && (
-        <div className="flex h-48 items-center justify-center text-[#667085] text-sm">
-          Loading sprints…
+        <div className="flex h-48 items-center justify-center text-sm text-cu-text-secondary">
+          Loading sprints...
         </div>
       )}
 
       {/* Error */}
       {!loadingSprints && error && !burndown && (
-        <div className="flex h-48 items-center justify-center rounded-xl bg-white text-[#F04438] text-sm font-medium shadow-sm border border-[#FECDCA]">
+        <div className="flex h-48 items-center justify-center rounded-xl border border-red-500/25 bg-cu-bg text-sm font-medium text-red-500 shadow-cu-sm">
           {error}
         </div>
       )}
 
       {/* No sprints */}
       {!loadingSprints && !error && sprints.length === 0 && (
-        <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl bg-white text-[#667085] shadow-sm border border-[#E4E7EC]">
-          <BarChart2 size={32} className="text-[#D0D5DD]" />
+        <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl border border-cu-border bg-cu-bg text-cu-text-secondary shadow-cu-sm">
+          <BarChart2 size={32} className="text-cu-text-muted" />
           <p className="text-sm">No sprints found for this project.</p>
         </div>
       )}
@@ -229,24 +226,24 @@ function BurndownContent() {
                 progressPct={progressPct}
               />
               {filterTo && selectedSprint?.endDate && filterTo !== selectedSprint.endDate && (
-                <p className="text-[12px] text-[#98A2B3] -mt-2">
+                <p className="-mt-2 text-[12px] text-cu-text-muted">
                   Stats shown as of{' '}
-                  <strong className="text-[#667085]">
+                  <strong className="text-cu-text-secondary">
                     {new Date(filterTo + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </strong>
-                  {' '}· adjust the date range to see the full sprint
+                  {' '} &middot; adjust the date range to see the full sprint
                 </p>
               )}
             </>
           )}
 
           {/* Chart card */}
-          <div className="rounded-xl border border-[#E4E7EC] bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-cu-border bg-cu-bg p-5 shadow-cu-sm">
             {loadingChart ? (
               <div className="flex h-64 items-center justify-center">
                 <div className="flex flex-col items-center gap-3">
-                  <div className="h-8 w-8 rounded-full border-[3px] border-[#175CD3] border-t-transparent animate-spin" />
-                  <p className="text-[13px] text-[#667085]">Loading chart…</p>
+                  <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-cu-primary border-t-transparent" />
+                  <p className="text-[13px] text-cu-text-secondary">Loading chart...</p>
                 </div>
               </div>
             ) : burndown ? (
@@ -262,7 +259,7 @@ function BurndownContent() {
                 onSaveDate={handleDateSaving}
               />
             ) : (
-              <div className="flex h-64 items-center justify-center text-[#98A2B3] text-sm">
+              <div className="flex h-64 items-center justify-center text-sm text-cu-text-muted">
                 Select a sprint to view the burndown chart.
               </div>
             )}
@@ -270,10 +267,10 @@ function BurndownContent() {
 
           {/* Sprint date range note */}
           {selectedSprint && selectedSprint.startDate && selectedSprint.endDate && (
-            <p className="text-center text-[12px] text-[#98A2B3] transition-all duration-300">
-              Sprint&nbsp;<strong className="text-[#667085]">{selectedSprint.name}</strong>&nbsp;·&nbsp;
+            <p className="text-center text-[12px] text-cu-text-muted transition-all duration-300">
+              Sprint <strong className="text-cu-text-secondary">{selectedSprint.name}</strong> &middot;{' '}
               {new Date(selectedSprint.startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              &nbsp;–&nbsp;
+              {' - '}
               {new Date(selectedSprint.endDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </p>
           )}
@@ -288,8 +285,8 @@ export default function BurndownPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex h-64 items-center justify-center text-[#667085] text-sm">
-          Loading…
+        <div className="flex h-64 items-center justify-center text-sm text-cu-text-secondary">
+          Loading...
         </div>
       }
     >

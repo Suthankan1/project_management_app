@@ -3,6 +3,7 @@ package com.planora.backend.service;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,16 +16,25 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.planora.backend.dto.ChatMessageDTO;
 import com.planora.backend.dto.ChatReactionDTO;
+import com.planora.backend.exception.ResourceNotFoundException;
 import com.planora.backend.model.ChatMessage;
 import com.planora.backend.model.ChatReaction;
 import com.planora.backend.model.ChatReadState;
+import com.planora.backend.model.ChatRoomMember;
 import com.planora.backend.model.ChatRoom;
 import com.planora.backend.model.ChatThread;
+import com.planora.backend.model.Project;
+import com.planora.backend.model.TeamMember;
+import com.planora.backend.model.User;
 import com.planora.backend.repository.ChatMessageRepository;
 import com.planora.backend.repository.ChatReactionRepository;
 import com.planora.backend.repository.ChatReadStateRepository;
+import com.planora.backend.repository.ChatRoomMemberRepository;
 import com.planora.backend.repository.ChatRoomRepository;
 import com.planora.backend.repository.ChatThreadRepository;
+import com.planora.backend.repository.ProjectRepository;
+import com.planora.backend.repository.TeamMemberRepository;
+import com.planora.backend.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -38,7 +48,11 @@ public class ChatService {
     private final ChatReadStateRepository chatReadStateRepository;
     private final ChatThreadRepository chatThreadRepository;
     private final ChatRoomRepository chatRoomRepository;
+    private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final ChatReactionRepository chatReactionRepository;
+    private final ProjectRepository projectRepository;
+    private final TeamMemberRepository teamMemberRepository;
+    private final UserRepository userRepository;
     private final UserCacheService userCacheService;
     private final ChatDocumentService chatDocumentService;
 
@@ -52,15 +66,304 @@ public class ChatService {
 
     public record ChatReactionSummary(String emoji, long count, boolean reactedByCurrentUser) {}
 
+    public record CreatedRoomResult(ChatRoom room, Set<User> addedUsers) {}
+
+    @Transactional(readOnly = true)
+    public ChatRoom getChatRoomById(Long roomId) {
+        return chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Chat room not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public ChatRoom getChatRoomByIdAndProjectId(Long roomId, Long projectId) {
+        return chatRoomRepository.findByIdAndProjectId(roomId, projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Chat room not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> getProjectMemberUsernames(Long teamId, String currentUsername) {
+        var currentAliases = currentUsername != null ? resolveUserAliases(currentUsername) : List.<String>of();
+        return teamMemberRepository.findByTeamId(teamId).stream()
+                .map(TeamMember::getUser)
+                .filter(user -> user != null)
+                .map(User::getUsername)
+                .filter(username -> username != null && !username.isBlank())
+                .filter(username -> currentAliases.isEmpty() || !currentAliases.contains(username.toLowerCase()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> getProjectParticipantUsernames(Long teamId) {
+        return teamMemberRepository.findByTeamId(teamId).stream()
+                .map(TeamMember::getUser)
+                .filter(user -> user != null)
+                .map(User::getUsername)
+                .filter(username -> username != null && !username.isBlank())
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public String getProjectName(Long projectId) {
+        return projectRepository.findById(projectId)
+                .map(Project::getName)
+                .filter(name -> name != null && !name.isBlank())
+                .orElse("the project");
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChatRoom> getChatRoomsForProject(Long projectId, String username, boolean includeArchived) {
+        return getChatRoomsForProject(projectId, username, includeArchived, userCacheService.resolveUserByEmailOrUsername(username));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChatRoom> getChatRoomsForProject(Long projectId,
+                                                 String username,
+                                                 boolean includeArchived,
+                                                 User currentUser) {
+        if (currentUser == null) {
+            return List.of();
+        }
+
+        var memberRoomIds = new LinkedHashSet<>(chatRoomMemberRepository.findRoomIdsByUserId(currentUser.getUserId()));
+
+        return chatRoomRepository.findByProjectId(projectId).stream()
+                .filter(room -> room.getCreatedBy() != null && room.getCreatedBy().equalsIgnoreCase(username)
+                        || memberRoomIds.contains(room.getId()))
+                .filter(room -> includeArchived || !Boolean.TRUE.equals(room.getArchived()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChatRoomMember> getRoomMembers(Long roomId) {
+        return chatRoomMemberRepository.findByChatRoomId(roomId);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ChatRoomMember> getRoomMember(Long roomId, Long userId) {
+        return chatRoomMemberRepository.findByChatRoomIdAndUserUserId(roomId, userId);
+    }
+
+    @Transactional
+    public ChatRoom saveChatRoom(ChatRoom room) {
+        return chatRoomRepository.save(room);
+    }
+
+    @Transactional
+    public ChatRoomMember saveRoomMember(ChatRoomMember member) {
+        return chatRoomMemberRepository.save(member);
+    }
+
+    @Transactional
+    public void deleteRoomMembersByRoomId(Long roomId) {
+        chatRoomMemberRepository.deleteByChatRoomId(roomId);
+    }
+
+    @Transactional
+    public void deleteChatRoom(ChatRoom room) {
+        chatRoomRepository.delete(room);
+    }
+
+    @Transactional(readOnly = true)
+    public List<User> resolveRoomRecipients(ChatRoom room, Long excludedUserId) {
+        if (room == null || room.getId() == null) {
+            return List.of();
+        }
+
+        Set<Long> recipientIds = new LinkedHashSet<>();
+        chatRoomMemberRepository.findByChatRoomId(room.getId()).stream()
+                .map(ChatRoomMember::getUser)
+                .filter(user -> user != null)
+                .map(User::getUserId)
+                .filter(userId -> userId != null)
+                .forEach(recipientIds::add);
+
+        var creator = userCacheService.resolveUserByEmailOrUsername(room.getCreatedBy());
+        if (creator != null && creator.getUserId() != null) {
+            recipientIds.add(creator.getUserId());
+        }
+
+        if (excludedUserId != null) {
+            recipientIds.remove(excludedUserId);
+        }
+
+        if (recipientIds.isEmpty()) {
+            return List.of();
+        }
+
+        return userRepository.findAllById(recipientIds);
+    }
+
+    @Transactional
+    public CreatedRoomResult createRoom(Long projectId,
+                                        Long teamId,
+                                        String username,
+                                        String roomName,
+                                        List<String> memberIdentifiers) {
+        var newRoom = new ChatRoom();
+        newRoom.setName(roomName);
+        newRoom.setProjectId(projectId);
+        newRoom.setCreatedBy(username);
+        newRoom.setArchived(false);
+
+        var savedRoom = chatRoomRepository.save(newRoom);
+
+        var teamMembers = teamMemberRepository.findByTeamId(teamId);
+        var teamUsersByIdentifier = new LinkedHashMap<String, User>();
+        teamMembers.stream()
+                .map(TeamMember::getUser)
+                .filter(user -> user != null)
+                .forEach(user -> {
+                    if (user.getEmail() != null) {
+                        teamUsersByIdentifier.put(user.getEmail().toLowerCase(), user);
+                    }
+                    if (user.getUsername() != null) {
+                        teamUsersByIdentifier.put(user.getUsername().toLowerCase(), user);
+                    }
+                });
+
+        var usersToAdd = new LinkedHashSet<User>();
+        if (memberIdentifiers != null) {
+            memberIdentifiers.stream()
+                    .filter(identifier -> identifier != null && !identifier.isBlank())
+                    .map(String::toLowerCase)
+                    .distinct()
+                    .map(teamUsersByIdentifier::get)
+                    .filter(user -> user != null)
+                    .forEach(usersToAdd::add);
+        }
+
+        var creator = userCacheService.resolveUserByEmailOrUsername(username);
+        if (creator != null) {
+            usersToAdd.add(creator);
+        }
+
+        usersToAdd.forEach(user -> {
+            boolean already = chatRoomMemberRepository.findByChatRoomIdAndUserUserId(savedRoom.getId(), user.getUserId()).isPresent();
+            if (!already) {
+                var roomMember = new ChatRoomMember();
+                roomMember.setChatRoom(savedRoom);
+                roomMember.setUser(user);
+                roomMember.setRole((creator != null && creator.getUserId().equals(user.getUserId()))
+                        ? ChatRoomMember.RoomRole.OWNER
+                        : ChatRoomMember.RoomRole.MEMBER);
+                chatRoomMemberRepository.save(roomMember);
+            }
+        });
+
+        return new CreatedRoomResult(savedRoom, usersToAdd);
+    }
+
+    @Transactional
+    public ChatRoom updateRoomMeta(Long projectId, Long roomId, String name, String topic, String description) {
+        var room = getChatRoomByIdAndProjectId(roomId, projectId);
+
+        if (name != null && !name.trim().isEmpty()) {
+            room.setName(name.trim());
+        }
+        room.setTopic(topic != null ? topic.trim() : null);
+        room.setDescription(description != null ? description.trim() : null);
+
+        return chatRoomRepository.save(room);
+    }
+
+    @Transactional
+    public ChatRoom pinRoomMessage(Long projectId, Long roomId, Long messageId) {
+        var room = getChatRoomByIdAndProjectId(roomId, projectId);
+        room.setPinnedMessageId(messageId);
+        return chatRoomRepository.save(room);
+    }
+
+    @Transactional
+    public void updateRoomMemberRole(Long projectId, Long roomId, Long memberUserId, ChatRoomMember.RoomRole role) {
+        var room = getChatRoomByIdAndProjectId(roomId, projectId);
+        var member = chatRoomMemberRepository.findByChatRoomIdAndUserUserId(room.getId(), memberUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Room member not found"));
+        member.setRole(role);
+        chatRoomMemberRepository.save(member);
+    }
+
+    @Transactional
+    public ChatRoom deleteRoom(Long projectId, Long roomId) {
+        var room = getChatRoomByIdAndProjectId(roomId, projectId);
+        chatRoomMemberRepository.deleteByChatRoomId(roomId);
+        chatRoomRepository.delete(room);
+        return room;
+    }
+
+    @Transactional(readOnly = true)
+    public void requireRoomAdminOrOwner(Long teamId, ChatRoom room, String usernameOrEmail) {
+        var user = userCacheService.resolveUserByEmailOrUsername(usernameOrEmail);
+        if (user == null) {
+            throw new ResourceNotFoundException("User not found");
+        }
+
+        if (isRoomCreator(room, user, usernameOrEmail)) {
+            return;
+        }
+
+        var member = chatRoomMemberRepository.findByChatRoomIdAndUserUserId(room.getId(), user.getUserId())
+                .orElseThrow(() -> new RuntimeException("User is not a room member"));
+
+        var role = member.getRole();
+        if (role == ChatRoomMember.RoomRole.OWNER || role == ChatRoomMember.RoomRole.ADMIN) {
+            return;
+        }
+
+        throw new RuntimeException("Only channel owner/admin can perform this action");
+    }
+
+    @Transactional
+    public void ensureRoomMembership(Long roomId, String usernameOrEmail) {
+        var user = userCacheService.resolveUserByEmailOrUsername(usernameOrEmail);
+        if (user == null) {
+            throw new RuntimeException("User is not found");
+        }
+
+        if (chatRoomMemberRepository.findByChatRoomIdAndUserUserId(roomId, user.getUserId()).isPresent()) {
+            return;
+        }
+
+        var room = getChatRoomById(roomId);
+        if (isRoomCreator(room, user, usernameOrEmail)) {
+            var roomMember = new ChatRoomMember();
+            roomMember.setChatRoom(room);
+            roomMember.setUser(user);
+            chatRoomMemberRepository.save(roomMember);
+            return;
+        }
+
+        throw new RuntimeException("User is not a member of this room");
+    }
+
+    private boolean isRoomCreator(ChatRoom room, User user, String usernameOrEmail) {
+        if (room == null || room.getCreatedBy() == null) {
+            return false;
+        }
+
+        return room.getCreatedBy().equalsIgnoreCase(usernameOrEmail)
+                || (user.getEmail() != null && room.getCreatedBy().equalsIgnoreCase(user.getEmail()))
+                || (user.getUsername() != null && room.getCreatedBy().equalsIgnoreCase(user.getUsername()));
+    }
+
     /**
      * Persist a chat message.
      */
     @SuppressWarnings("null")
     public ChatMessageDTO saveMessage(ChatMessage message) {
+        applyMessageDefaults(message);
+        return convertToDTO(chatMessageRepository.save(message));
+    }
+
+    private void applyMessageDefaults(ChatMessage message) {
+        if (message == null) {
+            return;
+        }
         if (message.getFormatType() == null) {
             message.setFormatType(ChatMessage.FormatType.PLAIN);
         }
-        return convertToDTO(chatMessageRepository.save(message));
+        if (message.getDeleted() == null) {
+            message.setDeleted(false);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -611,7 +914,7 @@ public class ChatService {
         message.setChatType(dto.getChatType());
         message.setParentMessageId(dto.getParentMessageId());
         message.setFormatType(dto.getFormatType());
-        message.setDeleted(dto.getDeleted());
+        message.setDeleted(Boolean.TRUE.equals(dto.getDeleted()));
         message.setDeletedAt(dto.getDeletedAt());
         message.setEditedAt(dto.getEditedAt());
         // timestamp is managed by JPA (@CreationTimestamp)

@@ -3,8 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { UserCircle2 } from 'lucide-react';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 interface AssigneeAvatarProps {
   name?: string | null;
@@ -22,10 +21,7 @@ const resolveProfilePic = (url?: string | null, name?: string | null) => {
     // DiceBear fallback for a professional "profile picture" look instead of just initials
     return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=00319c,1e56a0,163172&fontFamily=Arial,sans-serif`;
   }
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
-  const path = url.startsWith('/') ? url : `/${url}`;
-  return `${baseUrl}${path}`;
+  return resolveProfilePhotoUrl(url) || '';
 };
 
 const getInitials = (name?: string | null) => {
@@ -59,7 +55,7 @@ export default function AssigneeAvatar({
   return (
     <span
       className={joinClasses(
-        'inline-flex flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#F2F4F7] text-[#175CD3]',
+        'inline-flex flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-cu-bg-tertiary text-cu-primary',
         fallbackClassName,
         className
       )}
@@ -83,7 +79,7 @@ export default function AssigneeAvatar({
           {initials}
         </span>
       ) : (
-        <UserCircle2 size={iconSize} strokeWidth={1.5} className="text-[#98A2B3]" />
+        <UserCircle2 size={iconSize} strokeWidth={1.5} className="text-cu-text-muted" />
       )}
     </span>
   );

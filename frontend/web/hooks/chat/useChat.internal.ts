@@ -1,6 +1,6 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 
-import { getValidToken } from '@/lib/auth';
+import { ensureValidToken } from '@/lib/auth';
 import * as chatApi from '@/services/chat-service';
 import type {
   ChatFeatureFlags,
@@ -219,7 +219,7 @@ export async function initializeChatState(args: ChatInitializationArgs): Promise
     setRoomLastMessages,
   } = args;
 
-  const token = getValidToken();
+  const token = await ensureValidToken({ allowCookieRefresh: true });
   if (!token) {
     console.warn('[chat-ws] No valid token found, redirecting to login.');
     routerPush('/login');

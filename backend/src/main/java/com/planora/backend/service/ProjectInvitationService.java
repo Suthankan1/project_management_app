@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.planora.backend.controller.ProjectMemberController;
 import com.planora.backend.dto.ProjectInviteRequest;
+import com.planora.backend.exception.InvitationExpiredException;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.TeamInvitation;
 import com.planora.backend.model.TeamMember;
@@ -111,13 +112,13 @@ public class ProjectInvitationService {
                 invitation.getToken());
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = InvitationExpiredException.class)
     public void acceptInvitation(String token, Long userId) {
         if (token == null || token.isBlank()) {
             throw new RuntimeException("Invalid invitation token");
         }
 
-        TeamInvitation invitation = teamInvitationRepository.findByToken(token)
+        TeamInvitation invitation = teamInvitationRepository.findByTokenWithLock(token)
                 .orElseThrow(() -> new RuntimeException("Invitation not found or invalid"));
 
         Project project = invitation.getTeam().getProjects().stream().findFirst().orElse(null);
@@ -128,7 +129,11 @@ public class ProjectInvitationService {
         teamMemberService.enforceCreatorOnlyOwnerRole(invitation.getTeam().getId(), projectOwnerUserId);
 
         if (invitation.getExpiresAt() != null && invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Invitation has expired");
+            if (!"EXPIRED".equalsIgnoreCase(invitation.getStatus())) {
+                invitation.setStatus("EXPIRED");
+                teamInvitationRepository.save(invitation);
+            }
+            throw new InvitationExpiredException("Invitation has expired");
         }
 
         User user = userRepository.findById(userId)
@@ -140,17 +145,16 @@ public class ProjectInvitationService {
             throw new RuntimeException("This invitation was sent to a different email address");
         }
 
-        // Prevent duplicate membership
-        teamMemberRepository.findByTeamIdAndUserUserId(invitation.getTeam().getId(), userId)
-                .ifPresent(m -> {
-                    throw new RuntimeException("You are already a member of this team");
-                });
-
-        // Debug logging for investigation
-        System.out.println("[DEBUG] Accepting invitation:");
-        System.out.println("  Token: " + token);
-        System.out.println("  Invitation ID: " + invitation.getId());
-        System.out.println("  Invitation Role: '" + invitation.getRole() + "'");
+        // Accept can be submitted twice from the UI. The invitation row lock above
+        // serializes those requests; this branch makes the second one harmless.
+        var existingMember = teamMemberRepository.findByTeamIdAndUserUserId(invitation.getTeam().getId(), userId);
+        if (existingMember.isPresent()) {
+            if (!"ACCEPTED".equalsIgnoreCase(invitation.getStatus())) {
+                invitation.setStatus("ACCEPTED");
+                teamInvitationRepository.save(invitation);
+            }
+            return;
+        }
 
         TeamMember member = new TeamMember();
         member.setTeam(invitation.getTeam());
@@ -164,7 +168,6 @@ public class ProjectInvitationService {
             }
             invitedRole = TeamRole.valueOf(roleStr);
         } catch (Exception e) {
-            System.out.println("[DEBUG] Invalid role, defaulting to MEMBER");
             invitedRole = TeamRole.MEMBER; // fallback
         }
 
@@ -173,7 +176,6 @@ public class ProjectInvitationService {
         }
 
         member.setRole(invitedRole);
-        System.out.println("  Assigned TeamMember Role: '" + invitedRole + "'");
         teamMemberRepository.save(member);
 
         invitation.setStatus("ACCEPTED");

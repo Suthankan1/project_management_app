@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, Platform, Animated, ActivityIndicator,
@@ -11,8 +11,13 @@ import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Svg, { Path, Circle, Rect, Polygon, Line } from 'react-native-svg';
 import { T } from '../../../src/constants/tokens';
-import { projectService, type ProjectDetails, type ProjectType } from '../../../src/services/project-service';
+import { projectService, type ProjectDetails } from '../../../src/services/project-service';
 import { getCurrentUserId } from '../../../src/auth/storage';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import CustomFieldsManager from '../../../src/components/settings/CustomFieldsManager';
+import RecurringSchedulesManager from '../../../src/components/settings/RecurringSchedulesManager';
+import GitHubAutoTransitionsCard from '../../../src/components/settings/GitHubAutoTransitionsCard';
+import NotificationPreferencesPanel from '../../../src/components/settings/NotificationPreferencesPanel';
 
 // ─── Inline SVG Icons ─────────────────────────────────────────────────────────
 
@@ -37,14 +42,6 @@ const InfoIcon = ({ color = T.textSecondary }: { color?: string }) => (
     <Circle cx={12} cy={12} r={10} />
     <Line x1={12} y1={16} x2={12} y2={12} />
     <Line x1={12} y1={8} x2={12.01} y2={8} />
-  </Svg>
-);
-
-const LayersIcon = ({ color = T.textSecondary }: { color?: string }) => (
-  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <Polygon points="12 2 2 7 12 12 22 7 12 2" />
-    <Path d="M2 17l10 5 10-5" />
-    <Path d="M2 12l10 5 10-5" />
   </Svg>
 );
 
@@ -135,59 +132,6 @@ function IdentityRow({ label, value }: { label: string; value: string }) {
         <Text style={s.identityValueText} numberOfLines={1}>{value}</Text>
       </View>
     </View>
-  );
-}
-
-// ─── Type card ────────────────────────────────────────────────────────────────
-
-function TypeCard({
-  type,
-  label,
-  description,
-  selected,
-  isCurrent,
-  onPress,
-}: {
-  type: ProjectType;
-  label: string;
-  description: string;
-  selected: boolean;
-  isCurrent: boolean;
-  onPress: () => void;
-}) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const onPressIn = () =>
-    Animated.spring(scale, { toValue: 0.97, tension: 600, friction: 14, useNativeDriver: true }).start();
-  const onPressOut = () =>
-    Animated.spring(scale, { toValue: 1, tension: 300, friction: 18, useNativeDriver: true }).start();
-
-  return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <TouchableOpacity
-        onPress={onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        activeOpacity={1}
-        style={[s.typeCard, selected && s.typeCardSel]}
-      >
-        <View style={s.typeCardLeft}>
-          <View style={[s.typeRadio, selected && s.typeRadioSel]}>
-            {selected && <View style={s.typeRadioDot} />}
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={[s.typeCardName, selected && { color: T.primary }]}>{label}</Text>
-              {isCurrent && (
-                <View style={s.currentBadge}>
-                  <Text style={s.currentBadgeText}>Current</Text>
-                </View>
-              )}
-            </View>
-            <Text style={s.typeCardDesc}>{description}</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
   );
 }
 
@@ -415,97 +359,6 @@ function DeleteModal({
   );
 }
 
-// ─── Type change warning modal ────────────────────────────────────────────────
-
-function TypeChangeModal({
-  visible,
-  currentType,
-  newType,
-  onClose,
-  onConfirm,
-  isChanging,
-}: {
-  visible: boolean;
-  currentType: ProjectType;
-  newType: ProjectType;
-  onClose: () => void;
-  onConfirm: () => void;
-  isChanging: boolean;
-}) {
-  const insets = useSafeAreaInsets();
-  const fromAgile = currentType === 'AGILE';
-
-  const warnings = fromAgile
-    ? [
-        'Sprint history preserved but not visible in Kanban mode',
-        'Burndown charts and velocity tracking will be unavailable',
-        'Active sprints will remain but cannot be managed',
-      ]
-    : [
-        'Board restructured for sprint-based workflow',
-        'You can now create sprints and plan agile iterations',
-        'Burndown charts and velocity tracking become available',
-      ];
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={m.overlay}>
-        <TouchableWithoutFeedback onPress={!isChanging ? onClose : undefined}>
-          <View style={StyleSheet.absoluteFill} />
-        </TouchableWithoutFeedback>
-
-        <View style={[m.sheet, { paddingBottom: insets.bottom + 8 }]}>
-          <View style={m.handle} />
-
-          <View style={m.sheetHeader}>
-            <View style={[m.alertIconWrap, { backgroundColor: '#FFFBEB' }]}>
-              <AlertIcon color="#F59E0B" size={26} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={m.sheetTitle}>Change Project Type</Text>
-              <Text style={m.sheetSubtitle}>
-                {currentType} → {newType}
-              </Text>
-            </View>
-            {!isChanging && (
-              <TouchableOpacity onPress={onClose} style={m.closeBtn} activeOpacity={0.7}>
-                <XIcon color={T.textMuted} size={16} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={[m.consequenceBox, { backgroundColor: '#FFFBEB', borderColor: '#FEF3C7' }]}>
-            <Text style={[m.consequenceTitle, { color: '#92400E' }]}>THINGS TO BE AWARE OF</Text>
-            {warnings.map((w) => (
-              <View key={w} style={m.consequenceRow}>
-                <View style={[m.consequenceDot, { backgroundColor: '#F59E0B' }]} />
-                <Text style={[m.consequenceText, { color: '#92400E' }]}>{w}</Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={m.actions}>
-            <TouchableOpacity onPress={onClose} disabled={isChanging} style={[m.btn, m.btnCancel]} activeOpacity={0.75}>
-              <Text style={m.btnCancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={onConfirm}
-              disabled={isChanging}
-              style={[m.btn, { backgroundColor: '#F59E0B', flex: 1 }, isChanging && m.btnDisabled]}
-              activeOpacity={0.8}
-            >
-              {isChanging ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : null}
-              <Text style={m.btnDeleteText}>{isChanging ? 'Changing…' : 'Confirm Change'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 // ─── Main Settings Page ───────────────────────────────────────────────────────
 
 export default function ProjectSettingsPage() {
@@ -526,11 +379,6 @@ export default function ProjectSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [savedAnim] = useState(() => new Animated.Value(0));
 
-  // Type
-  const [selectedType, setSelectedType] = useState<ProjectType>('KANBAN');
-  const [showTypeModal, setShowTypeModal] = useState(false);
-  const [isChangingType, setIsChangingType] = useState(false);
-
   // Delete
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -543,7 +391,6 @@ export default function ProjectSettingsPage() {
   const isDirtyGeneral =
     project !== null &&
     (name.trim() !== project.name || (description.trim() !== (project.description ?? '')));
-  const isTypeDirty = project !== null && selectedType !== (project.type ?? 'KANBAN');
 
   const load = useCallback(async () => {
     if (isNaN(numericId)) return;
@@ -553,7 +400,6 @@ export default function ProjectSettingsPage() {
       setProject(data);
       setName(data.name);
       setDescription(data.description ?? '');
-      setSelectedType(data.type ?? 'KANBAN');
     } catch {
       // silently fall back to route param name if fetch fails
       if (routeProjectName) setName(Array.isArray(routeProjectName) ? routeProjectName[0] : routeProjectName);
@@ -593,21 +439,6 @@ export default function ProjectSettingsPage() {
       // keep dirty state so user can retry
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleChangeType = async () => {
-    if (!project || !isTypeDirty) return;
-    setIsChangingType(true);
-    try {
-      const updated = await projectService.update(numericId, { type: selectedType });
-      setProject(updated);
-      setSelectedType(updated.type ?? 'KANBAN');
-      setShowTypeModal(false);
-    } catch {
-      // keep modal open on error so user sees the issue
-    } finally {
-      setIsChangingType(false);
     }
   };
 
@@ -770,46 +601,47 @@ export default function ProjectSettingsPage() {
               </SectionCard>
             )}
 
-            {/* ── Project Type ─────────────────────────────────────────── */}
+            {/* ── Custom Fields ────────────────────────────────────────── */}
             <SectionCard
-              title="Project Type"
-              subtitle="Choose how your team manages work"
-              icon={<LayersIcon color="#0891B2" />}
+              title="Custom Fields"
+              subtitle="Add extra fields to all tasks in this project"
+              icon={<MaterialCommunityIcons name="form-select" size={18} color="#0891B2" />}
               iconBg="#ECFEFF"
             >
-              <TypeCard
-                type="AGILE"
-                label="Agile"
-                description="Sprint-based workflow with backlog, burndown charts, and velocity tracking."
-                selected={selectedType === 'AGILE'}
-                isCurrent={(project?.type ?? 'KANBAN') === 'AGILE'}
-                onPress={() => setSelectedType('AGILE')}
-              />
-              <View style={{ height: 10 }} />
-              <TypeCard
-                type="KANBAN"
-                label="Kanban"
-                description="Continuous flow with a visual board, column management, and WIP limits."
-                selected={selectedType === 'KANBAN'}
-                isCurrent={(project?.type ?? 'KANBAN') === 'KANBAN'}
-                onPress={() => setSelectedType('KANBAN')}
-              />
+              <CustomFieldsManager projectId={numericId} />
+            </SectionCard>
 
-              {isTypeDirty && (
-                <View style={s.typeChangeRow}>
-                  <View style={s.typeWarningBanner}>
-                    <AlertIcon color="#F59E0B" size={14} />
-                    <Text style={s.typeWarningText}>Changing type may affect existing data</Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => setShowTypeModal(true)}
-                    style={s.applyTypeBtn}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={s.applyTypeBtnText}>Apply</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+            {/* ── Recurring Tasks ──────────────────────────────────────── */}
+            <SectionCard
+              title="Recurring Tasks"
+              subtitle="Manage automated recurring schedules"
+              icon={<MaterialCommunityIcons name="autorenew" size={18} color="#D97706" />}
+              iconBg="#FFF6E8"
+            >
+              <RecurringSchedulesManager projectId={numericId} />
+            </SectionCard>
+
+            {/* ── GitHub Auto-Transitions ──────────────────────────────── */}
+            <SectionCard
+              title="GitHub Auto-Transitions"
+              subtitle="Quick setup for common GitHub workflow rules"
+              icon={<MaterialCommunityIcons name="github" size={18} color="#1A1A2E" />}
+              iconBg="#F0F1F3"
+            >
+              <GitHubAutoTransitionsCard projectId={numericId} />
+            </SectionCard>
+
+            {/* ── Notification Preferences ─────────────────────────────── */}
+            <SectionCard
+              title="Notification Overrides"
+              subtitle="Fine-tune which project events notify you"
+              icon={<MaterialCommunityIcons name="bell-cog-outline" size={18} color="#155DFC" />}
+              iconBg={T.primaryLight}
+            >
+              <NotificationPreferencesPanel
+                projectId={numericId}
+                helperText="These overrides only affect this project. If no override exists, your global notification defaults still apply."
+              />
             </SectionCard>
 
             {/* ── Danger Zone ──────────────────────────────────────────── */}
@@ -885,14 +717,6 @@ export default function ProjectSettingsPage() {
         onClose={() => !isDeleting && setShowDeleteModal(false)}
         onConfirm={handleDelete}
         isDeleting={isDeleting}
-      />
-      <TypeChangeModal
-        visible={showTypeModal}
-        currentType={project?.type ?? 'KANBAN'}
-        newType={selectedType}
-        onClose={() => !isChangingType && setShowTypeModal(false)}
-        onConfirm={handleChangeType}
-        isChanging={isChangingType}
       />
     </View>
   );
@@ -1093,118 +917,6 @@ const s = StyleSheet.create({
     fontSize: 13.5,
     fontWeight: '600',
     color: T.textPrimary,
-  },
-
-  // Type selector
-  typeCard: {
-    borderWidth: 2,
-    borderColor: T.border,
-    borderRadius: 14,
-    padding: 14,
-    backgroundColor: T.bgSecondary,
-  },
-  typeCardSel: {
-    borderColor: T.primary,
-    backgroundColor: T.primaryLight,
-    ...Platform.select({
-      ios: { shadowColor: T.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 10 },
-      android: { elevation: 3 },
-    }),
-  },
-  typeCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  typeRadio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: T.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  typeRadioSel: {
-    borderColor: T.primary,
-    backgroundColor: T.primary,
-  },
-  typeRadioDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#fff',
-  },
-  typeCardName: {
-    fontSize: 14.5,
-    fontWeight: '800',
-    color: T.textPrimary,
-    letterSpacing: -0.2,
-  },
-  typeCardDesc: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: T.textSecondary,
-    marginTop: 3,
-    lineHeight: 17,
-  },
-  currentBadge: {
-    backgroundColor: T.primaryLight,
-    borderWidth: 1,
-    borderColor: `${T.primary}33`,
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  currentBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: T.primary,
-    letterSpacing: 0.2,
-  },
-  typeChangeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 14,
-    paddingTop: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: T.borderLight,
-  },
-  typeWarningBanner: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FFFBEB',
-    borderWidth: 1,
-    borderColor: '#FEF3C7',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  typeWarningText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: '#92400E',
-    flex: 1,
-  },
-  applyTypeBtn: {
-    backgroundColor: '#F59E0B',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 12,
-    ...Platform.select({
-      ios: { shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
-      android: { elevation: 2 },
-    }),
-  },
-  applyTypeBtnText: {
-    fontSize: 13.5,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: 0.1,
   },
 
   // Danger zone

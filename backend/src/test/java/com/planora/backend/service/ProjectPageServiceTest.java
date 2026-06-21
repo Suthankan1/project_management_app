@@ -3,13 +3,16 @@ package com.planora.backend.service;
 import com.planora.backend.dto.PageDetailResponseDto;
 import com.planora.backend.dto.PageRequestDto;
 import com.planora.backend.dto.PageSummaryResponseDto;
+import com.planora.backend.dto.PageVersionResponseDto;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.ProjectPage;
+import com.planora.backend.model.ProjectPageVersion;
 import com.planora.backend.model.Team;
 import com.planora.backend.model.TeamMember;
 import com.planora.backend.model.TeamRole;
 import com.planora.backend.model.User;
 import com.planora.backend.repository.ProjectPageRepository;
+import com.planora.backend.repository.ProjectPageVersionRepository;
 import com.planora.backend.repository.ProjectRepository;
 import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.UserRepository;
@@ -51,6 +54,8 @@ class ProjectPageServiceTest {
     private NotificationService notificationService;
     @Mock
     private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private ProjectPageVersionRepository versionRepository;
 
     @InjectMocks
     private ProjectPageService service;
@@ -350,5 +355,308 @@ class ProjectPageServiceTest {
             "actor deleted page: Release Notes",
             "/pages?projectId=33");
         verify(repository).delete(page);
-        }
+    }
+
+    @Test
+    void toggleStar_togglesStatus() {
+        Team team = new Team();
+        team.setId(1L);
+        Project project = new Project();
+        project.setId(10L);
+        project.setTeam(team);
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+        ProjectPage page = ProjectPage.builder().id(2L).projectId(10L).title("Test").isStarred(false).build();
+
+        when(repository.findById(2L)).thenReturn(Optional.of(page));
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(1L, 5L)).thenReturn(Optional.of(member));
+        when(repository.save(any(ProjectPage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PageDetailResponseDto result = service.toggleStar(10L, 2L, 5L);
+
+        assertEquals(true, result.getIsStarred());
+    }
+
+    @Test
+    void movePage_setsParentPageId() {
+        Team team = new Team();
+        team.setId(1L);
+        Project project = new Project();
+        project.setId(10L);
+        project.setTeam(team);
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+        ProjectPage page = ProjectPage.builder().id(2L).projectId(10L).title("Child").build();
+        ProjectPage parentPage = ProjectPage.builder().id(3L).projectId(10L).title("Parent").build();
+
+        when(repository.findById(2L)).thenReturn(Optional.of(page));
+        when(repository.findById(3L)).thenReturn(Optional.of(parentPage));
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(1L, 5L)).thenReturn(Optional.of(member));
+        when(repository.save(any(ProjectPage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PageDetailResponseDto result = service.movePage(10L, 2L, 3L, 5L);
+
+        assertEquals(3L, result.getParentPageId());
+    }
+
+    @Test
+    void movePage_circularReference_throwsException() {
+        Team team = new Team();
+        team.setId(1L);
+        Project project = new Project();
+        project.setId(10L);
+        project.setTeam(team);
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+        ProjectPage page = ProjectPage.builder().id(2L).projectId(10L).title("Page").parentPageId(3L).build();
+        ProjectPage parentPage = ProjectPage.builder().id(3L).projectId(10L).title("Parent").parentPageId(2L).build();
+
+        when(repository.findById(2L)).thenReturn(Optional.of(page));
+        when(repository.findById(3L)).thenReturn(Optional.of(parentPage));
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(1L, 5L)).thenReturn(Optional.of(member));
+
+        assertThrows(IllegalArgumentException.class, () -> service.movePage(10L, 2L, 3L, 5L));
+    }
+
+    @Test
+    void markViewed_updatesLastViewedAt() {
+        Team team = new Team();
+        team.setId(1L);
+        Project project = new Project();
+        project.setId(10L);
+        project.setTeam(team);
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+        ProjectPage page = ProjectPage.builder().id(2L).projectId(10L).title("Test").build();
+
+        when(repository.findById(2L)).thenReturn(Optional.of(page));
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(1L, 5L)).thenReturn(Optional.of(member));
+        when(repository.save(any(ProjectPage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.markViewed(10L, 2L, 5L);
+
+        verify(repository).save(page);
+    }
+
+    @Test
+    void getPageVersions_returnsCorrectList() {
+        Team team = new Team();
+        team.setId(10L);
+        Project project = new Project();
+        project.setId(5L);
+        project.setTeam(team);
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+        ProjectPage page = ProjectPage.builder().id(1L).projectId(5L).title("Test").build();
+
+        ProjectPageVersion v1 = ProjectPageVersion.builder()
+                .id(100L)
+                .pageId(1L)
+                .title("Test v1")
+                .content("content")
+                .authorId(8L)
+                .versionNumber(1)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(repository.findById(1L)).thenReturn(Optional.of(page));
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(10L, 8L)).thenReturn(Optional.of(member));
+        when(versionRepository.findByPageIdOrderByVersionNumberDesc(1L)).thenReturn(List.of(v1));
+
+        List<PageVersionResponseDto> result = service.getPageVersions(5L, 1L, 8L);
+        assertEquals(1, result.size());
+        assertEquals("Test v1", result.get(0).getTitle());
+    }
+
+    @Test
+    void createPage_createsVersionOne() {
+        Team team = new Team();
+        team.setId(10L);
+        Project project = new Project();
+        project.setId(5L);
+        project.setTeam(team);
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+        PageRequestDto req = new PageRequestDto();
+        req.setTitle("New Page");
+        req.setContent("content");
+
+        ProjectPage saved = ProjectPage.builder()
+                .id(1L)
+                .projectId(5L)
+                .title("New Page")
+                .content("content")
+                .build();
+
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(10L, 8L)).thenReturn(Optional.of(member));
+        when(repository.save(any(ProjectPage.class))).thenReturn(saved);
+
+        PageDetailResponseDto result = service.createPage(5L, req, 8L);
+        assertEquals(1L, result.getId());
+
+        ArgumentCaptor<ProjectPageVersion> versionCaptor = ArgumentCaptor.forClass(ProjectPageVersion.class);
+        verify(versionRepository).save(versionCaptor.capture());
+        assertEquals(1L, versionCaptor.getValue().getPageId());
+        assertEquals("New Page", versionCaptor.getValue().getTitle());
+        assertEquals(1, versionCaptor.getValue().getVersionNumber());
+    }
+
+    @Test
+    void updatePage_throttling_updatesExistingVersion() {
+        Team team = new Team();
+        team.setId(10L);
+        Project project = new Project();
+        project.setId(5L);
+        project.setTeam(team);
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+        PageRequestDto req = new PageRequestDto();
+        req.setTitle("Updated Title");
+        req.setContent("new content");
+
+        ProjectPage existing = ProjectPage.builder()
+                .id(1L)
+                .projectId(5L)
+                .title("Old Title")
+                .content("old content")
+                .build();
+
+        // Latest version created 2 minutes ago by same user
+        ProjectPageVersion latest = ProjectPageVersion.builder()
+                .id(100L)
+                .pageId(1L)
+                .title("Old Title")
+                .content("old content")
+                .authorId(8L)
+                .versionNumber(1)
+                .createdAt(LocalDateTime.now().minusMinutes(2))
+                .build();
+
+        when(repository.findById(1L)).thenReturn(Optional.of(existing));
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(10L, 8L)).thenReturn(Optional.of(member));
+        when(versionRepository.findFirstByPageIdOrderByVersionNumberDesc(1L)).thenReturn(latest);
+        when(repository.save(any(ProjectPage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.updatePage(1L, req, 8L);
+
+        // Verification: existing version is updated, no new version record is saved
+        verify(versionRepository).save(latest);
+        assertEquals("Updated Title", latest.getTitle());
+        assertEquals("new content", latest.getContent());
+    }
+
+    @Test
+    void updatePage_noThrottling_createsNewVersion() {
+        Team team = new Team();
+        team.setId(10L);
+        Project project = new Project();
+        project.setId(5L);
+        project.setTeam(team);
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+        PageRequestDto req = new PageRequestDto();
+        req.setTitle("Updated Title");
+        req.setContent("new content");
+
+        ProjectPage existing = ProjectPage.builder()
+                .id(1L)
+                .projectId(5L)
+                .title("Old Title")
+                .content("old content")
+                .build();
+
+        // Latest version created 10 minutes ago by same user
+        ProjectPageVersion latest = ProjectPageVersion.builder()
+                .id(100L)
+                .pageId(1L)
+                .title("Old Title")
+                .content("old content")
+                .authorId(8L)
+                .versionNumber(1)
+                .createdAt(LocalDateTime.now().minusMinutes(10))
+                .build();
+
+        when(repository.findById(1L)).thenReturn(Optional.of(existing));
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(10L, 8L)).thenReturn(Optional.of(member));
+        when(versionRepository.findFirstByPageIdOrderByVersionNumberDesc(1L)).thenReturn(latest);
+        when(repository.save(any(ProjectPage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.updatePage(1L, req, 8L);
+
+        // Verification: a new version record is saved with versionNumber = 2
+        ArgumentCaptor<ProjectPageVersion> versionCaptor = ArgumentCaptor.forClass(ProjectPageVersion.class);
+        verify(versionRepository).save(versionCaptor.capture());
+        assertEquals(2, versionCaptor.getValue().getVersionNumber());
+        assertEquals("Updated Title", versionCaptor.getValue().getTitle());
+        assertEquals("new content", versionCaptor.getValue().getContent());
+    }
+
+    @Test
+    void restorePageVersion_restoresContentAndSavesNewVersion() {
+        Team team = new Team();
+        team.setId(10L);
+        Project project = new Project();
+        project.setId(5L);
+        project.setTeam(team);
+        TeamMember member = new TeamMember();
+        member.setRole(TeamRole.MEMBER);
+        ProjectPage page = ProjectPage.builder()
+                .id(1L)
+                .projectId(5L)
+                .title("Current Title")
+                .content("current content")
+                .build();
+
+        ProjectPageVersion versionToRestore = ProjectPageVersion.builder()
+                .id(99L)
+                .pageId(1L)
+                .title("Restored Title")
+                .content("restored content")
+                .versionNumber(1)
+                .build();
+
+        when(repository.findById(1L)).thenReturn(Optional.of(page));
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(10L, 8L)).thenReturn(Optional.of(member));
+        when(versionRepository.findById(99L)).thenReturn(Optional.of(versionToRestore));
+        when(repository.save(any(ProjectPage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(versionRepository.findFirstByPageIdOrderByVersionNumberDesc(1L)).thenReturn(versionToRestore);
+
+        PageDetailResponseDto result = service.restorePageVersion(5L, 1L, 99L, 8L);
+
+        assertEquals("Restored Title", result.getTitle());
+        assertEquals("restored content", result.getContent());
+
+        // Verifies a new version entry was created (version 2)
+        ArgumentCaptor<ProjectPageVersion> versionCaptor = ArgumentCaptor.forClass(ProjectPageVersion.class);
+        verify(versionRepository).save(versionCaptor.capture());
+        assertEquals(2, versionCaptor.getValue().getVersionNumber());
+        assertEquals("Restored Title", versionCaptor.getValue().getTitle());
+    }
+
+    @Test
+    void restorePageVersion_viewerDenied_throwsException() {
+        Team team = new Team();
+        team.setId(10L);
+        Project project = new Project();
+        project.setId(5L);
+        project.setTeam(team);
+        TeamMember viewer = new TeamMember();
+        viewer.setRole(TeamRole.VIEWER);
+        ProjectPage page = ProjectPage.builder().id(1L).projectId(5L).build();
+
+        when(repository.findById(1L)).thenReturn(Optional.of(page));
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(teamMemberRepository.findByTeamIdAndUserUserId(10L, 8L)).thenReturn(Optional.of(viewer));
+
+        assertThrows(AccessDeniedException.class, () -> service.restorePageVersion(5L, 1L, 99L, 8L));
+    }
 }

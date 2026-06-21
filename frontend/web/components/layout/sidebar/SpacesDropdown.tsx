@@ -89,7 +89,7 @@ export function SpacesDropdown({
   const dropdownContent = (
     <div
       data-sidebar-dropdown
-      className="bg-white rounded-xl border border-cu-border shadow-2xl shadow-black/10 overflow-hidden"
+      className="bg-cu-bg rounded-xl border border-cu-border shadow-2xl shadow-black/20 overflow-hidden"
       style={{
         position: 'fixed',
         top: fixedTop,
@@ -120,8 +120,8 @@ export function SpacesDropdown({
       <div className="py-1">
         {loading ? (
           <div className="px-3 py-3 flex flex-col gap-2 animate-pulse">
-            <div className="h-2 w-32 bg-gray-100 rounded" />
-            <div className="h-2 w-24 bg-gray-100 rounded" />
+            <div className="h-2 w-32 bg-cu-bg-tertiary rounded" />
+            <div className="h-2 w-24 bg-cu-bg-tertiary rounded" />
           </div>
         ) : visible.length > 0 ? (
           visible.map(project => (

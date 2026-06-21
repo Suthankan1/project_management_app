@@ -1,10 +1,11 @@
 import api from '@/lib/axios';
+import { tasksApi, sprintsApi } from '@/services/tasks-contract';
 import type { CalendarEventItem } from './types';
 
 const asArray = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
 
 export const patchTaskDates = (taskId: number, startDate: string, dueDate: string) =>
-  api.patch(`/api/tasks/${taskId}/dates`, { startDate, dueDate });
+  tasksApi.updateDates(taskId, { startDate, dueDate });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mapTask = (task: any): CalendarEventItem => ({
@@ -63,16 +64,16 @@ export const fetchCalendarEvents = async (projectId: string | number): Promise<C
     }));
   } catch {
     const [tasksRes, sprintsRes] = await Promise.allSettled([
-      api.get(`/api/tasks/project/${pid}`),
-      api.get(`/api/sprints/project/${pid}`),
+      tasksApi.listAllByProject(pid),
+      sprintsApi.listByProject(pid),
     ]);
 
     const tasks =
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tasksRes.status === 'fulfilled' ? asArray<any>(tasksRes.value.data).map(mapTask) : [];
+      tasksRes.status === 'fulfilled' ? asArray<any>(tasksRes.value).map(mapTask) : [];
     const sprints =
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      sprintsRes.status === 'fulfilled' ? asArray<any>(sprintsRes.value.data).map(mapSprint) : [];
+      sprintsRes.status === 'fulfilled' ? asArray<any>(sprintsRes.value).map(mapSprint) : [];
 
     return [...sprints, ...tasks];
   }

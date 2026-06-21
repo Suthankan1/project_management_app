@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import api from '@/lib/axios';
+import { projectsApi } from '@/services/api-contract';
 import type { ProjectSetupConfig } from './types';
 
 type TeamOption = 'NEW' | 'EXISTING';
@@ -55,8 +55,8 @@ export default function ProjectSetupPage({
 
             setCheckingKey(true);
             try {
-                const res = await api.get(`/api/projects/check-key?key=${currentGenerated.trim()}`);
-                setIsKeyValid(res.data);
+                const res = await projectsApi.checkKey(currentGenerated.trim());
+                setIsKeyValid(res);
             } catch (err) {
                 console.error('Key check error:', err);
                 setIsKeyValid(null);
@@ -79,8 +79,8 @@ export default function ProjectSetupPage({
 
             setCheckingTeam(true);
             try {
-                const res = await api.get(`/api/teams/check-name?name=${teamName.trim()}`);
-                const { exists, isMember } = res.data;
+                const res = await projectsApi.checkTeamName(teamName.trim());
+                const { exists, isMember } = res;
 
                 if (teamOption === 'NEW') {
                     setIsTeamValid(!exists);
@@ -115,30 +115,43 @@ export default function ProjectSetupPage({
             return;
         }
 
+        const draft = {
+            name: projectName,
+            projectKey: currentGenerated,
+            description,
+            teamOption,
+            teamName,
+            type: projectType
+        };
+
+        // New-team flow has a further "Invite Members" step that ends with "Start
+        // Project". To avoid leaving an orphaned project behind when the user abandons
+        // that step, we defer creation: stash the details and create only at the end.
+        if (teamOption === 'NEW') {
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('pendingProjectDraft', JSON.stringify(draft));
+                // Clear any stale pointers from a previous, completed run.
+                localStorage.removeItem('currentProjectId');
+                localStorage.removeItem('currentProjectName');
+                localStorage.removeItem('currentProjectKey');
+            }
+            router.push('/createProject/inviteMembers');
+            return;
+        }
+
         try {
             setLoading(true);
-            // Create project with shared fields plus methodology-specific type.
-            const res = await api.post('/api/projects', {
-                name: projectName,
-                projectKey: currentGenerated,
-                description,
-                teamOption,
-                teamName,
-                type: projectType
-            });
+            // Existing-team flow ends here, so create the project now.
+            const res = await projectsApi.create(draft);
 
             if (typeof window !== 'undefined') {
                 localStorage.setItem('currentProjectName', projectName);
-                localStorage.setItem('currentProjectId', res.data.id.toString());
+                localStorage.setItem('currentProjectId', res.id.toString());
                 localStorage.setItem('currentProjectKey', currentGenerated);
+                localStorage.removeItem('pendingProjectDraft');
             }
 
-            // Existing team goes to summary; new team continues with invite flow.
-            if (teamOption === 'EXISTING') {
-                router.push(`/summary/${res.data.id}`);
-            } else {
-                router.push(`/createProject/inviteMembers?projectId=${res.data.id}&projectKey=${currentGenerated}`);
-            }
+            router.push(`/summary/${res.id}`);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             if (err?.response?.status === 409) {

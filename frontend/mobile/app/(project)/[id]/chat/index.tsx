@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, GestureResponderEvent } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, StyleSheet, GestureResponderEvent, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useChat } from '@/src/hooks/chat/useChat';
 import { ChatSidebar }            from '@/src/components/chat/ChatSidebar';
@@ -22,15 +22,14 @@ type ChatScreenContentProps = {
   topOffset?: number;
 };
 
-export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenContentProps) {
 interface ReactionTarget {
   message: ChatMessage;
   anchorY: number;
   isMe: boolean;
 }
 
-export default function ChatScreen() {
-  const { id: projectId } = useLocalSearchParams<{ id: string }>();
+export function ChatScreenContent({ projectId, topOffset = 0 }: ChatScreenContentProps) {
+  const insets = useSafeAreaInsets();
   const [showSidebar, setShowSidebar] = useState(true);
   const [showSearch, setShowSearch]   = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,13 +52,14 @@ export default function ChatScreen() {
     teamTypingUsers, roomTypingUsers, privateTypingUsers,
     featureFlags, searchResults, isSearchLoading,
     messageReactions, activeThreadRoot, threadMessages,
-    onlineUsers, isLoading, isSocketConnected, error,
+    onlineUsers, isLoading, isSocketConnected, isNetworkOnline, error,
+    hasStaleCachedMessages, queuedChatCount, failedChatCount, serverChangedWhileOffline,
     roomMentionCounts, teamMentionCount,
     selectPrivateUser, selectRoom,
     sendMessage, sendRoomMessage, sendThreadReply,
     openThread, closeThread,
     editMessage, deleteMessage, toggleReaction,
-    loadPrivateHistory, loadRoomHistory,
+    loadRoomHistory,
     createRoom, deleteRoom, updateRoomMeta, pinRoomMessage,
     sendTyping, searchMessages, retryConnection,
   } = useChat(projectId as string);
@@ -104,13 +104,22 @@ export default function ChatScreen() {
     if (created) { selectRoom(created.id); setShowSidebar(false); }
   };
 
-  const roomTyping    = hasSelectedRoom && selectedRoomId != null ? (roomTypingUsers[selectedRoomId] || []) : [];
-  const privateTyping = selectedUser ? privateTypingUsers.filter(u => u === selectedUser.toLowerCase()) : [];
-  const activeTyping  = hasSelectedRoom ? roomTyping[0] : selectedUser ? privateTyping[0] : teamTypingUsers[0];
   const currentUserIdentitySet = new Set([
     currentUser.trim().toLowerCase(),
     ...currentUserAliases.map(alias => alias.trim().toLowerCase()),
   ]);
+
+  // Filter current user + all aliases out of every typing list so the user
+  // never sees their own "is typing" indicator (server echoes it back).
+  const roomTyping    = hasSelectedRoom && selectedRoomId != null
+    ? (roomTypingUsers[selectedRoomId] || []).filter(u => !currentUserIdentitySet.has(u.toLowerCase()))
+    : [];
+  const privateTyping = selectedUser
+    ? privateTypingUsers.filter(u => u === selectedUser.toLowerCase() && !currentUserIdentitySet.has(u.toLowerCase()))
+    : [];
+  const filteredTeamTyping = teamTypingUsers.filter(u => !currentUserIdentitySet.has(u.toLowerCase()));
+  const activeTyping  = hasSelectedRoom ? roomTyping[0] : selectedUser ? privateTyping[0] : filteredTeamTyping[0];
+
   const reactionMessage = reactionTarget?.message ?? null;
   const selectedReaction = reactionMessage?.id
     ? messageReactions[reactionMessage.id]?.find(reaction => reaction.reactedByCurrentUser)?.emoji
@@ -177,12 +186,21 @@ export default function ChatScreen() {
           teamMentionCount={teamMentionCount}
         />
       ) : (
-        <View style={styles.chatArea}>
+        <KeyboardAvoidingView
+          style={styles.chatArea}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? Math.max(insets.top, topOffset) : 0}
+        >
           <ChatConnectionBanner
             isConnected={isConnected}
             shouldShowErrorBanner={shouldShowErrorBanner}
             error={error}
             onRetry={retryConnection}
+            isOffline={!isNetworkOnline}
+            isShowingStaleCache={hasStaleCachedMessages}
+            queuedCount={queuedChatCount}
+            failedCount={failedChatCount}
+            serverChangedWhileOffline={serverChangedWhileOffline}
           />
 
           <ChatHeader
@@ -213,21 +231,14 @@ export default function ChatScreen() {
               isSearchLoading={isSearchLoading}
               searchResults={searchResults}
               onOpenResult={async (result) => {
-                const aliases = new Set([currentUser.toLowerCase(), ...currentUserAliases.map(a => a.toLowerCase())]);
-                if (result.context === 'ROOM' && result.roomId) {
+                if (result.roomId) {
                   selectRoom(result.roomId);
                   await loadRoomHistory(result.roomId);
-                  setShowSearch(false);
-                } else if (result.context === 'PRIVATE') {
-                  const sender = (result.sender || '').toLowerCase();
-                  const recipient = (result.recipient || '').toLowerCase();
-                  const partner = aliases.has(sender) ? recipient : sender;
-                  if (partner) {
-                    selectPrivateUser(partner);
-                    await loadPrivateHistory(partner);
-                    setShowSearch(false);
-                  }
+                } else {
+                  selectRoom(null);
+                  selectPrivateUser(null);
                 }
+                setShowSearch(false);
               }}
             />
           )}
@@ -254,7 +265,7 @@ export default function ChatScreen() {
           <ChatInput
             onSendMessage={handleSendMessage}
             onTypingChange={sendTyping}
-            disabled={isLoading || !isConnected || shouldShowErrorBanner}
+            disabled={isLoading || shouldShowErrorBanner}
             placeholder={
               hasSelectedRoom
                 ? `Message #${selectedRoom?.name ?? 'channel'}…`
@@ -266,7 +277,8 @@ export default function ChatScreen() {
             mentionCandidates={mentionCandidates}
             projectId={projectId as string}
           />
-        </View>
+        </KeyboardAvoidingView>
+
       )}
 
       {/* Modals */}

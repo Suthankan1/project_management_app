@@ -2,7 +2,9 @@ package com.planora.backend.repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,10 +17,17 @@ import com.planora.backend.model.Task;
 
 @Repository
 public interface TaskRepository extends JpaRepository<Task, Long> {
+    Page<Task> findByProjectIdAndArchived(Long projectId, boolean archived, Pageable pageable);
+
     boolean existsByProjectIdAndGithubIssueNumberAndGithubRepoFullNameIgnoreCase(
             Long projectId, Long githubIssueNumber, String githubRepoFullName);
 
     List<Task> findByProjectIdAndGithubIssueNumber(Long projectId, Long githubIssueNumber);
+
+    List<Task> findByProjectIdAndGithubIssueNumberAndGithubRepoFullNameIgnoreCase(
+            Long projectId, Long githubIssueNumber, String githubRepoFullName);
+
+    Optional<Task> findByProjectIdAndProjectTaskNumber(Long projectId, Long projectTaskNumber);
 
     @Query("""
            SELECT t FROM Task t
@@ -40,7 +49,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            """)
     List<Task> findByProjectIdWithScalars(@Param("projectId") Long projectId);
 
-    @EntityGraph(attributePaths = {"labels", "assignees", "assignees.user", "assignee", "assignee.user", "reporter", "reporter.user", "subTasks", "attachments"})
+    @EntityGraph(attributePaths = {"labels", "assignees", "assignees.user", "assignee", "assignee.user", "reporter", "reporter.user", "subTasks", "attachments", "dependencies"})
     @Query("SELECT DISTINCT t FROM Task t WHERE t.id IN :ids")
     List<Task> findByIdInWithCollections(@Param("ids") List<Long> ids);
 
@@ -205,6 +214,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            "AND t.project.team.id IN (SELECT tm.team.id FROM TeamMember tm WHERE tm.user.userId = :userId)")
     List<Task> searchTasksByTitle(@Param("query") String query, @Param("userId") Long userId, Pageable pageable);
 
+    boolean existsByRecurrenceParentIdAndDueDate(Long parentId, LocalDate dueDate);
+
     /** Recurring tasks whose next spawn date is today or earlier and still active. */
     @Query("SELECT t FROM Task t " +
            "LEFT JOIN FETCH t.project " +
@@ -215,7 +226,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            "LEFT JOIN FETCH t.reporter r " +
            "LEFT JOIN FETCH r.user " +
            "LEFT JOIN FETCH t.milestone " +
-           "WHERE t.archived = false AND t.nextOccurrence IS NOT NULL AND t.nextOccurrence <= :today AND t.recurrenceRule IS NOT NULL")
+           "WHERE t.archived = false AND t.recurrenceActive = true AND t.nextOccurrence IS NOT NULL AND t.nextOccurrence <= :today AND t.recurrenceRule IS NOT NULL")
     List<Task> findByNextOccurrenceBeforeOrEqualWithAssociations(@Param("today") LocalDate today);
 
     @Query("SELECT DISTINCT t FROM Task t " +
@@ -278,12 +289,20 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Object[]> aggregateVelocityBySprintIds(@Param("sprintIds") List<Long> sprintIds);
 
     @Query("""
-           SELECT t.id, d.id, d.title
+           SELECT t.id, d.id, d.title, d.status
            FROM Task t
            LEFT JOIN t.dependencies d
            WHERE t.id IN :taskIds
            """)
     List<Object[]> findDependencyRowsByTaskIds(@Param("taskIds") List<Long> taskIds);
+
+    @Query("""
+           SELECT t.id, d.id, d.title, d.status
+           FROM Task t
+           LEFT JOIN t.dependents d
+           WHERE t.id IN :taskIds
+           """)
+    List<Object[]> findDependentRowsByTaskIds(@Param("taskIds") List<Long> taskIds);
 
     @Query("""
            SELECT t.id, d.id
@@ -362,7 +381,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("UPDATE Task t SET t.reporter = null WHERE t.reporter.id = :memberId")
     void nullifyReporterForMember(@Param("memberId") Long memberId);
 
-    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM task_assignees WHERE member_id = :memberId", nativeQuery = true)
     void removeFromTaskAssignees(@Param("memberId") Long memberId);
 
@@ -376,4 +395,56 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
      */
     @Query("SELECT t FROM Task t WHERE t.githubBranch = :branch AND t.archived = false")
     List<Task> findByGithubBranch(@Param("branch") String branch);
+
+    @Query("""
+           SELECT t FROM Task t
+           LEFT JOIN FETCH t.project p
+           LEFT JOIN FETCH p.team
+           LEFT JOIN FETCH t.sprint
+           LEFT JOIN FETCH t.assignee a
+           LEFT JOIN FETCH a.user
+           LEFT JOIN FETCH t.reporter r
+           LEFT JOIN FETCH r.user
+           LEFT JOIN FETCH t.milestone
+           LEFT JOIN FETCH t.lastModifiedBy
+           WHERE t.project.id = :projectId
+             AND t.archived = :archived
+           ORDER BY
+             CASE WHEN t.sprint IS NULL THEN 0 ELSE 1 END,
+             CASE WHEN t.sprint IS NULL THEN t.backlogPosition ELSE t.sprintPosition END,
+             t.id
+           """)
+    List<Task> findByProjectIdWithScalarsAndArchived(
+            @Param("projectId") Long projectId,
+            @Param("archived") boolean archived);
+
+    @Query("SELECT t FROM Task t " +
+           "LEFT JOIN FETCH t.project p " +
+           "LEFT JOIN FETCH p.team pt " +
+           "LEFT JOIN FETCH t.sprint s " +
+           "LEFT JOIN FETCH t.assignee a " +
+           "LEFT JOIN FETCH a.user au " +
+           "LEFT JOIN FETCH t.reporter r " +
+           "LEFT JOIN FETCH r.user ru " +
+           "LEFT JOIN FETCH t.milestone m " +
+           "LEFT JOIN FETCH t.kanbanColumn kc " +
+           "WHERE p.id = :projectId " +
+           "AND t.archived = :archived " +
+           "AND (:status IS NULL OR t.status = :status) " +
+           "AND (:assigneeId IS NULL OR au.userId = :assigneeId) " +
+           "AND (:priority IS NULL OR CAST(t.priority AS string) = :priority) " +
+           "AND (:sprintId IS NULL OR s.id = :sprintId) " +
+           "AND (:milestoneId IS NULL OR m.id = :milestoneId) " +
+           "ORDER BY " +
+           "CASE WHEN t.sprint IS NULL THEN 0 ELSE 1 END, " +
+           "CASE WHEN t.sprint IS NULL THEN t.backlogPosition ELSE t.sprintPosition END, " +
+           "t.id")
+    List<Task> findByProjectIdFilteredAndArchived(
+            @Param("projectId") Long projectId,
+            @Param("status") String status,
+            @Param("assigneeId") Long assigneeId,
+            @Param("priority") String priority,
+            @Param("sprintId") Long sprintId,
+            @Param("milestoneId") Long milestoneId,
+            @Param("archived") boolean archived);
 }

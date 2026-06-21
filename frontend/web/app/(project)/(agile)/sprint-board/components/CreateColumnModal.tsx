@@ -45,30 +45,30 @@ export default function CreateColumnModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-[#0c111d]/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
           />
 
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-md overflow-hidden bg-white rounded-3xl shadow-2xl border border-[#EAECF0]"
+            className="relative w-full max-w-md overflow-hidden rounded-3xl border border-cu-border bg-cu-bg shadow-cu-xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-[#EAECF0] bg-gray-50/50">
+            <div className="flex items-center justify-between border-b border-cu-border bg-cu-bg-secondary px-6 py-5">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-cu-primary/10 flex items-center justify-center text-cu-primary">
                   <Layout size={20} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-[#101828]">Create New Column</h3>
-                  <p className="text-xs text-[#475467]">Organize your sprint workflow</p>
+                  <h3 className="text-lg font-bold text-cu-text-primary">Create New Column</h3>
+                  <p className="text-xs text-cu-text-secondary">Organize your sprint workflow</p>
                 </div>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 text-[#98A2B3] hover:text-[#101828] hover:bg-gray-100 rounded-xl transition-all"
+                className="rounded-xl p-2 text-cu-text-muted transition-all hover:bg-cu-hover hover:text-cu-text-primary"
               >
                 <X size={20} />
               </button>
@@ -77,24 +77,24 @@ export default function CreateColumnModal({
             {/* Form */}
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-[#344054]">Column Name</label>
+                <label className="text-sm font-bold text-cu-text-primary">Column Name</label>
                 <input
                   type="text"
                   placeholder="e.g. QA Testing, Ready for Review"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   autoFocus
-                  className="w-full px-4 py-3 bg-white border border-[#D0D5DD] rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-cu-primary/10 focus:border-cu-primary transition-all placeholder-[#98A2B3]"
+                  className="w-full rounded-xl border border-cu-border bg-cu-bg-secondary px-4 py-3 text-sm text-cu-text-primary transition-all placeholder:text-cu-text-muted focus:border-cu-primary focus:outline-none focus:ring-4 focus:ring-cu-primary/10"
                   required
                 />
               </div>
 
               <div className="space-y-4">
-                <label className="text-sm font-bold text-[#344054] flex items-center gap-2">
+                <label className="flex items-center gap-2 text-sm font-bold text-cu-text-primary">
                   Map to Status
                   <div className="group relative">
-                    <Info size={14} className="text-[#98A2B3] cursor-help" />
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
+                    <Info size={14} className="cursor-help text-cu-text-muted" />
+                    <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 w-48 -translate-x-1/2 rounded-lg border border-cu-border bg-cu-bg-secondary p-2 text-[10px] text-cu-text-secondary opacity-0 shadow-cu-lg transition-opacity group-hover:opacity-100">
                       This determines the business logic and task progression of the column.
                     </div>
                   </div>
@@ -109,11 +109,11 @@ export default function CreateColumnModal({
                         flex items-center gap-3 p-3 rounded-2xl border-2 transition-all text-left
                         ${status === opt.value 
                           ? 'border-cu-primary bg-cu-primary/5 shadow-sm ring-4 ring-cu-primary/5' 
-                          : 'border-[#EAECF0] bg-white hover:border-[#D0D5DD]'}
+                          : 'border-cu-border bg-cu-bg-secondary hover:border-cu-primary/30 hover:bg-cu-hover'}
                       `}
                     >
                       <div className={`w-2 h-2 rounded-full ${opt.color}`} />
-                      <span className={`text-[13px] font-bold ${status === opt.value ? 'text-cu-primary' : 'text-[#344054]'}`}>
+                      <span className={`text-[13px] font-bold ${status === opt.value ? 'text-cu-primary' : 'text-cu-text-primary'}`}>
                         {opt.label}
                       </span>
                     </button>
@@ -126,14 +126,14 @@ export default function CreateColumnModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 px-4 py-3 bg-white border border-[#D0D5DD] text-[#344054] rounded-xl text-sm font-bold hover:bg-gray-50 transition-all active:scale-95"
+                  className="flex-1 rounded-xl border border-cu-border bg-cu-bg-secondary px-4 py-3 text-sm font-bold text-cu-text-secondary transition-all hover:bg-cu-hover hover:text-cu-text-primary active:scale-95"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading || !name.trim()}
-                  className="flex-1 px-4 py-3 bg-cu-primary hover:bg-cu-primary-dark text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 disabled:opacity-50 disabled:shadow-none"
+                  className="flex-1 rounded-xl bg-cu-primary px-4 py-3 text-sm font-bold text-white shadow-cu-lg shadow-cu-primary/20 transition-all hover:bg-cu-primary-hover active:scale-95 disabled:opacity-50 disabled:shadow-none"
                 >
                   {loading ? (
                     <div className="flex items-center justify-center gap-2">

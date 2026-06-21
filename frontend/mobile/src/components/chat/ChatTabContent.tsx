@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GestureResponderEvent, View, StyleSheet } from 'react-native';
+import { GestureResponderEvent, KeyboardAvoidingView, Platform, View, StyleSheet } from 'react-native';
 import { useChat } from '@/src/hooks/chat/useChat';
 import { ChatSidebar }          from '@/src/components/chat/ChatSidebar';
 import { ChatHeader }           from '@/src/components/chat/ChatHeader';
@@ -50,7 +50,8 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
     teamTypingUsers, roomTypingUsers, privateTypingUsers,
     featureFlags, searchResults, isSearchLoading,
     messageReactions, activeThreadRoot, threadMessages,
-    onlineUsers, isLoading, isSocketConnected, error,
+    onlineUsers, isLoading, isSocketConnected, isNetworkOnline, error,
+    hasStaleCachedMessages, queuedChatCount, failedChatCount, serverChangedWhileOffline,
     roomMentionCounts, teamMentionCount,
     selectPrivateUser, selectRoom,
     sendMessage, sendRoomMessage, sendThreadReply,
@@ -161,12 +162,20 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
           />
         </View>
       ) : (
-        <View style={[s.chatArea, { paddingTop: navHeight }]}>
+        <KeyboardAvoidingView
+          style={[s.chatArea, { paddingTop: navHeight }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <ChatConnectionBanner
             isConnected={isConnected}
             shouldShowErrorBanner={shouldShowErrorBanner}
             error={error}
             onRetry={retryConnection}
+            isOffline={!isNetworkOnline}
+            isShowingStaleCache={hasStaleCachedMessages}
+            queuedCount={queuedChatCount}
+            failedCount={failedChatCount}
+            serverChangedWhileOffline={serverChangedWhileOffline}
           />
           <ChatHeader
             selectedRoom={selectedRoom}
@@ -189,16 +198,22 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
               isSearchLoading={isSearchLoading}
               searchResults={searchResults}
               onOpenResult={async (result) => {
-                const aliases = new Set([currentUser.toLowerCase(), ...currentUserAliases.map(a => a.toLowerCase())]);
-                if (result.context === 'ROOM' && result.roomId) {
-                  selectRoom(result.roomId);
-                  await loadRoomHistory(result.roomId);
+                const deepLink = new URL(result.deepLinkUrl, 'https://planora.local');
+                const roomId = deepLink.searchParams.get('roomId');
+                const withUser = deepLink.searchParams.get('with');
+
+                if (roomId) {
+                  const parsedRoomId = Number(roomId);
+                  if (Number.isFinite(parsedRoomId) && parsedRoomId > 0) {
+                    selectRoom(parsedRoomId);
+                    await loadRoomHistory(parsedRoomId);
+                    setShowSearch(false);
+                  }
+                } else if (withUser) {
+                  const partner = withUser.toLowerCase();
+                  selectPrivateUser(partner);
+                  await loadPrivateHistory(partner);
                   setShowSearch(false);
-                } else if (result.context === 'PRIVATE') {
-                  const sender    = (result.sender    || '').toLowerCase();
-                  const recipient = (result.recipient || '').toLowerCase();
-                  const partner   = aliases.has(sender) ? recipient : sender;
-                  if (partner) { selectPrivateUser(partner); await loadPrivateHistory(partner); setShowSearch(false); }
                 }
               }}
             />
@@ -224,7 +239,7 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
           <ChatInput
             onSendMessage={handleSendMessage}
             onTypingChange={sendTyping}
-            disabled={isLoading || !isConnected || shouldShowErrorBanner}
+            disabled={isLoading || shouldShowErrorBanner}
             placeholder={
               hasSelectedRoom
                 ? `Message #${selectedRoom?.name ?? 'channel'}…`
@@ -236,7 +251,7 @@ export function ChatTabContent({ projectId, navHeight }: Props) {
             mentionCandidates={mentionCandidates}
             projectId={projectId}
           />
-        </View>
+        </KeyboardAvoidingView>
       )}
 
       <CreateChannelModal

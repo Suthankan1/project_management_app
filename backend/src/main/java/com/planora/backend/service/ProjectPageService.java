@@ -3,11 +3,14 @@ package com.planora.backend.service;
 import com.planora.backend.dto.PageDetailResponseDto;
 import com.planora.backend.dto.PageRequestDto;
 import com.planora.backend.dto.PageSummaryResponseDto;
+import com.planora.backend.dto.PageVersionResponseDto;
 import com.planora.backend.model.Project;
 import com.planora.backend.model.ProjectPage;
+import com.planora.backend.model.ProjectPageVersion;
 import com.planora.backend.model.TeamMember;
 import com.planora.backend.model.TeamRole;
 import com.planora.backend.repository.ProjectPageRepository;
+import com.planora.backend.repository.ProjectPageVersionRepository;
 import com.planora.backend.repository.ProjectRepository;
 import com.planora.backend.repository.TeamMemberRepository;
 import com.planora.backend.repository.UserRepository;
@@ -37,6 +40,7 @@ public class ProjectPageService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ProjectPageVersionRepository versionRepository;
 
     @Transactional
     public PageDetailResponseDto createPage(Long projectId, PageRequestDto request, Long userId) {
@@ -55,6 +59,17 @@ public class ProjectPageService {
                 .build();
 
         ProjectPage saved = repository.save(page);
+
+        // Save version 1 immediately on page creation
+        ProjectPageVersion firstVersion = ProjectPageVersion.builder()
+                .pageId(saved.getId())
+                .title(saved.getTitle())
+                .content(saved.getContent())
+                .authorId(userId)
+                .versionNumber(1)
+                .build();
+        versionRepository.save(firstVersion);
+
         notifyProjectOwnersAndAdminsOnCreate(project, userId, saved);
         return toDetailDto(saved);
     }
@@ -103,6 +118,9 @@ public class ProjectPageService {
         // Security Check: Viewers can read pages, but they cannot edit them.
         validateProjectMembership(project.getTeam().getId(), userId, true);
 
+        // Fetch latest version before save to check throttling
+        ProjectPageVersion latest = versionRepository.findFirstByPageIdOrderByVersionNumberDesc(pageId);
+
         // Step 1: Snapshot old data to determine if we need to send notifications.
         String oldTitle = existingPage.getTitle();
         Long oldUpdatedByUserId = existingPage.getUpdatedByUserId();
@@ -113,6 +131,40 @@ public class ProjectPageService {
         existingPage.setUpdatedByUserId(userId);
 
         ProjectPage updatedPage = repository.save(existingPage);
+
+        // Versioning Throttling Logic
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        if (latest == null) {
+            ProjectPageVersion firstVersion = ProjectPageVersion.builder()
+                    .pageId(pageId)
+                    .title(updatedPage.getTitle())
+                    .content(updatedPage.getContent())
+                    .authorId(userId)
+                    .versionNumber(1)
+                    .build();
+            versionRepository.save(firstVersion);
+        } else {
+            boolean sameUser = Objects.equals(latest.getAuthorId(), userId);
+            boolean withinWindow = latest.getCreatedAt().isAfter(now.minusMinutes(5));
+
+            if (sameUser && withinWindow) {
+                // Throttle: Update the existing latest version
+                latest.setTitle(updatedPage.getTitle());
+                latest.setContent(updatedPage.getContent());
+                latest.setCreatedAt(now);
+                versionRepository.save(latest);
+            } else {
+                // Spawn a new version
+                ProjectPageVersion nextVersion = ProjectPageVersion.builder()
+                        .pageId(pageId)
+                        .title(updatedPage.getTitle())
+                        .content(updatedPage.getContent())
+                        .authorId(userId)
+                        .versionNumber(latest.getVersionNumber() + 1)
+                        .build();
+                versionRepository.save(nextVersion);
+            }
+        }
 
         if (!Objects.equals(oldTitle, updatedPage.getTitle())) {
             notifyImpactedStakeholdersOnRename(project, updatedPage, userId, oldTitle, oldUpdatedByUserId);
@@ -220,6 +272,74 @@ public class ProjectPageService {
         notifyUsersByIds(recipientIds, message, link);
     }
 
+    @Transactional
+    public PageDetailResponseDto toggleStar(Long projectId, Long pageId, Long userId) {
+        ProjectPage page = findPage(pageId);
+        Project project = findProject(projectId);
+        validateProjectMembership(project.getTeam().getId(), userId, false);
+
+        page.setIsStarred(page.getIsStarred() == null ? true : !page.getIsStarred());
+        ProjectPage saved = repository.save(page);
+        return toDetailDto(saved);
+    }
+
+    @Transactional
+    public PageDetailResponseDto movePage(Long projectId, Long pageId, Long parentPageId, Long userId) {
+        ProjectPage page = findPage(pageId);
+        Project project = findProject(projectId);
+        validateProjectMembership(project.getTeam().getId(), userId, true); // Viewers cannot move pages
+
+        if (parentPageId != null) {
+            ProjectPage parentPage = findPage(parentPageId);
+            if (!parentPage.getProjectId().equals(projectId)) {
+                throw new IllegalArgumentException("Parent page must belong to the same project");
+            }
+            if (isDescendant(pageId, parentPageId)) {
+                throw new IllegalArgumentException("Cannot move a page to one of its own subpages or itself");
+            }
+            page.setParentPageId(parentPageId);
+        } else {
+            page.setParentPageId(null);
+        }
+
+        ProjectPage saved = repository.save(page);
+        return toDetailDto(saved);
+    }
+
+    private boolean isDescendant(Long pageId, Long potentialParentId) {
+        if (pageId.equals(potentialParentId)) {
+            return true;
+        }
+        ProjectPage current = repository.findById(potentialParentId).orElse(null);
+        while (current != null && current.getParentPageId() != null) {
+            if (current.getParentPageId().equals(pageId)) {
+                return true;
+            }
+            current = repository.findById(current.getParentPageId()).orElse(null);
+        }
+        return false;
+    }
+
+    @Transactional
+    public void markViewed(Long projectId, Long pageId, Long userId) {
+        ProjectPage page = findPage(pageId);
+        Project project = findProject(projectId);
+        validateProjectMembership(project.getTeam().getId(), userId, false);
+
+        page.setLastViewedAt(java.time.LocalDateTime.now());
+        repository.save(page);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PageSummaryResponseDto> getRecentPages(Long projectId, Long userId) {
+        Project project = findProject(projectId);
+        validateProjectMembership(project.getTeam().getId(), userId, false);
+
+        return repository.findTop5ByProjectIdAndLastViewedAtIsNotNullOrderByLastViewedAtDesc(projectId).stream()
+                .map(this::toSummaryDto)
+                .collect(Collectors.toList());
+    }
+
     // ── Internal Helpers ──────────────────────────────────────────────────────────
 
     // Resolves the display name for notifications, preferring Full Name over Username.
@@ -267,6 +387,12 @@ public class ProjectPageService {
         dto.setTitle(page.getTitle());
         dto.setUpdatedAt(page.getUpdatedAt() != null ? page.getUpdatedAt().toString() : null);
         dto.setUpdatedByUsername(page.getUpdatedByUserId() != null ? resolveUsername(page.getUpdatedByUserId()) : null);
+        dto.setParentPageId(page.getParentPageId());
+        dto.setIsStarred(page.getIsStarred());
+        dto.setLastViewedAt(page.getLastViewedAt() != null ? page.getLastViewedAt().toString() : null);
+        dto.setSortOrder(page.getSortOrder());
+        dto.setIcon(page.getIcon());
+        dto.setCover(page.getCover());
         return dto;
     }
 
@@ -282,6 +408,12 @@ public class ProjectPageService {
         dto.setUpdatedByUsername(page.getUpdatedByUserId() != null ? resolveUsername(page.getUpdatedByUserId()) : null);
         dto.setCreatedAt(page.getCreatedAt() != null ? page.getCreatedAt().toString() : null);
         dto.setUpdatedAt(page.getUpdatedAt() != null ? page.getUpdatedAt().toString() : null);
+        dto.setParentPageId(page.getParentPageId());
+        dto.setIsStarred(page.getIsStarred());
+        dto.setLastViewedAt(page.getLastViewedAt() != null ? page.getLastViewedAt().toString() : null);
+        dto.setSortOrder(page.getSortOrder());
+        dto.setIcon(page.getIcon());
+        dto.setCover(page.getCover());
         return dto;
     }
 
@@ -289,5 +421,79 @@ public class ProjectPageService {
         return userRepository.findById(userId)
                 .map(u -> u.getUsername() != null ? u.getUsername() : u.getEmail())
                 .orElse("Unknown");
+    }
+
+    @Transactional(readOnly = true)
+    public List<PageVersionResponseDto> getPageVersions(Long projectId, Long pageId, Long userId) {
+        Objects.requireNonNull(projectId, "projectId cannot be null");
+        Objects.requireNonNull(pageId, "pageId cannot be null");
+        Objects.requireNonNull(userId, "userId cannot be null");
+
+        ProjectPage page = findPage(pageId);
+        if (!page.getProjectId().equals(projectId)) {
+            throw new IllegalArgumentException("Page does not belong to the specified project");
+        }
+
+        Project project = findProject(projectId);
+        validateProjectMembership(project.getTeam().getId(), userId, false);
+
+        List<ProjectPageVersion> versions = versionRepository.findByPageIdOrderByVersionNumberDesc(pageId);
+        return versions.stream()
+                .map(v -> PageVersionResponseDto.builder()
+                        .id(v.getId())
+                        .pageId(v.getPageId())
+                        .title(v.getTitle())
+                        .content(v.getContent())
+                        .versionNumber(v.getVersionNumber())
+                        .authorId(v.getAuthorId())
+                        .authorName(v.getAuthorId() != null ? resolveUsername(v.getAuthorId()) : "Unknown")
+                        .createdAt(v.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public PageDetailResponseDto restorePageVersion(Long projectId, Long pageId, Long versionId, Long userId) {
+        Objects.requireNonNull(projectId, "projectId cannot be null");
+        Objects.requireNonNull(pageId, "pageId cannot be null");
+        Objects.requireNonNull(versionId, "versionId cannot be null");
+        Objects.requireNonNull(userId, "userId cannot be null");
+
+        ProjectPage page = findPage(pageId);
+        if (!page.getProjectId().equals(projectId)) {
+            throw new IllegalArgumentException("Page does not belong to the specified project");
+        }
+
+        Project project = findProject(projectId);
+        validateProjectMembership(project.getTeam().getId(), userId, true); // viewers cannot restore
+
+        ProjectPageVersion version = versionRepository.findById(versionId)
+                .orElseThrow(() -> new EntityNotFoundException("Version not found with ID: " + versionId));
+
+        if (!version.getPageId().equals(pageId)) {
+            throw new IllegalArgumentException("Version does not belong to the specified page");
+        }
+
+        // Apply restore changes to page
+        page.setTitle(version.getTitle());
+        page.setContent(version.getContent());
+        page.setUpdatedByUserId(userId);
+        ProjectPage savedPage = repository.save(page);
+
+        // Find the latest version number to increment
+        ProjectPageVersion latest = versionRepository.findFirstByPageIdOrderByVersionNumberDesc(pageId);
+        int nextVersionNumber = (latest != null) ? latest.getVersionNumber() + 1 : 1;
+
+        // Force create a new version entry for the restored content (without throttling)
+        ProjectPageVersion newVersion = ProjectPageVersion.builder()
+                .pageId(pageId)
+                .title(savedPage.getTitle())
+                .content(savedPage.getContent())
+                .authorId(userId)
+                .versionNumber(nextVersionNumber)
+                .build();
+        versionRepository.save(newVersion);
+
+        return toDetailDto(savedPage);
     }
 }

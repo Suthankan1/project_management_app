@@ -58,7 +58,7 @@ export function SidebarPanel({ open, onClose, title, badge, searchValue, onSearc
           animate={{ opacity: 1, x: 0, scale: 1 }}
           exit={{ opacity: 0, x: -12, scale: 0.97 }}
           transition={{ type: 'spring', stiffness: 420, damping: 30, mass: 0.7 }}
-          className="fixed z-[9999] flex flex-col bg-white border border-cu-border rounded-xl shadow-2xl shadow-black/10 overflow-hidden"
+          className="fixed z-[9999] flex flex-col bg-cu-bg border border-cu-border rounded-xl shadow-cu-xl overflow-hidden ring-1 ring-black/5"
           style={{
             top: anchorTop !== undefined ? anchorTop : 8,
             left: anchorLeft + 8,
@@ -68,11 +68,11 @@ export function SidebarPanel({ open, onClose, title, badge, searchValue, onSearc
           data-sidebar-dropdown
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-3 pt-3 pb-2 border-b border-cu-border-light shrink-0">
+          <div className="flex items-center justify-between px-3 pt-3 pb-2 border-b border-cu-border-light shrink-0 bg-cu-bg/95">
             <div className="flex items-center gap-2">
               <span className="text-[13px] font-bold text-cu-text-primary tracking-tight">{title}</span>
               {typeof badge === 'number' && badge > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold leading-none">
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-cu-primary text-white text-[10px] font-bold leading-none shadow-[0_0_12px_rgba(21,93,252,0.28)]">
                   {badge > 99 ? '99+' : badge}
                 </span>
               )}
@@ -88,7 +88,7 @@ export function SidebarPanel({ open, onClose, title, badge, searchValue, onSearc
 
           {/* Search bar (favorites dropdown style) */}
           {onSearchChange && (
-            <div className="px-3 pt-3 pb-2 border-b border-cu-border-light shrink-0">
+            <div className="px-3 pt-3 pb-2 border-b border-cu-border-light shrink-0 bg-cu-bg">
               <div className="relative">
                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
                   <SearchIcon />
@@ -112,7 +112,7 @@ export function SidebarPanel({ open, onClose, title, badge, searchValue, onSearc
 
           {/* Footer */}
           {footer && (
-            <div className="border-t border-cu-border-light px-3 py-2 shrink-0 bg-white">
+            <div className="border-t border-cu-border-light px-3 py-2 shrink-0 bg-cu-bg">
               {footer}
             </div>
           )}

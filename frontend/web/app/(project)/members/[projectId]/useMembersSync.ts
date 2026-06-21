@@ -22,6 +22,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { CompatClient, Stomp } from '@stomp/stompjs';
 import { getValidToken } from '@/lib/auth';
+import { resolveWebSocketBaseUrl } from '@/lib/realtime-url';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
 // ── Types that mirror the backend MemberEvent record ───────────────────────────
 
@@ -122,8 +124,8 @@ export function useMembersSync(
       return;
     }
 
-    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-    const wsUrl = backendUrl.replace(/^http/, 'ws');
+    const backendUrl = getApiBaseUrl();
+    const wsUrl = resolveWebSocketBaseUrl(backendUrl);
     const client = Stomp.client(`${wsUrl}/ws-native`);
 
     // Silence the STOMP library's own console noise in production.
@@ -190,11 +192,17 @@ export function useMembersSync(
       (error: unknown) => {
         if (isUnmountedRef.current) return;
 
-        const errorMessage = typeof error === 'string' ? error : ((error as { headers?: { message?: string } })?.headers?.message || '');
-        const isAuthError = errorMessage.toLowerCase().includes('auth') ||
-                           errorMessage.toLowerCase().includes('jwt') ||
-                           errorMessage.toLowerCase().includes('expired') ||
-                           errorMessage.toLowerCase().includes('invalid');
+        const headers = (error as { headers?: Record<string, string> })?.headers;
+        const errorCode = headers?.['x-error-code'];
+        let isAuthError = errorCode === 'AUTH_EXPIRED' || errorCode === 'AUTH_INVALID';
+        const errorMessage = typeof error === 'string' ? error : (headers?.message || '');
+
+        if (!isAuthError) {
+          isAuthError = errorMessage.toLowerCase().includes('auth') ||
+                             errorMessage.toLowerCase().includes('jwt') ||
+                             errorMessage.toLowerCase().includes('expired') ||
+                             errorMessage.toLowerCase().includes('invalid');
+        }
 
         if (isAuthError) {
           console.error('[members-ws] Fatal authentication error:', errorMessage);

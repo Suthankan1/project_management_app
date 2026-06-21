@@ -26,6 +26,8 @@ public class GlobalSearchController {
                     .tasks(java.util.List.of())
                     .documents(java.util.List.of())
                     .members(java.util.List.of())
+                    .projects(java.util.List.of())
+                    .messages(java.util.List.of())
                     .build());
         }
 

@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { PageItem, PageHistoryItem } from '../../components/types';
+import { PageItem } from '../../components/types';
 import { predefinedTemplates } from '../../data/templates';
 import { usePages } from '../../components/usePages';
-import axiosInstance from '../../../../../lib/axios';
+import { pagesApi, PageVersionDto } from '@/services/api-contract';
 
 export function usePageContent(pageId: string, projectId: string | null) {
     const searchParams = useSearchParams();
@@ -15,11 +15,12 @@ export function usePageContent(pageId: string, projectId: string | null) {
     const [selectedPage, setSelectedPage] = useState<PageItem | null>(null);
     const [title, setTitle] = useState('');
     const [loadingPage, setLoadingPage] = useState(false);
-    const [historyMock, setHistoryMock] = useState<PageHistoryItem[]>([]);
+    const [versions, setVersions] = useState<PageVersionDto[]>([]);
 
     const {
         filteredPages, error, searchQuery, setSearchQuery,
         updatePage, createPage, deletePage, refetch,
+        toggleStar, movePage,
     } = usePages(projectId);
 
     useEffect(() => {
@@ -33,46 +34,35 @@ export function usePageContent(pageId: string, projectId: string | null) {
             // These set state from URL params (external source), not from other state — rule does not apply
             setSelectedPage({ id: 'new', title: defaultTitle, content: template.content, isStarred: false });
             setTitle(defaultTitle);
-            setHistoryMock([]);
+            setVersions([]);
             return;
         }
 
         const fetchPageDetail = async () => {
             setLoadingPage(true);
             try {
-                const response = await axiosInstance.get<{
-                    id: string | number;
-                    title: string;
-                    content?: string;
-                    updatedAt?: string;
-                    createdAt?: string;
-                }>(`/api/pages/${pageId}`);
+                const response = await pagesApi.get(pageId);
+                if (projectId) {
+                    void pagesApi.markViewed(projectId, pageId);
+                }
                 const pageData: PageItem = {
-                    id: response.data.id,
-                    title: response.data.title,
-                    content: response.data.content || '',
-                    updatedAt: response.data.updatedAt,
-                    isStarred: false,
+                    id: response.id,
+                    title: response.title,
+                    content: response.content || '',
+                    updatedAt: response.updatedAt,
+                    isStarred: response.isStarred || false,
                 };
                 // Both updates inside an async callback — not synchronous setState in effect body
                 setSelectedPage(pageData);
                 setTitle(pageData.title);
-                setHistoryMock([
-                    {
-                        id: 'h1',
-                        pageId: response.data.id,
-                        action: 'edited',
-                        editedBy: 'Current User',
-                        editedAt: response.data.updatedAt || new Date().toISOString(),
-                    },
-                    {
-                        id: 'h2',
-                        pageId: response.data.id,
-                        action: 'created',
-                        editedBy: 'Document Owner',
-                        editedAt: response.data.createdAt || new Date(Date.now() - 86_400_000).toISOString(),
-                    },
-                ]);
+
+                // Fetch actual page version history if page is not a draft and projectId is available
+                if (projectId) {
+                    const versionsData = await pagesApi.getVersions(projectId, pageId);
+                    setVersions(versionsData);
+                } else {
+                    setVersions([]);
+                }
             } catch (err) {
                 console.error('Error fetching page:', err);
             } finally {
@@ -81,15 +71,16 @@ export function usePageContent(pageId: string, projectId: string | null) {
         };
 
         void fetchPageDetail();
-    }, [pageId, isDraft, searchParams]);
+    }, [pageId, projectId, isDraft, searchParams]);
 
     return {
         selectedPage, setSelectedPage,
         title, setTitle,
         loadingPage,
-        historyMock, setHistoryMock,
+        versions, setVersions,
         isDraft,
         filteredPages, error, searchQuery, setSearchQuery,
         updatePage, createPage, deletePage, refetch,
+        toggleStar, movePage,
     };
 }

@@ -28,6 +28,8 @@ public class VerificationToken {
 
     private Instant expiry;
 
+    private Instant usedAt;
+
     @Builder.Default
     private boolean used = false;
 

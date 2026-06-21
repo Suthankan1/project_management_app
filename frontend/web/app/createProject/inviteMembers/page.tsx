@@ -3,8 +3,9 @@ export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 import { useEffect, useState, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/axios';
+import { projectsApi } from '@/services/api-contract';
 
 type StatusMessage = {
     type: 'success' | 'error';
@@ -14,6 +15,24 @@ type StatusMessage = {
 type ProjectContext = {
     projectId: string | null;
     projectKey: string | null;
+};
+
+type Role = 'ADMIN' | 'MEMBER' | 'VIEWER';
+
+// Project details carried over from the setup step when creation is deferred
+// (new-team flow). The project is not created until "Start Project" is clicked.
+type ProjectDraft = {
+    name: string;
+    projectKey: string;
+    description: string;
+    teamOption: 'NEW' | 'EXISTING';
+    teamName: string;
+    type: 'AGILE' | 'KANBAN';
+};
+
+type QueuedInvite = {
+    email: string;
+    role: Role;
 };
 
 const EMAIL_REGEX = /^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/;
@@ -72,11 +91,17 @@ function StatusBanner({ message }: { message: StatusMessage }) {
 
 export default function InviteMembersPage() {
     const searchParams = useSearchParams();
+    const router = useRouter();
 
     const [email, setEmail] = useState('');
-    const [role, setRole] = useState<'ADMIN' | 'MEMBER' | 'VIEWER'>('MEMBER');
+    const [role, setRole] = useState<Role>('MEMBER');
     const [projectId, setProjectId] = useState<string | null>(null);
     const [projectKey, setProjectKey] = useState<string | null>(null);
+
+    // Deferred-creation state for the new-team flow.
+    const [draft, setDraft] = useState<ProjectDraft | null>(null);
+    const [queuedInvites, setQueuedInvites] = useState<QueuedInvite[]>([]);
+    const [starting, setStarting] = useState(false);
 
     const [loading, setLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
@@ -89,7 +114,24 @@ export default function InviteMembersPage() {
         const { projectId: resolvedProjectId, projectKey: resolvedProjectKey } = resolveProjectContext(searchParams);
         setProjectId(resolvedProjectId);
         setProjectKey(resolvedProjectKey);
+
+        // No project yet means we are in the deferred (new-team) flow: load the draft.
+        if (!resolvedProjectId && typeof window !== 'undefined') {
+            const raw = localStorage.getItem('pendingProjectDraft');
+            if (raw) {
+                try {
+                    const parsed = JSON.parse(raw) as ProjectDraft;
+                    setDraft(parsed);
+                    setProjectKey(parsed.projectKey ?? null);
+                } catch {
+                    setDraft(null);
+                }
+            }
+        }
     }, [searchParams]);
+
+    // Draft mode: project does not exist yet, so invites are queued, not sent.
+    const isDraftMode = !projectId && Boolean(draft);
 
     // Handle clicking outside of the dropdown to close it
     useEffect(() => {
@@ -104,27 +146,41 @@ export default function InviteMembersPage() {
         };
     }, []);
 
-    const canInvite = Boolean(projectId && email.trim());
+    const canInvite = Boolean((projectId || isDraftMode) && email.trim());
 
     const handleInvite = async () => {
         setStatusMessage(null);
 
         const trimmed = email.trim().toLowerCase();
 
-        // Validate form inputs before calling the API.
-        if (!projectId) {
-            setStatusMessage({
-                type: 'error',
-                text: 'Project ID not found. Please open this page with ?projectId=... in URL.'
-            });
-            return;
-        }
+        // Validate the email before queuing or sending.
         if (!trimmed) {
             setStatusMessage({ type: 'error', text: 'Please enter an email address.' });
             return;
         }
         if (!EMAIL_REGEX.test(trimmed)) {
             setStatusMessage({ type: 'error', text: 'Please enter a valid email address.' });
+            return;
+        }
+
+        // Deferred flow: the project does not exist yet, so collect invites locally.
+        // They are sent right after the project is created via "Start Project".
+        if (isDraftMode) {
+            if (queuedInvites.some((invite) => invite.email === trimmed)) {
+                setStatusMessage({ type: 'error', text: 'That email is already in the list.' });
+                return;
+            }
+            setQueuedInvites((prev) => [...prev, { email: trimmed, role }]);
+            setEmail('');
+            setStatusMessage({ type: 'success', text: 'Added. It will be invited when you start the project.' });
+            return;
+        }
+
+        if (!projectId) {
+            setStatusMessage({
+                type: 'error',
+                text: 'Project not found. Please restart the project setup.'
+            });
             return;
         }
 
@@ -141,6 +197,62 @@ export default function InviteMembersPage() {
             setStatusMessage({ type: 'error', text: getApiErrorMessage(error) });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const removeQueuedInvite = (target: string) => {
+        setQueuedInvites((prev) => prev.filter((invite) => invite.email !== target));
+    };
+
+    // Deferred flow: create the project now, then send any queued invites.
+    const handleStartProject = async () => {
+        if (!draft) {
+            setStatusMessage({ type: 'error', text: 'Project details were lost. Please restart the setup.' });
+            return;
+        }
+
+        setStatusMessage(null);
+        try {
+            setStarting(true);
+            const created = await projectsApi.create(draft);
+            const newId = created.id;
+
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('currentProjectId', String(newId));
+                localStorage.setItem('currentProjectName', draft.name);
+                localStorage.setItem('currentProjectKey', draft.projectKey);
+                localStorage.removeItem('pendingProjectDraft');
+            }
+
+            // Best-effort: a failed invite shouldn't block entering the project.
+            const failed: string[] = [];
+            for (const invite of queuedInvites) {
+                try {
+                    await projectsApi.sendInvite(newId, invite.email, invite.role);
+                } catch {
+                    failed.push(invite.email);
+                }
+            }
+
+            if (failed.length > 0) {
+                if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('inviteFailures', JSON.stringify(failed));
+                }
+            }
+
+            router.push(`/summary/${newId}`);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (err: any) {
+            if (err?.response?.status === 409) {
+                setStatusMessage({
+                    type: 'error',
+                    text: 'That project key was just taken. Go back and pick a different key.'
+                });
+            } else {
+                setStatusMessage({ type: 'error', text: getApiErrorMessage(err) });
+            }
+        } finally {
+            setStarting(false);
         }
     };
 
@@ -253,9 +365,34 @@ export default function InviteMembersPage() {
                         className={`h-[44px] rounded-[14px] px-8 text-white font-inter font-medium text-[15px] shadow-sm transition-all sm:w-auto w-full ${!canInvite || loading ? 'bg-[#1D56D5]/60 cursor-not-allowed shadow-none' : 'bg-[#1D56D5] hover:bg-[#1642B5] hover:shadow-md'
                             }`}
                     >
-                        {loading ? 'Sending...' : 'Send Invite'}
+                        {loading ? 'Sending...' : isDraftMode ? 'Add' : 'Send Invite'}
                     </button>
                 </div>
+
+                {/* Queued invites (deferred flow) — sent when the project starts. */}
+                {isDraftMode && queuedInvites.length > 0 && (
+                    <div className="mb-6 flex flex-col gap-2">
+                        {queuedInvites.map((invite) => (
+                            <div
+                                key={invite.email}
+                                className="flex items-center justify-between bg-white/50 border border-white/60 rounded-[12px] px-4 py-2.5 font-inter text-[14px]"
+                            >
+                                <span className="flex items-center gap-2 text-[#1D1D1F]">
+                                    <div className={`w-2 h-2 rounded-full ${invite.role === 'ADMIN' ? 'bg-[#1D56D5]' : invite.role === 'MEMBER' ? 'bg-[#34C759]' : 'bg-[#FF9500]'}`}></div>
+                                    {invite.email}
+                                    <span className="text-[#86868B]">· {invite.role === 'ADMIN' ? 'Admin' : invite.role === 'MEMBER' ? 'Member' : 'Viewer'}</span>
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => removeQueuedInvite(invite.email)}
+                                    className="text-[#86868B] hover:text-[#B42318] transition-colors text-[13px] font-medium"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 {/* Role Permissions Section (info only) */}
                 <div className="bg-white/40 border border-white/40 rounded-[16px] p-4 mb-6 shadow-sm backdrop-blur-md">
@@ -310,9 +447,20 @@ export default function InviteMembersPage() {
                     <Link href="/createProject" className="w-[120px] h-[44px] bg-white/50 border border-white/60 rounded-[14px] flex items-center justify-center font-inter font-medium text-[15px] text-[#1D1D1F] hover:bg-white hover:shadow-sm transition-all md:w-auto md:flex-1">
                         Back
                     </Link>
-                    <Link href={projectId ? `/summary/${projectId}` : '/dashboard'} className="flex-1 h-[44px] bg-[#1D56D5] rounded-[14px] flex items-center justify-center font-inter font-medium text-[15px] text-white shadow-md hover:bg-[#1642B5] hover:shadow-lg transition-all">
-                        Start Project
-                    </Link>
+                    {isDraftMode ? (
+                        <button
+                            type="button"
+                            onClick={handleStartProject}
+                            disabled={starting}
+                            className={`flex-1 h-[44px] rounded-[14px] flex items-center justify-center font-inter font-medium text-[15px] text-white shadow-md transition-all md:flex-1 ${starting ? 'bg-[#1D56D5]/60 cursor-not-allowed shadow-none' : 'bg-[#1D56D5] hover:bg-[#1642B5] hover:shadow-lg'}`}
+                        >
+                            {starting ? 'Starting...' : 'Start Project'}
+                        </button>
+                    ) : (
+                        <Link href={projectId ? `/summary/${projectId}` : '/dashboard'} className="flex-1 h-[44px] bg-[#1D56D5] rounded-[14px] flex items-center justify-center font-inter font-medium text-[15px] text-white shadow-md hover:bg-[#1642B5] hover:shadow-lg transition-all">
+                            Start Project
+                        </Link>
+                    )}
                 </div>
 
             </div>

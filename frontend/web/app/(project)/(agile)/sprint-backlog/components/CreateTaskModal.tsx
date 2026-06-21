@@ -1,12 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, Plus, User, Hash } from 'lucide-react';
-import axios from '@/lib/axios';
-interface TeamMember {
-  id: number;
-  name: string;
-}
+import { useProjectAssigneeOptions } from '@/hooks/projects/useProjectAssigneeOptions';
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -21,10 +17,10 @@ interface CreateTaskModalProps {
 }
 
 const PRIORITY_OPTIONS = [
-  { value: 'LOW', label: 'Low', color: 'bg-[#ECFDF3] text-[#027A48] border-[#A6F4C5]' },
-  { value: 'MEDIUM', label: 'Medium', color: 'bg-[#FFFAEB] text-[#B54708] border-[#FEDF89]' },
-  { value: 'HIGH', label: 'High', color: 'bg-[#FEF3F2] text-[#B42318] border-[#FECDCA]' },
-  { value: 'CRITICAL', label: 'Critical', color: 'bg-[#FEE4E2] text-[#912018] border-[#FDA29B]' },
+  { value: 'LOW',      label: 'Low',      color: 'bg-cu-success-light text-cu-success border-cu-success/30' },
+  { value: 'MEDIUM',   label: 'Medium',   color: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/30' },
+  { value: 'HIGH',     label: 'High',     color: 'bg-cu-danger-light text-cu-danger border-cu-danger/30' },
+  { value: 'CRITICAL', label: 'Critical', color: 'bg-cu-danger-light text-cu-danger border-cu-danger/50' },
 ];
 
 const FIBONACCI = [0, 1, 2, 3, 5, 8, 13, 21];
@@ -40,40 +36,14 @@ export default function CreateTaskModal({
   const [priority, setPriority] = useState('MEDIUM');
   const [assignee, setAssignee] = useState<number | ''>('');
   const [storyPoint, setStoryPoint] = useState(0);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen || !projectId) return;
-
-    const loadMembers = async () => {
-      setLoadingMembers(true);
-      try {
-        const projectRes = await axios.get(`/api/projects/${projectId}`);
-        const project = projectRes.data;
-        const teamId = project.teamId ?? project.team?.id;
-        if (teamId) {
-          const membersRes = await axios.get(`/api/teams/${teamId}/members`);
-          const payload = membersRes.data;
-          const rawMembers = Array.isArray(payload) ? payload : [];
-          setTeamMembers(
-            rawMembers.map((m: { id: number; user?: { fullName?: string; username?: string } }) => ({
-              id: m.id,
-              name: m.user?.fullName ?? m.user?.username ?? 'Unknown',
-            }))
-          );
-        }
-      } catch {
-        // non-critical — assignee dropdown will be empty
-      } finally {
-        setLoadingMembers(false);
-      }
-    };
-
-    loadMembers();
-  }, [isOpen, projectId]);
+  const {
+    members: teamMembers,
+    loadingMembers,
+    membersError,
+    retryMembers,
+  } = useProjectAssigneeOptions(isOpen ? projectId : null);
 
   const resetForm = () => {
     setTitle('');
@@ -87,20 +57,10 @@ export default function CreateTaskModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (!title.trim()) {
-      setError('Task name is required');
-      return;
-    }
-
+    if (!title.trim()) { setError('Task name is required'); return; }
     setSubmitting(true);
     try {
-      await onCreateTask({
-        title: title.trim(),
-        priority,
-        assigneeId: assignee || undefined,
-        storyPoint,
-      });
+      await onCreateTask({ title: title.trim(), priority, assigneeId: assignee || undefined, storyPoint });
       resetForm();
       onClose();
     } catch {
@@ -113,10 +73,10 @@ export default function CreateTaskModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-[#00000040] z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 fade-in duration-200">
+    <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-cu-bg rounded-2xl shadow-xl border border-cu-border max-w-md w-full overflow-hidden animate-in zoom-in-95 fade-in duration-200">
         {/* Header */}
-        <div className="bg-[#155DFC] px-6 py-4">
+        <div className="bg-cu-primary px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Plus size={20} className="text-white" />
@@ -134,30 +94,25 @@ export default function CreateTaskModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Title */}
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054]">TASK TITLE</label>
+            <label className="text-[13px] font-bold text-cu-text-primary">TASK TITLE</label>
             <input
               type="text"
               maxLength={255}
               value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                setTitleLength(e.target.value.length);
-              }}
+              onChange={(e) => { setTitle(e.target.value); setTitleLength(e.target.value.length); }}
               placeholder="e.g. Design new landing page"
-              className="w-full px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm focus:ring-2 focus:ring-[#155DFC]/20 focus:outline-none transition-all"
+              className="w-full px-4 py-3 bg-cu-bg-secondary border border-cu-border rounded-xl text-sm text-cu-text-primary placeholder:text-cu-text-muted focus:ring-2 focus:ring-cu-primary/20 focus:border-cu-primary focus:outline-none transition-all"
               autoFocus
             />
             {titleLength > 200 && (
-              <p className="text-xs text-amber-500 mt-1">
-                {255 - titleLength} characters remaining
-              </p>
+              <p className="text-xs text-amber-500 mt-1">{255 - titleLength} characters remaining</p>
             )}
-            {error && <p className="text-red-500 text-xs font-medium">{error}</p>}
+            {error && <p className="text-cu-danger text-xs font-medium">{error}</p>}
           </div>
 
           {/* Priority */}
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054]">PRIORITY</label>
+            <label className="text-[13px] font-bold text-cu-text-primary">PRIORITY</label>
             <div className="flex gap-2 flex-wrap">
               {PRIORITY_OPTIONS.map((opt) => (
                 <button
@@ -166,8 +121,8 @@ export default function CreateTaskModal({
                   onClick={() => setPriority(opt.value)}
                   className={`px-3 py-1.5 rounded-lg border text-[12px] font-bold transition-all ${
                     priority === opt.value
-                      ? `${opt.color} ring-2 ring-[#155DFC]/30`
-                      : 'bg-white text-[#667085] border-[#EAECF0] hover:bg-[#F9FAFB]'
+                      ? `${opt.color} ring-2 ring-cu-primary/30`
+                      : 'bg-cu-bg text-cu-text-secondary border-cu-border hover:bg-cu-hover'
                   }`}
                 >
                   {opt.label}
@@ -176,10 +131,10 @@ export default function CreateTaskModal({
             </div>
           </div>
 
-          {/* Story Points (Fibonacci) */}
+          {/* Story Points */}
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054] flex items-center gap-2">
-              <Hash size={14} className="text-[#98A2B3]" /> STORY POINTS
+            <label className="text-[13px] font-bold text-cu-text-primary flex items-center gap-2">
+              <Hash size={14} className="text-cu-text-tertiary" /> STORY POINTS
             </label>
             <div className="flex gap-1.5 flex-wrap">
               {FIBONACCI.map((pt) => (
@@ -189,8 +144,8 @@ export default function CreateTaskModal({
                   onClick={() => setStoryPoint(pt)}
                   className={`h-8 w-8 rounded-lg border text-[12px] font-bold transition-all ${
                     storyPoint === pt
-                      ? 'bg-[#155DFC] text-white border-[#155DFC]'
-                      : 'bg-white text-[#667085] border-[#EAECF0] hover:bg-[#F9FAFB]'
+                      ? 'bg-cu-primary text-white border-cu-primary'
+                      : 'bg-cu-bg text-cu-text-secondary border-cu-border hover:bg-cu-hover'
                   }`}
                 >
                   {pt}
@@ -201,20 +156,35 @@ export default function CreateTaskModal({
 
           {/* Assignee */}
           <div className="space-y-2">
-            <label className="text-[13px] font-bold text-[#344054] flex items-center gap-2">
-              <User size={14} className="text-[#98A2B3]" /> ASSIGNEE
+            <label className="text-[13px] font-bold text-cu-text-primary flex items-center gap-2">
+              <User size={14} className="text-cu-text-tertiary" /> ASSIGNEE
             </label>
             <select
               value={assignee}
               onChange={(e) => setAssignee(e.target.value ? parseInt(e.target.value, 10) : '')}
-              className="w-full px-4 py-3 bg-[#F9FAFB] border border-[#EAECF0] rounded-xl text-sm text-[#475467] focus:ring-2 focus:ring-[#155DFC]/20 focus:outline-none transition-all appearance-none"
+              className="w-full px-4 py-3 bg-cu-bg-secondary border border-cu-border rounded-xl text-sm text-cu-text-primary focus:ring-2 focus:ring-cu-primary/20 focus:border-cu-primary focus:outline-none transition-all appearance-none"
               disabled={loadingMembers}
             >
-              <option value="">Select Assignee (optional)</option>
+              <option value="">{loadingMembers ? 'Loading assignees...' : 'Select Assignee (optional)'}</option>
               {teamMembers.map((m) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
             </select>
+            {loadingMembers && (
+              <div className="h-2 w-32 animate-pulse rounded-full bg-cu-border" aria-label="Loading assignees" />
+            )}
+            {membersError && (
+              <div className="rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-500">
+                <p className="font-semibold">{membersError}</p>
+                <button
+                  type="button"
+                  onClick={() => void retryMembers()}
+                  className="mt-2 font-bold text-red-600 underline underline-offset-2"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -222,14 +192,14 @@ export default function CreateTaskModal({
             <button
               type="button"
               onClick={() => { resetForm(); onClose(); }}
-              className="flex-1 px-4 py-3 border border-[#EAECF0] text-[#344054] rounded-xl font-bold text-sm hover:bg-gray-50 transition-all"
+              className="flex-1 px-4 py-3 border border-cu-border bg-cu-bg text-cu-text-primary rounded-xl font-bold text-sm hover:bg-cu-hover transition-all"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 px-4 py-3 bg-[#155DFC] text-white rounded-xl font-bold text-sm hover:bg-[#1149C9] shadow-md transition-all disabled:opacity-50"
+              className="flex-1 px-4 py-3 bg-cu-primary text-white rounded-xl font-bold text-sm hover:bg-cu-primary-hover shadow-md transition-all disabled:opacity-50"
             >
               {submitting ? 'Creating...' : 'Create Task'}
             </button>

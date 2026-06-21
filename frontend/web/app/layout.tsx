@@ -11,6 +11,7 @@ import { GlobalNotificationProvider } from "@/components/providers/GlobalNotific
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import KeyboardShortcutsProvider from "@/components/providers/KeyboardShortcutsProvider";
 import NextTopLoader from 'nextjs-toploader';
+import Script from 'next/script';
 
 const inter = Inter({ 
   subsets: ['latin'], 
@@ -61,6 +62,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${outfit.variable} ${arimo.variable} antialiased font-inter bg-cu-bg-secondary`}>
+        <Script id="planora-theme-init" strategy="beforeInteractive">
+          {`try{var p=location.pathname;var a=p==='/'||/^\\/(login|register|signup|forgot-password|reset-password|verify-email)(\\/|$)/.test(p);var t=localStorage.getItem('planora-theme');document.documentElement.classList.toggle('dark',!a&&t==='dark');}catch(e){}`}
+        </Script>
         <NextTopLoader
           color="#9810FA"
           initialPosition={0.08}

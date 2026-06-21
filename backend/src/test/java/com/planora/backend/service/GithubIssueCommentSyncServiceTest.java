@@ -48,6 +48,8 @@ class GithubIssueCommentSyncServiceTest {
     private TeamMembershipLookupService teamMembershipLookupService;
     @Mock
     private GithubIssuesSyncService githubIssuesSyncService;
+    @Mock
+    private GithubTokenService githubTokenService;
 
     @InjectMocks
     private GithubIssueCommentSyncService service;
@@ -85,6 +87,7 @@ class GithubIssueCommentSyncServiceTest {
         when(teamMembershipLookupService.getTeamMember(20L, 7L)).thenReturn(member);
         when(taskRepository.findByProjectIdAndGithubIssueNumber(10L, 34L)).thenReturn(List.of(task));
         when(commentRepository.findByTaskOrderByCreatedAtAsc(task)).thenReturn(List.of(existing));
+        when(githubTokenService.getToken(7L)).thenReturn("github-token");
         when(githubIssuesSyncService.fetchIssueComments("planora/app", 34, "github-token"))
                 .thenReturn(List.of(comment("octocat", "Already here", null),
                         comment("hubot", "New note", Instant.parse("2026-05-24T10:15:30Z"))));
@@ -116,6 +119,7 @@ class GithubIssueCommentSyncServiceTest {
         Task otherTask = new Task();
         when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
         when(teamMembershipLookupService.getTeamMember(20L, 7L)).thenReturn(member);
+        when(githubTokenService.getToken(7L)).thenReturn("github-token");
         when(taskRepository.findByProjectIdAndGithubIssueNumber(10L, 34L))
                 .thenReturn(List.of(task, otherTask));
 

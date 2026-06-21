@@ -4,7 +4,8 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { AxiosError } from 'axios';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/axios';
-import { getUserFromToken } from '@/lib/auth';
+import { ensureValidToken, getUserFromToken } from '@/lib/auth';
+import { updateProfile } from '@planora/contracts';
 
 type UserResponse = {
     userId: number;
@@ -45,6 +46,7 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
 
 export function useProfile() {
     const router = useRouter();
+    const [reloadToken, setReloadToken] = useState(0);
 
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
@@ -71,17 +73,30 @@ export function useProfile() {
     const resolvedProfilePicUrl = useMemo(() => profilePicUrl || '', [profilePicUrl]);
 
     useEffect(() => {
-        const tokenUser = getUserFromToken();
-        if (!tokenUser) {
-            router.push('/login');
-            return;
-        }
-        setUsername(tokenUser.username || '');
-        setEmail(tokenUser.email || '');
+        let isMounted = true;
 
         const loadProfile = async () => {
+            const token = await ensureValidToken({ allowCookieRefresh: true });
+            if (!token || !isMounted) {
+                if (isMounted) router.push('/login');
+                return;
+            }
+
+            const tokenUser = getUserFromToken();
+            if (!tokenUser) {
+                router.push('/login');
+                return;
+            }
+
+            setIsLoading(true);
+            setErrorMessage('');
+            setSuccessMessage('');
+            setUsername(tokenUser.username || '');
+            setEmail(tokenUser.email || '');
+
             try {
                 const response = await api.get<UserResponse>('/api/user/profile');
+                if (!isMounted) return;
                 const p = response.data;
                 setUsername(p.username || tokenUser.username || '');
                 setEmail(p.email || tokenUser.email || '');
@@ -97,13 +112,21 @@ export function useProfile() {
                 setProfilePicUrl(p.profilePicUrl || '');
                 setLastActive(p.lastActive || null);
             } catch (error: unknown) {
-                setErrorMessage(getApiErrorMessage(error, 'Failed to load profile details.'));
+                if (isMounted) setErrorMessage(getApiErrorMessage(error, 'Failed to load profile details.'));
             } finally {
-                setIsLoading(false);
+                if (isMounted) setIsLoading(false);
             }
         };
         void loadProfile();
-    }, [router]);
+
+        return () => {
+            isMounted = false;
+        };
+    }, [router, reloadToken]);
+
+    const reloadProfile = () => {
+        setReloadToken((value) => value + 1);
+    };
 
     const onSaveProfile = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -111,16 +134,16 @@ export function useProfile() {
         setSuccessMessage('');
         try {
             setIsSavingName(true);
-            const response = await api.put<UserResponse>('/api/user/profile/update', {
-                fullName: fullName.trim() || null,
-                firstName: firstName.trim() || null,
-                lastName: lastName.trim() || null,
-                contactNumber: contactNumber.trim() || null,
-                countryCode: countryCode.trim() || null,
-                jobTitle: jobTitle.trim() || null,
-                company: company.trim() || null,
-                position: position.trim() || null,
-                bio: bio.trim() || null,
+            const response = await updateProfile(api, {
+                fullName: fullName.trim() || undefined,
+                firstName: firstName.trim() || undefined,
+                lastName: lastName.trim() || undefined,
+                contactNumber: contactNumber.trim() || undefined,
+                countryCode: countryCode.trim() || undefined,
+                jobTitle: jobTitle.trim() || undefined,
+                company: company.trim() || undefined,
+                position: position.trim() || undefined,
+                bio: bio.trim() || undefined,
             });
             const p = response.data;
             setFullName(p.fullName || '');
@@ -187,6 +210,7 @@ export function useProfile() {
         isUploadingPhoto,
         errorMessage,
         successMessage,
+        reloadProfile,
         onSaveProfile,
         onUploadPhoto,
     };

@@ -25,7 +25,7 @@ export function CircularProgress({ percentage }: { percentage: number }) {
     return (
         <div className="relative w-[68px] h-[68px] flex items-center justify-center shrink-0">
             <svg viewBox="0 0 68 68" className="transform -rotate-90 w-full h-full overflow-visible">
-                <circle cx="34" cy="34" r={radius} stroke="#F3F4F6" strokeWidth="5" fill="transparent" />
+                <circle cx="34" cy="34" r={radius} stroke="var(--cu-bg-tertiary)" strokeWidth="5" fill="transparent" />
                 
                 {/* Glow effect layer */}
                 <motion.circle
@@ -53,14 +53,14 @@ export function CircularProgress({ percentage }: { percentage: number }) {
 
                 <defs>
                     <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <motion.stop offset="0%" animate={{ stopColor: ["#0052CC", "#3B82F6", "#0052CC"] }} transition={{ repeat: Infinity, duration: 4 }} />
-                        <motion.stop offset="100%" animate={{ stopColor: ["#0747A6", "#2563EB", "#0747A6"] }} transition={{ repeat: Infinity, duration: 4 }} />
+                        <stop offset="0%" stopColor="var(--cu-primary-light)" />
+                        <stop offset="100%" stopColor="var(--cu-primary)" />
                     </linearGradient>
                 </defs>
             </svg>
             
             <div className="absolute flex flex-col items-center justify-center pt-0.5">
-                <span className="font-arimo text-[14px] font-bold text-[#101828] leading-none">{displayValue}%</span>
+                <span className="font-arimo text-[14px] font-bold text-cu-text-primary leading-none">{displayValue}%</span>
             </div>
         </div>
     );

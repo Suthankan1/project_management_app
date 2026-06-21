@@ -1,5 +1,6 @@
 package com.planora.backend.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,6 +18,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findFirstByUsername(String username);
 
     Optional<User> findFirstByUsernameIgnoreCase(String username);
+
+    List<User> findByGithubUsernameIgnoreCase(String githubUsername);
     
     boolean existsByEmail(String email);
     

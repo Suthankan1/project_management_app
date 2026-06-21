@@ -1,78 +1,52 @@
-import api from '@/lib/axios';
-import type { ProjectType, ProjectMetrics } from '@/types';
+import { projectsApi, documentsApi } from './api-contract';
+import type { ProjectSummary } from './api-contract';
+import type { ProjectMetrics } from '@/types';
 
-// ── Types ──
-
-export interface ProjectSummary {
-  id: number;
-  name: string;
-  projectKey?: string;
-  type?: ProjectType;
-  teamId?: number;
-  teamName?: string;
-  ownerId?: number;
-  ownerName?: string;
-  description?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  isFavorite?: boolean;
-  [key: string]: unknown;
-}
-
-// ── API ──
+export type { ProjectSummary };
 
 export async function fetchAllProjects(): Promise<ProjectSummary[]> {
-  const { data } = await api.get<ProjectSummary[]>('/api/projects');
-  return data;
+  return projectsApi.list();
 }
 
 export async function fetchRecentProjects(limit = 10): Promise<ProjectSummary[]> {
-  const { data } = await api.get<ProjectSummary[]>('/api/projects/recent', { params: { limit } });
-  return data;
+  return projectsApi.getRecent(limit);
 }
 
 export async function fetchFavoriteProjects(): Promise<ProjectSummary[]> {
-  const { data } = await api.get<ProjectSummary[]>('/api/projects/favorites');
-  return data;
+  return projectsApi.getFavorites();
 }
 
 export async function fetchProjectDetails(projectId: string): Promise<ProjectSummary> {
-  const { data } = await api.get<ProjectSummary>(`/api/projects/${projectId}`);
-  return data;
+  return projectsApi.get(projectId);
 }
 
 export async function fetchProjectMetrics(projectId: string | number): Promise<ProjectMetrics> {
-  const { data } = await api.get<ProjectMetrics>(`/api/projects/${projectId}/metrics`);
-  return data;
+  return projectsApi.getMetrics(projectId);
 }
 
 export async function recordProjectAccess(projectId: number): Promise<void> {
-  await api.post(`/api/projects/${projectId}/access`);
+  return projectsApi.recordAccess(projectId);
 }
 
 export async function toggleFavorite(projectId: number | string): Promise<void> {
-  await api.post(`/api/projects/${projectId}/favorite`);
+  return projectsApi.toggleFavorite(projectId);
 }
 
-export async function updateProjectDetails(projectId: number | string, data: { name?: string; description?: string; type?: string }): Promise<ProjectSummary> {
-  const result = await api.put<ProjectSummary>(`/api/projects/${projectId}`, data);
-  return result.data;
+export async function updateProjectDetails(projectId: number | string, data: { name?: string; description?: string }): Promise<ProjectSummary> {
+  return projectsApi.update(projectId, data);
 }
 
 export async function deleteProject(projectId: number | string, teamId: number | string): Promise<void> {
-  await api.delete(`/api/projects/${projectId}/team/${teamId}`);
+  return projectsApi.delete(projectId, teamId);
 }
 
 export async function leaveProject(projectId: number | string): Promise<void> {
-  await api.post(`/api/projects/${projectId}/leave`);
+  return projectsApi.leave(projectId);
 }
 
 export async function fetchDocuments(
   projectId: string,
   includeDeleted = false,
 ): Promise<unknown[]> {
-  const { data } = await api.get(`/api/projects/${projectId}/documents`, {
-    params: { includeDeleted },
-  });
-  return data;
+  return documentsApi.listByProject(projectId, includeDeleted);
 }

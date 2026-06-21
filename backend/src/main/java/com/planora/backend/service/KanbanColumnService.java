@@ -15,15 +15,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import lombok.RequiredArgsConstructor;
+
 //Manages column lifecycle, automatic status generation, and reordering integrity
 @Service
+@RequiredArgsConstructor
 public class KanbanColumnService {
 
-    @Autowired
-    private KanbanColumnRepository kanbanColumnRepository;
+    private final KanbanColumnRepository kanbanColumnRepository;
 
-    @Autowired
-    private KanbanRepository kanbanRepository;
+    private final KanbanRepository kanbanRepository;
 
     //Creates a new column and automatically generates a logic-friendly 'status' key.
     public KanbanColumn createKanbanColumn(KanbanColumnRequestDTO dto) {

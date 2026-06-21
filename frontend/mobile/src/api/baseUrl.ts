@@ -13,7 +13,7 @@ function getExpoDevHost() {
 }
 
 export function resolveApiBaseUrl() {
-  const configuredUrl = process.env.EXPO_PUBLIC_API_URL || '';
+  const configuredUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_API_URL || '';
 
   if (!configuredUrl || Platform.OS === 'web') {
     return configuredUrl;
@@ -36,6 +36,19 @@ export function resolveApiBaseUrl() {
   }
 
   return configuredUrl;
+}
+
+export function buildApiUrl(path: string) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const baseUrl = resolveApiBaseUrl();
+
+  if (!baseUrl) {
+    return normalizedPath;
+  }
+
+  const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
+
+  return `${normalizedBaseUrl}${normalizedPath}`;
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();

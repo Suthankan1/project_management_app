@@ -20,7 +20,8 @@ export function useChatUnread(projectId: string) {
 
   const loadSummaries = useCallback(async () => {
     try {
-      const { directSummaries, roomSummaries, teamSummary } = await chatService.fetchChatSummaries(projectId);
+      const res = await chatService.fetchChatSummaries(projectId);
+      const { directSummaries = [], roomSummaries = [], teamSummary } = res || {};
 
       const pUnseen: Record<string, number> = {};
       const pLast: Record<string, ChatMessage | null> = {};

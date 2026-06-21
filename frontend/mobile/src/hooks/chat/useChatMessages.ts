@@ -1,6 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { ChatMessage } from '../../types/chat';
 import * as chatService from '../../services/chatService';
+import {
+  cacheChatSnapshot,
+  getProjectQueue,
+  loadCachedChat,
+} from '../../services/chatOfflineService';
 
 function sortMessages(messages: ChatMessage[]): ChatMessage[] {
   return [...messages].sort((a, b) => {
@@ -41,11 +46,75 @@ export function useChatMessages(projectId: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [roomMessages, setRoomMessages] = useState<Record<number, ChatMessage[]>>({});
   const [privateMessages, setPrivateMessages] = useState<Record<string, ChatMessage[]>>({});
+  const [hasStaleCache, setHasStaleCache] = useState(false);
+  const [hasHydratedCache, setHasHydratedCache] = useState(false);
+
+  const hydrateCachedMessages = useCallback(async () => {
+    const [cached, queued] = await Promise.all([
+      loadCachedChat(projectId),
+      getProjectQueue(projectId),
+    ]);
+
+    if (cached) {
+      setMessages(cached.teamMessages);
+      setRoomMessages(cached.roomMessages);
+      setPrivateMessages(cached.privateMessages);
+      setHasStaleCache(true);
+    }
+
+    queued.forEach((item) => {
+      const queuedMessage: ChatMessage = {
+        localId: item.localId,
+        sender: item.sender,
+        content: item.content,
+        recipient: item.scope.type === 'PRIVATE' ? item.scope.recipient : undefined,
+        roomId: item.scope.type === 'ROOM' ? item.scope.roomId : undefined,
+        chatType: item.scope.type,
+        type: 'CHAT',
+        formatType: 'PLAIN',
+        timestamp: item.createdAt,
+        syncStatus: item.status === 'failed' ? 'failed' : 'pending',
+        offlineQueued: true,
+        failureReason: item.error,
+      };
+
+      if (item.scope.type === 'ROOM') {
+        const roomId = item.scope.roomId;
+        setRoomMessages(prev => ({
+          ...prev,
+          [roomId]: mergeIncoming(prev[roomId] || [], queuedMessage),
+        }));
+      } else if (item.scope.type === 'PRIVATE') {
+        const key = dmKey(item.scope.recipient);
+        setPrivateMessages(prev => ({
+          ...prev,
+          [key]: mergeIncoming(prev[key] || [], queuedMessage),
+        }));
+      } else {
+        setMessages(prev => mergeIncoming(prev, queuedMessage));
+      }
+    });
+
+    setHasHydratedCache(true);
+    return Boolean(cached);
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!hasHydratedCache) return;
+    cacheChatSnapshot({
+      projectId,
+      cachedAt: Date.now(),
+      teamMessages: messages,
+      roomMessages,
+      privateMessages,
+    }).catch(err => console.error('cacheChatSnapshot failed:', err));
+  }, [hasHydratedCache, messages, privateMessages, projectId, roomMessages]);
 
   const loadTeamHistory = useCallback(async () => {
     try {
       const data = await chatService.fetchTeamMessages(projectId);
       setMessages(prev => mergeHistory(prev, data));
+      setHasStaleCache(false);
     } catch (err) {
       console.error('loadTeamHistory failed:', err);
     }
@@ -58,6 +127,7 @@ export function useChatMessages(projectId: string) {
         ...prev,
         [roomId]: mergeHistory(prev[roomId] || [], data),
       }));
+      setHasStaleCache(false);
     } catch (err) {
       console.error('loadRoomHistory failed:', err);
     }
@@ -71,6 +141,7 @@ export function useChatMessages(projectId: string) {
         ...prev,
         [key]: mergeHistory(prev[key] || [], data),
       }));
+      setHasStaleCache(false);
     } catch (err) {
       console.error('loadPrivateHistory failed:', err);
     }
@@ -140,6 +211,7 @@ export function useChatMessages(projectId: string) {
 
   return {
     messages, roomMessages, privateMessages,
+    hasStaleCache, hydrateCachedMessages, setHasStaleCache,
     setMessages, setRoomMessages, setPrivateMessages,
     loadTeamHistory, loadRoomHistory, loadPrivateHistory,
     addTeamMessage, addRoomMessage, addPrivateMessage,

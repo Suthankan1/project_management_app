@@ -14,6 +14,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,7 +31,7 @@ import lombok.Setter;
 public class ChatMessage {
     
     // Reactions are excluded from default serialization to prevent recursive payload expansion.
-    @jakarta.persistence.OneToMany(mappedBy = "message", cascade = jakarta.persistence.CascadeType.ALL, fetch = jakarta.persistence.FetchType.LAZY)
+    @jakarta.persistence.OneToMany(mappedBy = "message", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true, fetch = jakarta.persistence.FetchType.LAZY)
     @JsonIgnore
     private java.util.List<ChatReaction> reactions = new java.util.ArrayList<>();
 
@@ -37,6 +39,7 @@ public class ChatMessage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Enumerated(EnumType.STRING)
     private MessageType type;
 
     @Column(columnDefinition = "text")
@@ -48,6 +51,7 @@ public class ChatMessage {
 
     private Long roomId;
 
+    @Enumerated(EnumType.STRING)
     private ChatType chatType;
 
     // parentMessageId links replies to a thread root while keeping a single message table.
@@ -56,6 +60,7 @@ public class ChatMessage {
     @Enumerated(EnumType.STRING)
     private FormatType formatType = FormatType.PLAIN;
 
+    @Column(nullable = false)
     private Boolean deleted = false;
 
     // Soft-delete metadata allows moderation/history flows without hard deletes.
@@ -82,6 +87,17 @@ public class ChatMessage {
     public enum FormatType {
         PLAIN,
         MARKDOWN
+    }
+
+    @PrePersist
+    @PreUpdate
+    private void applyDefaults() {
+        if (formatType == null) {
+            formatType = FormatType.PLAIN;
+        }
+        if (deleted == null) {
+            deleted = false;
+        }
     }
 
     @Override

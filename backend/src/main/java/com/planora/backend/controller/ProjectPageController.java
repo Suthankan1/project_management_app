@@ -1,8 +1,10 @@
 package com.planora.backend.controller;
 
+import com.planora.backend.dto.MovePageRequestDto;
 import com.planora.backend.dto.PageDetailResponseDto;
 import com.planora.backend.dto.PageRequestDto;
 import com.planora.backend.dto.PageSummaryResponseDto;
+import com.planora.backend.dto.PageVersionResponseDto;
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.service.ProjectPageService;
 import jakarta.validation.Valid;
@@ -14,12 +16,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
 public class ProjectPageController {
 
-    @Autowired
-    private ProjectPageService service;
+    private final ProjectPageService service;
 
     @PostMapping("/projects/{projectId}/pages")
     public ResponseEntity<PageDetailResponseDto> createPage(
@@ -81,6 +85,62 @@ public class ProjectPageController {
             @AuthenticationPrincipal UserPrincipal principal) {
         service.deletePage(pageId, principal.getUserId());
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
+    @PatchMapping("/projects/{projectId}/pages/{pageId}/star")
+    public ResponseEntity<PageDetailResponseDto> toggleStar(
+            @PathVariable Long projectId,
+            @PathVariable Long pageId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(service.toggleStar(projectId, pageId, principal.getUserId()), HttpStatus.OK);
+    }
+
+    @PatchMapping("/projects/{projectId}/pages/{pageId}/move")
+    public ResponseEntity<PageDetailResponseDto> movePage(
+            @PathVariable Long projectId,
+            @PathVariable Long pageId,
+            @RequestBody MovePageRequestDto request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(service.movePage(projectId, pageId, request.getParentPageId(), principal.getUserId()), HttpStatus.OK);
+    }
+
+    @PostMapping("/projects/{projectId}/pages/{pageId}/viewed")
+    public ResponseEntity<Void> markViewed(
+            @PathVariable Long projectId,
+            @PathVariable Long pageId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        service.markViewed(projectId, pageId, principal.getUserId());
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
+    @GetMapping("/projects/{projectId}/pages/recent")
+    public ResponseEntity<List<PageSummaryResponseDto>> getRecentPages(
+            @PathVariable Long projectId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(service.getRecentPages(projectId, principal.getUserId()), HttpStatus.OK);
+    }
+
+    @GetMapping("/projects/{projectId}/pages/{pageId}/versions")
+    public ResponseEntity<List<PageVersionResponseDto>> getPageVersions(
+            @PathVariable Long projectId,
+            @PathVariable Long pageId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(
+                service.getPageVersions(projectId, pageId, principal.getUserId()),
+                HttpStatus.OK
+        );
+    }
+
+    @PostMapping("/projects/{projectId}/pages/{pageId}/versions/{versionId}/restore")
+    public ResponseEntity<PageDetailResponseDto> restorePageVersion(
+            @PathVariable Long projectId,
+            @PathVariable Long pageId,
+            @PathVariable Long versionId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return new ResponseEntity<>(
+                service.restorePageVersion(projectId, pageId, versionId, principal.getUserId()),
+                HttpStatus.OK
+        );
     }
 
 }

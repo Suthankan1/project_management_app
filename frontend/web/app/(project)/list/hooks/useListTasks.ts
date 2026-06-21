@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import api from '@/lib/axios';
-import { fetchTasksByProject } from '@/app/(project)/kanban/api';
+import { archiveTask, fetchTasksByProject, getArchivedTasks, unarchiveTask } from '@/app/(project)/kanban/api';
 import { getMilestones, assignTaskToMilestone } from '@/services/milestone-service';
 import { useTaskWebSocket } from '@/hooks/useTaskWebSocket';
 import type { CreateTaskData } from '@/components/shared/CreateTaskModal';
 import type { Label, MilestoneResponse, Task } from '@/types';
+import { authApi, labelsApi, projectsApi, tasksApi } from '@/services/api-contract';
+import { normalizeTaskPriority } from '@/services/tasks-contract';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
 
 const MEMBERS_CACHE_TTL_MS = 1000 * 60 * 30;
 
@@ -18,6 +20,7 @@ type MembersCacheEntry = {
 
 type TaskEventPatch = {
   id: number;
+  assigneeId?: number | null;
   title: string;
   storyPoint: number;
   status: string;
@@ -37,12 +40,9 @@ export type ListProjectMember = {
   photoUrl?: string | null;
 };
 
-const isHttpUrl = (value: string | null | undefined): value is string =>
-  Boolean(value && (value.startsWith('http://') || value.startsWith('https://')));
-
 const sanitizeTaskPhoto = (task: Task): Task => ({
   ...task,
-  assigneePhotoUrl: isHttpUrl(task.assigneePhotoUrl) ? task.assigneePhotoUrl : undefined,
+  assigneePhotoUrl: resolveProfilePhotoUrl(task.assigneePhotoUrl, task.assigneeId) ?? undefined,
 });
 
 // The backend AssigneeDTO sends `userId` (not `id`). Normalise so that
@@ -56,7 +56,9 @@ const normalizeAssignees = (task: Task): Task => {
       return {
         id: raw.userId ?? a.id,
         name: a.name,
-        avatar: isHttpUrl(raw.photoUrl) ? raw.photoUrl : isHttpUrl(a.avatar) ? a.avatar : undefined,
+        avatar: resolveProfilePhotoUrl(raw.photoUrl, raw.userId ?? a.id) ??
+          resolveProfilePhotoUrl(a.avatar, raw.userId ?? a.id) ??
+          undefined,
       };
     }),
   };
@@ -70,12 +72,14 @@ const normalizeTaskPatch = (patch: TaskEventPatch): Partial<Task> => ({
   priority: patch.priority,
   sprintId: patch.sprintId ?? undefined,
   assigneeName: patch.assigneeName ?? undefined,
-  assigneePhotoUrl: isHttpUrl(patch.assigneePhotoUrl) ? patch.assigneePhotoUrl : undefined,
+  assigneePhotoUrl: resolveProfilePhotoUrl(patch.assigneePhotoUrl, patch.assigneeId) ?? undefined,
   assignees: Array.isArray(patch.assignees)
     ? patch.assignees.map((item) => ({
         id: Number(item.userId ?? item.id ?? 0),
         name: item.name ?? item.username ?? 'User',
-        avatar: isHttpUrl(item.photoUrl) ? item.photoUrl : isHttpUrl(item.avatar) ? item.avatar : undefined,
+        avatar: resolveProfilePhotoUrl(item.photoUrl, item.userId ?? item.id) ??
+          resolveProfilePhotoUrl(item.avatar, item.userId ?? item.id) ??
+          undefined,
       }))
     : undefined,
   startDate: patch.startDate ?? undefined,
@@ -93,8 +97,10 @@ export function useListTasks() {
   const [milestones, setMilestones] = useState<MilestoneResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
-  const cacheKey = projectId ? `planora:tasks:${projectId}` : null;
+  const cacheKey = projectId ? `planora:tasks:${projectId}:${showArchived ? 'archived' : 'active'}` : null;
   const membersCacheKey = projectId ? `planora:membersMap:${projectId}` : null;
 
   // Fetch project members to get profile photo URLs (keyed by userId)
@@ -109,20 +115,21 @@ export function useListTasks() {
             return parsed.data;
           }
         } else {
-          const legacyHasInvalidValue = Object.values(parsed).some((value) => value && !isHttpUrl(value));
-          if (!legacyHasInvalidValue) {
-            return parsed;
-          }
+          return parsed;
         }
       } catch {
         /* ignore */
       }
     }
     try {
-      const res = await api.get(`/api/projects/${projectId}/members`);
+      const res = await projectsApi.getMembers(projectId);
       const map: Record<number, string | null> = {};
-      (res.data as { user: { userId: number; profilePicUrl?: string } }[]).forEach((m) => {
-        map[m.user.userId] = isHttpUrl(m.user.profilePicUrl) ? m.user.profilePicUrl : null;
+      (res as { id?: number; user: { userId: number; profilePicUrl?: string } }[]).forEach((m) => {
+        const photoUrl = resolveProfilePhotoUrl(m.user.profilePicUrl, m.user.userId);
+        map[m.user.userId] = photoUrl;
+        if (m.id != null) {
+          map[m.id] = photoUrl;
+        }
       });
       const entry: MembersCacheEntry = {
         expiresAt: Date.now() + MEMBERS_CACHE_TTL_MS,
@@ -137,6 +144,7 @@ export function useListTasks() {
 
   const loadTasks = useCallback(async () => {
     if (!projectId || !cacheKey) return;
+    setError(null);
     // Serve stale data instantly
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
@@ -144,11 +152,14 @@ export function useListTasks() {
         setTasks((JSON.parse(cached) as Task[]).map(sanitizeTaskPhoto).map(normalizeAssignees));
         setLoading(false);
       } catch { /* ignore corrupt cache */ }
+    } else {
+      setTasks([]);
+      setLoading(true);
     }
     // Always revalidate in background; load tasks + member photos in parallel
     try {
       const [data, membersMap] = await Promise.all([
-        fetchTasksByProject(projectId),
+        showArchived ? getArchivedTasks(projectId) : fetchTasksByProject(projectId, { archived: false }),
         loadMembersMap(),
       ]);
       const enriched = (data as Task[]).map((t) =>
@@ -163,17 +174,21 @@ export function useListTasks() {
     } finally {
       setLoading(false);
     }
-  }, [projectId, cacheKey, loadMembersMap]);
+  }, [projectId, cacheKey, loadMembersMap, showArchived]);
 
   const loadRowEditDependencies = useCallback(async () => {
     if (!projectId) return;
     try {
-      const [membersRes, labelsRes, milestonesRes] = await Promise.all([
-        api.get(`/api/projects/${projectId}/members`),
-        api.get(`/api/labels/project/${projectId}`),
+      const [currentUserRes, membersRes, labelsRes, milestonesRes] = await Promise.all([
+        authApi.getCurrentUser().catch(() => null),
+        projectsApi.getMembers(projectId),
+        labelsApi.listByProject(projectId),
         getMilestones(projectId),
       ]);
-      const normalizedMembers = (membersRes.data as Array<{
+      const currentUserId = currentUserRes?.userId;
+      const currentMember = (membersRes as Array<{ role?: string; user?: { userId?: number } }>).find((item) => item.user?.userId === currentUserId);
+      setCurrentUserRole(currentMember?.role ?? 'MEMBER');
+      const normalizedMembers = (membersRes as Array<{
         id?: number;
         user?: { userId?: number; fullName?: string; username?: string; profilePicUrl?: string | null };
       }>).map((item) => {
@@ -183,16 +198,17 @@ export function useListTasks() {
           id,
           memberId: item?.id,
           name,
-          photoUrl: isHttpUrl(item?.user?.profilePicUrl) ? item.user!.profilePicUrl : null,
+          photoUrl: resolveProfilePhotoUrl(item?.user?.profilePicUrl, id),
         };
       }).filter((m) => Number.isFinite(m.id));
       setMembers(normalizedMembers);
-      setLabels(Array.isArray(labelsRes.data) ? labelsRes.data : []);
+      setLabels(Array.isArray(labelsRes) ? labelsRes : []);
       setMilestones(Array.isArray(milestonesRes) ? milestonesRes : []);
     } catch {
       setMembers([]);
       setLabels([]);
       setMilestones([]);
+      setCurrentUserRole(null);
     }
   }, [projectId]);
 
@@ -213,6 +229,15 @@ export function useListTasks() {
         return next;
       });
     } else if (event.type === 'TASK_UPDATED' && event.task) {
+      const incomingArchived = Boolean((event.task as { archived?: boolean }).archived);
+      if (incomingArchived !== showArchived) {
+        setTasks((prev) => {
+          const next = prev.filter((t) => t.id !== event.task!.id);
+          if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
+          return next;
+        });
+        return;
+      }
       // Merge partial fields — no API call needed
       setTasks((prev) => {
         const taskPatch = normalizeTaskPatch(event.task as TaskEventPatch);
@@ -230,16 +255,16 @@ export function useListTasks() {
       });
     } else if (event.type === 'TASK_CREATED' && event.task) {
       // Fetch the single new task for full data (labels, milestones etc.)
-      void api.get(`/api/tasks/${event.task.id}`).then((res) => {
+      void tasksApi.get(event.task.id).then((res) => {
         setTasks((prev) => {
           if (prev.some((t) => t.id === event.task!.id)) return prev;
-          const next = [...prev, normalizeAssignees(sanitizeTaskPhoto(res.data as Task))];
+          const next = [...prev, normalizeAssignees(sanitizeTaskPhoto(res as Task))];
           if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
           return next;
         });
       }).catch(() => void loadTasks());
     }
-  }, [loadTasks, cacheKey]));
+  }, [loadTasks, cacheKey, showArchived]));
 
   const handleStatusChange = useCallback(async (taskId: number, newStatus: string) => {
     setTasks((prev) => {
@@ -248,7 +273,7 @@ export function useListTasks() {
       return next;
     });
     try {
-      await api.put(`/api/tasks/${taskId}`, { status: newStatus });
+      await tasksApi.update(taskId, { status: newStatus });
     } catch {
       if (cacheKey) localStorage.removeItem(cacheKey);
       void loadTasks();
@@ -262,12 +287,40 @@ export function useListTasks() {
       return next;
     });
     try {
-      await api.delete(`/api/tasks/${taskId}`);
+      await tasksApi.delete(taskId);
     } catch {
       if (cacheKey) localStorage.removeItem(cacheKey);
       void loadTasks();
     }
   }, [loadTasks, cacheKey]);
+
+  const handleArchive = useCallback(async (taskId: number) => {
+    setTasks((prev) => {
+      const next = prev.filter((t) => t.id !== taskId);
+      if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
+      return next;
+    });
+    try {
+      await archiveTask(taskId);
+    } catch {
+      if (cacheKey) localStorage.removeItem(cacheKey);
+      void loadTasks();
+    }
+  }, [cacheKey, loadTasks]);
+
+  const handleRestore = useCallback(async (taskId: number) => {
+    setTasks((prev) => {
+      const next = prev.filter((t) => t.id !== taskId);
+      if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
+      return next;
+    });
+    try {
+      await unarchiveTask(taskId);
+    } catch {
+      if (cacheKey) localStorage.removeItem(cacheKey);
+      void loadTasks();
+    }
+  }, [cacheKey, loadTasks]);
 
   const handleBulkStatusChange = useCallback(async (taskIds: number[], newStatus: string) => {
     if (taskIds.length === 0) return;
@@ -278,10 +331,10 @@ export function useListTasks() {
       return next;
     });
     try {
-      await api.patch('/api/tasks/bulk/status', { taskIds, status: newStatus });
+      await tasksApi.bulkUpdateStatus({ taskIds, status: newStatus });
     } catch {
       // Fallback for environments without bulk endpoint support
-      await Promise.all(taskIds.map((id) => api.put(`/api/tasks/${id}`, { status: newStatus }).catch(() => null)));
+      await Promise.all(taskIds.map((id) => tasksApi.update(id, { status: newStatus }).catch(() => null)));
       if (cacheKey) localStorage.removeItem(cacheKey);
       void loadTasks();
     }
@@ -296,9 +349,9 @@ export function useListTasks() {
       return next;
     });
     try {
-      await api.delete('/api/tasks/bulk', { data: { taskIds } });
+      await tasksApi.bulkDelete({ taskIds });
     } catch {
-      await Promise.all(taskIds.map((id) => api.delete(`/api/tasks/${id}`).catch(() => null)));
+      await Promise.all(taskIds.map((id) => tasksApi.delete(id).catch(() => null)));
       if (cacheKey) localStorage.removeItem(cacheKey);
       void loadTasks();
     }
@@ -316,7 +369,7 @@ export function useListTasks() {
     const previous = tasks.find((t) => t.id === taskId)?.dueDate;
     patchTaskOptimistic(taskId, { dueDate: dueDate ?? undefined });
     try {
-      await api.patch(`/api/tasks/${taskId}/dates`, { dueDate });
+      await tasksApi.updateDates(taskId, { dueDate });
     } catch {
       patchTaskOptimistic(taskId, { dueDate: previous });
     }
@@ -331,8 +384,8 @@ export function useListTasks() {
       assigneePhotoUrl: selectedMember?.photoUrl ?? undefined,
     });
     try {
-      if (assigneeId === null) await api.put(`/api/tasks/${taskId}`, { assigneeId: null });
-      else await api.patch(`/api/tasks/${taskId}/assign/${assigneeId}`);
+      if (assigneeId === null) await tasksApi.update(taskId, { assigneeId: null });
+      else await tasksApi.assignTaskSingle(taskId, assigneeId);
     } catch {
       if (previous) {
         patchTaskOptimistic(taskId, {
@@ -362,7 +415,7 @@ export function useListTasks() {
     });
 
     try {
-      await api.patch(`/api/tasks/${taskId}/assignees`, { assigneeIds });
+      await tasksApi.assignTaskMultiple(taskId, { assigneeIds });
     } catch {
       if (previous) {
         patchTaskOptimistic(taskId, {
@@ -382,8 +435,8 @@ export function useListTasks() {
       labels: shouldAttach ? [...previous, label] : previous.filter((l) => l.id !== label.id),
     });
     try {
-      if (shouldAttach) await api.post(`/api/tasks/${taskId}/label/${label.id}`);
-      else await api.delete(`/api/tasks/${taskId}/label/${label.id}`);
+      if (shouldAttach) await tasksApi.addLabel(taskId, label.id);
+      else await tasksApi.removeLabel(taskId, label.id);
     } catch {
       patchTaskOptimistic(taskId, { labels: previous });
     }
@@ -411,17 +464,17 @@ export function useListTasks() {
   const handleAddTask = useCallback(async (data: CreateTaskData) => {
     if (!projectId) return;
     try {
-      const res = await api.post('/api/tasks', {
+      const res = await tasksApi.create({
         projectId,
         title: data.title,
         storyPoint: data.storyPoint,
-        priority: data.priority,
+        priority: normalizeTaskPriority(data.priority),
         assigneeId: data.assigneeId,
         labelIds: data.labelIds,
         dueDate: data.dueDate,
       });
       setTasks((prev) => {
-        const next = [...prev, res.data as Task];
+        const next = [...prev, res as Task];
         if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
         return next;
       });
@@ -445,8 +498,13 @@ export function useListTasks() {
     labels,
     milestones,
     loadTasks,
+    showArchived,
+    setShowArchived,
+    canModifyTasks: currentUserRole !== 'VIEWER',
     handleStatusChange,
     handleDelete,
+    handleArchive,
+    handleRestore,
     handleAddTask,
     handleBulkStatusChange,
     handleBulkDelete,

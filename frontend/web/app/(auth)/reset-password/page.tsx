@@ -3,14 +3,15 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import api from '@/lib/axios';
 import { validatePassword } from '@/lib/passwordValidation';
 import BrandLogo from '../components/UI/BrandLogo';
 import ResetPasswordForm from './components/ResetPasswordForm';
 import SuccessMessage from './components/SuccessMessage';
+import { authApi } from '@/services/api-contract';
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
+  const [email, setEmail] = useState(() => searchParams.get('email') ?? '');
   const [otp, setOtp] = useState(() => searchParams.get('token') ?? '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,6 +22,11 @@ export default function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
+
+    if (!email || email.trim() === '') {
+      setError('Please enter your email address.');
+      return;
+    }
 
     if (!otp || otp.trim().length < 6) {
       setError('Please enter the 6-digit reset code from your email.');
@@ -41,7 +47,8 @@ export default function ResetPasswordPage() {
     setIsLoading(true);
 
     try {
-      await api.post('/api/auth/reset', {
+      await authApi.resetPassword({
+        email: email.trim(),
         token: otp.trim(),
         newPassword,
       });
@@ -71,7 +78,7 @@ export default function ResetPasswordPage() {
     <div className='min-h-screen flex flex-col items-center justify-center p-4'>
       {/* Back to Login Link */}
       <div className="w-full max-w-[420px] mb-4">
-        <Link href="/login" className='inline-flex items-center text-sm text-gray-500 hover:text-gray-900 transition-colors'>
+        <Link href="/login" className='inline-flex items-center text-sm text-cu-text-muted hover:text-cu-text-primary transition-colors'>
           <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
           </svg>
@@ -89,11 +96,13 @@ export default function ResetPasswordPage() {
           <SuccessMessage />
         ) : (
           <ResetPasswordForm
+            email={email}
             otp={otp}
             newPassword={newPassword}
             confirmPassword={confirmPassword}
             error={error}
             isLoading={isLoading}
+            onEmailChange={setEmail}
             onOtpChange={setOtp}
             onPasswordChange={setNewPassword}
             onConfirmPasswordChange={setConfirmPassword}
@@ -102,7 +111,7 @@ export default function ResetPasswordPage() {
         )}
 
         {/* Footer Reference */}
-        <p className="mt-8 text-center text-xs text-gray-400">
+        <p className="mt-8 text-center text-xs text-cu-text-muted">
           © 2026 Planora. All rights reserved.
         </p>
       </div>

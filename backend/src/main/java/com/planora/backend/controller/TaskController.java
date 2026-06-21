@@ -1,19 +1,34 @@
 package com.planora.backend.controller;
 
+import com.planora.backend.dto.BulkDeleteTasksRequest;
+import com.planora.backend.dto.BulkUpdateStatusRequest;
+import com.planora.backend.dto.ApiErrorResponse;
 import com.planora.backend.dto.CommentRequestDTO;
 import com.planora.backend.dto.LinkedCommitResponseDTO;
 import com.planora.backend.dto.LinkedPrResponseDTO;
+import com.planora.backend.dto.PatchTaskDatesRequest;
+import com.planora.backend.dto.ReorderTasksRequest;
 import com.planora.backend.dto.TaskActivityResponseDTO;
 import com.planora.backend.dto.TaskBranchUpdateDTO;
 import com.planora.backend.dto.TaskGithubSummaryDTO;
 import com.planora.backend.dto.TaskRequestDTO;
 import com.planora.backend.dto.TaskResponseDTO;
 import com.planora.backend.dto.TaskTemplateDTO;
+import com.planora.backend.dto.UpdateAssigneesRequest;
+import com.planora.backend.dto.UpdatePriorityRequest;
+import com.planora.backend.dto.UpdateStatusRequest;
+
 import com.planora.backend.model.UserPrincipal;
 import com.planora.backend.service.TaskActivityService;
 import com.planora.backend.service.TaskGithubService;
 import com.planora.backend.service.TaskService;
 import com.planora.backend.service.TaskTemplateService;
+import com.planora.backend.service.GithubTokenService;
+import com.planora.backend.service.GithubIssuesSyncService;
+import com.planora.backend.service.GithubNotificationService;
+import com.planora.backend.dto.GithubIssueCreateRequestDTO;
+import com.planora.backend.dto.GithubIssueDTO;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.groups.Default;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,32 +39,39 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.time.LocalDateTime;
+
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/tasks")
+@RequiredArgsConstructor
 public class TaskController {
 
-    @Autowired
-    TaskService service;
+    private final TaskService service;
 
-    @Autowired
-    TaskActivityService activityService;
+    private final TaskActivityService activityService;
 
-    @Autowired
-    TaskTemplateService templateService;
+    private final TaskTemplateService templateService;
 
-    @Autowired
-    TaskGithubService taskGithubService;
+    private final TaskGithubService taskGithubService;
+
+    private final GithubTokenService githubTokenService;
+
+    private final GithubIssuesSyncService githubIssuesSyncService;
+
+    private final GithubNotificationService githubNotificationService;
 
     // Spring's WebSocket messaging template used for real-time push notifications.
-    @Autowired
-    SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
 
     //Creates a new task and broadcasts the creation to all connected clients.
     @PostMapping
@@ -71,8 +93,9 @@ public class TaskController {
      * Fetches a single task and silently logs that the user viewed it
      * (used to populate their "Recently Viewed" dashboard).
      *
-     * Optional GitHub enrichment: supply both X-GitHub-Token header and
-     * repoFullName query param (e.g. "owner/repo") to populate the
+     * Optional GitHub enrichment: supply repoFullName query param
+     * (e.g. "owner/repo") while authenticated with a connected GitHub account
+     * to populate the
      * githubPrCount, ciStatus, linkedPrs, and recentCommits response fields.
      * Omitting either parameter returns the task with null GitHub fields —
      * fully backward-compatible with existing API consumers.
@@ -80,12 +103,12 @@ public class TaskController {
     @GetMapping("/{taskId}")
     public ResponseEntity<TaskResponseDTO> getTaskById(
             @PathVariable Long taskId,
-            @RequestHeader(value = "X-GitHub-Token", required = false) String githubToken,
             @RequestParam(required = false) String repoFullName,
             @AuthenticationPrincipal UserPrincipal currentUser) {
         if (currentUser != null) {
             service.recordTaskAccess(taskId, currentUser.getUserId());
         }
+        String githubToken = (currentUser != null) ? githubTokenService.getToken(currentUser.getUserId()) : null;
         TaskResponseDTO dto = (githubToken != null && repoFullName != null)
                 ? service.getTaskById(taskId, repoFullName, githubToken)
                 : service.getTaskById(taskId);
@@ -95,20 +118,18 @@ public class TaskController {
     /**
      * Returns the full GitHub summary (PRs, commits, CI status, branch) for a task.
      *
-     * When X-GitHub-Token and repoFullName are both provided the service syncs fresh
-     * data from the GitHub API before responding. Omit them to get the last cached data.
+     * Omit repoFullName to get the last cached data.
      *
      * GET /api/tasks/{taskId}/github
      *     ?repoFullName=owner/repo          (optional)
-     *     Header: X-GitHub-Token: <token>   (optional)
      */
     @GetMapping("/{taskId}/github")
     public ResponseEntity<TaskGithubSummaryDTO> getTaskGithubSummary(
             @PathVariable Long taskId,
-            @RequestHeader(value = "X-GitHub-Token", required = false) String githubToken,
             @RequestParam(required = false) String repoFullName,
             @AuthenticationPrincipal UserPrincipal currentUser) {
 
+        String githubToken = (currentUser != null) ? githubTokenService.getToken(currentUser.getUserId()) : null;
         TaskGithubSummaryDTO summary = (githubToken != null && repoFullName != null)
                 ? taskGithubService.syncAndGetSummary(taskId, repoFullName, githubToken)
                 : taskGithubService.getTaskGithubSummary(taskId);
@@ -121,17 +142,17 @@ public class TaskController {
      *
      * GET /api/tasks/{taskId}/pull-requests
      *     ?repoFullName=owner/repo          (optional — triggers a fresh GitHub sync first)
-     *     Header: X-GitHub-Token: <token>   (optional — required when repoFullName is set)
      *
-     * Without token+repo the endpoint returns the last cached PR data from the DB.
-     * With token+repo it syncs fresh data from GitHub before responding.
+     * Without repo the endpoint returns the last cached PR data from the DB.
+     * With repo it syncs fresh data from GitHub before responding.
      */
     @GetMapping("/{taskId}/pull-requests")
     public ResponseEntity<List<LinkedPrResponseDTO>> getLinkedPullRequests(
             @PathVariable Long taskId,
-            @RequestHeader(value = "X-GitHub-Token", required = false) String githubToken,
-            @RequestParam(required = false) String repoFullName) {
+            @RequestParam(required = false) String repoFullName,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
 
+        String githubToken = (currentUser != null) ? githubTokenService.getToken(currentUser.getUserId()) : null;
         List<LinkedPrResponseDTO> prs = (githubToken != null && repoFullName != null)
                 ? taskGithubService.syncAndGetLinkedPrs(taskId, repoFullName, githubToken)
                 : taskGithubService.getLinkedPrs(taskId);
@@ -145,28 +166,81 @@ public class TaskController {
      * GET /api/tasks/{taskId}/commits
      *     ?limit=20                          (optional, 1-50, default 20)
      *     ?repoFullName=owner/repo           (optional — triggers a fresh GitHub sync first)
-     *     Header: X-GitHub-Token: <token>   (optional — required when repoFullName is set)
      *
      * Each commit includes:
      *   - sha (7-char), fullSha (40-char), message, author, committedAt, htmlUrl, ciStatus
      *   - referencedTaskNumbers: task project-numbers extracted from the commit message
      *     using the patterns "#<number>" and "TASK-<number>" (case-insensitive)
      *
-     * Without token+repo the endpoint returns cached data from the DB.
-     * With token+repo it syncs fresh data from GitHub before responding.
+     * Without repo the endpoint returns cached data from the DB.
+     * With repo it syncs fresh data from GitHub before responding.
      */
     @GetMapping("/{taskId}/commits")
     public ResponseEntity<List<LinkedCommitResponseDTO>> getLinkedCommits(
             @PathVariable Long taskId,
-            @RequestHeader(value = "X-GitHub-Token", required = false) String githubToken,
             @RequestParam(required = false) String repoFullName,
-            @RequestParam(defaultValue = "20") int limit) {
+            @RequestParam(defaultValue = "20") int limit,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
 
+        String githubToken = (currentUser != null) ? githubTokenService.getToken(currentUser.getUserId()) : null;
         List<LinkedCommitResponseDTO> commits = (githubToken != null && repoFullName != null)
                 ? taskGithubService.syncAndGetLinkedCommits(taskId, repoFullName, githubToken, limit)
                 : taskGithubService.getLinkedCommits(taskId, limit);
 
         return ResponseEntity.ok(commits);
+    }
+
+    @PostMapping("/{taskId}/github-issue")
+    public ResponseEntity<?> createGithubIssue(
+            @PathVariable Long taskId,
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        String repoFullName = (String) body.get("repoFullName");
+        String title = (String) body.get("title");
+        String issueBody = (String) body.get("body");
+
+        if (repoFullName == null || repoFullName.isBlank() || title == null || title.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "repoFullName and title are required"));
+        }
+
+        String accessToken = githubTokenService.getToken(currentUser.getUserId());
+        if (accessToken == null || accessToken.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "GitHub account is not connected"));
+        }
+
+        GithubIssueCreateRequestDTO request = new GithubIssueCreateRequestDTO();
+        request.setRepoFullName(repoFullName);
+        request.setTitle(title);
+        request.setBody(issueBody);
+        request.setTaskId(taskId);
+
+        GithubIssueDTO createdIssue = githubIssuesSyncService.createIssue(request, accessToken);
+
+        service.linkGithubIssue(
+                taskId,
+                createdIssue.getNumber().longValue(),
+                repoFullName,
+                currentUser.getUserId());
+
+        githubNotificationService.notifyIssueEvent(
+                repoFullName,
+                createdIssue.getNumber(),
+                createdIssue.getTitle(),
+                "opened",
+                currentUser.getUsername(),
+                createdIssue.getBody(),
+                List.of());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "issueNumber", createdIssue.getNumber(),
+                "title", createdIssue.getTitle(),
+                "htmlUrl", createdIssue.getHtmlUrl(),
+                "state", createdIssue.getState()
+        ));
     }
 
     /**
@@ -191,7 +265,22 @@ public class TaskController {
     @PutMapping("/{taskId}")
     public ResponseEntity<TaskResponseDTO> updateTask(
             @PathVariable Long taskId,
-            @Validated @RequestBody TaskRequestDTO request,
+            @Valid @RequestBody TaskRequestDTO request,
+            @AuthenticationPrincipal UserPrincipal currentUser){
+        Long currentUserId = currentUser.getUserId();
+        TaskResponseDTO task = service.updateTask(taskId, request, currentUserId);
+
+        // REAL-TIME PUSH: Update the task card on everyone's screen.
+        messagingTemplate.convertAndSend(
+                "/topic/project/" + task.getProjectId() + "/tasks",
+                Map.of("type", "TASK_UPDATED", "task", task));
+        return new ResponseEntity<>(task, HttpStatus.OK);
+    }
+
+    @PatchMapping("/{taskId}")
+    public ResponseEntity<TaskResponseDTO> patchTask(
+            @PathVariable Long taskId,
+            @Valid @RequestBody TaskRequestDTO request,
             @AuthenticationPrincipal UserPrincipal currentUser){
         Long currentUserId = currentUser.getUserId();
         TaskResponseDTO task = service.updateTask(taskId, request, currentUserId);
@@ -222,17 +311,55 @@ public class TaskController {
      * Supports multiple optional filters via query parameters.
      */
     @GetMapping("/project/{projectId}")
-    public ResponseEntity<List<TaskResponseDTO>> getTasksByProject(
+    public ResponseEntity<?> getTasksByProject(
+            @PathVariable Long projectId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false, defaultValue = "false") Boolean archived,
+            HttpServletRequest servletRequest,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (!TaskService.isAllowedTaskSortField(sortBy)) {
+            return badTaskSortRequest(
+                    "Invalid sortBy '" + sortBy + "'. Allowed values: " + String.join(", ", TaskService.ALLOWED_SORT_FIELDS),
+                    servletRequest);
+        }
+        if (!TaskService.isAllowedTaskSortDirection(sortDir)) {
+            return badTaskSortRequest("Invalid sortDir '" + sortDir + "'. Allowed values: asc, desc", servletRequest);
+        }
+        Pageable pageable = PageRequest.of(page, size,
+                sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() :
+                        Sort.by(sortBy).descending());
+        return ResponseEntity.ok(service.getTasksByProject(projectId,
+                currentUser.getUserId(), pageable, archived));
+    }
+
+    private ResponseEntity<ApiErrorResponse> badTaskSortRequest(String message, HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                LocalDateTime.now().toString(),
+                HttpStatus.BAD_REQUEST.value(),
+                "BAD_REQUEST",
+                message,
+                request.getRequestURI(),
+                null
+        );
+        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+    }
+
+    @GetMapping("/project/{projectId}/all")
+    public ResponseEntity<List<TaskResponseDTO>> getAllTasksByProject(
             @PathVariable Long projectId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long assigneeId,
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) Long sprintId,
             @RequestParam(required = false) Long milestoneId,
+            @RequestParam(required = false, defaultValue = "false") Boolean archived,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
-        return new ResponseEntity<>(service.getTasksByProject(projectId, currentUserId, status, assigneeId, priority, sprintId, milestoneId), HttpStatus.OK);
+        return new ResponseEntity<>(service.getTasksByProject(projectId, currentUserId, status, assigneeId, priority, sprintId, milestoneId, archived), HttpStatus.OK);
     }
 
     @GetMapping("/project/{projectId}/archived")
@@ -303,7 +430,7 @@ public class TaskController {
     @PostMapping("/{parentId}/subtasks")
     public ResponseEntity<TaskResponseDTO> createSubTask(
             @PathVariable Long parentId,
-            @Validated({TaskRequestDTO.OnCreate.class, Default.class}) @RequestBody TaskRequestDTO subTaskRequest,
+            @Validated({TaskRequestDTO.OnSubTaskCreate.class, Default.class}) @RequestBody TaskRequestDTO subTaskRequest,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
@@ -381,14 +508,14 @@ public class TaskController {
 
     // ── ASSIGNMENT ──────────────────────────────────────────────────────────────
 
-    @PatchMapping("{taskID}/assign/{userId}")
+    @PatchMapping("/{taskId}/assign/{userId}")
     public ResponseEntity<Void> assignUser(
-            @PathVariable Long taskID,
+            @PathVariable Long taskId,
             @PathVariable Long userId,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
-        service.assignUser(taskID,userId,currentUserId);
+        service.assignUser(taskId, userId, currentUserId);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
@@ -405,16 +532,10 @@ public class TaskController {
     @PatchMapping("/{taskId}/assignees")
     public ResponseEntity<TaskResponseDTO> updateAssignees(
             @PathVariable Long taskId,
-            @RequestBody Map<String, Object> body,
+            @Valid @RequestBody UpdateAssigneesRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        List<Long> assigneeIds = body.containsKey("assigneeIds")
-                ? ((List<?>) body.get("assigneeIds")).stream()
-                    .filter(Objects::nonNull)
-                    .map(id -> Long.valueOf(id.toString()))
-                    .toList()
-                : List.of();
-        TaskResponseDTO task = service.updateAssignees(taskId, assigneeIds, currentUser.getUserId());
+        TaskResponseDTO task = service.updateAssignees(taskId, request.getAssigneeIds(), currentUser.getUserId());
         messagingTemplate.convertAndSend(
                 "/topic/project/" + task.getProjectId() + "/tasks",
                 Map.of("type", "TASK_UPDATED", "task", task));
@@ -425,32 +546,19 @@ public class TaskController {
 
     @PatchMapping("/bulk/status")
     public ResponseEntity<Void> bulkUpdateStatus(
-            @RequestBody Map<String, Object> body,
+            @Valid @RequestBody BulkUpdateStatusRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
-        List<Long> taskIds = body.containsKey("taskIds")
-                ? ((List<?>) body.get("taskIds")).stream()
-                    .filter(Objects::nonNull)
-                    .map(id -> Long.valueOf(id.toString()))
-                    .toList()
-                : List.of();
-        String status = (String) body.get("status");
-        service.bulkUpdateStatus(taskIds, status, currentUser.getUserId());
+        service.bulkUpdateStatus(request.getTaskIds(), request.getStatus(), currentUser.getUserId());
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
     @DeleteMapping("/bulk")
     public ResponseEntity<Void> bulkDelete(
-            @RequestBody Map<String, Object> body,
+            @Valid @RequestBody BulkDeleteTasksRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
-        List<Long> taskIds = body.containsKey("taskIds")
-                ? ((List<?>) body.get("taskIds")).stream()
-                    .filter(Objects::nonNull)
-                    .map(id -> Long.valueOf(id.toString()))
-                    .toList()
-                : List.of();
-        service.bulkDelete(taskIds, currentUser.getUserId());
+        service.bulkDelete(request.getTaskIds(), currentUser.getUserId());
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
@@ -459,12 +567,11 @@ public class TaskController {
     @PatchMapping("/{taskId}/priority")
     public ResponseEntity<TaskResponseDTO> updatePriority(
             @PathVariable Long taskId,
-            @RequestBody java.util.Map<String, String> body,
+            @Valid @RequestBody UpdatePriorityRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
-        String priority = body.get("priority");
-        return new ResponseEntity<>(service.updatePriority(taskId, priority, currentUserId), HttpStatus.OK);
+        return new ResponseEntity<>(service.updatePriority(taskId, request.getPriority(), currentUserId), HttpStatus.OK);
     }
 
     /**
@@ -475,12 +582,11 @@ public class TaskController {
     @PatchMapping("/{taskId}/status")
     public ResponseEntity<TaskResponseDTO> updateStatus(
             @PathVariable Long taskId,
-            @RequestBody Map<String, String> body,
+            @Valid @RequestBody UpdateStatusRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ){
         Long currentUserId = currentUser.getUserId();
-        String status = body.get("status");
-        TaskResponseDTO task = service.updateStatus(taskId, status, currentUserId);
+        TaskResponseDTO task = service.updateStatus(taskId, request.getStatus(), currentUserId);
         messagingTemplate.convertAndSend(
                 "/topic/project/" + task.getProjectId() + "/tasks",
                 Map.of(
@@ -500,35 +606,27 @@ public class TaskController {
     @PatchMapping("/{taskId}/dates")
     public ResponseEntity<Void> patchTaskDates(
             @PathVariable Long taskId,
-            @RequestBody Map<String, String> body,
+            @Valid @RequestBody PatchTaskDatesRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        boolean startDateProvided = body.containsKey("startDate");
-        boolean dueDateProvided = body.containsKey("dueDate");
-        LocalDate startDate = startDateProvided && body.get("startDate") != null && !body.get("startDate").trim().isEmpty()
-                ? LocalDate.parse(body.get("startDate")) : null;
-        LocalDate dueDate = dueDateProvided && body.get("dueDate") != null && !body.get("dueDate").trim().isEmpty()
-                ? LocalDate.parse(body.get("dueDate")) : null;
-        service.patchTaskDates(taskId, startDate, startDateProvided, dueDate, dueDateProvided, currentUser.getUserId());
+        service.patchTaskDates(
+                taskId,
+                request.getStartDate(), request.isStartDateProvided(),
+                request.getDueDate(), request.isDueDateProvided(),
+                currentUser.getUserId());
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
     @PatchMapping("/reorder")
     public ResponseEntity<Void> reorderTasks(
-            @RequestBody Map<String, Object> body,
+            @Valid @RequestBody ReorderTasksRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        Long projectId = body.get("projectId") == null ? null : Long.valueOf(String.valueOf(body.get("projectId")));
-        Long sprintId = body.get("sprintId") == null ? null : Long.valueOf(String.valueOf(body.get("sprintId")));
-        @SuppressWarnings("unchecked")
-        List<Object> rawIds = (List<Object>) body.get("orderedTaskIds");
-        List<Long> orderedTaskIds = rawIds == null
-                ? List.of()
-                : rawIds.stream().map(id -> Long.valueOf(String.valueOf(id))).toList();
-        if (projectId == null) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
-        service.reorderTasks(projectId, sprintId, orderedTaskIds, currentUser.getUserId());
+        service.reorderTasks(
+                request.getProjectId(),
+                request.getSprintId(),
+                request.getOrderedTaskIds() != null ? request.getOrderedTaskIds() : List.of(),
+                currentUser.getUserId());
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 

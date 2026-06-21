@@ -53,8 +53,14 @@ public class TaskResponseDTO {
     private java.time.LocalDate recurrenceEnd;
     private Long recurrenceParentId;
     private java.time.LocalDate nextOccurrence;
+    private boolean recurrenceActive;
+    private Integer customInterval;
+    private Integer recurrenceLimit;
+    private int recurrenceCount;
 
     // GitHub integration fields (V8)
+    private Long githubIssueNumber;
+    private String githubRepoFullName;
     private String githubBranch;
     private Integer githubPrCount;
     private String ciStatus;        // "PASSING" | "FAILED" | "RUNNING" | null  (CiStatus enum name)
@@ -98,6 +104,7 @@ public class TaskResponseDTO {
         private Long id;
         private String title;
         private String relation;
+        private String status;
     }
 
     @Data

@@ -20,12 +20,12 @@ interface ItemsTableProps {
 // ─── Table Header ─────────────────────────────────────────────────────────────
 
 function TableHeader({ activeTab }: { activeTab: string }) {
-  const thBase = 'py-3.5 text-left font-outfit text-[11px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100';
+  const thBase = 'py-3.5 text-left font-outfit text-[11px] font-bold text-cu-text-muted uppercase tracking-widest border-b border-cu-border';
 
   if (activeTab === 'assigned-to-me') {
     return (
-      <tr className="border-b border-slate-100">
-        <th className={`sticky left-0 z-20 bg-white px-4 ${thBase}`}>Task Name</th>
+      <tr className="border-b border-cu-border">
+        <th className={`sticky left-0 z-20 bg-cu-bg px-4 ${thBase}`}>Task Name</th>
         <th className={`px-4 ${thBase}`}>Status</th>
       </tr>
     );
@@ -35,9 +35,9 @@ function TableHeader({ activeTab }: { activeTab: string }) {
   const locationLabel = activeTab === 'boards' ? 'Project' : activeTab === 'favorites' ? 'Project Key' : 'Location';
 
   return (
-    <tr className="border-b border-slate-100">
-      <th className="py-3.5 w-[48px] border-b border-slate-100" />
-      <th className={`sticky left-0 z-20 bg-white pr-4 ${thBase}`}>{nameLabel}</th>
+    <tr className="border-b border-cu-border">
+      <th className="py-3.5 w-[48px] border-b border-cu-border" />
+      <th className={`sticky left-0 z-20 bg-cu-bg pr-4 ${thBase}`}>{nameLabel}</th>
       <th className={thBase}>{locationLabel}</th>
     </tr>
   );
@@ -70,18 +70,18 @@ function TableRow({
         delay: activeTab === 'assigned-to-me' ? Math.min(index * 0.05, 0.4) : 0,
       }}
       key={item.id}
-      className={`group border-b-[0.8px] border-[#E5E7EB] hover:bg-gray-50/80 cursor-pointer transition-all duration-300 ${
+      className={`group border-b border-cu-border hover:bg-cu-hover cursor-pointer transition-all duration-300 ${
         isDimmed ? 'opacity-20 scale-[0.99] grayscale' : 'opacity-100'
       }`}
       onClick={() => onRowClick(item)}
     >
       {activeTab === 'assigned-to-me' ? (
         <>
-          <td className="sticky left-0 z-10 bg-white/95 backdrop-blur-sm py-3.5 px-4 max-w-[150px] sm:max-w-[200px] xl:max-w-[280px] shadow-[6px_0_10px_-6px_rgba(0,0,0,0.08)]">
-            <div className="font-outfit text-[13.5px] text-slate-900 font-bold truncate group-hover:text-blue-600 transition-colors" title={item.name}>
+          <td className="sticky left-0 z-10 bg-cu-bg/95 backdrop-blur-sm py-3.5 px-4 max-w-[150px] sm:max-w-[200px] xl:max-w-[280px] shadow-[6px_0_10px_-6px_rgba(0,0,0,0.15)]">
+            <div className="font-outfit text-[13.5px] text-cu-text-primary font-bold truncate group-hover:text-cu-primary transition-colors" title={item.name}>
               {item.name}
             </div>
-            <div className="font-outfit text-[10px] font-bold text-slate-400 mt-1 truncate tracking-wider uppercase">
+            <div className="font-outfit text-[10px] font-bold text-cu-text-muted mt-1 truncate tracking-wider uppercase">
               {item.location}
             </div>
           </td>
@@ -94,10 +94,10 @@ function TableRow({
           <td className="py-3.5 whitespace-nowrap">
             <ItemIcon item={item} />
           </td>
-          <td className="sticky left-0 z-10 bg-white/95 backdrop-blur-sm py-3.5 pr-4 text-[#101828] font-outfit text-[13.5px] font-bold whitespace-nowrap shadow-[6px_0_10px_-6px_rgba(0,0,0,0.08)]">
+          <td className="sticky left-0 z-10 bg-cu-bg/95 backdrop-blur-sm py-3.5 pr-4 text-cu-text-primary font-outfit text-[13.5px] font-bold whitespace-nowrap shadow-[6px_0_10px_-6px_rgba(0,0,0,0.15)]">
             {item.name}
           </td>
-          <td className="py-3.5 text-slate-500 font-outfit text-[12.5px] font-medium">
+          <td className="py-3.5 text-cu-text-secondary font-outfit text-[12.5px] font-medium">
             {item.location}
           </td>
         </>
@@ -122,14 +122,14 @@ function PaginationControls({
   if (totalCount <= 5) return null;
 
   return (
-    <div className="w-full flex items-center justify-center gap-3 mt-4 mb-2 pt-4 border-t border-gray-100/80">
+    <div className="w-full flex items-center justify-center gap-3 mt-4 mb-2 pt-4 border-t border-cu-border">
       {visibleCount < totalCount && (
         <button
           onClick={onShowMore}
-          className="group flex items-center gap-1.5 px-4 py-1.5 font-arimo text-[13px] font-semibold text-[#4B5563] bg-white border border-[#E5E7EB] rounded-full shadow-sm hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50/50 transition-all active:scale-95"
+          className="group flex items-center gap-1.5 px-4 py-1.5 font-arimo text-[13px] font-semibold text-cu-text-primary bg-cu-bg border border-cu-border rounded-full shadow-sm hover:text-cu-primary hover:border-cu-primary/30 hover:bg-cu-primary/5 transition-all active:scale-95"
         >
           <span>Show More</span>
-          <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-500 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="w-3.5 h-3.5 text-cu-text-muted group-hover:text-cu-primary transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
@@ -137,10 +137,10 @@ function PaginationControls({
       {visibleCount > 5 && (
         <button
           onClick={onShowLess}
-          className="group flex items-center gap-1.5 px-4 py-1.5 font-arimo text-[13px] font-semibold text-[#4B5563] bg-white border border-[#E5E7EB] rounded-full shadow-sm hover:text-gray-900 hover:border-gray-300 hover:bg-gray-50 transition-all active:scale-95"
+          className="group flex items-center gap-1.5 px-4 py-1.5 font-arimo text-[13px] font-semibold text-cu-text-primary bg-cu-bg border border-cu-border rounded-full shadow-sm hover:text-cu-text-primary hover:border-cu-border hover:bg-cu-hover transition-all active:scale-95"
         >
           <span>Show Less</span>
-          <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="w-3.5 h-3.5 text-cu-text-muted group-hover:text-cu-text-secondary transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 15l-6-6-6 6" />
           </svg>
         </button>
@@ -173,7 +173,7 @@ export function ItemsTable({
         <tbody>
           {filteredItems.length === 0 ? (
             <tr>
-              <td colSpan={colSpan} className="border-b-[0.8px] border-[#E5E7EB]">
+              <td colSpan={colSpan} className="border-b border-cu-border">
                 <EmptyState activeTab={activeTab} searchQuery={searchQuery} />
               </td>
             </tr>

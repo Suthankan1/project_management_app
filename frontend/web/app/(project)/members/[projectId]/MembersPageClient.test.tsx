@@ -139,13 +139,20 @@ const setupGetMocks = ({
 };
 
 describe('MembersPageClient', () => {
+  let consoleWarnSpy: jest.SpyInstance;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     mockedGetUserFromToken.mockReturnValue({ userId: 201, email: 'alice@example.com' });
     setupGetMocks({});
     mockedAxios.patch.mockResolvedValue({ data: {} });
     mockedAxios.post.mockResolvedValue({ data: {} });
     mockedAxios.delete.mockResolvedValue({ data: {} });
+  });
+
+  afterEach(() => {
+    consoleWarnSpy.mockRestore();
   });
 
   it('renders loading state then members table and stats', async () => {

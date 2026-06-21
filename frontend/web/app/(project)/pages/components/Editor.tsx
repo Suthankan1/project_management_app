@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import { StarterKit } from '@tiptap/starter-kit';
@@ -23,10 +23,45 @@ import {
   Minus, Undo2, Redo2, Type,
 } from 'lucide-react';
 import { Collaboration } from '@tiptap/extension-collaboration';
+import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import * as Y from 'yjs';
+import type { WebsocketProvider } from 'y-websocket';
 import SlashCommand, { slashSuggestion } from './slashCommand';
+import { Modal } from '@/components/ui/Modal';
 
-interface CollaborationUser { name: string; color: string; }
+interface CollaborationUser { name: string; color: string; avatar?: string; }
+
+export function validateUrl(url: string): boolean {
+  const trimmed = url.trim();
+  if (!trimmed) return true;
+
+  // Remove all spaces and control characters to check for bad schemes
+  const normalized = trimmed.replace(/[\s\u0000-\u001F]/g, '');
+  if (/^(javascript|data|vbscript|file|ftp):/i.test(normalized)) {
+    return false;
+  }
+
+  if (trimmed.startsWith('//')) {
+    return false;
+  }
+
+  try {
+    const base = 'http://relative-base.internal';
+    const parsed = new URL(trimmed, base);
+
+    if (parsed.origin === base) {
+      return true;
+    }
+
+    return (
+      parsed.protocol === 'http:' ||
+      parsed.protocol === 'https:' ||
+      parsed.protocol === 'mailto:'
+    );
+  } catch (_e) {
+    return false;
+  }
+}
 
 interface EditorProps {
   content: string;
@@ -34,6 +69,7 @@ interface EditorProps {
   onImmediateUpdate?: (html: string) => void;
   editable?: boolean;
   ydoc?: Y.Doc;
+  provider?: WebsocketProvider;
   collaborationUser?: CollaborationUser;
 }
 
@@ -52,7 +88,7 @@ function ToolbarButton({
       type="button"
       className={`flex items-center justify-center w-8 h-8 min-w-[36px] min-h-[36px] rounded-md text-sm font-medium transition-all duration-150 ${
         isActive
-          ? 'bg-blue-600 text-white shadow-sm'
+          ? 'bg-cu-primary text-white shadow-sm'
           : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
       }`}
     >
@@ -65,8 +101,107 @@ function Divider() {
   return <div className="w-px h-5 bg-gray-200 mx-1 flex-shrink-0" />;
 }
 
-export default function Editor({ content, onUpdate, onImmediateUpdate, editable = true, ydoc, collaborationUser: _collaborationUser }: EditorProps) {
+interface LinkEditModalProps {
+  open: boolean;
+  initialUrl: string;
+  hasExistingLink: boolean;
+  onOpenChange: (open: boolean) => void;
+  onApply: (url: string) => void;
+  onRemove: () => void;
+}
+
+function LinkEditModal({
+  open,
+  initialUrl,
+  hasExistingLink,
+  onOpenChange,
+  onApply,
+  onRemove,
+}: LinkEditModalProps) {
+  const [draftUrl, setDraftUrl] = useState(initialUrl);
+  const [urlValidationError, setUrlValidationError] = useState<string | null>(null);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedUrl = draftUrl.trim();
+
+    if (trimmedUrl === '') {
+      onRemove();
+      return;
+    }
+
+    if (!validateUrl(trimmedUrl)) {
+      setUrlValidationError('Invalid URL. Only http, https, mailto, and relative app-safe URLs are allowed.');
+      return;
+    }
+
+    onApply(trimmedUrl);
+  };
+
+  return (
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Insert / Edit Link"
+      description="Enter a URL for this link. Only safe protocols (http, https, mailto) and relative app-safe URLs are allowed."
+      size="md"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+        <div>
+          <label htmlFor="link-url-input" className="block text-sm font-medium text-cu-text-secondary mb-1">
+            URL
+          </label>
+          <input
+            id="link-url-input"
+            type="text"
+            value={draftUrl}
+            onChange={(e) => {
+              setDraftUrl(e.target.value);
+              if (urlValidationError) setUrlValidationError(null);
+            }}
+            placeholder="https://example.com or /dashboard"
+            className="w-full px-3 py-2 border border-cu-border rounded-cu-md bg-cu-bg text-cu-text-primary focus:outline-none focus:ring-2 focus:ring-cu-primary/20 text-sm"
+            autoFocus
+          />
+          {urlValidationError && (
+            <p className="mt-1.5 text-xs text-red-500 font-medium" role="alert">{urlValidationError}</p>
+          )}
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 pt-2">
+          {hasExistingLink && (
+            <button
+              type="button"
+              onClick={onRemove}
+              className="mr-auto px-4 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-cu-md transition-colors"
+            >
+              Remove link
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="px-4 py-2 text-xs font-medium text-cu-text-primary bg-cu-bg-secondary hover:bg-cu-bg-tertiary rounded-cu-md transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 text-xs font-medium text-white bg-cu-primary hover:bg-cu-primary-dark rounded-cu-md transition-colors"
+          >
+            Save
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+export default function Editor({ content, onUpdate, onImmediateUpdate, editable = true, ydoc, provider, collaborationUser }: EditorProps) {
   const [isMounted, setIsMounted] = useState(false);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [linkInitialUrl, setLinkInitialUrl] = useState('');
+  const [hasExistingLink, setHasExistingLink] = useState(false);
+  const savedSelectionRef = useRef<{ from: number; to: number } | null>(null);
 
   // 800ms debounce avoids a save API call on every keystroke while still feeling responsive
   const handleUpdate = useMemo(
@@ -103,37 +238,115 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
     ...(ydoc ? [
       Collaboration.configure({ document: ydoc }),
     ] : []),
-  ], [ydoc]);
+    ...(ydoc && provider && collaborationUser ? [
+      CollaborationCaret.configure({
+        provider,
+        user: collaborationUser,
+        render(user) {
+          const cursor = document.createElement('span');
+          cursor.classList.add('collaboration-cursor__caret');
+          cursor.style.borderLeftColor = user.color;
+          cursor.style.borderLeftWidth = '2px';
+          cursor.style.borderLeftStyle = 'solid';
+
+          const label = document.createElement('span');
+          label.classList.add('collaboration-cursor__label');
+          label.style.backgroundColor = user.color;
+
+          if (user.avatar) {
+            const img = document.createElement('img');
+            img.src = user.avatar;
+            img.classList.add('collaboration-cursor__avatar');
+            label.appendChild(img);
+          }
+
+          const nameText = document.createTextNode(user.name);
+          label.appendChild(nameText);
+          cursor.appendChild(label);
+          return cursor;
+        }
+      })
+    ] : []),
+  ], [ydoc, provider, collaborationUser]);
 
   const editor = useEditor({
     // immediatelyRender: false prevents a SSR/CSR hydration mismatch since TipTap's output differs server vs browser
     immediatelyRender: false,
     extensions,
-    content,
+    content: ydoc ? undefined : content,
     editable,
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor, transaction }) => {
       const html = editor.getHTML();
       onImmediateUpdate?.(html);
-      handleUpdate(html);
+      
+      const isConnected = provider && provider.wsconnected;
+      if (isConnected) {
+        const isRemote = transaction.getMeta('y-sync$') !== undefined;
+        if (!isRemote) {
+          handleUpdate(html);
+        }
+      } else {
+        handleUpdate(html);
+      }
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-gray prose-base focus:outline-none max-w-none min-h-[400px] leading-relaxed',
+        class: 'prose prose-gray dark:prose-invert prose-base focus:outline-none max-w-none min-h-[400px] leading-relaxed',
       },
     },
-  });
+  }, [ydoc]);
 
   // Sync content on external changes (e.g. file import or initial load when ydoc wasn't ready yet).
   // We skip when the editor is focused (user is actively typing) and when content is truly identical.
   // With Collaboration, getHTML() on an empty Yjs doc returns '<p></p>' so we treat that as empty too.
   useEffect(() => {
-    if (!editor || editor.isFocused || !content) return;
+    if (!editor || editor.isFocused || !content || ydoc) return;
     const editorHTML = editor.getHTML();
     const editorIsEmpty = editorHTML === '<p></p>' || editorHTML === '';
     if (editorIsEmpty || content !== editorHTML) {
       editor.commands.setContent(content, { emitUpdate: false });
     }
-  }, [content, editor]);
+  }, [content, editor, ydoc]);
+
+  // Synchronize initial content from DB if we are the first user to open the room
+  useEffect(() => {
+    if (!editor || !provider || !ydoc) return;
+
+    let fallbackTimeoutId: NodeJS.Timeout;
+
+    const handleSync = (isSynced: boolean) => {
+      if (isSynced) {
+        if (fallbackTimeoutId) clearTimeout(fallbackTimeoutId);
+        const fragment = ydoc.getXmlFragment('default');
+        const editorHTML = editor.getHTML();
+        const isEditorEmpty = editorHTML === '<p></p>' || editorHTML === '';
+        if ((fragment.length === 0 || isEditorEmpty) && content) {
+          editor.commands.setContent(content, { emitUpdate: false });
+        }
+      }
+    };
+
+    provider.on('sync', handleSync);
+
+    if (provider.synced) {
+      handleSync(true);
+    } else {
+      // Fallback: If Yjs WebSocket doesn't sync in 1.5 seconds (offline or server issues),
+      // populate the editor with the DB content so the page isn't blank.
+      fallbackTimeoutId = setTimeout(() => {
+        const editorHTML = editor.getHTML();
+        const isEditorEmpty = editorHTML === '<p></p>' || editorHTML === '';
+        if (isEditorEmpty && content) {
+          editor.commands.setContent(content, { emitUpdate: false });
+        }
+      }, 1500);
+    }
+
+    return () => {
+      provider.off('sync', handleSync);
+      if (fallbackTimeoutId) clearTimeout(fallbackTimeoutId);
+    };
+  }, [editor, provider, ydoc, content]);
 
   if (!isMounted || !editor) {
     return (
@@ -145,14 +358,32 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
   }
 
   const toggleLink = () => {
-    const previousUrl = editor.getAttributes('link').href;
-    const url = window.prompt('Enter URL:', previousUrl);
-    if (url === null) return;
-    if (url === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
-      return;
+    const previousUrl = editor.getAttributes('link').href || '';
+    savedSelectionRef.current = {
+      from: editor.state.selection.from,
+      to: editor.state.selection.to,
+    };
+    setLinkInitialUrl(previousUrl);
+    setHasExistingLink(Boolean(previousUrl));
+    setIsLinkModalOpen(true);
+  };
+
+  const restoreLinkSelection = () => {
+    const chain = editor.chain().focus();
+    if (savedSelectionRef.current) {
+      chain.setTextSelection(savedSelectionRef.current);
     }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+    return chain.extendMarkRange('link');
+  };
+
+  const applyLink = (url: string) => {
+    restoreLinkSelection().setLink({ href: url }).run();
+    setIsLinkModalOpen(false);
+  };
+
+  const removeLink = () => {
+    restoreLinkSelection().unsetLink().run();
+    setIsLinkModalOpen(false);
   };
 
   return (
@@ -305,6 +536,17 @@ export default function Editor({ content, onUpdate, onImmediateUpdate, editable 
           <EditorContent editor={editor} />
         </div>
       </div>
+
+      {isLinkModalOpen && (
+        <LinkEditModal
+          open={isLinkModalOpen}
+          onOpenChange={setIsLinkModalOpen}
+          initialUrl={linkInitialUrl}
+          hasExistingLink={hasExistingLink}
+          onApply={applyLink}
+          onRemove={removeLink}
+        />
+      )}
     </div>
   );
 }

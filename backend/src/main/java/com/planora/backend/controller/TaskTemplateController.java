@@ -11,12 +11,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/projects/{projectId}/templates")
+@RequiredArgsConstructor
 public class TaskTemplateController {
 
-    @Autowired
-    private TaskTemplateService templateService;
+    private final TaskTemplateService templateService;
 
     /*
      * Fetches all available templates for a specific project.

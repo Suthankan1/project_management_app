@@ -15,6 +15,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.planora.backend.service.UserService;
+
 import java.util.Map;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -25,9 +27,8 @@ import java.util.stream.Collectors;
 public class TeamMemberController {
 
         private final TeamMemberService teamMemberService;
-
-        @Autowired
-        private TaskRepository taskRepository;
+        private final TaskRepository taskRepository;
+        private final UserService userService;
 
         // ---------------- ADD MEMBER TO TEAM (OWNER ONLY) ----------------
         @PostMapping("/{teamId}/members/{userId}")
@@ -79,7 +80,8 @@ public class TeamMemberController {
                                                                 .username(member.getUser().getUsername())
                                                                 .fullName(member.getUser().getFullName())
                                                                 .email(member.getUser().getEmail())
-                                                                .profilePicUrl(member.getUser().getProfilePicUrl())
+                                                                .profilePicUrl(userService.generatePresignedUrl(
+                                                                                member.getUser().getProfilePicUrl()))
                                                                 .build())
                                                 .lastActive(member.getUser().getLastActive())
                                                 .taskCount(taskCountByUserId.getOrDefault(member.getUser().getUserId(),

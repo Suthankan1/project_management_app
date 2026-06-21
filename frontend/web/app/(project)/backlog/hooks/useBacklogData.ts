@@ -10,11 +10,17 @@ import {
     TeamMemberOption,
     unarchiveTask,
 } from '../../kanban/api';
-import api from '@/lib/axios';
 import { useTaskWebSocket } from '@/hooks/useTaskWebSocket';
 import { type CreateTaskData } from '@/components/shared/CreateTaskModal';
 import { buildSessionCacheKey, getSessionCache, setSessionCache, removeSessionCache } from '@/lib/session-cache';
 import { toast } from '@/components/ui';
+import { tasksApi } from '@/services/api-contract';
+import { normalizeTaskPriority } from '@/services/tasks-contract';
+import { resolveProfilePhotoUrl } from '@/lib/profile-photo';
+
+type TaskWithAssignees = Task & {
+    assignees?: Array<{ id?: number; avatar?: string | null }>;
+};
 
 export function useBacklogData(projectId: string | null, showArchived = false) {
 
@@ -67,6 +73,38 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         }
     }, [projectId]);
 
+    const memberPhotoById = useMemo(() => {
+        const map: Record<number, string | null> = {};
+        teamMembers.forEach((member) => {
+            map[member.id] = member.photoUrl ?? null;
+            if (member.userId != null) {
+                map[member.userId] = member.photoUrl ?? null;
+            }
+        });
+        return map;
+    }, [teamMembers]);
+
+    const enrichTaskAvatars = useCallback((items: Task[]): Task[] => {
+        return items.map((task) => {
+            const taskWithAssignees = task as TaskWithAssignees;
+            const assigneePhotoUrl =
+                resolveProfilePhotoUrl(task.assigneePhotoUrl, task.assigneeId) ||
+                (task.assigneeId != null ? memberPhotoById[task.assigneeId] : null) ||
+                null;
+
+            const assignees = taskWithAssignees.assignees?.map((assignee) => ({
+                ...assignee,
+                avatar: resolveProfilePhotoUrl(assignee.avatar, assignee.id) || assignee.avatar,
+            }));
+
+            return {
+                ...task,
+                assigneePhotoUrl,
+                ...(assignees ? { assignees } : {}),
+            };
+        });
+    }, [memberPhotoById]);
+
     // ── Dynamic Data (Periodic Sync) ──
     const fetchData = useCallback(async (options: { showSpinner?: boolean, forceNetwork?: boolean } = {}) => {
         if (!projectId) return;
@@ -74,7 +112,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         const pid = parseInt(projectId, 10);
         if (isNaN(pid)) return;
 
-        const cKey = buildSessionCacheKey('kanban-backlog', [projectId]);
+        const cKey = buildSessionCacheKey('kanban-backlog', [projectId, showArchived.toString()]);
         let hasCachedData = false;
         if (cKey && !forceNetwork) {
             const cached = getSessionCache<Task[]>(cKey, { allowStale: true });
@@ -88,16 +126,17 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         if (showSpinner && !hasCachedData) setLoading(true);
         setError(null);
         try {
-            const fetched = await fetchTasksByProject(pid);
-            setTasks(fetched);
-            if (cKey) setSessionCache(cKey, fetched, 30 * 60_000);
+            const fetched = await fetchTasksByProject(pid, { archived: showArchived });
+            const enriched = enrichTaskAvatars(fetched);
+            setTasks(enriched);
+            if (cKey) setSessionCache(cKey, enriched, 30 * 60_000);
         } catch (err) {
             console.error('Error loading backlog tasks:', err);
             if (showSpinner) setError(err instanceof Error ? err.message : 'Failed to load tasks');
         } finally {
             if (showSpinner && !hasCachedData) setLoading(false);
         }
-    }, [projectId]);
+    }, [projectId, showArchived, enrichTaskAvatars]);
 
     const fetchArchivedData = useCallback(async () => {
         if (!projectId || !showArchived) {
@@ -113,14 +152,14 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         setArchivedLoading(true);
         try {
             const data = await getArchivedTasks(pid);
-            setArchivedTasks(data as Task[]);
+            setArchivedTasks(enrichTaskAvatars(data as Task[]));
         } catch (err) {
             console.error('Error loading archived backlog tasks:', err);
             toast('Failed to load archived tasks', 'error');
         } finally {
             setArchivedLoading(false);
         }
-    }, [projectId, showArchived]);
+    }, [projectId, showArchived, enrichTaskAvatars]);
 
     const forceRefresh = useCallback(() => void fetchData({ showSpinner: false, forceNetwork: true }), [fetchData]);
 
@@ -145,7 +184,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
     useTaskWebSocket(projectId, useCallback((event) => {
         if (event.type === 'TASK_CREATED' && event.task) {
             if (!event.task.archived) {
-                setTasks(prev => [...prev.filter(x => x.id !== event.task!.id), event.task as Task]);
+                setTasks(prev => enrichTaskAvatars([...prev.filter(x => x.id !== event.task!.id), event.task as Task]));
             }
         } else if (event.type === 'TASK_UPDATED' && event.task) {
             if (event.task.archived) {
@@ -155,25 +194,25 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
                 }
             } else {
                 setTasks(prev => prev.some(x => x.id === event.task!.id)
-                    ? prev.map(x => x.id === event.task!.id ? { ...x, ...event.task } as Task : x)
-                    : [...prev, event.task as Task]);
+                    ? enrichTaskAvatars(prev.map(x => x.id === event.task!.id ? { ...x, ...event.task } as Task : x))
+                    : enrichTaskAvatars([...prev, event.task as Task]));
                 setArchivedTasks(prev => prev.filter(x => x.id !== event.task!.id));
             }
         } else if (event.type === 'TASK_DELETED' && event.taskId) {
             setTasks(prev => prev.filter(x => x.id !== event.taskId));
             setArchivedTasks(prev => prev.filter(x => x.id !== event.taskId));
         }
-    }, [showArchived]));
+    }, [showArchived, enrichTaskAvatars]));
 
     const handleMarkDone = useCallback(async (id: number) => {
         const task = tasks.find(t => t.id === id);
         setTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'DONE' } : t));
         try {
-            await api.patch(`/api/tasks/${id}/status`, { status: 'DONE' });
+            await tasksApi.updateStatus(id, 'DONE');
         } catch (e: unknown) {
             const status = (e as { response?: { status?: number } })?.response?.status;
             if ((status === 401 || status === 404) && task?.title) {
-                try { await api.put(`/api/tasks/${id}`, { title: task.title, status: 'DONE' }); forceRefresh(); return; } catch { /* fall through */ }
+                try { await tasksApi.update(id, { title: task.title, status: 'DONE' }); forceRefresh(); return; } catch { /* fall through */ }
             }
             forceRefresh();
         }
@@ -181,20 +220,20 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
 
     const handleDelete = useCallback(async (id: number) => {
         setTasks(prev => prev.filter(t => t.id !== id));
-        try { await api.delete(`/api/tasks/${id}`); forceRefresh(); } catch { forceRefresh(); }
+        try { await tasksApi.delete(id); forceRefresh(); } catch { forceRefresh(); }
     }, [forceRefresh]);
 
     const handleAddTask = useCallback(async (data: CreateTaskData) => {
         if (!projectId) return;
         try {
-            const res = await api.post('/api/tasks', {
+            const res = await tasksApi.create({
                 projectId: parseInt(projectId, 10),
                 title: data.title,
-                priority: data.priority,
+                priority: normalizeTaskPriority(data.priority),
                 assigneeId: data.assigneeId,
                 labelIds: data.labelIds,
             });
-            const newTask = res.data as Task;
+            const newTask = res as Task;
             // Deduplicate: WebSocket may have already added this task
             setTasks(prev => prev.some(t => t.id === newTask.id) ? prev : [...prev, newTask]);
             const key = buildSessionCacheKey('kanban-backlog', [projectId]);
@@ -209,11 +248,11 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         const task = tasks.find(t => t.id === id);
         setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
         try {
-            await api.patch(`/api/tasks/${id}/status`, { status });
+            await tasksApi.updateStatus(id, status);
         } catch (e: unknown) {
             const errStatus = (e as { response?: { status?: number } })?.response?.status;
             if ((errStatus === 401 || errStatus === 404) && task?.title) {
-                try { await api.put(`/api/tasks/${id}`, { title: task.title, status }); forceRefresh(); return; } catch { /* fall through */ }
+                try { await tasksApi.update(id, { title: task.title, status }); forceRefresh(); return; } catch { /* fall through */ }
             }
             forceRefresh();
         }
@@ -223,7 +262,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         const task = tasks.find(t => t.id === id);
         setTasks(prev => prev.map(t => t.id === id ? { ...t, dueDate: dueDate || undefined } : t));
         try {
-            await api.patch(`/api/tasks/${id}/due-date`, { dueDate });
+            await tasksApi.updateDates(id, { dueDate });
             const cKey = buildSessionCacheKey('kanban-backlog', [projectId]);
             if (cKey) removeSessionCache(cKey);
             window.dispatchEvent(new CustomEvent('planora:task-updated'));
@@ -231,7 +270,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
             const errStatus = (e as { response?: { status?: number } })?.response?.status;
             if ((errStatus === 401 || errStatus === 404) && task?.title) {
                 try {
-                    await api.put(`/api/tasks/${id}`, { title: task.title, dueDate });
+                    await tasksApi.update(id, { title: task.title, dueDate });
                     const cKey = buildSessionCacheKey('kanban-backlog', [projectId]);
                     if (cKey) removeSessionCache(cKey);
                     window.dispatchEvent(new CustomEvent('planora:task-updated'));
@@ -278,7 +317,7 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         const ids = [...selectedIds];
         setTasks(prev => prev.filter(t => !ids.includes(t.id)));
         setSelectedIds(new Set());
-        try { await Promise.all(ids.map(id => api.delete(`/api/tasks/${id}`))); forceRefresh(); } catch { forceRefresh(); }
+        try { await Promise.all(ids.map(id => tasksApi.delete(id))); forceRefresh(); } catch { forceRefresh(); }
     }, [selectedIds, forceRefresh]);
 
     const handleBulkDone = useCallback(async () => {
@@ -286,13 +325,13 @@ export function useBacklogData(projectId: string | null, showArchived = false) {
         setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, status: 'DONE' } : t));
         setSelectedIds(new Set());
         try {
-            await api.patch('/api/tasks/bulk/status', { taskIds: ids, status: 'DONE' });
+            await tasksApi.bulkUpdateStatus({ taskIds: ids, status: 'DONE' });
             forceRefresh();
         } catch {
             // Fallback: update each task individually with PUT
             try {
                 const tasksToUpdate = tasks.filter(t => ids.includes(t.id));
-                await Promise.all(tasksToUpdate.map(t => api.put(`/api/tasks/${t.id}`, { title: t.title, status: 'DONE' })));
+                await Promise.all(tasksToUpdate.map(t => tasksApi.update(t.id, { title: t.title, status: 'DONE' })));
                 forceRefresh();
             } catch { forceRefresh(); }
         }

@@ -19,20 +19,19 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class MilestoneService {
 
-    @Autowired
-    private MilestoneRepository milestoneRepository;
+    private final MilestoneRepository milestoneRepository;
 
-    @Autowired
-    private ProjectRepository projectRepository;
+    private final ProjectRepository projectRepository;
 
-    @Autowired
-    private TeamMemberRepository teamMemberRepository;
+    private final TeamMemberRepository teamMemberRepository;
 
-    @Autowired
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
     // Creates a new milestone for a specific project.
     @Transactional
@@ -140,12 +139,16 @@ public class MilestoneService {
     private void requireAtLeastMember(Long teamId, Long userId) {
         var member = teamMemberRepository.findByTeamIdAndUserUserId(teamId, userId)
                 .orElseThrow(() -> new ForbiddenException("User is not a member of this project"));
-        int rank = switch (member.getRole()) {
-            case OWNER  -> 4;
-            case ADMIN  -> 3;
-            case MEMBER -> 2;
-            case VIEWER -> 1;
-        };
+        int rank;
+        if (member.getRole() == TeamRole.OWNER) {
+            rank = 4;
+        } else if (member.getRole() == TeamRole.ADMIN) {
+            rank = 3;
+        } else if (member.getRole() == TeamRole.MEMBER) {
+            rank = 2;
+        } else {
+            rank = 1;
+        }
         if (rank < 2) {
             throw new ForbiddenException("Insufficient permissions: MEMBER or above required");
         }

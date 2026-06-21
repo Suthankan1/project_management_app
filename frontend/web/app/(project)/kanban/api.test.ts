@@ -1,8 +1,12 @@
 import {
+  archiveTask,
   createTask,
   deleteTask,
   fetchTasksByProject,
+  fetchAllTasksByProject,
+  getArchivedTasks,
   fetchTeamMembers,
+  unarchiveTask,
   updateTask,
   updateTaskStatus,
 } from './api';
@@ -22,16 +26,62 @@ jest.mock('@/lib/axios', () => ({
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe('kanban api', () => {
+  let consoleErrorSpy: jest.SpyInstance;
+  let consoleWarnSpy: jest.SpyInstance;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   it('fetchTasksByProject returns task list', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: [{ id: 1, title: 'Task 1' }] });
+    mockedAxios.get.mockResolvedValueOnce({ data: { content: [{ id: 1, title: 'Task 1' }] } });
 
     const result = await fetchTasksByProject(12);
 
-    expect(mockedAxios.get).toHaveBeenCalledWith('/api/tasks/project/12', { params: {} });
+    expect(mockedAxios.get).toHaveBeenCalledWith('/api/tasks/project/12', { params: { page: 0, size: 500 } });
+    expect(result).toEqual([{ id: 1, title: 'Task 1' }]);
+  });
+
+  it('fetchTasksByProject requests active tasks by default when asked', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: { content: [{ id: 1, title: 'Active task', archived: false }] } });
+
+    const result = await fetchTasksByProject(12, { archived: false });
+
+    expect(mockedAxios.get).toHaveBeenCalledWith('/api/tasks/project/12', { params: { page: 0, size: 500, archived: false } });
+    expect(result).toEqual([{ id: 1, title: 'Active task', archived: false }]);
+  });
+
+  it('fetches archived tasks and restores them through archive helpers', async () => {
+    mockedAxios.patch
+      .mockResolvedValueOnce({ data: { id: 2, title: 'Archived task', archived: true } })
+      .mockResolvedValueOnce({ data: { id: 2, title: 'Archived task', archived: false } });
+    mockedAxios.get.mockResolvedValueOnce({ data: [{ id: 2, title: 'Archived task', archived: true }] });
+
+    const archived = await archiveTask(2);
+    const list = await getArchivedTasks(12);
+    const restored = await unarchiveTask(2);
+
+    expect(mockedAxios.patch).toHaveBeenNthCalledWith(1, '/api/tasks/2/archive');
+    expect(mockedAxios.get).toHaveBeenCalledWith('/api/tasks/project/12/archived');
+    expect(mockedAxios.patch).toHaveBeenNthCalledWith(2, '/api/tasks/2/unarchive');
+    expect(archived.archived).toBe(true);
+    expect(list).toEqual([{ id: 2, title: 'Archived task', archived: true }]);
+    expect(restored.archived).toBe(false);
+  });
+
+  it('fetchAllTasksByProject returns task list', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: [{ id: 1, title: 'Task 1' }] });
+
+    const result = await fetchAllTasksByProject(12);
+
+    expect(mockedAxios.get).toHaveBeenCalledWith('/api/tasks/project/12/all', { params: {} });
     expect(result).toEqual([{ id: 1, title: 'Task 1' }]);
   });
 
@@ -86,13 +136,13 @@ describe('kanban api', () => {
   it('fetchTeamMembers supports wrapped payload shape', async () => {
     mockedAxios.get.mockResolvedValueOnce({
       data: {
-        members: [{ id: '8', user: { username: 'alice' } }, { id: 'x', name: '' }],
+        members: [{ id: '8', user: { userId: 12, username: 'alice', profilePicUrl: '/api/auth/users/12/photo' } }, { id: 'x', name: '' }],
       },
     });
 
     const result = await fetchTeamMembers(10);
 
     expect(mockedAxios.get).toHaveBeenCalledWith('/api/teams/10/members');
-    expect(result).toEqual([{ id: 8, name: 'alice' }]);
+    expect(result).toEqual([{ id: 8, userId: 12, name: 'alice', photoUrl: 'http://localhost:8080/api/auth/users/12/photo' }]);
   });
 });

@@ -45,10 +45,11 @@ jest.mock('@/services/chat-service', () => ({
   },
   searchChatMessages: async (projectId: string, query: string) => {
     const res = await fetch(
-      `/api/projects/${projectId}/chat/search?q=${encodeURIComponent(query)}`,
+      `/api/search?q=${encodeURIComponent(query)}&projectId=${encodeURIComponent(projectId)}`,
     );
     if (!res.ok) return [];
-    return (res.json() as Promise<unknown[]>);
+    const data = (await res.json()) as { messages?: unknown[] };
+    return data.messages || [];
   },
   postThreadReply: async (projectId: string, parentId: number, content: string) => {
     const res = await fetch(
@@ -59,6 +60,30 @@ jest.mock('@/services/chat-service', () => ({
         body: JSON.stringify({ content, formatType: 'PLAIN' }),
       },
     );
+    return res.json();
+  },
+  postTeamMessage: async (projectId: string, content: string, localId?: string) => {
+    const res = await fetch(`/api/projects/${projectId}/chat/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, localId, formatType: 'PLAIN' }),
+    });
+    return res.json();
+  },
+  postPrivateMessage: async (projectId: string, recipient: string, content: string, localId?: string) => {
+    const res = await fetch(`/api/projects/${projectId}/chat/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, recipient, localId, formatType: 'PLAIN' }),
+    });
+    return res.json();
+  },
+  postRoomMessage: async (projectId: string, roomId: number, content: string, localId?: string) => {
+    const res = await fetch(`/api/projects/${projectId}/chat/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, roomId, localId, formatType: 'PLAIN' }),
+    });
     return res.json();
   },
 }));
@@ -78,13 +103,14 @@ const token = `header.${btoa(JSON.stringify(tokenPayload))}.signature`;
 describe('useChat hook', () => {
   let phaseDEnabled = true;
   let consoleErrorSpy: jest.SpyInstance;
+  let consoleWarnSpy: jest.SpyInstance;
 
   jest.setTimeout(15000);
 
-  const defaultFetchImplementation = (input: RequestInfo | URL) => {
+  const defaultFetchImplementation = (input: RequestInfo | URL, options?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString();
 
-    if (url.includes('/api/auth/me')) {
+    if (url.includes('/api/user/me')) {
       return jsonResponse({ username: 'alice' });
     }
 
@@ -125,27 +151,36 @@ describe('useChat hook', () => {
       });
     }
 
-    if (url.includes('/api/projects/42/chat/messages?') || url.endsWith('/api/projects/42/chat/messages')) {
-      return jsonResponse([]);
+    if (url.includes('/api/projects/42/chat/messages/1/thread/replies')) {
+      return jsonResponse({ id: 51, sender: 'alice', content: 'thread reply', parentMessageId: 1 });
+    }
+
+    if (url.endsWith('/api/projects/42/chat/messages') && options?.method === 'POST') {
+      return jsonResponse({ id: 61, sender: 'alice', content: 'saved message', type: 'CHAT' }, true);
     }
 
     if (url.includes('/api/projects/42/chat/messages/1/thread')) {
       return jsonResponse([{ id: 1, sender: 'bob', content: 'root message', type: 'CHAT' }]);
     }
 
-    if (url.includes('/api/projects/42/chat/messages/1/thread/replies')) {
-      return jsonResponse({ id: 51, sender: 'alice', content: 'thread reply', parentMessageId: 1 });
+    if (url.includes('/api/projects/42/chat/messages?') || url.endsWith('/api/projects/42/chat/messages')) {
+      return jsonResponse([]);
     }
 
-    if (url.includes('/chat/search?')) {
-      return jsonResponse([
-        {
-          messageId: 10,
-          sender: 'bob',
-          content: 'backend deploy complete',
-          context: 'TEAM',
-        },
-      ]);
+    if (url.includes('/api/search?')) {
+      return jsonResponse({
+        messages: [
+          {
+            messageId: 10,
+            senderName: 'bob',
+            highlightedContent: 'backend deploy complete',
+            type: 'MESSAGE',
+            roomOrProjectId: 42,
+            projectId: 42,
+            deepLinkUrl: '/project/42/chat?messageId=10&view=team',
+          },
+        ],
+      });
     }
 
     if (url.includes('/chat/messages/') && url.includes('/reactions')) {
@@ -197,10 +232,12 @@ describe('useChat hook', () => {
     window.localStorage.setItem('token', token);
 
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   it('redirects to login when token is missing', async () => {
@@ -259,7 +296,7 @@ describe('useChat hook', () => {
     expect(JSON.parse(roomBody).timestamp).toBeTruthy();
   });
 
-  it('rejects blank messages and sets reconnect error when socket is unavailable', async () => {
+  it('rejects blank messages and persists over HTTP when socket is unavailable', async () => {
     const hook = await renderInitializedHook();
     const { result, rerender } = hook;
 
@@ -279,8 +316,50 @@ describe('useChat hook', () => {
       result.current.sendMessage('message while reconnecting');
     });
 
-    expect(result.current.error).toBe('Realtime chat is reconnecting. Please wait a moment and try again.');
     expect(mockSendRealtime).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      const createCalls = fetchMock.mock.calls.filter(([url, options]) =>
+        String(url).endsWith('/api/projects/42/chat/messages') &&
+        (options as RequestInit)?.method === 'POST'
+      );
+      expect(createCalls).toHaveLength(1);
+      expect(JSON.parse((createCalls[0][1] as RequestInit).body as string)).toMatchObject({
+        content: 'message while reconnecting',
+        formatType: 'PLAIN',
+      });
+    });
+  });
+
+  it('persists private and room messages over HTTP when socket is unavailable', async () => {
+    const hook = await renderInitializedHook();
+    const { result, rerender } = hook;
+
+    act(() => {
+      mockRealtimeConnected = false;
+      rerender();
+    });
+
+    act(() => {
+      result.current.sendMessage('persist dm', 'bob');
+      result.current.sendRoomMessage('persist room', 1);
+    });
+
+    await waitFor(() => {
+      const createBodies = fetchMock.mock.calls
+        .filter(([url, options]) =>
+          String(url).endsWith('/api/projects/42/chat/messages') &&
+          (options as RequestInit)?.method === 'POST'
+        )
+        .map(([, options]) => JSON.parse((options as RequestInit).body as string));
+
+      expect(createBodies).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ content: 'persist dm', recipient: 'bob' }),
+          expect.objectContaining({ content: 'persist room', roomId: 1 }),
+        ]),
+      );
+    });
   });
 
   it('receives realtime team and private messages and updates local collections', async () => {
@@ -371,7 +450,7 @@ describe('useChat hook', () => {
 
     await waitFor(() => {
       expect(result.current.searchResults).toHaveLength(1);
-      expect(result.current.searchResults[0].content).toContain('backend');
+      expect(result.current.searchResults[0].highlightedContent).toContain('backend');
     });
   });
 
@@ -383,7 +462,7 @@ describe('useChat hook', () => {
     await result.current.searchMessages('backend');
 
     expect(result.current.searchResults).toEqual([]);
-    const searchCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/chat/search?'));
+    const searchCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/search?'));
     expect(searchCalls).toHaveLength(0);
   });
 
