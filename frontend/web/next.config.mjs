@@ -86,7 +86,12 @@ const nextConfig = {
     const publicApiOrigin = originFromUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
     const publicBackendOrigin = originFromUrl(process.env.NEXT_PUBLIC_BACKEND_URL);
     const rewriteBackendOrigin = originFromUrl(process.env.BACKEND_URL);
-    const websocketOrigin = websocketOriginFromUrl(process.env.NEXT_PUBLIC_WS_BASE_URL);
+    const websocketOrigin = websocketOriginFromUrl(
+      process.env.NEXT_PUBLIC_WS_BASE_URL ||
+      process.env.NEXT_PUBLIC_API_BASE_URL ||
+      process.env.NEXT_PUBLIC_BACKEND_URL ||
+      process.env.BACKEND_URL,
+    );
     const localSources = isProduction ? [] : [localBackendOrigin];
     const localWebSocketSources = isProduction ? [] : [localWebSocketOrigin];
 
