@@ -181,18 +181,16 @@ export function GlobalNotificationProvider({ children }: { children: React.React
   }, [clearReconnectTimer]);
 
   const handleConnectionLost = useCallback((client: Client, token: string) => {
-    if (stompClientRef.current === client) {
-      stompClientRef.current = null;
-      setClientState(null);
+    if (stompClientRef.current !== client || activeTokenRef.current !== token) {
+      return;
     }
 
+    stompClientRef.current = null;
+    setClientState(null);
     isConnectingRef.current = false;
     setRealtimeConnected(false);
     setRealtimeReconnecting(true);
-
-    if (activeTokenRef.current === token) {
-      reconnectAttemptHandlerRef.current(token);
-    }
+    reconnectAttemptHandlerRef.current(token);
   }, []);
 
   const connectRealtime = useCallback((token: string) => {
@@ -281,9 +279,6 @@ export function GlobalNotificationProvider({ children }: { children: React.React
           reason: event.reason,
           wasClean: event.wasClean,
         });
-        handleConnectionLost(client, token);
-      },
-      onDisconnect: () => {
         handleConnectionLost(client, token);
       },
     });

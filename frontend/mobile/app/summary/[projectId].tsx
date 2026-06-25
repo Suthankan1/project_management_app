@@ -19,6 +19,10 @@ import MobilePagesScreen from '../../src/components/pages/MobilePagesScreen';
 import MobileDocsScreen from '../../src/components/docs/MobileDocsScreen';
 import MobileBurndownScreen from '../../src/components/burndown/MobileBurndownScreen';
 import MobileMembersScreen from '../../src/components/members/MobileMembersScreen';
+import MobileTimelineScreen from '../../src/components/timeline/MobileTimelineScreen';
+import MobileListScreen from '../../src/components/list/MobileListScreen';
+import MobileCalendarScreen from '../../src/components/calendar/MobileCalendarScreen';
+import MobileMilestoneScreen from '../../src/components/milestone/MobileMilestoneScreen';
 
 /** Height of the nav bar = padding top (8) + title row (56) + tab row (48) + padding bottom (12) */
 const NAV_INNER_HEIGHT = 124; // matches ProjectTopNav.tsx exactly
@@ -139,6 +143,42 @@ export default function ProjectRoute() {
       if (activeMoreTab === 'members') {
         return (
           <MobileMembersScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight + 16}
+          />
+        );
+      }
+      if (activeMoreTab === 'timeline') {
+        return (
+          <MobileTimelineScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight + 16}
+          />
+        );
+      }
+      if (activeMoreTab === 'calendar') {
+        return (
+          <MobileCalendarScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight + 16}
+          />
+        );
+      }
+      if (activeMoreTab === 'milestone') {
+        return (
+          <MobileMilestoneScreen
+            projectId={numericId}
+            projectName={name}
+            topOffset={navHeight + 16}
+          />
+        );
+      }
+      if (activeMoreTab === 'list') {
+        return (
+          <MobileListScreen
             projectId={numericId}
             projectName={name}
             topOffset={navHeight + 16}

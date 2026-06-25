@@ -21,7 +21,6 @@ export interface ProjectDetails {
 export interface UpdateProjectPayload {
   name?: string;
   description?: string;
-  type?: ProjectType;
 }
 
 const MEMBERS_CACHE_TTL_MS = 60_000;
@@ -85,4 +84,31 @@ export const projectService = {
 
   getMilestones: (projectId: number | string): Promise<any[]> =>
     api.get<any[]>(`/api/projects/${projectId}/milestones`).then(r => r.data),
+
+  // ── Custom fields ──────────────────────────────────────────────────────────
+  getCustomFields: (projectId: number | string): Promise<CustomFieldDto[]> =>
+    api.get<CustomFieldDto[]>(`/api/projects/${projectId}/custom-fields`).then(r => r.data ?? []),
+
+  createCustomField: (projectId: number | string, payload: CreateCustomFieldPayload): Promise<CustomFieldDto> =>
+    api.post<CustomFieldDto>(`/api/projects/${projectId}/custom-fields`, payload).then(r => r.data),
+
+  deleteCustomField: (projectId: number | string, fieldId: number | string): Promise<void> =>
+    api.delete(`/api/projects/${projectId}/custom-fields/${fieldId}`).then(() => undefined),
 };
+
+export type CustomFieldType = 'TEXT' | 'NUMBER' | 'DATE' | 'SELECT';
+
+export interface CustomFieldDto {
+  id: number;
+  name: string;
+  fieldType: CustomFieldType;
+  options?: string[] | null;
+  position?: number;
+}
+
+export interface CreateCustomFieldPayload {
+  name: string;
+  fieldType: CustomFieldType;
+  options: string[];
+  position: number;
+}
