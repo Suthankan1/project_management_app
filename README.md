@@ -163,6 +163,7 @@ cp .env.production.example .env.production
 | `MAIL_PORT` | SMTP port | `587` |
 | `MAIL_USERNAME` | Sender email address | `you@example.com` |
 | `MAIL_PASSWORD` | SMTP app password | `your-app-password` |
+| `APP_FRONTEND_BASE_URL` | Public frontend origin used in invitation emails | `https://app.yourapp.com` |
 | `AWS_ACCESS_KEY` | AWS IAM access key | `your_aws_access_key` |
 | `AWS_SECRET_KEY` | AWS IAM secret key | `your_aws_secret_key` |
 | `AWS_REGION` | S3 bucket region | `eu-north-1` |
@@ -199,7 +200,7 @@ For staging and production, set all required variables in the hosting platform:
 |---|---|
 | Local Docker | `SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/planora_db`, matching `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `JWT_SECRET`, mail settings, AWS credentials, and the four storage bucket names if uploads are used. |
 | Staging | External PostgreSQL JDBC URL with SSL if required by the provider, staging database credentials, staging JWT secret, staging SMTP credentials, staging AWS credentials, staging-only S3 buckets, and staging `CORS_ALLOWED_ORIGINS`. Do not use `db:5432` outside Docker Compose. |
-| Production | Managed PostgreSQL JDBC URL with SSL, production database credentials, local EC2 Redis container from `docker-compose.ec2.yml`, `APP_CACHE_REDIS_FAIL_OPEN=true` unless you intentionally want cache outages to fail requests, strong production JWT secret, production SMTP credentials, production AWS credentials, production-only S3 buckets, production `CORS_ALLOWED_ORIGINS`, `WEBSOCKET_ALLOWED_ORIGINS`, and any provider-specific Flyway settings. Missing production bucket variables fail startup. Do not reuse local or staging bucket names. |
+| Production | Managed PostgreSQL JDBC URL with SSL, production database credentials, production Redis host (`REDIS_HOST`) pointing at a real instance for Spring Cache/auth counters/rate limiting, `APP_CACHE_REDIS_FAIL_OPEN=true` unless you intentionally want cache outages to fail requests, strong production JWT secret, production SMTP credentials, `APP_FRONTEND_BASE_URL` set to the public frontend origin, production AWS credentials, production-only S3 buckets, production `CORS_ALLOWED_ORIGINS`, `WEBSOCKET_ALLOWED_ORIGINS` if realtime clients differ from CORS origins, and any provider-specific Flyway settings. Missing production bucket variables fail startup. Do not reuse local or staging bucket names. |
 
 ### 3. Run with Docker Compose
 
