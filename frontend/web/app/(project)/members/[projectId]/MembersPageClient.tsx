@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
+import { toast } from "@/components/ui/Toast";
 import { useMembersData } from "./useMembersData";
 import { ROLE_OPTIONS } from "./constants";
 import { InviteMemberModal } from "./components/InviteMemberModal";
@@ -40,32 +41,30 @@ export default function MembersPageClient({ projectId }: { projectId: string }) 
     hasAutoOpenedInvite.current = true;
   }, [searchParams, setShowModal]);
 
+  useEffect(() => {
+    if (roleChangeSuccess) {
+      toast(roleChangeSuccess, "success");
+    }
+  }, [roleChangeSuccess]);
+
+  useEffect(() => {
+    if (roleChangeError) {
+      toast(roleChangeError, "error");
+    }
+  }, [roleChangeError]);
+
+  useEffect(() => {
+    if (removeSuccess) {
+      toast(removeSuccess, "success");
+    }
+  }, [removeSuccess]);
+
   if (loading) return <div className="mobile-page-padding max-w-[900px] mx-auto pb-6 text-sm text-gray-500">Loading...</div>;
 
   return (
     <div className="mobile-page-padding max-w-[900px] mx-auto pb-6">
       <div className="space-y-5 sm:space-y-6">
         <MembersHeader onInviteClick={() => setShowModal(true)} />
-
-        {(roleChangeSuccess || roleChangeError || removeSuccess) && (
-          <div className="space-y-3">
-            {roleChangeSuccess && (
-              <div className="p-3 text-sm sm:text-[15px] bg-green-50 text-green-700 border border-green-200 rounded-md shadow-sm">
-                {roleChangeSuccess}
-              </div>
-            )}
-            {roleChangeError && (
-              <div className="p-3 text-sm sm:text-[15px] bg-red-50 text-red-700 border border-red-200 rounded-md shadow-sm">
-                {roleChangeError}
-              </div>
-            )}
-            {removeSuccess && (
-              <div className="p-3 text-sm sm:text-[15px] bg-green-50 text-green-700 border border-green-200 rounded-md shadow-sm">
-                {removeSuccess}
-              </div>
-            )}
-          </div>
-        )}
 
         <MembersStatsCards
           totalMembers={totalMembers}
