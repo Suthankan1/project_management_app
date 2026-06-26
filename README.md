@@ -163,7 +163,7 @@ cp .env.production.example .env.production
 | `MAIL_PORT` | SMTP port | `587` |
 | `MAIL_USERNAME` | Sender email address | `you@example.com` |
 | `MAIL_PASSWORD` | SMTP app password | `your-app-password` |
-| `APP_FRONTEND_BASE_URL` | Public frontend origin used in invitation emails | `https://app.yourapp.com` |
+| `APP_FRONTEND_BASE_URL` | Public frontend origin used in invitation emails. Required for `prod`/`production` startup. | `https://planora-pma.netlify.app` |
 | `AWS_ACCESS_KEY` | AWS IAM access key | `your_aws_access_key` |
 | `AWS_SECRET_KEY` | AWS IAM secret key | `your_aws_secret_key` |
 | `AWS_REGION` | S3 bucket region | `eu-north-1` |
@@ -352,6 +352,28 @@ On the EC2 host, create a production env file and fill every placeholder with re
 cp .env.production.example .env.production
 ```
 
+Before starting or redeploying production, verify the required frontend origin values:
+
+```bash
+bash scripts/validate-production-env.sh .env.production
+```
+
+To repair those values automatically on the EC2 host, run:
+
+```bash
+bash scripts/repair-production-backend-env.sh .env.production
+bash scripts/validate-production-env.sh .env.production
+```
+
+For the current production Netlify site, `.env.production` must include:
+
+```env
+SPRING_PROFILES_ACTIVE=prod
+APP_FRONTEND_BASE_URL=https://planora-pma.netlify.app
+CORS_ALLOWED_ORIGINS=https://planora-pma.netlify.app
+WEBSOCKET_ALLOWED_ORIGINS=https://planora-pma.netlify.app
+```
+
 Start the backend and private Redis container:
 
 ```bash
@@ -371,6 +393,20 @@ Check container health:
 docker compose -f docker-compose.ec2.yml --env-file .env.production ps
 curl -fsS http://127.0.0.1:8080/actuator/health
 curl -fsS http://127.0.0.1:8080/actuator/health/readiness
+```
+
+If Netlify returns `502` for `/api/*` after a backend deploy, inspect backend startup logs first:
+
+```bash
+docker compose -f docker-compose.ec2.yml --env-file .env.production logs --tail=200 backend
+```
+
+If the logs mention `APP_FRONTEND_BASE_URL` or `FrontendBaseUrlStartupValidator`, fix `.env.production`, rerun `bash scripts/validate-production-env.sh .env.production`, and restart only the backend/Redis services:
+
+```bash
+bash scripts/repair-production-backend-env.sh .env.production
+bash scripts/validate-production-env.sh .env.production
+docker compose -f docker-compose.ec2.yml --env-file .env.production up -d --no-build backend redis
 ```
 
 The EC2 compose file binds the backend to `127.0.0.1:${BACKEND_PORT:-8080}:8080` and does not publish Redis. Put Nginx or Caddy on the EC2 host in front of the container and proxy HTTPS traffic to `127.0.0.1:8080`.
