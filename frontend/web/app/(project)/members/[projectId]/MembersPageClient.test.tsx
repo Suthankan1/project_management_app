@@ -124,7 +124,7 @@ const setupGetMocks = ({
   members?: Member[];
   pending?: Array<{ id: number; email: string; invitedAt: string; status: string; role: string }>;
   users?: typeof usersFixture;
-  project?: { id: number; ownerId?: number; ownerName?: string; name?: string };
+  project?: Record<string, unknown>;
 }) => {
   mockedAxios.get.mockImplementation((url: string) => {
     if (url === '/api/projects/7') {
@@ -261,6 +261,46 @@ describe('MembersPageClient', () => {
     expect(screen.getByText('Owner')).toBeInTheDocument();
     expect(
       screen.getAllByRole('combobox').some((element) => (element as HTMLSelectElement).value === 'ADMIN'),
+    ).toBe(false);
+  });
+
+  it('resolves owner role from createdByUserId when ownerId is absent', async () => {
+    setupGetMocks({
+      members: [
+        {
+          ...membersFixture[0],
+          role: 'ADMIN',
+          user: { ...membersFixture[0].user, userId: 201 },
+        },
+        membersFixture[1],
+      ],
+      project: { id: 7, createdByUserId: 201, createdByUsername: 'alice', name: 'Project Alpha' },
+    });
+
+    render(<MembersPageClient projectId="7" />);
+
+    await screen.findByText('Alice Admin');
+
+    expect(screen.getByText('Owner')).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('combobox').some((element) => (element as HTMLSelectElement).value === 'OWNER'),
+    ).toBe(false);
+  });
+
+  it('renders owner rows as fixed badges even when the current owner email is unavailable', async () => {
+    mockedGetUserFromToken.mockReturnValue({ userId: 201 });
+    setupGetMocks({
+      members: ownerMembersFixture,
+      project: { id: 7, ownerId: 201, ownerName: 'Alice Admin', name: 'Project Alpha' },
+    });
+
+    render(<MembersPageClient projectId="7" />);
+
+    await screen.findByText('Alice Admin');
+
+    expect(screen.getByText('Owner')).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('combobox').some((element) => (element as HTMLSelectElement).value === 'OWNER'),
     ).toBe(false);
   });
 

@@ -61,6 +61,37 @@ export function applyProjectOwnerRole(members: Member[], projectOwnerId?: number
   return changed ? normalizedMembers : members;
 }
 
+export function resolveProjectOwnerId(project: unknown): number | null {
+  if (!project || typeof project !== 'object') return null;
+
+  const record = project as Record<string, unknown>;
+  const candidateKeys = ['ownerId', 'createdByUserId', 'createdById'];
+
+  for (const key of candidateKeys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+
+  const owner = record.owner;
+  if (owner && typeof owner === 'object') {
+    const ownerRecord = owner as Record<string, unknown>;
+    for (const key of ['userId', 'id']) {
+      const value = ownerRecord[key];
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+    }
+  }
+
+  return null;
+}
+
 export function canManageMember(
   currentUserRole: string | null,
   currentUserEmail: string | null,
@@ -72,6 +103,7 @@ export function canManageMember(
   const targetRole = String(targetMember.role).toUpperCase().trim();
 
   if (targetMember.status === 'Pending') return false;
+  if (targetRole === 'OWNER') return false;
   if (currentUserEmail && targetMember.user.email?.toLowerCase() === currentUserEmail) return false;
   if (currentRole === 'OWNER') return true;
   if (currentRole === 'ADMIN') return targetRole === 'MEMBER' || targetRole === 'VIEWER';

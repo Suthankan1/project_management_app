@@ -114,24 +114,34 @@ function RoleControl({
   onRoleChange,
   compact = false,
 }: RoleControlProps) {
+  const role = String(member.role || '').toUpperCase();
+
+  if (role === 'OWNER') {
+    return (
+      <span className={`px-2 py-1 ${compact ? 'h-8 text-xs' : 'h-9 text-sm'} rounded font-semibold inline-flex items-center gap-1.5 w-max leading-none ${ROLE_COLORS.OWNER}`}>
+        {ICONS.owner}
+        {ROLE_LABELS.OWNER}
+      </span>
+    );
+  }
+
   if (canChangeRole(member) && member.user.userId) {
     return (
       <div className="relative inline-flex items-center w-full sm:w-auto">
         <select
-          value={member.role}
+          value={role}
           onChange={(event) => onRoleChange(member.user.userId, event.target.value)}
           disabled={changingRoleId === member.user.userId}
-          className={`appearance-none outline-none cursor-pointer pl-8 pr-8 h-11 rounded-md text-sm font-semibold leading-none w-full sm:w-auto ${ROLE_COLORS[member.role] || 'bg-gray-100 text-cu-text-secondary'}`}
+          className={`appearance-none outline-none cursor-pointer pl-8 pr-8 h-11 rounded-md text-sm font-semibold leading-none w-full sm:w-auto ${ROLE_COLORS[role] || 'bg-gray-100 text-cu-text-secondary'}`}
         >
           {getAvailableOptions().map((opt) => (
             <option key={opt} value={opt}>{ROLE_LABELS[opt] || opt}</option>
           ))}
         </select>
         <div className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none flex items-center justify-center w-3.5 h-3.5">
-          {member.role === 'OWNER' && ICONS.owner}
-          {member.role === 'ADMIN' && ICONS.adminRole}
-          {member.role === 'MEMBER' && ICONS.member}
-          {member.role === 'VIEWER' && ICONS.viewer}
+          {role === 'ADMIN' && ICONS.adminRole}
+          {role === 'MEMBER' && ICONS.member}
+          {role === 'VIEWER' && ICONS.viewer}
         </div>
         <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-60">
           {changingRoleId === member.user.userId ? (
@@ -145,12 +155,11 @@ function RoleControl({
   }
 
   return (
-    <span className={`px-2 py-1 ${compact ? 'h-8 text-xs' : 'h-9 text-sm'} rounded font-semibold inline-flex items-center gap-1.5 w-max leading-none ${ROLE_COLORS[member.role] || 'bg-gray-100 text-cu-text-secondary'}`}>
-      {member.role === 'OWNER' && ICONS.owner}
-      {member.role === 'ADMIN' && ICONS.adminRole}
-      {member.role === 'MEMBER' && ICONS.member}
-      {member.role === 'VIEWER' && ICONS.viewer}
-      {ROLE_LABELS[member.role] || member.role}
+    <span className={`px-2 py-1 ${compact ? 'h-8 text-xs' : 'h-9 text-sm'} rounded font-semibold inline-flex items-center gap-1.5 w-max leading-none ${ROLE_COLORS[role] || 'bg-gray-100 text-cu-text-secondary'}`}>
+      {role === 'ADMIN' && ICONS.adminRole}
+      {role === 'MEMBER' && ICONS.member}
+      {role === 'VIEWER' && ICONS.viewer}
+      {ROLE_LABELS[role] || member.role}
     </span>
   );
 }

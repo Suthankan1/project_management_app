@@ -10,6 +10,7 @@ import {
   applyProjectOwnerRole,
   buildCombinedMembers,
   canManageMember,
+  resolveProjectOwnerId,
   resolveProfilePicUrl as resolveProfilePicUrlValue,
   timeAgo,
 } from "./utils";
@@ -108,7 +109,7 @@ export function useMembersData(projectId: string) {
         let nextProjectOwnerId = cachedProjectOwnerId;
 
         if (projectRes.status === "fulfilled") {
-          nextProjectOwnerId = typeof projectRes.value.ownerId === "number" ? projectRes.value.ownerId : null;
+          nextProjectOwnerId = resolveProjectOwnerId(projectRes.value);
           setProjectOwnerId(nextProjectOwnerId);
         } else {
           console.error("Failed to fetch project details:", projectRes.reason);
