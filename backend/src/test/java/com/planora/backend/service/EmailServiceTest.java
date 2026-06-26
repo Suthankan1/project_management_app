@@ -40,6 +40,29 @@ class EmailServiceTest {
     }
 
     @Test
+    void sendProjectInvitationHtmlEmailUsesPlanoraProductionFrontendBaseUrl() throws Exception {
+        JavaMailSenderImpl mailSender = mock(JavaMailSenderImpl.class);
+        MimeMessage message = new MimeMessage(Session.getInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(message);
+
+        EmailService emailService = new EmailService(mailSender, "https://planora-pma.netlify.app");
+
+        emailService.sendProjectInvitationHtmlEmail(
+                "invitee@example.com",
+                "Inviter Name",
+                "Apollo",
+                "prod-token");
+
+        ArgumentCaptor<MimeMessage> messageCaptor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(mailSender).send(messageCaptor.capture());
+
+        String html = htmlContent(messageCaptor.getValue());
+        assertTrue(html.contains("https://planora-pma.netlify.app/accept-invite?token=prod-token"));
+        assertTrue(html.contains("https://planora-pma.netlify.app/privacy"));
+        assertTrue(html.contains("https://planora-pma.netlify.app/contact"));
+    }
+
+    @Test
     void sendProjectInvitationHtmlEmailFallsBackToLocalhostWhenBaseUrlIsBlank() throws Exception {
         JavaMailSenderImpl mailSender = mock(JavaMailSenderImpl.class);
         MimeMessage message = new MimeMessage(Session.getInstance(new Properties()));

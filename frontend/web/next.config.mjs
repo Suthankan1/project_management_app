@@ -7,11 +7,28 @@ const isProduction = process.env.NODE_ENV === 'production';
 const localBackendOrigin = 'http://localhost:8080';
 const localWebSocketOrigin = 'ws://localhost:8080';
 const awsRegion = process.env.AWS_REGION || 'eu-north-1';
+const productionS3Buckets = [
+  process.env.AWS_S3_PROFILE_BUCKET,
+  process.env.AWS_S3_DMS_BUCKET,
+  process.env.AWS_S3_CHAT_BUCKET,
+  process.env.AWS_S3_TASK_BUCKET,
+  'planora-prod-profile-photos-657347292859-eu-north-1-an',
+  'planora-prod-dms-documents',
+  'planora-prod-chat-attachments-657347292859-eu-north-1-an',
+  'planora-prod-task-attachments-657347292859-eu-north-1-an',
+].filter(Boolean);
 const awsS3Sources = [
+  'https://s3.amazonaws.com',
+  `https://s3.${awsRegion}.amazonaws.com`,
   'https://*.amazonaws.com',
   'https://*.s3.amazonaws.com',
   `https://*.s3.${awsRegion}.amazonaws.com`,
   `https://*.s3-${awsRegion}.amazonaws.com`,
+  ...productionS3Buckets.flatMap((bucket) => [
+    `https://${bucket}.s3.amazonaws.com`,
+    `https://${bucket}.s3.${awsRegion}.amazonaws.com`,
+    `https://${bucket}.s3-${awsRegion}.amazonaws.com`,
+  ]),
 ];
 const githubAvatarImageSource = 'https://avatars.githubusercontent.com';
 
