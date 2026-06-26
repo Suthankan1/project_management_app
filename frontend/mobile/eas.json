@@ -8,9 +8,19 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://13-61-189-159.sslip.io"
+      }
     },
-    "production": {}
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://13-61-189-159.sslip.io"
+      }
+    }
   },
   "submit": {
     "production": {}
