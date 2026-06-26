@@ -13,7 +13,8 @@ jest.mock('emoji-picker-react', () => ({
   default: ({ onEmojiClick }: { onEmojiClick: (emojiData: { emoji: string }) => void }) => (
     <button onClick={() => onEmojiClick({ emoji: '😀' })}>Pick emoji</button>
   ),
-  Theme: { LIGHT: 'light' },
+  EmojiStyle: { NATIVE: 'native' },
+  Theme: { DARK: 'dark', LIGHT: 'light' },
 }));
 
 jest.mock('./uploadChatDocument', () => ({
@@ -86,6 +87,22 @@ describe('ChatInput', () => {
     fireEvent.click(sendButton);
 
     expect(onSendMessage).not.toHaveBeenCalled();
+  });
+
+  it('closes the emoji picker when clicking outside it', async () => {
+    const onSendMessage = jest.fn();
+
+    render(<ChatInput onSendMessage={onSendMessage} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle emoji picker' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Pick emoji')).toBeInTheDocument();
+    });
+
+    fireEvent.mouseDown(document.body);
+
+    expect(screen.queryByText('Pick emoji')).not.toBeInTheDocument();
   });
 
   it('uploads file and sends uploaded URL when upload succeeds', async () => {
