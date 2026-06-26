@@ -89,6 +89,22 @@ describe('ChatInput', () => {
     expect(onSendMessage).not.toHaveBeenCalled();
   });
 
+  it('closes the emoji picker when clicking outside it', async () => {
+    const onSendMessage = jest.fn();
+
+    render(<ChatInput onSendMessage={onSendMessage} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle emoji picker' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Pick emoji')).toBeInTheDocument();
+    });
+
+    fireEvent.mouseDown(document.body);
+
+    expect(screen.queryByText('Pick emoji')).not.toBeInTheDocument();
+  });
+
   it('uploads file and sends uploaded URL when upload succeeds', async () => {
     const onSendMessage = jest.fn();
     mockedUploadChatDocument.mockResolvedValueOnce('https://files.example.com/report.pdf');
