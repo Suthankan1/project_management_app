@@ -104,6 +104,7 @@ export function GlobalNotificationProvider({ children }: { children: React.React
   const seenNotificationIdsRef = useRef<Set<number>>(new Set());
   const notificationsCacheKeyRef = useRef<string | null>(null);
   const stompClientRef = useRef<Client | null>(null);
+  const intentionallyClosingClientRef = useRef<Client | null>(null);
   const activeTokenRef = useRef<string | null>(null);
   const isConnectingRef = useRef(false);
   const reconnectTimerRef = useRef<number | null>(null);
@@ -172,8 +173,10 @@ export function GlobalNotificationProvider({ children }: { children: React.React
     setRealtimeConnected(false);
     setRealtimeReconnecting(false);
 
-    if (stompClientRef.current) {
-      stompClientRef.current.deactivate();
+    const client = stompClientRef.current;
+    if (client) {
+      intentionallyClosingClientRef.current = client;
+      client.deactivate();
       stompClientRef.current = null;
     }
 
@@ -197,6 +200,7 @@ export function GlobalNotificationProvider({ children }: { children: React.React
     clearReconnectTimer();
     isConnectingRef.current = true;
     activeTokenRef.current = token;
+    intentionallyClosingClientRef.current = null;
 
     let wsUrl: string;
     try {
@@ -274,6 +278,11 @@ export function GlobalNotificationProvider({ children }: { children: React.React
         handleConnectionLost(client, token);
       },
       onWebSocketClose: (event) => {
+        if (intentionallyClosingClientRef.current === client) {
+          intentionallyClosingClientRef.current = null;
+          return;
+        }
+
         console.warn('[realtime-ws] WebSocket closed:', {
           code: event.code,
           reason: event.reason,
