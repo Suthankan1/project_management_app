@@ -119,12 +119,17 @@ const setupGetMocks = ({
   members = membersFixture,
   pending = pendingFixture,
   users = usersFixture,
+  project = { id: 7, ownerId: 999, ownerName: 'Project Owner', name: 'Project Alpha' },
 }: {
   members?: Member[];
   pending?: Array<{ id: number; email: string; invitedAt: string; status: string; role: string }>;
   users?: typeof usersFixture;
+  project?: { id: number; ownerId?: number; ownerName?: string; name?: string };
 }) => {
   mockedAxios.get.mockImplementation((url: string) => {
+    if (url === '/api/projects/7') {
+      return Promise.resolve({ data: project });
+    }
     if (url === '/api/projects/7/members') {
       return Promise.resolve({ data: members });
     }
@@ -236,6 +241,29 @@ describe('MembersPageClient', () => {
     expect(within(roleSelect as HTMLElement).getByRole('option', { name: 'Viewer' })).toBeInTheDocument();
   });
 
+  it('shows the project creator as owner even when the members endpoint returns another role', async () => {
+    setupGetMocks({
+      members: [
+        {
+          ...membersFixture[0],
+          role: 'ADMIN',
+          user: { ...membersFixture[0].user, userId: 201 },
+        },
+        membersFixture[1],
+      ],
+      project: { id: 7, ownerId: 201, ownerName: 'Alice Admin', name: 'Project Alpha' },
+    });
+
+    render(<MembersPageClient projectId="7" />);
+
+    await screen.findByText('Alice Admin');
+
+    expect(screen.getByText('Owner')).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('combobox').some((element) => (element as HTMLSelectElement).value === 'ADMIN'),
+    ).toBe(false);
+  });
+
   it('removes a member after confirmation modal acceptance', async () => {
     render(<MembersPageClient projectId="7" />);
 
@@ -243,11 +271,11 @@ describe('MembersPageClient', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
 
-    const removeHeading = screen.getByText('Remove Member');
+    const removeHeading = screen.getByRole('heading', { name: 'Remove Member' });
     expect(removeHeading).toBeInTheDocument();
     const removeModal = removeHeading.closest('div');
     expect(removeModal).toBeTruthy();
-    fireEvent.click(within(removeModal as HTMLElement).getByRole('button', { name: /^Remove$/ }));
+    fireEvent.click(within(removeModal as HTMLElement).getByRole('button', { name: /Remove Member/i }));
 
     await waitFor(() => {
       expect(mockedAxios.delete).toHaveBeenCalledWith('/api/projects/7/members/202');

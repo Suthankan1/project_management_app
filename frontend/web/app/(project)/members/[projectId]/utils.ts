@@ -45,6 +45,22 @@ export function buildCombinedMembers(members: Member[], pending: PendingInvite[]
   ];
 }
 
+export function applyProjectOwnerRole(members: Member[], projectOwnerId?: number | null): Member[] {
+  if (typeof projectOwnerId !== 'number') return members;
+
+  let changed = false;
+  const normalizedMembers = members.map((member) => {
+    if (member.user.userId !== projectOwnerId || member.role === 'OWNER') {
+      return member;
+    }
+
+    changed = true;
+    return { ...member, role: 'OWNER' };
+  });
+
+  return changed ? normalizedMembers : members;
+}
+
 export function canManageMember(
   currentUserRole: string | null,
   currentUserEmail: string | null,
