@@ -296,9 +296,10 @@ export function MembersTable({
                     {canRemoveMember(member) && (
                       <button
                         onClick={() => onRequestRemove(member)}
-                        className="p-1 px-3 max-md:min-h-[44px] rounded text-cu-danger hover:bg-cu-danger/10 font-medium text-sm transition-colors border border-transparent hover:border-cu-danger/20"
+                        className="inline-flex items-center gap-2 min-h-[36px] px-3 rounded-lg border border-cu-danger/20 bg-cu-danger/10 text-sm font-semibold text-cu-danger hover:bg-cu-danger/15 transition-colors"
                         title="Remove Member"
                       >
+                        <Trash2 size={15} aria-hidden="true" />
                         Remove
                       </button>
                     )}
