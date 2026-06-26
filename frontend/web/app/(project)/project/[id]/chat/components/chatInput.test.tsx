@@ -13,7 +13,8 @@ jest.mock('emoji-picker-react', () => ({
   default: ({ onEmojiClick }: { onEmojiClick: (emojiData: { emoji: string }) => void }) => (
     <button onClick={() => onEmojiClick({ emoji: '😀' })}>Pick emoji</button>
   ),
-  Theme: { LIGHT: 'light' },
+  EmojiStyle: { NATIVE: 'native' },
+  Theme: { DARK: 'dark', LIGHT: 'light' },
 }));
 
 jest.mock('./uploadChatDocument', () => ({
