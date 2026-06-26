@@ -177,7 +177,7 @@ export const ChatMessages = ({
     ...currentUserAliases.map((a) => a.toLowerCase()),
   ]);
 
-  const visibleMessages = messages.filter((msg) => msg.type !== 'JOIN');
+  const visibleMessages = messages.filter((msg) => msg.type !== 'JOIN' && !msg.parentMessageId);
 
   const rowVirtualizer = useVirtualizer({
     count: visibleMessages.length,
@@ -372,11 +372,17 @@ export const ChatMessages = ({
                         setActiveMessageId(msg.id);
                       }
                     }}
-                    className="relative cursor-pointer"
+                    className="group/message relative cursor-pointer"
                   >
                     {/* Hover action bar */}
-                    {!!msg.id && isActiveMessage && (
-                      <div className={`absolute bottom-full mb-1 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-1 bg-cu-bg border border-cu-border shadow-cu-lg rounded-xl px-2 py-2`}>
+                    {!!msg.id && !msg.deleted && (
+                      <div
+                        className={`absolute bottom-full mb-1 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-1 rounded-xl border border-cu-border bg-cu-bg px-2 py-2 shadow-cu-lg transition-opacity ${
+                          isActiveMessage
+                            ? 'opacity-100'
+                            : 'pointer-events-none opacity-0 group-hover/message:pointer-events-auto group-hover/message:opacity-100 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100'
+                        }`}
+                      >
                         {/* Quick reactions */}
                         {QUICK_REACTIONS.map((emoji) => (
                           <button
@@ -484,7 +490,7 @@ export const ChatMessages = ({
                   </div>
 
                   {/* Reactions row */}
-                  {!!msg.id && isActiveMessage && !msg.deleted && msgReactions.length > 0 && (
+                  {!!msg.id && !msg.deleted && msgReactions.length > 0 && (
                     <div
                       onClick={(event) => event.stopPropagation()}
                       className="flex flex-wrap gap-1 mt-1.5"
