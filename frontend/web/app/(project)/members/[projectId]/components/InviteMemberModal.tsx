@@ -1,4 +1,6 @@
 import type { FormEvent } from 'react';
+import { Send, X } from 'lucide-react';
+import Button from '@/components/shared/Button';
 
 interface InviteMemberModalProps {
   isOpen: boolean;
@@ -33,10 +35,10 @@ export function InviteMemberModal({
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50 p-4 sm:p-0">
       <div className="bg-cu-bg rounded-lg shadow-lg p-4 sm:p-8 w-full max-w-sm sm:max-w-md max-h-[90vh] overflow-y-auto relative">
         <button
-          className="absolute top-2 right-2 text-cu-text-muted hover:text-cu-text-primary"
           onClick={onClose}
+          className="absolute top-3 right-3 p-1 rounded hover:bg-cu-hover text-cu-text-muted"
         >
-          &times;
+          <X size={18} />
         </button>
         <h2 className="text-xl font-bold mb-4">Invite Team Member</h2>
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -70,21 +72,26 @@ export function InviteMemberModal({
           {inviteError && <div className="text-cu-danger text-sm">{inviteError}</div>}
           {inviteSuccess && <div className="text-emerald-500 text-sm">{inviteSuccess}</div>}
           <div className="flex flex-col sm:flex-row gap-2 mt-4">
-            <button
+            <Button
               type="button"
-              className="flex-1 py-2.5 min-h-[44px] rounded border border-cu-border bg-cu-bg-secondary hover:bg-cu-hover"
+              variant="secondary"
+              size="lg"
+              className="flex-1"
               onClick={onClose}
               disabled={inviteLoading}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="flex-1 py-2.5 min-h-[44px] rounded bg-cu-primary text-white hover:bg-cu-primary-dark flex items-center justify-center"
-              disabled={inviteLoading}
+              variant="primary"
+              size="lg"
+              className="flex-1"
+              isLoading={inviteLoading}
+              leftIcon={<Send size={16} />}
             >
-              {inviteLoading ? 'Sending...' : (<><span className="mr-2">✉️</span>Send Invite</>)}
-            </button>
+              Send Invite
+            </Button>
           </div>
         </form>
       </div>
