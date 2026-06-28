@@ -1,4 +1,5 @@
 import { Search, SlidersHorizontal } from 'lucide-react';
+import Button from '@/components/shared/Button';
 
 interface MembersFiltersProps {
   search: string;
@@ -34,13 +35,14 @@ export function MembersFilters({
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
-        <button
-          className="border border-cu-border rounded-lg px-4 py-2.5 min-h-[44px] flex items-center justify-center gap-2 text-sm font-semibold bg-cu-bg text-cu-text-secondary shadow-sm hover:bg-cu-hover"
+        <Button
+          variant="secondary"
+          size="lg"
+          rightIcon={<SlidersHorizontal size={16} />}
           onClick={onToggleFilters}
         >
-          <span>Filters</span>
-          <SlidersHorizontal size={16} aria-hidden="true" />
-        </button>
+          Filters
+        </Button>
       </div>
 
       {showFilters && (
